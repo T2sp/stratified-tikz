@@ -759,6 +759,12 @@ preview and detached exports. The selection ring retains its separate
 non-scaling overlay. Font sizing, body conversion/cache keys, camera projection
 and immutable pending capture are unchanged.
 
+Polygon stroke bounds and exterior picking share a local union of edge strips
+and turn-selected joins (miter limit 10), including concave corners and thick
+overlaps. Picking measures its six-unit allowance from that region; it preserves
+the original contour's interior selection. Pending and committed empty bodies
+use the same layout contract. No stroke geometry enters the adapter/cache key.
+
 The accepted 32B `yeWQVG` parent passed all five checks, 16 groups and 16 point
 scenarios with no page errors. Independent review then rejected namespace
 lookup and responsive border geometry, with zero Critical and two Medium

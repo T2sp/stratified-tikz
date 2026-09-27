@@ -306,8 +306,36 @@ function observeInlineSelectionClicks() {
   }
 }
 
+/** Empty bodies have identical pending and committed geometry. Record candidate
+ * collection before each real pointer event without changing production state. */
+function observeEmptyPointSelectionClicks() {
+  const svg = container.querySelector<SVGSVGElement>('svg.svg-diagram')!
+  const events: { trusted: boolean; alt: boolean; client: { x: number; y: number }; point: { x: number; y: number };
+    beforeSelection: SelectedElement; candidates: string[]; overlayExcluded: boolean }[] = []
+  const capture = (event: MouseEvent) => {
+    if (!(event.target instanceof Element) || !svg.contains(event.target)) return
+    const diagram = editor.editableDiagram
+    if (diagram.ambientDimension !== 2 || diagram.labels.length !== 0
+      || diagram.strata.some((point) => point.geometricKind !== 'point' || (point.text ?? '') !== '')) {
+      throw new Error('Empty point click diagnostics require a point-only empty-label 2D fixture')
+    }
+    if (events.length >= 16) throw new Error('Empty point click diagnostic budget exceeded')
+    const camera = resolveSvgCamera(diagram, 900, 700, { ...props, viewAdjustment: props.cameraViewAdjustment })
+    const client = { x: event.clientX, y: event.clientY }
+    const point = mapClientPointToViewBox(client, svg.getBoundingClientRect(), { width: 900, height: 700 })
+    const candidates = collectSvgPreviewSelectionCandidates({ diagram, camera, viewportHeight: 700, point,
+      layerFilter: editor.layerFilter, visibility: createSvgSelectionCandidateVisibility({
+        visibilityOptions: resolveVisibilityOptions(diagram, props.visibilityOptions) }) })
+    events.push({ trusted: event.isTrusted, alt: event.altKey, client, point,
+      beforeSelection: editor.selectedElement, candidates: candidates.map((candidate) => candidate.id),
+      overlayExcluded: event.target.closest('[data-svg-export-exclude],.svg-geometry-handle') === null })
+  }
+  document.addEventListener('click', capture, true)
+  return { read: () => structuredClone(events), dispose: () => document.removeEventListener('click', capture, true) }
+}
+
 const api = {
-  mount, mutateLabel, mutateInlineNode, state, observeInlineSelectionClicks,
+  mount, mutateLabel, mutateInlineNode, state, observeInlineSelectionClicks, observeEmptyPointSelectionClicks,
   mutatePoint(id: string, change: Partial<PointStratum>) {
     const diagram = { ...editor.editableDiagram, strata: editor.editableDiagram.strata.map((point) =>
       point.id === id && point.geometricKind === 'point'

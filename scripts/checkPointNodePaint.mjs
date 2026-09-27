@@ -15,6 +15,7 @@ import { resolvePointInspectorField, selectPointInspectorField, inspectPointInsp
   checkPointInspectorFieldBoundary, POINT_PAINT_SELECT_OPTIONS } from './pointInspectorFields.mjs'
 import { runResponsivePointPaintChecks } from './checkPointResponsivePaint.mjs'
 import { runPointImportedPaintChecks } from './checkPointImportedPaint.mjs'
+import { runPointPolygonJoinChecks } from './checkPointPolygonJoins.mjs'
 
 const group = 'point-node-paint-import-persistence'
 const mixed = { text: { color: '#ff0000', opacity: .6 }, fill: { enabled: true, color: '#0000ff', opacity: .35 },
@@ -465,6 +466,8 @@ alias outer node/.style={/tikz/alias node}}`, 'alias outer node', '#00ff00'],
       finally { await cleanupPointCheck(standaloneFailure, () => standalone.close()) }
     }
     await runResponsivePointPaintChecks({ browser, page, artifactDir, state, load, settle, eventAction,
+      begin: (name) => { scenario = name }, saved, diagnose: observeCase })
+    await runPointPolygonJoinChecks({ page: rendererPage, artifactDir,
       begin: (name) => { scenario = name }, saved, diagnose: observeCase })
     assert.deepEqual(errors, []); await completeGroup(group)
   } catch (error) {

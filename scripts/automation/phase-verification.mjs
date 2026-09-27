@@ -17,6 +17,8 @@ import { homedir, tmpdir } from "node:os";
 import { join, resolve } from "node:path";
 import { observePostExternalPointPaint, assertPostExternalPointPaint, observeLiteralPointPaint, assertPointPaint, assertExplicitPointPaint } from "../pointPaintOracle.mjs";
 
+import { polygonJoinScenario, polygonJoinArtifacts, assertPolygonJoinEvidence } from "../pointPolygonJoinContract.mjs";
+
 const freeLabelGroups = [
   "existing-renderer-regressions",
   "independent-oracle-negative-controls",
@@ -61,10 +63,11 @@ export const pointNodeScenarios = {
     "point-paint-local-override-intent", "point-paint-cross-file-resolution",
     "point-paint-unsupported-color-bindings",
     "point-paint-unsupported-mutations", "point-paint-clear-imported-style",
-    "point-paint-mutation-directory-uncertainty", "point-paint-app-continuity",
+    "point-paint-mutation-directory-uncertainty", "point-paint-app-continuity", polygonJoinScenario,
   ],
 };
 export function pointNodeScenarioArtifacts(name) {
+  if (name === polygonJoinScenario) return polygonJoinArtifacts();
   if (name === "point-paint-app-continuity") {
     return [`${name}.json`, "point-paint-app-lifecycle.json", "point-paint-app-transitions.json", "point-paint-app-controls.json",
       ...["missing-api", "wrong-api", "same-url-reload"].flatMap((fault) =>
@@ -211,6 +214,10 @@ function evidenceObject(artifactDir, name) {
 }
 
 function validateTargetedPaintEvidence(artifactDir, name, group) {
+  if (name === polygonJoinScenario) {
+    assertPolygonJoinEvidence(evidenceObject(artifactDir, `${name}.json`));
+    return;
+  }
   if (name === "point-paint-app-continuity") {
     validateAppContinuityEvidence(artifactDir, name, group);
     return;
@@ -689,7 +696,10 @@ function validateBrowserEvidence(name, artifactDir, phase, checkout) {
             if (!value || typeof value !== "object") throw new Error(`Invalid point-node JSON: ${artifact}`);
           } else if (artifact.endsWith(".svg")) {
             const svg = bytes.toString();
-            if (!hasWholePointSvg(svg)) {
+            if (artifact.startsWith(`${polygonJoinScenario}-`) && artifact.endsWith(".input.svg")) {
+              if (!/^<svg\s[^>]*><polygon\s[^>]*><\/polygon><\/svg>$/u.test(svg)
+                || /(?:href|onload|script|data-)=/u.test(svg)) throw new Error(`Invalid polygon stroke SVG input: ${artifact}`);
+            } else if (!hasWholePointSvg(svg)) {
               throw new Error(`Invalid whole-point SVG artifact: ${artifact}`);
             }
           } else if (artifact.endsWith(".png") && (bytes.length < 24

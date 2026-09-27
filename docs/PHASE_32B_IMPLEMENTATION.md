@@ -1,7 +1,14 @@
 # Phase 32B: Independent point paint and imported styles
 
 Status: 32B remains incomplete until matching final verification and independent
-review succeed. The supplied `XSgoUN` parent report passed all five commands,
+review succeed. The `AsZusl` parent passed all five commands, 16 cumulative
+groups, 27 required point scenarios and 281 required artifacts on fingerprint
+`51f57223704b6de91222612111c519751e790483750c9be1f9baea25e04e0c01`.
+Independent review accepted the imported-paint corrections and found one Medium
+polygon stroke bounds/picking defect. The final section documents the targeted
+join correction and its verification handoff. 32C/32D remain deferred.
+
+The following status records are historical. The supplied `XSgoUN` parent report passed all five commands,
 16 cumulative groups, 27 point scenarios and 281 required artifacts on the
 pre-fix fingerprint `df0d1cb9183b85a216a665c849d882c95716e2e98d3c3fce7eee7edf894105b5`.
 Independent review accepted the runtime-key, execution/scope, handler-boundary
@@ -2586,3 +2593,96 @@ both native commands pending for the authorized parent, without relaxing any
 assertion or changing permissions. 32B remains incomplete until matching
 verification and independent review succeed; no commit or push is authorized
 while either gate fails. Any later checkout change requires fresh verification.
+
+## Targeted polygon stroke bounds and picking correction (2026-09-27)
+
+The accepted `AsZusl` parent and `/private/tmp/stz-32b-independent-review/`
+cover the pre-prompt identity above. The actual starting checkout is clean
+`b8455dfc828471c87d75abb4a3c44121186d7756` on the requested branch; that commit
+includes the prior implementation and updated fix prompt. All 68 previously
+untracked paint-value fixture/regression files match their accepted SHA256 bytes.
+The eight retained `/private/tmp/stz-review-{miter,bevel}.{mjs,json,svg,png}`
+artifacts were inspected and preserved; corrected probe runs use separate paths.
+No PGF reference was regenerated and no import/override-intent code changed.
+
+Both failures use an empty size-3 triangle, disabled fill and a solid 30pt
+border (36 local SVG units). At `(0,28)` the miter's actual bottom is
+`20.5455844123`, leaving `7.4544155877` units beyond paint. Synthetic inward
+miters incorrectly extended the old layout bottom to `30.9088311755`.
+At `(0,-24)` the bevel's actual top is `-15.4544155877`, leaving
+`8.5455844123` units beyond paint. The old half-width contour expansion admitted
+this probe despite the bevel. The opposite horizontal edge's inward strip sets
+that top at this width; measuring only the apex would give the wrong oracle.
+Both probes now produce no point candidate without changing the SVG paint.
+
+`src/geometry/polygonStroke.ts` represents the solid closed stroke as a union
+of edge rectangles and local joins. Turn direction selects the outside offset
+at each individual vertex, including reflex star corners and either winding.
+Bevels add the triangle between the corner and outside edge endpoints. Miters
+add their outside intersection only within SVG's miter ratio limit 10; longer
+miters fall back to the bevel. Round joins use disks, whose inner portions are
+already covered by the edge rectangles. Duplicate consecutive/closing vertices
+are removed before normal construction; straight/reversing bevels need no added
+area. Construction and distance queries use bounded linear work in the number
+of vertices, without polygon intersection/clipping or width caps.
+
+The same union supplies exact stroke extents and Euclidean exterior distance.
+Distances minimize over all pieces, so thick overlapping strips and concave
+joins need no special cases. A bounding box is never a final hit oracle. The
+existing six-unit allowance is measured from this region in local SVG units.
+Disabled strokes use the original contour; original contour interiors retain
+selection even for hollow/transparent nodes. Circle behavior, enabled zero
+alpha, visibility/layer/lock rules, candidate order, cycling and dashed-border
+interaction policy remain unchanged. Normal SVG scaling and `pt * 1.2` width
+conversion are retained; native probes transform screen coordinates back into
+the same local space.
+
+`svgPointNodeLayout` shares this region with pending and committed picking and
+uses its extrema/radius for painted bounds, anchor-clearance bounds and the
+selection circle. Body and path bounds remain separate and unchanged. The
+existing source/font/owner/style guards still reject stale committed layouts.
+Both preview and settled immutable capture reconstruct through this layout.
+The consumer audit found no current reader of `anchorClearanceBounds`; attached
+metadata placement remains unchanged, with configurable anchors deferred.
+SVG capture retains the root viewport rather than fitting to these bounds.
+Existing responsive capture framing already reserves genuine outward triangle
+miters and remains required; no viewport or export-framing rewrite was needed.
+
+The registered `svgPolygonStrokePicking.test.ts` adds 45 tests. The independent
+[SVG fixtures](../tests/fixtures/polygon-stroke-svg/README.md) retain 18 input/PNG
+pairs and raster observations from librsvg 2.63.0 / Cairo 1.18.4, with no imports
+from production geometry in their generator. Tests compare region distances,
+bounds and radius in both windings and with explicit closure, then exercise
+production candidates. They include thin/wide triangles, thin/wide concave stars,
+acute miter-limit fallback and duplicate/near-collinear edges. Raster uncertainty
+is 1/16 local unit for bounds and 2/16 for thresholded nearest-pixel distances;
+the exact triangle edge and 5.9/6.1 tolerance assertions remain analytic and
+strict. Supplied misses, actual outward miter tips, a genuine off-axis wide
+bevel edge, disabled borders, original interiors, round/circle controls and
+pending/committed layouts at display scales 0.5, 1 and 2 are retained.
+
+Mandatory native scenario `point-paint-polygon-joins` supplements the existing
+paint group with 12 cases: wide miter/bevel triangles, thick concave miter/bevel
+stars, a thin miter triangle and a round control, each at display scales 0.5 and
+1.5. Its independent browser SVG raster supplies distances and stroke extents;
+native screen transforms preserve the original local probes. Each probe clears
+selection, excludes handles/overlays, and records an ordinary click and three
+Alt clicks with an overlapping control candidate. The scenario retains SVG
+inputs, high-resolution rasters, local/screen coordinates, paint settings,
+measured distances, candidate/selection observations and per-probe screenshots.
+The cumulative policy requires 16 groups, 28 point scenarios and 386 artifacts
+(105 new), with negative controls for omitted probes, synthetic bounds, stale
+candidates, incorrect ordinary selections and incomplete cycling. Existing App
+continuity/geometry diagnostics, all responsive downloads, owned-process cleanup,
+failure retention and the runner's 60-second fixture deadline remain intact.
+
+Final command results, tracked/untracked/binary identity, retained-probe hashes,
+fixture preservation checks and review are recorded outside the checkout at
+`/private/tmp/stz-phase32b-joins-handoff/`. Documentation is finalized before
+`32B verify`; later report updates stay external. The accepted pre-fix native
+report is historical evidence only. If the child's local server/browser is
+restricted, its failed attempt is retained and current native acceptance stays
+pending for the authorized parent. No assertion, timeout or sandbox permission
+is relaxed. 32B is incomplete until all five commands and independent read-only
+review succeed on the same final identity; no commit or push while either gate
+is unsuccessful.

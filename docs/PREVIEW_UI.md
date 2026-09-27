@@ -1667,7 +1667,11 @@ Point contours scale normally with the SVG display transform: border width,
 dash lengths and phase use local units (`TeX pt * 1.2`) just like the body and
 bounds. At responsive scales 0.5 and 2, a 20pt border displays at 12 and 48 CSS
 pixels respectively, with local half-width 12. Picking retains its additional
-6 local units; miter joins retain their independent corner extension. The
+6 local units measured from the actual polygon stroke: edge strips plus the
+outside join at each local turn, including concave star corners. Miters keep
+their genuine tips within limit 10; bevels keep their straight corner edge.
+Overlapping wide strips contribute to both bounds and distance. Interior
+selection of hollow nodes is unchanged. Bounds are not a final hit oracle. The
 editor selection ring alone keeps its non-scaling outline.
 
 Both `\tikzstyle` and `\tikzset` imported presets resolve supported literal

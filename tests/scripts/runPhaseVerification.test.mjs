@@ -21,6 +21,8 @@ import {
   hasWholePointSvg,
 } from '../../scripts/automation/phase-verification.mjs'
 
+import { polygonJoinScenario, polygonJoinCases, polygonJoinScales, polygonJoinArtifacts, assertPolygonJoinEvidence } from '../../scripts/pointPolygonJoinContract.mjs'
+
 const freeLabelGroups = [
   'existing-renderer-regressions',
   'independent-oracle-negative-controls',
@@ -89,7 +91,7 @@ if (command.startsWith('run check:')) {
     if (process.env.STZ_TEST_POINT_ARTIFACTS === 'yes') {
       for (const entry of pointEvidence.evidence || []) for (const artifact of entry.artifacts) {
         const content = process.env.STZ_TEST_POINT_CORRUPT === 'yes' ? 'broken' : artifact.endsWith('.svg')
-          ? '<svg><g><circle r="20"/><g><title>fixture</title><g><g><text x="0" y="0">fixture</text></g></g></g></g></svg>'
+          ? artifact.endsWith('.input.svg') ? '<svg xmlns="http://www.w3.org/2000/svg"><polygon points="0,0 1,0 0,1" fill="none" stroke="black"></polygon></svg>' : '<svg><g><circle r="20"/><g><title>fixture</title><g><g><text x="0" y="0">fixture</text></g></g></g></g></svg>'
           : artifact.endsWith('.png') ? Buffer.from([137,80,78,71,13,10,26,10,0,0,0,0,0,0,0,0,0,0,0,1,0,0,0,1]) : JSON.stringify(artifactValues[artifact] || {})
         fs.writeFileSync(path.join(artifacts, artifact), content)
       }
@@ -462,11 +464,11 @@ const targetedPaintScenarios = [
   'point-paint-responsive-circle',
   'point-paint-responsive-triangle',
   'point-paint-responsive-downloads',
-  ...importRegressionScenarios, ...correctionScenarios, ...continuityScenarios,
+  ...importRegressionScenarios, ...correctionScenarios, ...continuityScenarios, polygonJoinScenario,
 ]
 test('32B preserves its original groups and scenarios and requires namespace and responsive paint evidence', () => {
   assert.equal(pointGroups.length, 16)
-  assert.equal(Object.values(pointNodeScenarios).flat().length, 27)
+  assert.equal(Object.values(pointNodeScenarios).flat().length, 28)
   assert.deepEqual(pointNodeScenarios['point-node-paint-import-persistence'], [
     'point-paint-native-inspector-history', 'point-paint-imported-presets-persistence',
     'point-paint-lifecycle-dimming', 'point-paint-pending-transparent-edit',
@@ -698,6 +700,32 @@ function appContinuityEvidence() {
   files['point-paint-app-controls.json'] = { schema: 1, controls }
   return { evidence, files }
 }
+function polygonJoinEvidence() {
+  return { scenario: polygonJoinScenario, group: 'point-node-paint-import-persistence', result: 'passed',
+    cases: polygonJoinCases.flatMap((specification) => polygonJoinScales.map((scale) => ({
+      key: specification.key, scale, specification, modelUnchanged: true,
+      observation: { source: '', bodyStatus: 'ready', vertices: Array.from({ length: specification.shape === 'star' ? 10 : 3 }, (_, index) => {
+          const angle = -Math.PI / 2 - index * Math.PI / (specification.shape === 'star' ? 5 : 1.5)
+          const radius = specification.size * 1.2 / 2 * Math.SQRT2 * (specification.shape === 'star' ? index % 2 === 0 ? 1.5 : 1 : 2)
+          return { x: Math.cos(angle) * radius, y: Math.sin(angle) * radius }
+        }),
+        strokeWidth: specification.widthPt * 1.2, fill: 'none', join: specification.join,
+        miterLimit: 10, resolution: 16, boundaryPixelCount: 100, boundsMatch: true,
+        declaredBounds: [-10, specification.key === 'triangle-bevel-wide' ? -15.4544155877 : -10, 10, specification.key === 'triangle-miter-wide' ? 20.5455844123 : 10],
+        rasterBounds: { minX: -10, minY: specification.key === 'triangle-bevel-wide' ? -15.4544155877 : -10, maxX: 10, maxY: specification.key === 'triangle-miter-wide' ? 20.5455844123 : 10 }, ctm: { a: scale, b: 0, c: 0, d: scale, e: 10, f: 10 } },
+      probes: ['paint', 'within', 'outside', 'interior', ...(specification.exact ? ['exact'] : []),
+        ...(specification.key === 'triangle-miter-wide' ? ['miter-tip'] : []),
+        ...(specification.key === 'triangle-bevel-wide' ? ['bevel-edge'] : [])].map((kind) => {
+        const candidates = ['outside', 'exact'].includes(kind) ? ['control'] : ['control', 'p']
+        const local = kind === 'exact' ? specification.exact : kind === 'miter-tip' ? { x: 0, y: -40.8 } : kind === 'bevel-edge' ? { x: 10, y: -14 } : { x: 0, y: 0 }
+        return { kind, screenshot: `${polygonJoinScenario}-${specification.key}-scale-${scale}-${kind}.png`, nativeStrokeContains: true, local, transform: { ctm: { a: scale, b: 0, c: 0, d: scale, e: 10, f: 20 } }, selectionCleared: true,
+          rasterDistance: ({ paint: 0, within: 5.5, outside: 6.5, interior: 0, exact: specification.join === 'miter' ? 7.4544155877 : 8.5455844123, 'miter-tip': 0, 'bevel-edge': 0 })[kind],
+          actions: [false, true, true, true].map((alt, index) => ({ alt, trusted: true, beforeSelection: null,
+            overlayExcluded: true, candidates, screen: { x: scale * local.x + 10, y: scale * local.y + 20 }, point: { x: 450 + local.x, y: 350 + local.y }, selection: { id: index === 0 && ['paint', 'miter-tip', 'bevel-edge'].includes(kind) ? 'p' : candidates[index % candidates.length] } })) }
+      }),
+    }))) }
+}
+
 function completePointEvidence(fixture) {
   fixture.env.STZ_TEST_FREE_LABEL_GROUPS = JSON.stringify(pointGroups)
   fixture.env.STZ_TEST_POINT_ARTIFACTS = 'yes'
@@ -717,7 +745,7 @@ function completePointEvidence(fixture) {
   fixture.env.STZ_TEST_POINT_EVIDENCE = JSON.stringify(evidence)
   fixture.env.STZ_TEST_POINT_ARTIFACT_VALUES = JSON.stringify(Object.fromEntries(targetedPaintScenarios.map((name) => [
     `${name}.json`, { scenario: name, group: 'point-node-paint-import-persistence', result: 'passed',
-      ...(name === 'point-paint-app-continuity' ? appContinuityEvidence().evidence : name === 'point-paint-clear-imported-style' ? clearRegressionEvidence() : [...importRegressionScenarios, 'point-paint-unsupported-mutations', 'point-paint-mutation-directory-uncertainty'].includes(name) ? importRegressionEvidence(name) : name === 'point-paint-responsive-downloads' ? {
+      ...(name === polygonJoinScenario ? polygonJoinEvidence() : name === 'point-paint-app-continuity' ? appContinuityEvidence().evidence : name === 'point-paint-clear-imported-style' ? clearRegressionEvidence() : [...importRegressionScenarios, 'point-paint-unsupported-mutations', 'point-paint-mutation-directory-uncertainty'].includes(name) ? importRegressionEvidence(name) : name === 'point-paint-responsive-downloads' ? {
         cases: ['transparent', 'white'].flatMap((background) => [['circle', 'solid'], ['triangle', 'solid'], ['circle', 'dashed']]
           .map(([shape, variant]) => ({ background, shape, variant,
             baseline: { fixture: { source: 'Scale' }, expectedBackground: background, saved: bodyStructure(background) },
@@ -1205,3 +1233,37 @@ for (const fault of ['empty-json', 'started-json', 'missing-scale', 'duplicate-s
     assert.throws(() => verify(t, fixture, '32B'), /evidence is incomplete or invalid/)
   })
 }
+
+
+test('32B requires independent polygon join raster and native candidate/cycling evidence', (t) => {
+  assert.equal(polygonJoinArtifacts().length, 105)
+  assertPolygonJoinEvidence(polygonJoinEvidence())
+  for (const [name, damage] of [
+    ['nonempty body', (e) => { e.cases[0].observation.source = 'wide' }],
+    ['pending body only', (e) => { e.cases[0].observation.bodyStatus = 'pending' }],
+    ['changed point size', (e) => { e.cases[0].specification.size = 30 }],
+    ['changed point shape', (e) => { e.cases[0].specification.shape = 'circle' }],
+    ['convex control replaces concave star', (e) => { e.cases[4].observation.vertices.length = 3 }],
+    ['convex decagon replaces concave star', (e) => { e.cases[4].observation.vertices = Array.from({ length: 10 }, (_, index) => ({ x: 10 * Math.cos(index * Math.PI / 5), y: 10 * Math.sin(index * Math.PI / 5) })) }],
+    ['nonfinite vertices', (e) => { e.cases[0].observation.vertices[0].x = null }],
+    ['missing exact probe', (e) => { e.cases[0].probes = e.cases[0].probes.filter((p) => p.kind !== 'exact') }],
+    ['stale spurious candidate', (e) => { e.cases[0].probes.find((p) => p.kind === 'exact').actions[0].candidates.push('p') }],
+    ['omitted ordinary click', (e) => { e.cases[0].probes[0].actions[0].alt = true }],
+    ['incorrect native transform', (e) => { e.cases[0].probes[0].transform.ctm.e += 2 }],
+    ['untrusted click', (e) => { e.cases[0].probes[0].actions[0].trusted = false }],
+    ['missing concave case', (e) => { e.cases = e.cases.filter((c) => c.key !== 'star-bevel-wide') }],
+    ['easy outside miss', (e) => { e.cases[0].probes.find((p) => p.kind === 'outside').rasterDistance = 12 }],
+    ['missing actual miter tip', (e) => { e.cases[0].probes = e.cases[0].probes.filter((p) => p.kind !== 'miter-tip') }],
+    ['missing actual bevel edge', (e) => { e.cases[2].probes = e.cases[2].probes.filter((p) => p.kind !== 'bevel-edge') }],
+    ['ordinary miss hidden by Alt', (e) => { e.cases[0].probes.find((p) => p.kind === 'exact').actions[0].selection.id = 'p' }],
+    ['forged bounds assertion', (e) => { e.cases[0].observation.declaredBounds[3] = 30 }],
+    ['missing native raster bounds', (e) => { e.cases[0].observation.boundsMatch = false }],
+  ]) {
+    const fixture = checkoutFixture(t); completePointEvidence(fixture)
+    const artifacts = JSON.parse(fixture.env.STZ_TEST_POINT_ARTIFACT_VALUES)
+    damage(artifacts[`${polygonJoinScenario}.json`])
+    fixture.env.STZ_TEST_POINT_ARTIFACT_VALUES = JSON.stringify(artifacts)
+    const error = failedVerification(t, fixture, '32B')
+    assert.equal(error.report.status, 'failed', name)
+  }
+})

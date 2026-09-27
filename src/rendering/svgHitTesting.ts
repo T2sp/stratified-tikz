@@ -1,5 +1,6 @@
 import { pathIntersectionDetectionForDiagram } from '../geometry/pathIntersections.ts'
 import { sampleCurvedSheetPrimitive } from '../geometry/curvedSheets.ts'
+import { distanceToPolygonStroke } from '../geometry/polygonStroke.ts'
 import {
   arcSegmentToCubicBezierSegments,
   pathSegmentEnd,
@@ -1172,14 +1173,14 @@ function collectPointCandidate(
   const { geometry } = layout
   const localPoint = { x: point.x - center.x, y: point.y - center.y }
   const boundaryDistance = geometry.kind === 'circle'
-    ? Math.max(distance - geometry.radius, 0)
+    ? Math.max(distance - geometry.radius - layout.stroke / 2, 0)
     : pointInPolygon(localPoint, geometry.vertices)
       ? 0
-      : distanceToClosedPolyline(localPoint, geometry.vertices)
+      : layout.stroke > 0 && layout.strokeRegion
+        ? distanceToPolygonStroke(localPoint, layout.strokeRegion)
+        : distanceToClosedPolyline(localPoint, geometry.vertices)
 
-  const miterHit = layout.miterJoins.some((join) => pointInPolygon(localPoint, join)
-    || distanceToClosedPolyline(localPoint, join) <= 6)
-  if (boundaryDistance > 6 + layout.stroke / 2 && !miterHit) {
+  if (boundaryDistance > 6) {
     return true
   }
 

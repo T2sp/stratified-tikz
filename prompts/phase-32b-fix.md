@@ -1,21 +1,20 @@
-# Phase 32B Targeted Fix Prompt: Match polygon stroke bounds and picking to visible joins
+# Phase 32B Targeted Fix Prompt: Include dashed caps in point bounds and picking
 
 ## Environment and scope
 
-Work on `phase/32b-color-opacity-outline`. Inspect status and preserve all
-current production, documentation, package, browser/policy and test changes,
-including the 68 untracked paint-value PGF fixture and regression files.
-At this prompt update HEAD is `a7f2d153a8ebe36879572621083c1aa7e7c29244`.
-The accepted parent verification and independently reviewed checkout match
-this pre-prompt fingerprint:
+Work on `phase/32b-color-opacity-outline`. Inspect status and preserve all current
+geometry, rendering, browser/policy, documentation, package and test changes,
+including the 43 untracked solid-join helper, fixture and regression files.
+At this prompt update HEAD is `b8455dfc828471c87d75abb4a3c44121186d7756`.
+The accepted parent report and reviewed checkout match this pre-prompt identity:
 
 ```text
-51f57223704b6de91222612111c519751e790483750c9be1f9baea25e04e0c01
+121aaf324b9b9945e785e9aaf0bdc0e07a0f68895b703007e22cda5b1dba5e42
 ```
 
-This identifies the tree before this prompt edit. Recompute final identity
-including tracked changes, untracked files and binary bytes after corrections.
-Do not reset, discard or restart the existing implementation.
+This describes the checkout before this prompt edit. Recompute final identity
+including tracked, untracked and binary bytes after corrections. Do not reset,
+discard or restart the existing work.
 
 Use Node >=22.12.0 with the supported installation first in PATH:
 
@@ -23,220 +22,238 @@ Use Node >=22.12.0 with the supported installation first in PATH:
 export PATH=/opt/homebrew/bin:$PATH
 ```
 
-Fix only the remaining Medium production defect: wide polygon borders have
-bounds and exterior picking regions that disagree with their visible miter
-and bevel joins. Preserve completed paint/import uncertainty and override-intent
-work. Keep strict TypeScript, small testable geometry helpers, existing
-dependencies and 32A behavior. Keep 32C/32D deferred.
+Correct the remaining Medium defect: supported dashed square-cap borders paint
+outside the geometry used for point bounds, selection extent and picking.
+Include relevant dash/cap settings in committed-layout matching. Preserve the
+completed solid-join fixes and intentional selection through dash gaps.
+Separately investigate the retained lifecycle-test timeout below without
+weakening its assertions. Keep strict TypeScript, bounded geometry, existing
+dependencies and 32A behavior; keep 32C/32D deferred.
 
-## Accepted verification and remaining review finding
+## Accepted parent evidence and failed reviewer test
 
-The matching parent verification passed all five commands, including both
-required browser commands:
-
-```text
-/var/folders/vk/7kf940pd4bx8f6cg3rzlmtc80000gn/T/stz-phase32b-before-review-AsZusl/verification.json
-/var/folders/vk/7kf940pd4bx8f6cg3rzlmtc80000gn/T/stz-phase32b-before-review-AsZusl/05-check-free-labels/artifacts/free-labels-evidence.json
-/private/tmp/stz-32b-independent-review/results.json
-/private/tmp/stz-32b-independent-review/parent-evidence-audit.json
-```
-
-The review accepts 16 cumulative groups, 27 required point scenarios and
-281 required artifacts on Chrome 154.0.8037.57, with no page errors.
-Before/after identities match the reviewed checkout, including untracked files.
-Independent Node v26.9.0 tests passed 3,937 cases with no failures/skips.
-Build, diff, strict production/fixture/changed-test TypeScript and 40 script
-syntax checks passed. Focused lint found only reproduced baseline debt of
-40 errors and four warnings, unchanged from accepted 32A revision `595139d`;
-repository-wide lint was not run. The existing build chunk warning remains
-nonblocking. Retained PGF/PDF evidence was inspected without fresh TeX compilation.
-
-Independent review returned `needs_changes`, with zero Critical, one Medium
-and zero Low issues, and `ready_to_commit: false`. Native acceptance is complete
-for the reviewed tree. The blocker is the confirmed polygon stroke/picking
-defect below, not missing browser evidence or another imported-paint failure.
-
-## Confirmed reproductions and failure mechanisms
-
-Inspect and preserve the existing production probes and independently
-rasterized SVG evidence before editing:
+Matching parent verification passed all five commands, including both browser
+commands:
 
 ```text
-/private/tmp/stz-review-miter.mjs
-/private/tmp/stz-review-miter.json
-/private/tmp/stz-review-miter.svg
-/private/tmp/stz-review-miter.png
-/private/tmp/stz-review-bevel.mjs
-/private/tmp/stz-review-bevel.json
-/private/tmp/stz-review-bevel.svg
-/private/tmp/stz-review-bevel.png
+/var/folders/vk/7kf940pd4bx8f6cg3rzlmtc80000gn/T/stz-phase32b-before-review-wPPGzN/verification.json
+/var/folders/vk/7kf940pd4bx8f6cg3rzlmtc80000gn/T/stz-phase32b-before-review-wPPGzN/05-check-free-labels/artifacts/free-labels-evidence.json
+/private/tmp/stz-32b-review-H8bkE3/checks.json
 ```
 
-Both probes use an empty triangle of size `3`, disabled fill and an enabled
-solid `30pt` border. The existing conversion gives a stroke of `36` local SVG
-units. The model point is at the origin; probe coordinates below are relative
-to its projected center. Keep the existing six-local-unit hit tolerance.
+The review accepts 16 cumulative groups, 28 point scenarios and 386 required
+artifacts with no page errors, on the unchanged tracked/untracked identity.
+Actual observations, downloads, standalone reopening and PGF evidence were
+inspected. This is accepted native evidence for the pre-fix tree.
 
-| Join | Local probe | Actual painted edge | Distance beyond paint | Current result |
-| --- | --- | --- | --- | --- |
-| Miter | `(0, 28)` | bottom `20.5455844123` | `7.4544155877` | selects the node |
-| Bevel | `(0, -24)` | top `-15.4544155877` | `8.5455844123` | selects the node |
+Keep the independent reviewer results distinct:
 
-Both probes must be rejected because they exceed the tolerance. The bevel
-example is thick enough for the stroke of the opposite edge to affect the
-painted extent; an apex-only calculation is not a sufficient oracle.
+| Reviewer check | Actual result |
+| --- | --- |
+| Full `npm test` | 3,987 total: 3,986 passed, 1 failed; zero skipped/cancelled |
+| Focused lifecycle rerun | 11/11 passed; does not replace the failed full run |
+| Build / diff | Passed on Node v26.9.0; existing bundle-size warning |
+| Strict production/fixture/new-test TypeScript | Passed |
+| Latest changed-code ESLint / script syntax | Passed / all 60 scripts passed |
+| Broader focused lint | 40 baseline errors and 4 warnings, independently matched |
 
-Two separate implementation choices cause the mismatch:
+Repository-wide lint was not run. The independent review returned
+`needs_changes`, with zero Critical, one Medium and zero Low findings and
+`ready_to_commit: false`. The production geometry finding and failed full test
+must both be addressed. Do not label native acceptance missing, or treat the
+parent pass or isolated rerun as an explanation of the reviewer timeout.
 
-1. `polygonMiterJoins()` in `src/rendering/svgPointNodeLayout.ts`, around line
-   54, creates triangles for both `[1, -1]` offset signs at every corner.
-   A synthetic inward miter can protrude beyond the actual stroked polygon
-   when the border is thick. These vertices affect `paintedBounds`,
-   `anchorClearanceBounds`, `selectionRadius` and `miterHit`.
-2. `collectPointCandidate()` in `src/rendering/svgHitTesting.ts`, around line
-   1174, also accepts points within `stroke / 2 + 6` of the original polygon
-   contour, regardless of join style. This rounded expansion admits points
-   outside a bevel stroke's true six-unit neighborhood. Removing only the
-   synthetic inward miters leaves the bevel defect unresolved.
+## 1. Confirmed dashed-cap geometry defect
 
-The SVG paint already supplies the requested join and miter limit `10`, with
-ordinary geometric scaling. Existing tests protect an outward triangle miter
-apex but miss these bottom-miter and top-bevel probes. Fix the geometry used by
-bounds and picking; do not change the requested paint to match the old hit region.
+Inspect and preserve:
 
-## Required targeted correction
+```text
+/private/tmp/stz-32b-review-H8bkE3/triangle-dash-repro.json
+/private/tmp/stz-32b-review-H8bkE3/dash-repro.json
+```
 
-1. Represent or calculate the actual polygon stroke region using edge strips
-   and the appropriate join geometry. Select joins from local turn direction;
-   handle both convex corners and concave star corners rather than adding both
-   offset wedges or assuming every corner has the same turn. Account for
-   overlapping thick strokes and the renderer's miter-limit behavior.
-2. Derive polygon stroke extents and exterior hit distance from the same correct
-   geometry. Remove synthetic vertices from painted/clearance bounds and radius
-   calculations, and remove the join-independent rounded expansion that causes
-   bevel false positives. Keep any intentionally conservative broad-phase
-   bounds separate from final hit acceptance; a bounding box is not an exact
-   hit oracle.
-3. Measure the existing six-unit tolerance from the actual stroke region in its
-   established local coordinate space. Preserve genuine outward miter tips,
-   bevel edges and positive near-border hits. Do not shrink the tolerance,
-   clamp to the original polygon bounds, cap supported border widths, switch
-   join styles or special-case the two probe coordinates.
-4. Preserve the established selection behavior inside the original contour,
-   including hollow nodes. This task corrects exterior false positives; it does
-   not redesign transparent/interior selection or opacity policy. Keep circle
-   behavior, label/body geometry, normal/Alt cycling, layer/visibility rules,
-   locking and candidate ordering intact.
-5. Keep layout and picking consistent for pending and committed label geometry,
-   including empty labels. Audit consumers of the corrected bounds/radius for
-   selection decoration, attached-label clearance and export/capture framing.
-   Preserve normal responsive scaling and the existing width conversion; map
-   native screen probes into the same geometry space instead of changing units.
+The exact triangle is empty, size `3`, fill disabled, with an enabled solid-color
+`30pt` border using `lineStyle: 'dashed'`, `dashPhase: 0`, `lineCap: 'rect'` and
+`lineJoin: 'bevel'`. Rendering emits width `36`, dash array approximately
+`[3.6, 3.6]`, cap `square`, join `bevel` and miter limit `10`, all in local SVG
+units. Probe coordinates are relative to the projected point center.
 
-Prefer a focused, deterministic geometry correction without new dependencies.
-Keep finite behavior at degenerate/near-collinear edges and miter-limit cases;
-no NaN/Infinity, unbounded intersection work or unrelated rendering rewrite.
-Keep existing supported round-join behavior covered as a control. Dashed-border
-or transparent-node interaction redesign is outside this finding's scope.
+Independent raster observations show:
 
-## Registered regressions and native acceptance
+| Observation | Actual paint | Current layout / picking |
+| --- | --- | --- |
+| Local `(0, -24)` | Fully painted, alpha 255 | Rejected |
+| Local `(-6, -28)` | Fully painted, alpha 255 | Rejected |
+| Minimum Y | Approximately `-29.65625` | `-15.4544155877` |
+| Maximum radius | Approximately `30.3804328989` | `21.0133538218` |
 
-Add registered geometry/layout/picking regressions in the appropriate existing
-suites or register new files in `package.json`. Cover:
+Selection decoration therefore under-encloses visible paint, and overlap
+cycling can omit the clicked point. Retain independent exterior negative
+controls as well as these painted positive probes.
 
-- The two exact empty-triangle probes with disabled fill, solid `30pt` border
-  and size `3`. Assert rejection through production candidate collection and
-  correct stroke bounds, while independently checking the actual paint extent.
-- Positive points on genuine miter tips and bevel edges, and probes just inside
-  and just outside the six-unit allowance. A fix that rejects painted corners
-  or merely narrows all hit regions is insufficient.
-- Thin and wide strokes, concave star corners and overlapping thick edge strips.
-  Exercise relevant turn directions/winding in any general polygon helper,
-  acute miter-limit behavior and finite degenerate-edge handling. Compare the
-  resulting region to independent SVG rendering rather than copying the new
-  helper's output into expected values.
-- Disabled stroke, circle/round controls, existing contour-interior selection,
-  pending/committed layouts and geometrically scaled display. Preserve tests
-  that require an actual outward miter extension beyond half the stroke width.
+The completed solid geometry is correct for its intended input:
+`svgPointNodeLayout.ts` calls `createPolygonStrokeRegion(vertices, width, join)`
+and uses `radius + width / 2` for circles. However, `svgPointPaint.ts` also emits
+effective dash arrays, phase and caps. Square caps at dash endpoints can extend
+beyond that solid-stroke region. Both polygons and circles need the missing
+extent, not just the supplied triangle.
 
-Extend native point-click acceptance to cover the supplied outside-border
-probes and concave star corners with thick empty-node borders. Use production
-selection and real pointer actions; clear earlier selection and exclude drag
-handles or overlays before measuring results. Include ordinary clicks and
-relevant Alt cycling with an overlapping control candidate so a stale or
-spurious candidate cannot be hidden by the selected result.
+`currentSvgPointNodeLayout()` currently matches owner/source/font/shape/size,
+width and join, but omits line style, pattern, phase and cap. Once these settings
+affect layout, accepting old committed geometry after their change is unsafe.
 
-Retain SVG inputs, independent raster observations, coordinate transforms,
-paint/join/width settings, measured distances, screenshots and observed
-selection/candidate results for passing and failing controls. Verify legitimate
-border/within-tolerance hits as well as outside misses. Do not use the corrected
-bounds or candidate helper as its own oracle, inflate distances to easy misses,
-force clicks, substitute direct selection mutation or remove a failing scenario.
+### Required targeted correction
 
-The existing `point-contour-boundaries-cycling` coverage uses nonempty text and
-default borders; it does not substitute for these cases. Integrate the new checks
-into required cumulative acceptance, not only an optional standalone probe.
-Preserve current groups/scenarios and artifacts; extend policy/registered
-regressions as needed so reports omitting the new assertions cannot claim the
-new coverage. Obtain fresh native evidence on the final corrected tree.
+1. Share effective stroke settings between rendering and geometry: named-style
+   defaults, explicit-pattern precedence, phase, caps and joins, with the existing
+   `TeX pt * 1.2` conversion. Use the actual emitted pattern semantics rather
+   than a second inconsistent interpretation of raw style fields.
+2. Include actual dash endpoint caps for polygons and circles. Account for
+   tangent orientation on circles, dash continuity across polygon corners,
+   closed-path seams and overlapping wide caps. Do not add a cap at a join
+   crossed by one uninterrupted dash. Keep miter-limit and solid-join behavior.
+3. Correct painted bounds, selection extent/radius, applicable clearance bounds
+   and picking together. Painted extent and interaction geometry may differ:
+   preserve the original contour interior and continuous stroke neighborhood
+   used to select through dash gaps, while including real cap extensions.
+   Do not replace that established policy with paint-only gap rejection.
+4. Preserve the existing six-local-unit tolerance. A blanket radius/box padding
+   is not an exact hit oracle and must not restore the old solid miter/bevel
+   false positives. Solid bevel `(0,-24)` must still miss, while the reported
+   dashed square-cap variant at that coordinate must hit. Preserve the fixed
+   solid miter `(0,28)` miss and genuine outward miter-tip hits.
+5. Match committed layouts against every effective style setting that can alter
+   the new geometry. Compare pattern contents, not only array/object identity,
+   and retain the current owner/source/font guards. Reject stale commits after
+   relevant edits and accept the matching refreshed layout. Keep pending,
+   committed and immutable export reconstruction consistent.
+6. Keep computation finite and bounded for supported zero-length entries,
+   positive-total patterns, short intervals, large/wrapped phases and wide
+   borders. Avoid non-advancing loops and unbounded tessellation. Preserve the
+   supported pattern/width range and explain any bounded approximation with
+   independent error checks; do not silently drop caps or valid patterns.
 
-## Preserve completed work
+Preserve the existing opacity/disabled-stroke, hollow-interior, layer/visibility,
+locking, candidate-order and ordinary/Alt-cycling contracts. Keep geometric
+responsive scaling and the existing local tolerance; convert screen probes
+through actual transforms. Do not switch caps/joins, shrink border widths,
+increase tolerance, change source text or force selection to hide the mismatch.
 
-Keep all imported paint corrections: executable recognized values use the
-shared ordinary/dependency guard; execution uncertainty remains sticky through
-nested styles, retained mutation lists, reload and preset reapplication;
-ordinary invalid literals retain field-specific recovery; explicit recorded
-local edits remain authoritative. Keep raw source and external semantics
-without executing input or appending untouched uncertain paint in either TikZ
-mode. Preserve source grammar, handler boundaries, the atomic 512-event limit
-and all prior independent PGF references, including `paint-value-execution/`.
-Do not regenerate them to repair SVG stroke picking.
+### Registered geometry and native regressions
 
-Preserve independent paint/opacity/dimming, immutable SVG capture, exact raw
-JSON/CRLF, cloning/clipboard/history, detached provenance cleanup, the bounded
-100-entry history, 2D/3D semantics and free/inline-label behavior. Keep the existing
-App geometry/ownership diagnostics, bounded waits, native scroll deadline,
-pointer assertions and five geometry fault controls. Retain seven App → SVG →
-App transitions, three continuity controls and 13 artifacts, the directory
-scenario and 11 artifacts, and six responsive downloads with 91 artifacts.
+Add focused registered tests covering:
 
-The current accepted minimum is 16 cumulative groups / 27 required point
-scenarios / 281 required artifacts. New coverage must supplement that baseline.
-Keep the runner's 60-second fixture deadline, owned-process cleanup, failure
-retention, fresh-process verifier loading and transitive dependencies. Do not
-weaken policy or native assertions to pass this correction.
+- The exact triangle, both painted positive probes, independent bounds/radius
+  observations and meaningful exterior negatives beyond the interaction region.
+- Square-cap circle borders extending beyond `radius + halfWidth`, with butt
+  and round caps as controls. Include thin/wide strokes and relevant polygon
+  corners/concave shapes without regressing the solid-join suite.
+- Named dashed/dotted/densely-dotted styles, explicit-pattern precedence,
+  nonzero/wrapped phases, cap endpoints near corners/seams and overlapping
+  caps. Keep valid zero-entry and other bounded-input controls.
+- Intentional dash-gap selection, original contour interiors, disabled stroke
+  and established zero-alpha behavior. Distinguish gaps from exterior misses.
+- Stale committed layouts after changes to line style, pattern contents, phase
+  or cap; correct refreshed layouts; pending/committed equivalence and immutable
+  captured output after live edits. Keep responsive coordinate mapping covered.
 
-## Verification, documentation and review
+Use independent SVG rasterization/native paint observations for polygon and
+circle bounds, cap-positive probes and exterior negatives. Retain source SVGs,
+settings, raster resolution/error limits, transforms and observations. Do not
+use the corrected helper as its own oracle or simply loosen expected bounds.
+Preserve original failed evidence and put corrected results separately.
 
-Read `AGENTS.md`, paired 32B implement/review prompts and current
-`docs/PHASE_32B_IMPLEMENTATION.md`, plus relevant rendering/geometry documentation.
-Document the real join geometry and tolerance contract, both original failures,
-corrected bounds/picking behavior and independent/native results. Keep changes
-confined to this finding and necessary regressions/documentation.
+Add mandatory native ordinary-click and Alt overlap-cycling regressions. The
+visibly clicked node must be present in candidates and reachable through cycling;
+an overlapping control must not conceal its omission. Clear prior selection,
+exclude handles/overlays, use real pointer actions and retain candidate/selection
+records and screenshots. Exercise actual style edits so stale dash/cap layouts
+cannot pass unnoticed. Integrate the checks into cumulative acceptance with
+appropriate policy/negative controls, preserving the current 16 groups,
+28 scenarios and 386 artifacts while adding new required coverage.
 
-Run focused registered tests, applicable strict production/fixture/test
+## 2. Investigate the retained lifecycle-test timeout
+
+Preserve these distinct results:
+
+```text
+/private/tmp/stz-32b-review-H8bkE3/npm-test.log
+/private/tmp/stz-32b-review-H8bkE3/owned-app-page-rerun.log
+/private/tmp/stz-32b-review-H8bkE3/checks.json
+```
+
+The full suite failed the unchanged test
+`bounded failing capture and screenshot retain primary, own late rejections and permit cleanup`
+at `tests/scripts/ownedAppPage.test.mjs:118` with:
+
+```text
+Timed out after 15ms during owned App lifecycle evidence
+```
+
+The test passes `timeoutMs: 15` through `setup()`. That budget covers real
+lifecycle file persistence as well as diagnostic capture/disposal; intentionally
+hanging browser mocks are installed only after setup. The retained timer stack
+from `pointCheckDiagnostics.mjs` does not establish which lifecycle save phase
+timed out. Filesystem scheduling, setup and disposal are hypotheses, not a
+confirmed root cause. The focused 11/11 pass does not explain the full-run failure.
+
+Read the test, `scripts/ownedAppPage.mjs` and bounded diagnostic helper. Identify
+the failed operation/phase and collect actionable timing/evidence under focused
+and ordinary full-suite conditions. Keep this investigation separate from the
+dashed-cap production defect. If evidence justifies test hardening, separate
+controlled timeout checks from incidental real-I/O timing, or use a narrow
+deterministic scheduling seam. Preserve finite production bounds and the
+assertions for primary-error retention, both capture timeouts, ownership of late
+rejections, retained JSON/lifecycle evidence, close events and cleanup/isolation.
+
+Do not blanket-increase deadlines, remove the timeout case, weaken artifact
+assertions, change global concurrency or retry until green. Keep successful
+reruns alongside the failure and state any unproven trigger explicitly. Require
+fresh whole-suite success on the final tree; a focused rerun alone is insufficient.
+
+## Preserve completed work and verify the final tree
+
+Keep `src/geometry/polygonStroke.ts`, its solid-join regression/independent
+fixtures, and mandatory `point-paint-polygon-joins` coverage. Preserve the
+corrected convex/concave joins, miter-limit fallback, thick overlap behavior,
+six-unit allowance and original contour selection. The dash-cap correction
+must extend this work, not reinstate the earlier rounded polygon expansion.
+
+Keep all importer certainty, recorded local override, raw source/persistence
+and independent PGF work unchanged unless a demonstrated dependency requires
+otherwise. Preserve independent paint/opacity/dimming, cloning/clipboard/history,
+raw JSON/CRLF, 2D/3D semantics, immutable whole-node export and free/inline labels.
+Keep App ownership/geometry diagnostics and five native geometry fault controls,
+seven App → SVG → App transitions, three continuity controls and 13 artifacts,
+the directory scenario and 11 artifacts, and six responsive downloads with
+91 artifacts. Preserve fresh-process verification, the runner's 60-second
+fixture deadline, owned-process cleanup and failed-evidence retention.
+
+Read `AGENTS.md`, paired 32B implement/review prompts, current implementation
+report and relevant rendering/geometry documentation. Document effective dash/
+cap geometry, intended gap selection, revision matching, independent results and
+the actual lifecycle investigation. Keep changes focused on these requested
+corrections and necessary tests/documentation; defer 32C/32D.
+
+Run focused registered regressions, applicable strict production/fixture/test
 TypeScript, changed-script syntax, targeted lint and `git diff --check`.
 Run `npm test` and `npm run build` sequentially because they share asset
-preparation. Separate reproduced baseline lint debt and the build chunk warning
-from new failures; do not perform unrelated cleanup.
+preparation. Separate baseline lint debt and the bundle warning from new failures.
 
-The AsZusl report is accepted for the reviewed pre-fix tree. Subsequent production
-changes need fresh matching verification. Finalize code, tests and tracked
-documentation before the final run; record final identities and report paths
-in an external handoff. Then run:
+The wPPGzN parent evidence verifies the pre-fix tree; it cannot verify subsequent
+changes or erase the failed reviewer run. Finalize code/tests/tracked docs before
+final verification and record identities/report paths in an external handoff:
 
 ```bash
 PATH=/opt/homebrew/bin:$PATH node scripts/automation/run-phase.mjs 32B verify
 ```
 
-Require all five commands and current cumulative native evidence, including
-new join/picking checks, on the same tracked/untracked/binary identity. Any
-checkout change after verification requires matching verification again.
+Require all five commands and current cumulative native evidence, including new
+dash-cap checks, on the same tracked/untracked/binary identity. Preserve failures.
+Any checkout edit after verification requires matching verification again.
 Obtain independent read-only review of that verified tree against
-`prompts/phase-32b-review.md`, explicitly reassessing both join failures and
-concave-corner behavior using independent SVG paint evidence. `32B verify`
-itself does not perform review.
+`prompts/phase-32b-review.md`, reassessing the cap geometry, layout matching and
+lifecycle-test result. `32B verify` itself does not perform review.
 
-Do not commit or push while the finding or either gate remains unsuccessful.
-32B stays incomplete until the defect, verification and review are resolved;
-32C/32D remain deferred.
+Do not commit or push while the finding, full verification or review remains
+unsuccessful. 32B stays incomplete until these gates pass; 32C/32D remain deferred.

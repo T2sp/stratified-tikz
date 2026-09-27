@@ -4,7 +4,7 @@ import { svgLabelRequestIdentity, type SvgLabelState } from './labels/svgLabelRu
 import { svgPointNodeGeometry } from './svgPointNodeGeometry.ts'
 import { svgPointNodeTextFontFamily, svgPointNodeTextFontSize, svgPointNodeTexPointScale } from './svgPointNodeText.ts'
 import { getPointPaint } from '../model/styles.ts'
-import type { Vec2 } from '../model/types.ts'
+import { createPolygonStrokeRegion } from '../geometry/polygonStroke.ts'
 
 export function svgPointNodeLayout(style: PointStyle, state: SvgLabelState) {
   const body = placeSvgLabel(state.layout, svgPointNodeTextFontSize, 'center')
@@ -16,47 +16,18 @@ export function svgPointNodeLayout(style: PointStyle, state: SvgLabelState) {
   // even when a responsive viewport changes its displayed thickness.
   const stroke = border.enabled ? border.width * svgPointNodeTexPointScale : 0
   const strokeJoin = border.lineJoin
-  // Miter corners can extend further than half a stroke beyond the path box.
-  // Retain these vertices for both bounds and picking (SVG/PGF miter limit 10).
-  const miterJoins = strokeJoin === 'miter' ? polygonMiterJoins(geometry.vertices, stroke / 2) : []
-  const miterVertices = miterJoins.flat()
-  const paintedBounds = {
+  // Bounds, selection decoration and exterior picking share the actual union
+  // of strips and joins, including overlapping wide strokes (miter limit 10).
+  const strokeRegion = geometry.kind === 'polygon'
+    ? createPolygonStrokeRegion(geometry.vertices, stroke, strokeJoin) : null
+  const paintedBounds = geometry.kind === 'circle' ? {
     minX: geometry.bounds.minX - stroke / 2, minY: geometry.bounds.minY - stroke / 2,
     maxX: geometry.bounds.maxX + stroke / 2, maxY: geometry.bounds.maxY + stroke / 2,
-  }
-  for (const vertex of miterVertices) {
-    paintedBounds.minX = Math.min(paintedBounds.minX, vertex.x)
-    paintedBounds.minY = Math.min(paintedBounds.minY, vertex.y)
-    paintedBounds.maxX = Math.max(paintedBounds.maxX, vertex.x)
-    paintedBounds.maxY = Math.max(paintedBounds.maxY, vertex.y)
-  }
-  const selectionRadius = Math.max(geometry.radius + stroke / 2,
-    ...miterVertices.map(({ x, y }) => Math.hypot(x, y)))
+  } : { ...(strokeRegion?.bounds ?? geometry.bounds) }
+  const selectionRadius = geometry.kind === 'circle' ? geometry.radius + stroke / 2
+    : Math.max(geometry.radius, strokeRegion?.radius ?? 0)
   return { body, geometry, paintedBounds, anchorClearanceBounds: { ...paintedBounds }, stroke, strokeJoin,
-    miterVertices, miterJoins, selectionRadius }
-}
-
-function polygonMiterJoins(vertices: readonly Vec2[], halfStroke: number): Vec2[][] {
-  if (vertices.length < 3 || halfStroke === 0) return []
-  return vertices.flatMap((vertex, index) => {
-    const previous = vertices[(index + vertices.length - 1) % vertices.length]
-    const next = vertices[(index + 1) % vertices.length]
-    const firstLength = Math.hypot(vertex.x - previous.x, vertex.y - previous.y)
-    const secondLength = Math.hypot(next.x - vertex.x, next.y - vertex.y)
-    if (firstLength === 0 || secondLength === 0) return []
-    const first = { x: -(vertex.y - previous.y) / firstLength, y: (vertex.x - previous.x) / firstLength }
-    const second = { x: -(next.y - vertex.y) / secondLength, y: (next.x - vertex.x) / secondLength }
-    const denominator = 1 + first.x * second.x + first.y * second.y
-    if (denominator < 1e-10) return []
-    const offset = { x: (first.x + second.x) * halfStroke / denominator,
-      y: (first.y + second.y) * halfStroke / denominator }
-    if (Math.hypot(offset.x, offset.y) > halfStroke * 10) return []
-    return [1, -1].map((sign) => [
-      { x: vertex.x + sign * first.x * halfStroke, y: vertex.y + sign * first.y * halfStroke },
-      { x: vertex.x + sign * offset.x, y: vertex.y + sign * offset.y },
-      { x: vertex.x + sign * second.x * halfStroke, y: vertex.y + sign * second.y * halfStroke },
-    ])
-  })
+    strokeRegion, selectionRadius }
 }
 export type SvgPointNodeLayout = ReturnType<typeof svgPointNodeLayout>
 export type SvgPointNodeCommit = Readonly<{
