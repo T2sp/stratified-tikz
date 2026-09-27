@@ -113,17 +113,51 @@ metadata follows new definitions. Unoverridden channels receive the new
 effective baseline; overridden channels and distinguishable changes from the
 old snapshot keep their values. An earlier unknown fallback becoming known
 does not become a local override. Untracked legacy styles and authored values
-are preserved. Truly missing styles remain diagnosed and unresolved.
+are preserved. When arbitrary runtime execution makes the baseline uncertain,
+snapshot differences cannot establish authorship: only recorded local fields
+are authoritative, and refresh preserves the saved fallback and intent. Truly
+missing styles remain diagnosed and unresolved.
+
+When a later full definition restores supported resolution, refresh checks the
+previous context as well. Previously uncertain snapshot differences never become
+new overrides: only recorded fields survive onto the supported baseline. An
+untracked legacy fallback receives a fresh supported snapshot on that recovery.
+This replaces uncertain paint and unrecorded overall opacity while retaining
+nonpaint shape/size. A recorded overall-opacity edit remains authoritative.
 
 Known literal references expand at their exact option position. Runtime `.cd`
 inside a style body is explicitly unsupported: it produces a diagnostic and
 marks paint unresolved. Subsequent relative options, including those in nested
 expansion or the calling option list, remain conservatively unresolved. Explicit
 absolute supported options such as `/tikz/text=red` can still resolve their own
-fields. This does not pretend to execute or approximate runtime directory changes.
+fields when the bounded scan establishes only directory uncertainty. An absolute
+path does not establish handler or color-binding certainty after arbitrary code.
+This does not pretend to execute or approximate runtime directory changes.
 Cycles and excessive depth/work produce diagnostics and terminate preview work.
 No `.code`, macros, package/preamble execution, parameterized styles, or arbitrary
 PGF/TeX programs are evaluated.
+
+Unsupported execution-capable runtime options, including `/utils/exec`, unknown
+keys/handlers and invocation of a retained code mutation, lose color-binding and
+option-handler certainty for the entire current resolution. The resolver marks
+every paint field unresolved and records `executionUncertain` in its transient
+preview result. Later `text`, `fill`, `draw`, `color`, mixtures, opacity and line
+options cannot clear that state, even with absolute `/tikz/...` paths. No payload
+is interpreted, and the possible effects are not restricted to a color named
+inside the code. Known earlier values remain deterministic preview fallbacks;
+later literal-looking values are not applied using potentially stale bindings.
+The state propagates through nested styles, canonical aliases and the return to
+an outer option list. An independent resolution without those executable effects
+keeps normal literal behavior. Ordinary invalid values for a known paint key
+still invalidate its own fields and allow justified later recovery.
+
+Assigned retained keys are checked too; a literal `font=...` cannot hide a
+stored code handler. TeX-bearing deferred layout values, nonliteral runtime
+directories and unscanned tails of retained mutation lists also lose execution
+certainty. The scanner does not interpret their payloads.
+Runtime handler suffixes such as `shape aspect/.style` and nonliteral key tokens
+are checked before deferred-layout classification. A layout-like prefix cannot
+hide a handler definition or restore later paint certainty.
 
 Recognizable unsupported declarations targeting a literal key (including
 `.append style`, `.prefix style` and `\tikzstyle{key}+=[...]`) are retained as
@@ -135,12 +169,14 @@ not merely delete the body. The last supported body can supply deterministic
 preview values, but every paint field becomes uncertain and the reference
 displays a diagnostic. Nested invocation propagates the uncertainty; a subsequent
 supported option such as `text=green` restores only its own fields when the
-invocation directory is still known. Recognizable mutation bodies and their
+mutation is demonstrably paint-only and the invocation directory is still known.
+Retained code handlers also lose binding/handler certainty, irrespective of any
+last-known supported body. Recognizable mutation bodies and their
 nested literal dependencies also carry runtime `/.cd` uncertainty into the
 calling option list. Later relative keys then remain unresolved, because they
 may name handlers in another directory. Explicit supported `/tikz/...` options
-still resolve their own fields; paint-only mutations do not invent directory
-uncertainty. Unrelated
+still resolve their own fields after a fully scanned directory-only change;
+paint-only mutations do not invent directory or execution uncertainty. Unrelated
 keys, including a distinct `/other/myPoint`, keep their existing resolution.
 A later full supported definition restores known resolution for that key.
 
@@ -149,12 +185,23 @@ reference options cannot replace an invalidated definition. The selected ID and
 raw options remain unchanged. Dependency comments retain defining, mutating and
 required nested/color sources in source load order, even when a later imported
 file has no new reference for the mutated key. Recognizable style-list mutation
-arguments are scanned only for literal style/color dependencies and directory
-uncertainty, never applied as paint. This separate scan is bounded to 4,096
-options / 16 levels. Exceeding a bound conservatively loses directory certainty;
-either a bound failure or an unknown runtime directory retains all imported
+arguments are scanned for literal style/color dependencies, directory changes
+and executable effects, never applied as paint. An executable option in an
+appended/prefixed list has the same sticky effect as one in a supported body.
+This separate scan is bounded to 4,096 options / 16 levels. Bound exhaustion or
+cycles in either traversal leave effects unvisited and therefore lose binding/
+handler certainty as well as any affected directory certainty; later absolute
+options cannot restore paint. This narrows the earlier bound-failure recovery
+rule, while fully scanned directory-only recovery remains supported. A bound
+failure, arbitrary execution or an unknown runtime directory retains all imported
 source hints. Declaration-level `.cd` still only qualifies declaration names.
 Arbitrary code handlers are not interpreted.
+After directory uncertainty, the scan checks possible retained definitions in
+other namespaces for executable effects without applying their paint or choosing
+a directory. Directory state carries across retained lists. If a mutation can
+change it, fallback and retained lists are conservatively rescanned with unknown
+directory because a prefix may run earlier. Candidate visits and rescans share
+the same 4,096-step budget; directory-only controls still permit absolute recovery.
 Mutation-only files without any
 supported importable definition retain the existing import behavior; adding that
 UI workflow is outside this correction. Importer snapshots refresh through the
@@ -211,13 +258,25 @@ are explicitly fallbacks; export suppresses untouched paint after the external
 key in both modes. Ordinary supported imports and their ordered per-key mutation
 or runtime-directory recovery retain their previous behavior.
 
+Runtime execution uncertainty is distinct from that source-wide rejection:
+the literal top-level `.style` declaration remains accepted and its exact body
+is retained; uncertainty arises when resolving an invocation. Both states are
+reconstructed from raw sources or legacy saved reference options on reload.
+`executionUncertain` is derived state, never a saved authority that can declare
+an old snapshot safe. Reference diagnostics retain previous messages and add the
+reconstructed limitations.
+
 Matching `importedPaint` intent still preserves explicit local edits, including
-an accepted value equal to its preview fallback. Without that metadata, saved
-paint differences cannot prove authorship once raw-source execution is uncertain;
-export does not promote them to local overrides. The first new edit snapshots
-those saved fallback values and claims only the edited fields. Preset reapplication
-and Undo/Redo preserve this distinction. Historical edits without intent metadata
-are inherently ambiguous under this source-wide failure policy.
+an accepted value equal to its preview fallback. With either source-wide or
+runtime execution uncertainty, differences from a saved snapshot or legacy
+preview do not by themselves prove authorship. Export, refresh and the first
+edit do not promote those differences to local overrides. A first edit without
+metadata snapshots the saved fallback and claims only its actual edited fields;
+existing metadata retains already recorded intent and adds the accepted fields.
+Preset reapplication, serialization and Undo/Redo preserve this distinction.
+Historical edits without recorded intent are inherently ambiguous under either
+execution-uncertainty policy. Untouched uncertain channels stay under external
+control even when another channel is explicitly edited.
 
 `ExternalTikzStyleSource.rawSource` preserves the complete imported source.
 `ImportedTikzStyleReference.rawOptions` preserves each original option body;
@@ -313,10 +372,12 @@ external key. For an unresolved supported paint property (for example
 of replacing it with the preview fallback; changing that local paint property
 then emits an explicit override. Unknown named styles/macros can affect any paint field. Their baseline paint is
 written before the external key, and unchanged unresolved fields are not emitted
-after it; later known options and explicit local edits still take precedence.
+after it. Later known options recover only when binding/handler and relevant
+directory assumptions still hold; explicit recorded local edits remain authoritative.
 Such unresolved cases remain documented preview
 limitations. Deferred geometry remains the external style's responsibility.
-Known later options resolve only their affected fields. An explicit local
+After arbitrary runtime execution, no later imported option resolves paint from
+the stale environment. An explicit local
 override remains after the external key even when it returns to the original
 fallback value; an untouched unresolved field remains under external control.
 
@@ -372,3 +433,15 @@ The same comparison directory contains a
 fix classified arbitrary handlers as local mutations, incorrectly exporting blue
 while PGF was red. The final boundary rejects that source and stale-source reload
 omits false paint; independent PDF operators show all five corrected nodes red.
+
+[The runtime-execution follow-up](../tests/fixtures/point-paint-pgf/execution-boundary/runtime-execution/README.md)
+preserves the distinct invocation-time `/utils/exec` failure: PGF's external
+node was blue while both old application nodes forced red. Corrected standalone
+and inline-math output compile separately against identical external source with
+PGF 3.1.11a/pdfTeX 1.40.29. Each PDF's external node, untouched import, reload,
+stale-snapshot reload and preset reapplication remain blue. Explicit red/black
+text and yellow/black fill edits retain their requested colors, including edits
+equal to the visible fallback; fill-only edits leave text blue. All 18 node
+observations come from actual PDF operators. The supplied failure establishes a
+color-binding side effect; handler mutation receives separate parser regression
+coverage and is not claimed as a second observation from these PDFs.

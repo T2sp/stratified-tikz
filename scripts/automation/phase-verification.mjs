@@ -417,7 +417,12 @@ function validateImportedPaintEvidence(artifactDir, name, group) {
     for (const boundary of ["crossFile", "reloaded"]) check(boundary, "outer", { fill: "#ff0000", text: "#00ff00", draw: "#0000ff" });
     check("priorColor", "outer", { fill: "#123456", text: "#00ff00", draw: "#0000ff" });
     check("redefined", "outer", { fill: "#ffff00", text: "#0000ff", draw: "#00ff00" });
-    check("missing", "outer", { fill: null, text: null, draw: "#0000ff" });
+    check("missing", "outer", { fill: null, text: null, draw: null });
+    const missingResolution = evidence.missing.modelDiagnostics?.resolution;
+    if (missingResolution?.executionUncertain !== true || !missingResolution.diagnostics?.length
+      || !["fillColor", "drawColor", "textColor"].every((field) => missingResolution.unresolvedFields?.includes(field))) {
+      throw new Error("Missing dependency execution uncertainty must survive later paint options");
+    }
     check("laterUndone", "outer", { fill: "#000000", text: null });
     for (const boundary of ["later", "laterRedone", "laterReloaded"]) check(boundary, "outer", { fill: "#000000", text: "#00ff00", draw: "#0000ff" });
     if (!persistence(evidence.laterDownload, "download") || !persistence(evidence.laterReload, "reload")) throw new Error("Later import must preserve local paint through save/reload");

@@ -1,0 +1,16 @@
+Original reproduction: /private/tmp/stz-review-runtime-exec (all original bytes preserved).
+Corrected compiler output directory: /private/tmp/stz-runtime-execution-pgf-vhv5hjyq
+Working directory: /Users/takamatoshinori/Desktop/stratified-tikz/tests/fixtures/point-paint-pgf/execution-boundary/runtime-execution
+
+PATH=/opt/homebrew/bin:$PATH node generate.mjs
+PATH=/opt/homebrew/bin:/Library/TeX/texbin:$PATH node --version
+PATH=/opt/homebrew/bin:/Library/TeX/texbin:$PATH pdflatex --version
+PATH=/opt/homebrew/bin:/Library/TeX/texbin:$PATH pdflatex -interaction=nonstopmode -halt-on-error -output-directory=/private/tmp/stz-runtime-execution-pgf-vhv5hjyq runtime-standalone.tex > standalone-compilation.txt 2>&1
+Exit code: 0
+cp /private/tmp/stz-runtime-execution-pgf-vhv5hjyq/runtime-standalone.pdf runtime-standalone.pdf
+cp /private/tmp/stz-runtime-execution-pgf-vhv5hjyq/runtime-standalone.log runtime-standalone.log.txt
+PATH=/opt/homebrew/bin:/Library/TeX/texbin:$PATH pdflatex -interaction=nonstopmode -halt-on-error -output-directory=/private/tmp/stz-runtime-execution-pgf-vhv5hjyq runtime-inlineMath.tex > inlineMath-compilation.txt 2>&1
+Exit code: 0
+cp /private/tmp/stz-runtime-execution-pgf-vhv5hjyq/runtime-inlineMath.pdf runtime-inlineMath.pdf
+cp /private/tmp/stz-runtime-execution-pgf-vhv5hjyq/runtime-inlineMath.log runtime-inlineMath.log.txt
+PATH=/opt/homebrew/bin:$PATH node extract-operators.mjs

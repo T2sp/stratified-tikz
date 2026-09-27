@@ -1,0 +1,77 @@
+{
+  "originalDirectory": "/private/tmp/stz-review-runtime-exec",
+  "files": [
+    {
+      "originalName": "commands.txt",
+      "retainedName": "commands.txt",
+      "sha256": "ed56182be898215f5c841314f70314486516fa8a7bccfd720cf314494ffef892",
+      "bytes": 198
+    },
+    {
+      "originalName": "compilation.txt",
+      "retainedName": "compilation.txt",
+      "sha256": "4ae7ef19da7ec5036d2b6243006e861afb637ad1b8942877242a0a6be649c98c",
+      "bytes": 7206
+    },
+    {
+      "originalName": "inlineMath.tex",
+      "retainedName": "inlineMath.tex",
+      "sha256": "b634c06057fc7830de7eaa8666b7b9a0de345392b39f0768ac79480d6d34baf1",
+      "bytes": 2229
+    },
+    {
+      "originalName": "observations.json",
+      "retainedName": "observations.json",
+      "sha256": "b46e4717c7da7f21e3f89075353cf9350e201ade4d4937f500c1f4ff3b55a492",
+      "bytes": 247
+    },
+    {
+      "originalName": "operators.txt",
+      "retainedName": "operators.txt",
+      "sha256": "ce4790cb58e887a5cee89e44acd05d9df4de3db27050849a441e828c30a052b6",
+      "bytes": 1880
+    },
+    {
+      "originalName": "probe.aux",
+      "retainedName": "probe.aux",
+      "sha256": "fbabe80c887f95a1ede6847f22dd91b380bda9d17ae8bfaa72e1741b16aa41e9",
+      "bytes": 32
+    },
+    {
+      "originalName": "probe.log",
+      "retainedName": "probe.log.txt",
+      "sha256": "f350b5d9784cb3c81dbeb5c9fa3cee566606a3487d2db952a66c9db7b565f774",
+      "bytes": 15844
+    },
+    {
+      "originalName": "probe.pdf",
+      "retainedName": "probe.pdf",
+      "sha256": "fd0612731b3e904abd357afd64f7836306db8ab9b22edd411b5f91a574bb945f",
+      "bytes": 14518
+    },
+    {
+      "originalName": "probe.tex",
+      "retainedName": "probe.tex",
+      "sha256": "b17d85602f7ab1d31aeebe553305cef6162705621ab24b3a1995d0f550d32904",
+      "bytes": 310
+    },
+    {
+      "originalName": "repro.mjs",
+      "retainedName": "repro.mjs",
+      "sha256": "d32e0f28e97251dab8db8c9b8db788e6164d503775d87cb07162175a423d2a61",
+      "bytes": 1946
+    },
+    {
+      "originalName": "runtime.sty",
+      "retainedName": "runtime.sty",
+      "sha256": "21365c2659609a6d699e61a7227874287978f506974d75809073cae2dfd00984",
+      "bytes": 81
+    },
+    {
+      "originalName": "standalone.tex",
+      "retainedName": "standalone.tex",
+      "sha256": "8fa303fa9646cbfeb22817c7e48d89661f217bbc44768175b8ee0885334cd257",
+      "bytes": 1939
+    }
+  ]
+}

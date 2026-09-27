@@ -1,12 +1,13 @@
 # Phase 32B: Independent point paint and imported styles
 
 Status: 32B remains incomplete until matching final verification and independent
-review succeed. The supplied `T5qkan` parent report passed all five commands,
+review succeed. The supplied `UD0YeR` parent report passed all five commands,
 16 cumulative groups, 27 point scenarios and 281 required artifacts on the
-pre-fix fingerprint `d47b85b1596b340a97f9ca80a0197fce67d450d368d38b605b0cb7e487ed4dff`.
-Independent review then found two Medium importer defects: execution/scope
-uncertainty and declaration-limit overflow becoming authoritative paint. The
-final section documents these targeted corrections and the new external handoff.
+pre-fix fingerprint `1673235823b56d698409147427446e2d7269ac1f98bee42b3dd07abd15b1aac3`.
+Independent review accepted the execution/scope, handler-boundary and declaration
+limit corrections, but found one Medium runtime-execution defect: a later paint
+option could regain false certainty after arbitrary code changed a color binding.
+The final section documents this targeted correction and its separate evidence.
 The App diagnostics, cumulative native policy and accepted historical evidence
 are preserved. 32C/32D remain deferred.
 The following paragraphs and earlier sections retain historical evidence only.
@@ -2362,3 +2363,132 @@ and new fixture script syntax checks, and `git diff --check` passed. The final
 frozen verifier now includes **3,441** registered tests and runs build only after
 the full test process exits. Its external report supersedes the first attempt;
 tracked documentation is not changed after this freeze.
+
+## Targeted runtime-execution certainty correction (2026-09-27)
+
+The accepted pre-fix parent report is
+`/var/folders/vk/7kf940pd4bx8f6cg3rzlmtc80000gn/T/stz-phase32b-before-review-UD0YeR/verification.json`;
+the independent review checks are
+`/private/tmp/stz-phase32b-independent-review-EU8oKW/checks.json`.
+The supplied fingerprint identifies the accepted pre-prompt tree, including
+tracked, untracked and binary bytes. All five commands, 16 groups, 27 point
+scenarios and 281 required artifacts were accepted, with no page errors.
+Independent Node v26.9.0 checks passed 3,441 tests. This turn actually starts on
+`phase/32b-color-opacity-outline` at clean HEAD
+`bb8fc874c7802ecdcfa4732ddb903d3cd4608d4d`, which incorporates the preceding work
+and updated prompt, rather than the supplied `0cf3811` revision. No matching
+starting-tree fingerprint is inferred from the historical report. That accepted
+evidence is not replaced by historical child browser-startup failures. Fresh
+matching verification is required for this production correction. The earlier
+execution-boundary and handler-execution fixtures and registered regressions
+remain intact; nothing was reset or discarded.
+
+The retained `/private/tmp/stz-review-runtime-exec/` reproduction uses exactly:
+
+```tex
+\tikzset{myPoint/.style={/utils/exec={\definecolor{red}{HTML}{0000FF}},text=red}}
+```
+
+The declaration is supported storage of a style body. Its later invocation runs
+arbitrary code, so declaration-time boundary validation cannot establish its
+paint effects. Original PGF 3.1.11a operators show blue (`0 0 1 rg`) for the
+external node and red (`1 0 0 rg`) for both generated application nodes. The
+application appended `text=stzPointpText2` after `myPoint`, defining that name as
+`FF0000`. The resolver had warned at `/utils/exec` and marked paint unresolved,
+then used its stale built-in red binding to clear `textColor` uncertainty at
+the later literal option. The original files and failed outputs are retained
+byte-for-byte under the separate
+[runtime-execution fixture](../tests/fixtures/point-paint-pgf/execution-boundary/runtime-execution/README.md).
+The supplied PDF demonstrates color-binding mutation. Option-handler mutation
+is an additional possible effect of arbitrary execution and receives focused
+regression coverage; it is not asserted as a second observation from that PDF.
+
+The resolver now tracks loss of binding/handler certainty throughout one
+invocation. Unsupported execution-capable options, unknown runtime keys/handlers
+and retained code mutations set transient `executionUncertain` and mark all
+paint unresolved. The state is shared through nested references, aliases and
+returns to outer option lists. Retained appended/prefixed lists are scanned for
+execution effects as well as dependencies and directory changes. No body is
+executed or interpreted, and the effect is not restricted to a named color.
+Later paint, mixtures or absolute `/tikz/...` keys cannot restore certainty:
+absolute spelling establishes a path, not unchanged handlers or bindings. Source
+dependencies and load hints remain retained in source order.
+
+The same conservative rule applies when body/work/depth bounds or cycles leave
+effects unvisited. This deliberately narrows the earlier documented recovery
+after an incomplete scan: a later absolute paint key cannot prove recovery from
+uninspected arbitrary effects. The existing budgets remain unchanged. Fully
+scanned directory-only changes still permit supported absolute-key recovery;
+demonstrably paint-only mutations and ordinary invalid literals retain their
+field-specific recovery. Independent supported resolutions keep their normal
+behavior. The completed top-level closed grammar, passive handler allowlist,
+argument boundaries and atomic 512-event limit are unchanged.
+
+This policy retains accepted raw source and the actual external key. It differs
+from the existing rejected-source guard, which invalidates every imported source
+because declaration-time effects are unknown. Both are reconstructed on load;
+the new preview flag is never stored as authority. Diagnostics are retained and
+reconstructed for raw sources and legacy reference options. Stale snapshots
+cannot cause export, refresh or first editing to invent local intent. Recorded
+`overriddenFields` still win, including explicit edits equal to the visible
+fallback. The first untracked edit claims only its accepted fields; untouched
+uncertain channels remain external. Preset reapplication, JSON and Undo/Redo
+preserve this distinction. Both modes keep defaults before the external key and
+omit uncertain untouched paint after it.
+
+The registered `pointPaintRuntimeExecution.test.ts` regressions supplement the
+completed boundary suite.
+They cover the exact source, nested/aliased and outer-list execution, retained
+mutation dependencies, bounds, later general/specific/absolute paint and mixtures,
+handler side effects, stale snapshots, exact raw source/CRLF and diagnostics,
+existing-preset reapplication, history and explicit text/fill intent. Export
+assertions inspect target-node options after the actual external key. Supported
+literals, independent resolutions, paint-only recovery and directory-only
+absolute recovery remain controls. The importer and preview do not execute TeX.
+
+Read-only pre-verification audit added controls for retained namespaced code
+handlers reached after directory uncertainty, assigned deferred-layout handlers,
+and prefixes or successive mutations that change invocation order. The effect
+scan carries directory state and conservatively rescans possible earlier lists
+with unknown directory, sharing the existing work limit. Deferred layout TeX,
+nonliteral directories and trailing mutation tokens cannot hide execution.
+Refresh also checks the previous context when a later supported definition
+restores resolution: stale tracked or legacy fallbacks cannot become local intent.
+Recorded edits alone survive that transition onto the supported baseline.
+The independent review additionally caught runtime handler syntax hidden behind
+deferred-layout prefixes (`shape aspect/.style`). Handler suffixes and nonliteral
+key tokens now lose execution certainty before layout classification; direct
+and retained-list regressions cover that boundary. The review's separate PGF
+reproduction is recorded in the external handoff, distinct from the original
+color-binding evidence and the preserved corrected exact-source comparison.
+
+The corrected independent comparison compiles standalone and inline-math output
+separately with pdfTeX 1.40.29 / PGF 3.1.11a, each against byte-identical
+`runtime.sty`. Both compiler exits are zero. Each PDF contains one external node
+and eight application cases; actual paint operators show blue for the external,
+untouched, reloaded, stale-red-snapshot reloaded and preset-reapplied text.
+Intentional red text remains red and an intentional fallback-equal black text
+edit remains black. Yellow and fallback-equal black fill edits retain those
+colors while their untouched text remains external blue. The source, original
+failure, generated fragments, commands, versions, full logs, PDFs, actual paint
+operators and 18 independent observations are retained in the runtime fixture.
+The expected external blue comes from the original compiler observation, not
+the application resolver. This evidence verifies the corrected precedence in
+both modes without authorizing application TeX execution.
+
+The existing missing-dependency native boundary now requires unresolved draw as
+well as fill/text after the unknown invocation; later literal draw cannot assume
+unchanged handlers. The browser assertion and parent policy require the derived
+execution flag and unresolved channels, with negative policy controls for false
+paint and missing uncertainty. This strengthens the existing scenario without
+changing its artifacts, groups, deadlines or native interactions.
+All 16 groups,
+27 point scenarios and required artifacts remain mandatory, including seven
+App/SVG transitions, three continuity controls, five native geometry controls,
+the directory scenario and six responsive downloads. No dependency, deferred
+32C/32D feature, unrelated lint cleanup, commit or push is included. Final code,
+tests and tracked documentation must be frozen before matching verification;
+final binary-aware identity, report paths and the subsequent independent review
+belong in `/private/tmp/stz-phase32b-runtime-handoff/`. No final fingerprint is
+stored in tracked documentation. Missing verification or review acceptance keeps
+32B incomplete, and any subsequent checkout change requires verification again.

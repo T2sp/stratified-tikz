@@ -548,7 +548,9 @@ function importRegressionEvidence(name) {
     for (const boundary of ['crossFile', 'reloaded']) result[boundary] = snapshot('outer', { fill: '#ff0000', text: '#00ff00', draw: '#0000ff' })
     result.priorColor = snapshot('outer', { fill: '#123456', text: '#00ff00', draw: '#0000ff' })
     result.redefined = snapshot('outer', { fill: '#ffff00', text: '#0000ff', draw: '#00ff00' })
-    result.missing = snapshot('outer', { fill: null, text: null, draw: '#0000ff' }, ['Unsupported absent base'])
+    result.missing = snapshot('outer', { fill: null, text: null, draw: null }, ['Unsupported absent base'])
+    result.missing.modelDiagnostics = { resolution: { executionUncertain: true,
+      diagnostics: ['Unsupported absent base'], unresolvedFields: ['fillColor', 'drawColor', 'textColor'] } }
     result.laterUndone = snapshot('outer', { fill: '#000000', text: null })
     for (const boundary of ['later', 'laterRedone', 'laterReloaded']) result[boundary] = snapshot('outer', { fill: '#000000', text: '#00ff00', draw: '#0000ff' })
     result.laterDownload = { boundary: 'download', differencePaths: [] }; result.laterReload = { boundary: 'reload', differencePaths: [] }
@@ -1091,7 +1093,7 @@ for (const name of importRegressionScenarios) {
   }
 }
 
-for (const fault of ['claimed-unknown-fill', 'claimed-unknown-text', 'missing-noncolor-return', 'missing-later-import', 'missing-prior-color', 'reversed-hints', 'missing-diagnostic',
+for (const fault of ['claimed-unknown-fill', 'claimed-unknown-text', 'claimed-unknown-handler-paint', 'missing-runtime-uncertainty', 'missing-noncolor-return', 'missing-later-import', 'missing-prior-color', 'reversed-hints', 'missing-diagnostic',
   'missing-focus-blur', 'focus-blur-override', 'focus-blur-history', 'missing-focused-control', 'unblurred-control']) {
   test(`32B rejects incomplete import regression boundaries: ${fault}`, (t) => {
     const fixture = checkoutFixture(t)
@@ -1101,6 +1103,8 @@ for (const fault of ['claimed-unknown-fill', 'claimed-unknown-text', 'missing-no
     const unsupported = artifacts['point-paint-unsupported-color-bindings.json']
     if (fault === 'claimed-unknown-fill') intent.untouched.output.inlineMath = intent.back.output.inlineMath
     if (fault === 'claimed-unknown-text') unsupported.back.output.standalone = unsupported.back.output.standalone.replace('myPoint,', 'myPoint,text=black,')
+    if (fault === 'claimed-unknown-handler-paint') cross.missing.output.inlineMath = cross.missing.output.inlineMath.replace('outer,', 'outer,draw=blue,')
+    if (fault === 'missing-runtime-uncertainty') delete cross.missing.modelDiagnostics.resolution.executionUncertain
     if (fault === 'missing-noncolor-return') delete intent.settingsBack
     if (fault === 'missing-later-import') delete cross.later
     if (fault === 'missing-prior-color') delete cross.priorColor

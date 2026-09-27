@@ -32,6 +32,8 @@ export type TikzPaintPreview = {
   diagnostics?: string[]
   unresolvedFields?: string[]
   sourceDependencies?: string[]
+  /** Derived per invocation: color bindings/key handlers may have changed. */
+  executionUncertain?: boolean
 }
 export type TikzStylePreviewDefinition = {
   key: string
@@ -39,6 +41,7 @@ export type TikzStylePreviewDefinition = {
   sourceId?: string
   sourceDependencies?: readonly string[]
   dependencyOptions?: readonly string[]
+  executionUncertain?: boolean
 } & (
   | { state?: 'known' }
   | { state: 'unresolved'; diagnostics: readonly string[] }
@@ -149,6 +152,7 @@ export function resolveTikzPaint(options: string, context: TikzPreviewContext = 
   // absolute option handlers may have changed. The caller supplies a visible
   // fallback while these fields prohibit authoritative post-key paint.
   if (context.sourceDiagnostics?.length) return {
+    executionUncertain: true,
     diagnostics: context.sourceDiagnostics.slice(0, 64),
     unresolvedFields: paintFields,
     sourceDependencies: [...(context.sourceIds ?? [])],
@@ -160,57 +164,110 @@ export function resolveTikzPaint(options: string, context: TikzPreviewContext = 
     'line cap': ['lineCap'], cap: ['lineCap'], 'line join': ['lineJoin'], join: ['lineJoin'],
   }
   const deferredShapeLayout = /^(?:shape(?: |$)|circle$|rectangle$|ellipse$|diamond$|trapezium(?: |$)|semicircle$|regular polygon(?: |$)|star(?: |$)|isosceles triangle(?: |$)|kite(?: |$)|dart(?: |$)|circular sector(?: |$)|cylinder(?: |$)|aspect$|inner |outer |minimum |anchor$|text (?:width|height|depth)$|align$|font$|node contents$)/
-  const resolved = (...fields: string[]) => fields.forEach((field) => unresolved.delete(field))
+  let bindingsKnown = true
+  const resolved = (...fields: string[]) => {
+    if (bindingsKnown) fields.forEach((field) => unresolved.delete(field))
+  }
   let work = 0
   const styles = new Map((context.styles ?? []).map((style) => [canonicalTikzStyleKey(style.key), style]))
   const warn = (message: string) => { if (diagnostics.length < 64 && !diagnostics.includes(message)) diagnostics.push(message) }
   // Dependency discovery is deliberately separate from paint resolution. An
   // unsupported style-list mutation can require nested styles and colors even
   // though none of its option values are safe to apply to the preview. Return
-  // whether its invocation directory stays known: a literal .cd in a mutation
-  // or nested dependency also affects the options following that invocation.
+  // whether its invocation directory stays known, and propagate executable
+  // effects without applying the mutation's paint approximation.
   let dependencyWork = 0
   const retainAllSourceHints = (message: string) => {
     warn(message)
     for (const sourceId of context.sourceIds ?? []) dependencies.add(sourceId)
   }
-  const collectOptionDependencies = (body: string, active: readonly string[]): boolean => {
+  const loseExecutionCertainty = (message: string) => {
+    bindingsKnown = false
+    preview.executionUncertain = true
+    paintFields.forEach((field) => unresolved.add(field))
+    retainAllSourceHints(`${message} Runtime color bindings and option handlers remain unknown; later paint cannot restore certainty.`)
+  }
+  // Known paint keys with invalid literal arguments retain field-local recovery.
+  // An unknown key/handler can run arbitrary code; do not guess its effects.
+  const hasRuntimeHandlerSyntax = (key: string) => /\/\s*\./.test(key) || /[\\{}#=$%~^&]/.test(key)
+  const isPaintOrLayoutKey = (key: string) => !key.includes('/') && !hasRuntimeHandlerSyntax(key) && (Object.hasOwn(keyFields, key)
+    || Object.hasOwn(thickness, key) || Object.hasOwn(lineStyles, key) || deferredShapeLayout.test(key))
+  const isColorOption = (key: string) => Object.hasOwn(context.colors ?? {}, key)
+    || Object.hasOwn(namedTikzColors, key) || key.includes('!')
+  const hasExecutableLayoutValue = (key: string, value: string) => deferredShapeLayout.test(key)
+    && /[\\#~^$&%]/.test(value)
+  const collectOptionDependencies = (body: string, active: readonly string[], directoryKnown = true): boolean => {
     if (body.length > 100_000 || active.length > 16) {
-      retainAllSourceHints('Style dependency scan exceeds its preview bound; retaining all imported source hints.')
+      loseExecutionCertainty('Style dependency scan exceeds its preview bound; unvisited options may execute code.')
       return false
     }
-    let directoryKnown = true
     for (const rawOption of splitTikzOptions(body)) {
       const option = rawOption.trim()
       if (!option) continue
       dependencyWork += 1
       if (dependencyWork > 4096) {
-        retainAllSourceHints('Style dependency scan exceeds the 4096-option bound; retaining all imported source hints.')
+        loseExecutionCertainty('Style dependency scan exceeds the 4096-option bound; unvisited options may execute code.')
         return false
       }
       const equals = option.indexOf('=')
       const key = (equals < 0 ? option : option.slice(0, equals)).trim()
+      const paintKey = key.replace(/^\/tikz\//, '').replace(/\s+/g, ' ')
       if (key.endsWith('/.cd')) {
+        if (/[\\{}#=$%~^&]/.test(key) || /[\\#~^$&%]/.test(option.slice(equals + 1))) {
+          loseExecutionCertainty(`Unsupported executable runtime directory: ${option}`)
+        }
         retainAllSourceHints('Style dependency scan has an unsupported runtime directory change; retaining all imported source hints.')
-        return false
+        directoryKnown = false
+        continue
       }
-      if (/[\\{}#=$%~^&]/.test(key)) continue
       const identity = canonicalTikzStyleKey(key)
       const definition = styles.get(identity)
-      if (definition !== undefined) {
-        if (definition.sourceId !== undefined) dependencies.add(definition.sourceId)
-        for (const sourceId of definition.sourceDependencies ?? []) dependencies.add(sourceId)
-        if (!active.includes(identity)) {
-          const nestedActive = [...active, identity]
-          directoryKnown = collectOptionDependencies(definition.options ?? '', nestedActive) && directoryKnown
-          for (const options of definition.dependencyOptions ?? []) {
-            directoryKnown = collectOptionDependencies(options, nestedActive) && directoryKnown
+      if (hasRuntimeHandlerSyntax(key)) loseExecutionCertainty(`Unsupported executable runtime key: ${option}`)
+      if (hasExecutableLayoutValue(paintKey, equals < 0 ? '' : option.slice(equals + 1))) {
+        loseExecutionCertainty(`Unsupported executable layout option: ${option}`)
+      }
+      // After .cd, even a relative paint-looking key can invoke a retained
+      // namespaced code handler. Inspect all matching definitions for effects;
+      // do not pick a directory or apply their paint values to the preview.
+      const candidates = !directoryKnown && !key.startsWith('/')
+        ? [...styles.values()].filter((style) => canonicalTikzStyleKey(style.key).endsWith(`/${key}`))
+        : definition === undefined ? [] : [definition]
+      for (const candidate of candidates) {
+        dependencyWork += 1
+        if (dependencyWork > 4096) {
+          loseExecutionCertainty('Style dependency scan exceeds the 4096-option bound; unvisited handlers may execute code.')
+          return false
+        }
+        const candidateIdentity = canonicalTikzStyleKey(candidate.key)
+        if (equals >= 0 && candidate.options?.includes('#')) loseExecutionCertainty(`Unsupported parameterized style invocation: ${option}`)
+        if (candidate.sourceId !== undefined) dependencies.add(candidate.sourceId)
+        for (const sourceId of candidate.sourceDependencies ?? []) dependencies.add(sourceId)
+        if (candidate.executionUncertain) loseExecutionCertainty(`Unsupported executable style mutation: ${candidate.key}.`)
+        if (active.includes(candidateIdentity)) {
+          loseExecutionCertainty(`Cyclic style dependency: ${key}; unvisited options may execute code.`)
+        } else {
+          const nestedActive = [...active, candidateIdentity]
+          const startedWithKnownDirectory = directoryKnown
+          directoryKnown = collectOptionDependencies(candidate.options ?? '', nestedActive, directoryKnown) && directoryKnown
+          for (const options of candidate.dependencyOptions ?? []) {
+            directoryKnown = collectOptionDependencies(options, nestedActive, directoryKnown) && directoryKnown
+          }
+          if (startedWithKnownDirectory && !directoryKnown && candidate.dependencyOptions?.length) {
+            // A retained prefix can run before the fallback/earlier lists. We
+            // do not interpret mutation order, so inspect all possible effects
+            // again with unknown directory using the same bounded work budget.
+            collectOptionDependencies(candidate.options ?? '', nestedActive, false)
+            for (const options of candidate.dependencyOptions) collectOptionDependencies(options, nestedActive, false)
           }
         }
-      } else if (equals < 0) {
-        color(key)
-      } else if (['fill', 'draw', 'text', 'color'].includes(key.replace(/^\/tikz\//, ''))) {
+      }
+      if (candidates.length) continue
+      if (equals < 0 && isColorOption(paintKey)) {
+        color(paintKey)
+      } else if (['fill', 'draw', 'text', 'color'].includes(paintKey)) {
         color(option.slice(equals + 1))
+      } else if (!isPaintOrLayoutKey(paintKey)) {
+        loseExecutionCertainty(`Unsupported executable preview option: ${option}`)
       }
     }
     return directoryKnown
@@ -221,11 +278,10 @@ export function resolveTikzPaint(options: string, context: TikzPreviewContext = 
   // encountered, relative options remain unresolved instead of guessing a path.
   let runtimeDirectoryKnown = true
   const incompleteExpansion = (message: string) => {
-    // Unvisited options may change the invocation directory as well as paint.
-    // A later relative key cannot recover certainty about either meaning.
+    // Unvisited options can redefine bindings and handlers as well as directory.
     runtimeDirectoryKnown = false
     retainAllSourceHints(`${message} Runtime key directory remains unknown; retaining all imported source hints.`)
-    paintFields.forEach((field) => unresolved.add(field))
+    loseExecutionCertainty('Incomplete style expansion; unvisited options may execute code.')
   }
   const visit = (body: string, active: readonly string[]) => {
     if (body.length > 100_000) { incompleteExpansion('Preview option input exceeds the 100000-character bound.'); return }
@@ -239,33 +295,44 @@ export function resolveTikzPaint(options: string, context: TikzPreviewContext = 
       const key = rawKey.replace(/^\/tikz\//, '').replace(/\s+/g, ' ')
       const value = equals < 0 ? undefined : unbrace(option.slice(equals + 1))
       if (rawKey.endsWith('/.cd')) {
+        if (/[\\{}#=$%~^&]/.test(rawKey) || (value !== undefined && /[\\#~^$&%]/.test(value))) {
+          loseExecutionCertainty(`Unsupported executable runtime directory: ${option}`)
+        }
         warn(`Unsupported runtime key directory change: ${option}`)
         runtimeDirectoryKnown = false
         paintFields.forEach((field) => unresolved.add(field))
         continue
       }
       if (!runtimeDirectoryKnown && !rawKey.startsWith('/')) {
+        // Still inspect retained lists for executable effects after .cd.
+        collectOptionDependencies(option, active, false)
         warn(`Unresolved option after unsupported runtime key directory change: ${option}`)
         paintFields.forEach((field) => unresolved.add(field))
         continue
       }
       const canonicalKey = canonicalTikzStyleKey(rawKey)
-      const reference = equals < 0 && styles.has(canonicalKey) ? canonicalKey : undefined
+      const reference = styles.has(canonicalKey) ? canonicalKey : undefined
       if (reference !== undefined) {
         const definition = styles.get(reference)!
+        const startedWithKnownDirectory = runtimeDirectoryKnown
+        if (equals >= 0) loseExecutionCertainty(`Unsupported parameterized style invocation: ${option}`)
         if (definition.sourceId !== undefined) dependencies.add(definition.sourceId)
         for (const sourceId of definition.sourceDependencies ?? []) dependencies.add(sourceId)
-        if (active.includes(reference)) { warn(`Cyclic style reference: ${[...active, reference].join(' → ')}`); paintFields.forEach((field) => unresolved.add(field)) }
+        if (active.includes(reference)) loseExecutionCertainty(`Cyclic style reference: ${[...active, reference].join(' → ')}`)
         else if (active.length >= 16) incompleteExpansion('Preview style expansion exceeds the 16-level depth bound.')
         else visit(definition.options ?? '', [...active, reference])
         // The last known body is only a deterministic preview approximation.
-        // Unknown handlers may change every channel; subsequent literal options
-        // can restore certainty for their own fields through resolved(), only
-        // while their key's invocation directory remains known.
+        // Only a completely scanned paint-only mutation can permit later
+        // own-field recovery. Arbitrary handlers also invalidate bindings.
         if (definition.state === 'unresolved') {
           definition.diagnostics.forEach(warn)
+          if (definition.executionUncertain) loseExecutionCertainty(`Unsupported executable style mutation: ${rawKey}.`)
           for (const options of definition.dependencyOptions ?? []) {
-            runtimeDirectoryKnown = collectOptionDependencies(options, [reference]) && runtimeDirectoryKnown
+            runtimeDirectoryKnown = collectOptionDependencies(options, [reference], runtimeDirectoryKnown) && runtimeDirectoryKnown
+          }
+          if (startedWithKnownDirectory && !runtimeDirectoryKnown && definition.dependencyOptions?.length) {
+            collectOptionDependencies(definition.options ?? '', [reference], false)
+            for (const options of definition.dependencyOptions) collectOptionDependencies(options, [reference], false)
           }
           paintFields.forEach((field) => unresolved.add(field))
         }
@@ -275,6 +342,19 @@ export function resolveTikzPaint(options: string, context: TikzPreviewContext = 
         warn(`Unsupported or invalid preview option: ${option}`)
         const fields = affectedFields ?? (Object.hasOwn(keyFields, key) ? keyFields[key] : deferredShapeLayout.test(key) ? [] : paintFields)
         fields.forEach((field) => unresolved.add(field))
+      }
+      if (hasRuntimeHandlerSyntax(rawKey)) loseExecutionCertainty(`Unsupported executable runtime key: ${option}`)
+      if (hasExecutableLayoutValue(key, value ?? '')) loseExecutionCertainty(`Unsupported executable layout option: ${option}`)
+      if (!isPaintOrLayoutKey(key) && !(value === undefined && isColorOption(key))) {
+        invalid()
+        loseExecutionCertainty(`Unsupported executable preview option: ${option}`)
+      }
+      // Continue bounded dependency discovery, but never apply stale handlers or
+      // bindings to the fallback after arbitrary execution has become possible.
+      if (!bindingsKnown) {
+        if (value === undefined && isColorOption(key)) color(key)
+        else if (value !== undefined && ['fill', 'draw', 'text', 'color'].includes(key)) color(value)
+        continue
       }
       if (key === 'draw' || key === 'fill') {
         const enabledKey = key === 'draw' ? 'drawEnabled' : 'fillEnabled'

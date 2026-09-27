@@ -327,10 +327,12 @@ export function recordPointPaintEdit(before: PointStyle, after: PointStyle): Poi
 }
 
 /** Refresh importer snapshots only; legacy explicit styles have no provenance. */
-export function refreshImportedPointPaintSnapshot(style: PointStyle, resolvedStyle: PointStyle, referenceId: string): PointStyle {
+export function refreshImportedPointPaintSnapshot(style: PointStyle, resolvedStyle: PointStyle, referenceId: string, inferSnapshotDifferences = true): PointStyle {
   if (style.importedPaint?.referenceId !== referenceId) return style
   const oldBaseline: PointStyle = { ...style, paint: style.importedPaint.baseline, opacity: 1 }
-  const result = markPointPaintOverrides(style, changedPointPaintFields(oldBaseline, style))
+  // Recovery from unknown execution has no trustworthy historical baseline.
+  // Keep recorded intent, but never promote those old fallback differences.
+  const result = markPointPaintOverrides(style, inferSnapshotDifferences ? changedPointPaintFields(oldBaseline, style) : [])
   const overridden = new Set(result.importedPaint?.overriddenFields)
   const paint = clonePointPaint(getPointPaint(style))
   const resolved = getPointPaint(resolvedStyle)
@@ -344,7 +346,7 @@ export function refreshImportedPointPaintSnapshot(style: PointStyle, resolvedSty
       else Reflect.set(paint[channel], property, Array.isArray(value) ? [...value] : value)
     }
   }
-  return { ...result, paint, importedPaint: {
+  return { ...result, paint, opacity: overridden.has('opacity') ? result.opacity : resolvedStyle.opacity, importedPaint: {
     referenceId, baseline: clonePointPaint(resolved), overriddenFields: [...overridden],
   } }
 }

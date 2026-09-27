@@ -1,0 +1,34 @@
+\documentclass{article}
+\usepackage{tikz}
+\pagestyle{empty}
+\pdfcompresslevel=0
+\pdfobjcompresslevel=0
+\begin{document}
+\typeout{STZ-PGF-VERSION=\pgfversion}
+\input{runtime.sty}
+\noindent External reference\par
+\begin{tikzpicture}\node[myPoint] at (0,0) {PGF};\end{tikzpicture}
+\par\noindent\texttt{untouched}\par
+\[\input{untouched-inlineMath.tex}\]
+
+\par\noindent\texttt{reloaded}\par
+\[\input{reloaded-inlineMath.tex}\]
+
+\par\noindent\texttt{stale-reloaded}\par
+\[\input{stale-reloaded-inlineMath.tex}\]
+
+\par\noindent\texttt{preset-reapplied}\par
+\[\input{preset-reapplied-inlineMath.tex}\]
+
+\par\noindent\texttt{local-text-red}\par
+\[\input{local-text-red-inlineMath.tex}\]
+
+\par\noindent\texttt{local-text-fallback}\par
+\[\input{local-text-fallback-inlineMath.tex}\]
+
+\par\noindent\texttt{local-fill-yellow}\par
+\[\input{local-fill-yellow-inlineMath.tex}\]
+
+\par\noindent\texttt{local-fill-fallback}\par
+\[\input{local-fill-fallback-inlineMath.tex}\]
+\end{document}

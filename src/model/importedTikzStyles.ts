@@ -74,7 +74,7 @@ export type ParsedTikzStyleDefinition = {
 
 export type ParsedTikzStyleDeclaration =
   | ({ kind: 'definition' } & ParsedTikzStyleDefinition)
-  | { kind: 'mutation'; key: string; diagnostic: string; dependencyOptions?: readonly string[] }
+  | { kind: 'mutation'; key: string; diagnostic: string; dependencyOptions?: readonly string[]; executionUncertain?: boolean }
 
 export type TikzsetParserWarning = {
   message: string
@@ -305,6 +305,7 @@ export function createImportedTikzResolutionContext(
           options: previous?.options,
           sourceId: source.id,
           state: 'unresolved',
+          executionUncertain: previous?.executionUncertain || declaration.executionUncertain,
           diagnostics: [...new Set([...(previous?.state === 'unresolved' ? previous.diagnostics : []), declaration.diagnostic])],
           dependencyOptions: [...(previous?.dependencyOptions ?? []), ...(declaration.dependencyOptions ?? [])],
           sourceDependencies: [...new Set([
@@ -342,15 +343,21 @@ export function createImportedTikzResolutionContext(
 /** Reconstruct limitations in old saves without rewriting source or inventing intent. */
 export function restoreImportedTikzSourceDiagnostics(diagram: Diagram): string[] {
   const context = createImportedTikzResolutionContext(diagram)
-  if (!context.sourceDiagnostics?.length) return []
-  diagram.importedTikzStyleReferences = diagram.importedTikzStyleReferences?.map((reference) => ({
-    ...reference,
-    previewDiagnostics: [...new Set([
-      ...(reference.previewDiagnostics ?? []),
-      ...(resolveImportedTikzStyle(reference, context).diagnostics ?? []),
-    ])],
-  }))
-  return [...context.sourceDiagnostics]
+  const warnings = new Set(context.sourceDiagnostics ?? [])
+  if (diagram.importedTikzStyleReferences === undefined) return [...warnings]
+  diagram.importedTikzStyleReferences = diagram.importedTikzStyleReferences.map((reference) => {
+    const preview = resolveImportedTikzStyle(reference, context)
+    // Plain external references without saved input have no runtime body to
+    // reconstruct. Preserve their existing optional metadata representation.
+    if (!preview.executionUncertain || (!context.sourceDiagnostics?.length && reference.options === undefined
+      && !diagram.externalTikzStyleSources?.some((source) => source.id === reference.sourceId && source.rawSource !== undefined))) return reference
+    // Invocation limitations belong to the reference's preview diagnostics;
+    // source rejection continues to supply diagram-load warnings separately.
+    return { ...reference, previewDiagnostics: [...new Set([
+      ...(reference.previewDiagnostics ?? []), ...(preview.diagnostics ?? []),
+    ])] }
+  })
+  return [...warnings]
 }
 
 /** Invoke the key, so an older reference ID never selects a stale root body. */
@@ -454,7 +461,7 @@ export function importTikzStyleFile(
   }))
 
   return {
-    diagram: refreshImportedPointSnapshots(addDetectedImportedStylePresets(diagramWithReferences, references, context), context),
+    diagram: refreshImportedPointSnapshots(addDetectedImportedStylePresets(diagramWithReferences, references, context), context, createImportedTikzResolutionContext(diagram)),
     source,
     references,
     parseResult,
@@ -658,16 +665,26 @@ function addDetectedImportedStylePresets(
   return nextDiagram
 }
 
-/** Only importer-owned snapshots follow later definitions; authored values stay. */
-function refreshImportedPointSnapshots(diagram: Diagram, context: TikzPreviewContext): Diagram {
+/** Refresh tracked baselines; execution-uncertain legacy recovery cannot infer intent. */
+function refreshImportedPointSnapshots(diagram: Diagram, context: TikzPreviewContext, previousContext: TikzPreviewContext): Diagram {
   // A source-wide failure has no established replacement baseline. Keep saved
   // fallbacks and intent, without promoting old differences during refresh.
   if (context.sourceDiagnostics?.length) return diagram
   const references = new Map((diagram.importedTikzStyleReferences ?? []).map((reference) => [reference.id, reference]))
   const refresh = (style: PointStyle, referenceId: string | undefined): PointStyle => {
-    if (referenceId === undefined || style.importedPaint?.referenceId !== referenceId) return style
+    if (referenceId === undefined) return style
     const reference = references.get(referenceId)
-    return reference === undefined ? style : refreshImportedPointPaintSnapshot(style, importedTikzStylePresetStyle('point', reference, context), referenceId)
+    // A runtime execution failure supplies no trustworthy replacement snapshot
+    // and cannot turn old paint differences into inferred local edits.
+    if (reference === undefined || resolveImportedTikzStyle(reference, context).executionUncertain) return style
+    const previouslyUncertain = resolveImportedTikzStyle(reference, previousContext).executionUncertain === true
+    if (style.importedPaint?.referenceId !== referenceId && !previouslyUncertain) return style
+    const resolvedStyle = importedTikzStylePresetStyle('point', reference, context)
+    // Legacy fallback values have no recorded intent either. On a supported
+    // recovery, establish a fresh snapshot rather than infer authorship later.
+    return style.importedPaint?.referenceId !== referenceId
+      ? createImportedPointPaintSnapshot({ ...style, paint: getPointPaint(resolvedStyle), opacity: resolvedStyle.opacity }, referenceId)
+      : refreshImportedPointPaintSnapshot(style, resolvedStyle, referenceId, !previouslyUncertain)
   }
   return {
     ...diagram,
@@ -940,7 +957,10 @@ function parseUnsupportedStyleMutation(entry: string, currentDirectory: string):
   for (let bodyIndex = 0; bodyIndex < bodies; bodyIndex += 1) {
     const body = readBracedContent(entry, skipWhitespace(entry, index))
     if (!body.ok) {
-      if (bodies === 1) dependencyOptions.push(entry.slice(index).trim())
+      if (bodies === 1) {
+        dependencyOptions.push(entry.slice(index).trim())
+        index = entry.length
+      }
       break
     }
     dependencyOptions.push(body.content)
@@ -950,6 +970,9 @@ function parseUnsupportedStyleMutation(entry: string, currentDirectory: string):
     kind: 'mutation',
     key,
     diagnostic: `Unsupported style mutation ${key}/.${handler}; paint preview uses a fallback and remains unresolved.`,
+    // Only complete literal option lists can be checked for paint/directory-only
+    // effects. Stored code or parameterized/other handlers have no such proof.
+    ...(bodies === 0 || dependencyOptions.length !== bodies || entry.slice(index).trim() ? { executionUncertain: true } : {}),
     ...(dependencyOptions.length === 0 ? {} : { dependencyOptions }),
   }
 }

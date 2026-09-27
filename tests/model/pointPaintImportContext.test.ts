@@ -126,8 +126,15 @@ test('later imports preserve local edits and legacy explicit values through relo
   const legacy = reload(applied)
   delete point(legacy).style.importedPaint
   const legacyAfter = importTikzStyleFile(legacy, 'dependency.sty', String.raw`\tikzstyle{missing}=[fill=blue]`).diagram
-  assert.equal(getPointPaint(point(legacyAfter).style).fill.color, '#000000', 'authored legacy style is not regenerated')
-  assert.equal(point(legacyAfter).style.importedPaint, undefined)
+  assert.equal(getPointPaint(point(legacyAfter).style).fill.color, '#0000FF', 'an execution-uncertain legacy fallback is not inferred as authored paint on recovery')
+  assert.deepEqual(point(legacyAfter).style.importedPaint?.overriddenFields, [])
+  const known = importTikzStyleFile(diagram(), 'known.sty', String.raw`\tikzstyle{outer}=[fill=red]`)
+  const authoredLegacy = reload(apply(known.diagram, known.references[0]))
+  delete point(authoredLegacy).style.importedPaint
+  getPointPaint(point(authoredLegacy).style).fill.color = '#123456'
+  const knownAfter = importTikzStyleFile(authoredLegacy, 'replacement.sty', String.raw`\tikzstyle{outer}=[fill=blue]`).diagram
+  assert.equal(getPointPaint(point(knownAfter).style).fill.color, '#123456', 'always-supported legacy authored values stay unchanged')
+  assert.equal(point(knownAfter).style.importedPaint, undefined)
 })
 
 test('unsupported built-in and custom color redefinitions are unknown bindings in declaration/source order', () => {

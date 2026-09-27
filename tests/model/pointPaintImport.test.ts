@@ -4,7 +4,7 @@ import test from 'node:test'
 import { createEmptyDiagram, createPointStratum } from '../../src/model/constructors.ts'
 import { importedStylePresetStyle, importTikzStyleFile, parseTikzsetStyles, parseTikzStylePreviewOptions } from '../../src/model/importedTikzStyles.ts'
 import { literalTikzColor, literalTikzDimension, resolveTikzPaint } from '../../src/model/importedTikzPaint.ts'
-import { getPointPaint } from '../../src/model/styles.ts'
+import { getPointPaint, markPointPaintOverrides } from '../../src/model/styles.ts'
 import { applyUserStylePresetToStratum } from '../../src/model/stylePresets.ts'
 import { parseSavedDiagramJson, serializeDiagram } from '../../src/model/serialization.ts'
 import { generateTikz } from '../../src/tikz/generateTikz.ts'
@@ -165,7 +165,7 @@ test('namespace imports retain correct paint, source and reference identity thro
   }
 })
 
-test('missing root remains unresolved despite nearby namespace paint until known options or local edits resolve it', () => {
+test('missing root cannot establish later paint certainty but recorded local edits remain authoritative', () => {
   const source = String.raw`\tikzset{ns/.cd,base/.style={text=blue},outer/.style={base}}`
   const result = applied(source, 'ns/outer')
   const reference = result.importedTikzStyleReferences?.find((entry) => entry.key === 'ns/outer')
@@ -185,13 +185,14 @@ test('missing root remains unresolved despite nearby namespace paint until known
     assert.doesNotMatch(nodeBlock.slice(nodeBlock.indexOf('ns/outer')), /text=|fill=|draw=|opacity=|line width=/)
     assert.doesNotMatch(output, /\{HTML\}\{0000FF\}/)
   }
-  point.style = { ...point.style, paint: { ...point.style.paint, text: { ...point.style.paint.text, color: '#123456' } } }
+  point.style = markPointPaintOverrides({ ...point.style, paint: { ...point.style.paint, text: { ...point.style.paint.text, color: '#123456' } } }, ['text.color'])
   for (const exportMode of ['standalone', 'inlineMath'] as const) {
     assert.match(generateTikz(loaded.diagram, { exportMode }), /ns\/outer,[\s\S]*text=stzPointpaintText/)
   }
   const knownLater = resolveTikzPaint('ns/outer,text=red', { styles: result.importedTikzStyleReferences })
-  assert.equal(knownLater.textColor, '#FF0000')
-  assert.ok(!knownLater.unresolvedFields?.includes('textColor'))
+  assert.equal(knownLater.textColor, undefined)
+  assert.equal(knownLater.executionUncertain, true)
+  assert.ok(knownLater.unresolvedFields?.includes('textColor'))
   assert.ok(knownLater.unresolvedFields?.includes('fillColor'))
 })
 
@@ -241,8 +242,9 @@ test('bounded mutation dependency scans cannot claim later relative paint after 
     assert.ok(preview.unresolvedFields?.includes('textColor'), name)
     assert.match(preview.diagnostics?.join() ?? '', /dependency scan exceeds/, name)
     assert.deepEqual(preview.sourceDependencies, ['root-source', 'dependency-source'], name)
-    assert.equal(preview.drawColor, '#0000FF', `${name}: absolute supported paint remains meaningful`)
-    assert.ok(!preview.unresolvedFields?.includes('drawColor'), name)
+    assert.equal(preview.drawColor, undefined, `${name}: unvisited execution can replace even absolute handlers`)
+    assert.equal(preview.executionUncertain, true)
+    assert.ok(preview.unresolvedFields?.includes('drawColor'), name)
   }
 })
 
@@ -261,12 +263,9 @@ test('bounded retained mutation bodies keep a hidden runtime directory change un
     assert.match(preview.diagnostics?.join() ?? '', bound, name)
     assert.match(preview.diagnostics?.join() ?? '', /Runtime key directory remains unknown/, name)
     assert.deepEqual(preview.sourceDependencies, ['root-source', 'unvisited-directory-source'], name)
-    if (name === 'option work') {
-      assert.ok(preview.unresolvedFields?.includes('drawColor'), 'an exhausted work budget never resumes evaluation')
-    } else {
-      assert.equal(preview.drawColor, '#0000FF', `${name}: absolute paint is still supported while work remains`)
-      assert.ok(!preview.unresolvedFields?.includes('drawColor'), name)
-    }
+    assert.equal(preview.executionUncertain, true)
+    assert.equal(preview.drawColor, undefined, `${name}: no proof of unchanged bindings/handlers`)
+    assert.ok(preview.unresolvedFields?.includes('drawColor'))
   }
   const paintOnly = resolveTikzPaint('mutated,text=green', {
     styles: [{ key: 'mutated', state: 'unresolved', options: 'text=red', diagnostics: ['Unsupported mutation'], dependencyOptions: ['fill=blue'] }],
@@ -397,7 +396,8 @@ test('object prototype property names are unknown colors/options, never executab
     const preview = parseTikzStylePreviewOptions(value)
     assert.equal(preview.lineWidth, undefined)
     assert.equal(preview.lineStyle, undefined)
-    assert.equal(preview.diagnostics?.length, 1)
+    assert.ok(preview.diagnostics?.length)
+    assert.equal(preview.executionUncertain, true)
   }
 })
 
@@ -415,29 +415,29 @@ test('prototype-looking style names retain raw option strings safely', () => {
 })
 
 
-test('unknown referenced styles retain arbitrary paint while later known options still override', () => {
+test('unknown referenced styles retain arbitrary execution uncertainty while explicit local edits override', () => {
   const result = applied(String.raw`\tikzstyle{node}=[mystery,text=red]`, 'node')
   for (const exportMode of ['standalone', 'inlineMath'] as const) {
     const nodeBlock = generateTikz(result, { exportMode }).match(/\\node\[[\s\S]*?\] at/)?.[0] ?? ''
-    const externalIndex = nodeBlock.indexOf('node,')
+    const externalIndex = nodeBlock.indexOf('\n            node')
     assert.ok(externalIndex > nodeBlock.indexOf('fill=stzPointpaintFill'))
     assert.doesNotMatch(nodeBlock.slice(0, externalIndex), /text opacity=/)
     const afterExternal = nodeBlock.slice(externalIndex)
-    assert.match(afterExternal, /text=stzPointpaintText/)
-    assert.doesNotMatch(afterExternal, /fill=|draw=|fill opacity=|draw opacity=|text opacity=|line width=/)
+    assert.doesNotMatch(afterExternal, /text=|fill=|draw=|fill opacity=|draw opacity=|text opacity=|line width=/)
   }
   const point = result.strata[0]
   if (point.geometricKind !== 'point' || !point.style.paint) throw new Error('Expected point paint')
-  point.style = { ...point.style, paint: { ...point.style.paint, fill: { ...point.style.paint.fill, color: '#123456' } } }
+  point.style = markPointPaintOverrides({ ...point.style, paint: { ...point.style.paint, fill: { ...point.style.paint.fill, color: '#123456' } } }, ['fill.color'])
   const output = generateTikz(result)
   assert.match(output, /node,[\s\S]*fill=stzPointpaintFill/)
 })
 
-test('known options resolve only their own uncertain fields after unknown references', () => {
+test('known options cannot recover potentially replaced handlers after unknown references', () => {
   const preview = parseTikzStylePreviewOptions('mystery,color=red,draw=none,text opacity=.5,line width=2pt')
+  assert.equal(preview.executionUncertain, true)
   assert.ok(preview.unresolvedFields?.includes('fillEnabled'))
-  assert.ok(!preview.unresolvedFields?.includes('drawEnabled'))
-  assert.ok(!preview.unresolvedFields?.includes('textColor'))
-  assert.ok(!preview.unresolvedFields?.includes('textOpacity'))
-  assert.ok(!preview.unresolvedFields?.includes('lineWidth'))
+  assert.ok(preview.unresolvedFields?.includes('drawEnabled'))
+  assert.ok(preview.unresolvedFields?.includes('textColor'))
+  assert.ok(preview.unresolvedFields?.includes('textOpacity'))
+  assert.ok(preview.unresolvedFields?.includes('lineWidth'))
 })

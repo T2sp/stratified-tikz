@@ -1,0 +1,3 @@
+PATH=/opt/homebrew/bin:$PATH node /private/tmp/stz-review-runtime-exec/repro.mjs
+cd /private/tmp/stz-review-runtime-exec
+pdflatex -interaction=nonstopmode -halt-on-error probe.tex > compilation.txt

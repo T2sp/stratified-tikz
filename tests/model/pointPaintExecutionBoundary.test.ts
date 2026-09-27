@@ -315,10 +315,11 @@ test('tikzstyle brackets inside nested or escaped braces do not end the top-leve
   assert.equal(parsed.colors?.Custom, '#123456', 'the command after the real closing bracket remains visible')
   const imported = importTikzStyleFile(diagram(), 'brackets.sty', source)
   const preview = resolveImportedTikzStyle(reference(imported.diagram), createImportedTikzResolutionContext(imported.diagram))
-  assert.equal(preview.textColor, '#0000FF')
-  assert.equal(preview.fillColor, '#FF0000')
-  assert.ok(!preview.unresolvedFields?.includes('textColor'))
-  assert.ok(!preview.unresolvedFields?.includes('fillColor'))
+  // The declaration is complete, but its unsupported runtime label key is
+  // not proof of unchanged handlers. Parsing and invocation are distinct.
+  assert.equal(preview.executionUncertain, true)
+  assert.ok(preview.unresolvedFields?.includes('textColor'))
+  assert.ok(preview.unresolvedFields?.includes('fillColor'))
 })
 
 for (const form of ['commands', 'block'] as const) {
