@@ -1,4 +1,5 @@
 import assert from 'node:assert/strict'
+import { createHash } from 'node:crypto'
 export const rawDashCapSquarePoints = '5.000000000000001,-5 -5,-5.000000000000001 -5.000000000000002,5 5,5.000000000000002'
 export const dashCapScenario = 'point-paint-dash-caps'
 export const dashCapScales = [.5, 1.5]
@@ -13,7 +14,7 @@ export const dashCapCases = [
   { key: 'square-later-zero-phase-10', shape: 'square', size: 5.892556509887896, widthPt: 30, lineStyle: 'solid', pattern: [5 / 1.2, 5 / 1.2, 0, 15 / 1.2], phase: 10 / 1.2, exterior: { x: -32, y: 32 }, audit: true },
   { key: 'square-later-zero-phase-0', shape: 'square', size: 5.892556509887896, widthPt: 30, lineStyle: 'solid', pattern: [5 / 1.2, 5 / 1.2, 0, 15 / 1.2], phase: 0, exterior: { x: -32, y: 32 }, audit: true },
   { key: 'square-zero-off', shape: 'square', size: 5.892556509887896, widthPt: 30, lineStyle: 'solid', pattern: [10 / 1.2, 0], phase: 0, exterior: { x: -22, y: -30 }, exact: [{ x: -22, y: -22 }, { x: 16, y: -22 }], audit: true, livePaint: true },
-  { key: 'square-positive-before-corner', shape: 'square', size: 5.892556509887896, widthPt: 30, lineStyle: 'solid', pattern: [10 / 1.2, 10 / 1.2], phase: .25 / 1.2, exterior: { x: -22, y: -30 }, exact: [{ x: -22, y: -22 }, { x: 16, y: -22 }], audit: true, livePaint: true },
+  { key: 'square-positive-before-corner', exactMissIndices: [1], shape: 'square', size: 5.892556509887896, widthPt: 30, lineStyle: 'solid', pattern: [10 / 1.2, 10 / 1.2], phase: .25 / 1.2, exterior: { x: -22, y: -30 }, exact: [{ x: -22, y: -22 }, { x: 16, y: -22 }], audit: true, livePaint: true },
 ]
 export const triangleDashPhaseNegatives = [{ x: -6, y: -34 }, { x: 0, y: -32 }]
 export const dashCapEditFields = ['lineStyle', 'lineCap', 'dashPattern', 'dashPhase', 'restore']
@@ -104,11 +105,12 @@ export function assertDashCapEntry(entry, spec, scale) {
     const probe = entry.probes.find((p) => p.kind === kind); assert.ok(probe)
     assert.equal(probe.screenshot, `${dashCapScenario}-${spec.key}-scale-${scale}-${kind}.png`)
     const miss = dashCapProbeIsMiss(spec, kind)
-    if (!miss && (kind === 'paint' || kind === 'audit-cap' || kind.startsWith('exact'))) { assert.equal(probe.alpha, 255); assertDashCapPaintContainment(probe, entry) }
+    if (!spec.livePaint && !miss && (kind === 'paint' || kind === 'audit-cap' || kind.startsWith('exact'))) { assert.equal(probe.alpha, 255); assertDashCapPaintContainment(probe, entry) }
     if (kind.startsWith('exact')) assert.deepEqual(probe.local, spec.exact[Number(kind.slice(6))])
     if (kind === 'outside') assert.deepEqual(probe.local, spec.exterior)
-    if (miss) { assert.equal(probe.alpha, 0); assert.equal(probe.nativeStrokeContains, false); assert.ok(probe.rasterDistance > 6.14); if (spec.audit) assert.ok(probe.solidDistance > 6.14) }
+    if (!spec.livePaint && miss) { assert.equal(probe.alpha, 0); assert.equal(probe.nativeStrokeContains, false); assert.ok(probe.rasterDistance > 6.14); if (spec.audit) assert.ok(probe.solidDistance > 6.14) }
     if (kind === 'gap') { assert.equal(probe.alpha, 0); assert.equal(probe.nativeStrokeContains, false); assert.ok(Math.abs(Math.hypot(probe.local.x, probe.local.y) - observation.radius) < 1e-8) }
+    if (spec.livePaint) assertLiveProbe(probe, entry, miss)
     assert.equal(probe.selectionCleared, true)
     assert.deepEqual(probe.actions.map((action) => action.alt), [false, true, true, true])
     const expected = miss ? ['control'] : ['control', 'p'], matrix = probe.transform.ctm
@@ -147,7 +149,8 @@ export function assertDashCapEngineAudit(entry, spec, scale) {
   assert.deepEqual(audit.solidControl.vertices, audit.originalVertices)
   assert.equal(audit.originalVertices.length, 4)
   assert.ok(audit.originalVertices.every(({ x, y }) => Number.isFinite(x) && Number.isFinite(y) && Math.abs(Math.abs(x) - 5) < 1e-8 && Math.abs(Math.abs(y) - 5) < 1e-8))
-  assert.equal(audit.mismatches.length, 0, 'Native paint plus intentional continuous-gap selection must match picking')
+  if (!spec.livePaint) assert.equal(audit.mismatches.length, 0, 'Native paint plus intentional continuous-gap selection must match picking')
+  else assert.deepEqual(audit.mismatches, audit.samples.filter((sample) => sample.expected !== 'uncertain' && (sample.candidates.includes('p') !== (sample.expected === 'hit') || sample.candidates.some((id) => id !== 'p'))).map(({ local, expected, candidates }) => ({ local, expected, candidates })), 'Clone disagreement stays visible')
   let hits = 0, misses = 0, uncertain = 0
   for (const [index, sample] of audit.samples.entries()) {
     const local = { x: -32 + index % 33 * 2, y: -32 + Math.floor(index / 33) * 2 }
@@ -164,8 +167,11 @@ export function assertDashCapEngineAudit(entry, spec, scale) {
     assert.equal(typeof sample.nativeStrokeContains, 'boolean'); assert.equal(typeof sample.paintCore, 'boolean')
     if (sample.paintDistance > .14) assert.equal(sample.nativeStrokeContains, false)
     if (sample.paintCore) { assert.equal(sample.paintAlpha, 255); assertDashCapPaintContainment(sample, entry) }
-    if (expected === 'hit') { hits++; assert.deepEqual(sample.candidates, ['p']) }
-    else if (expected === 'miss') { misses++; assert.deepEqual(sample.candidates, []) }
+    const interactionExpected = spec.livePaint ? entry.observation.livePaint.interaction.samples[index].expected : expected
+    if (interactionExpected === 'hit') assert.deepEqual(sample.candidates, ['p'])
+    else if (interactionExpected === 'miss') assert.deepEqual(sample.candidates, [])
+    if (expected === 'hit') hits++
+    else if (expected === 'miss') misses++
     else uncertain++
   }
   assert.ok(hits > 100 && misses > 50 && uncertain < 200)
@@ -178,7 +184,8 @@ export function assertDashCapEngineAudit(entry, spec, scale) {
       assert.equal(sample.insideContour, false); assert.ok(sample.solidDistance > 6.14)
       assert.equal(probe.rasterDistance, sample.paintDistance); assert.equal(probe.solidDistance, sample.solidDistance)
       assert.equal(probe.alpha, sample.paintAlpha); assert.equal(probe.nativeStrokeContains, sample.nativeStrokeContains)
-      if (dashCapProbeIsMiss(spec, probe.kind)) { assert.equal(sample.expected, 'miss'); assert.deepEqual(sample.candidates, []) }
+      if (spec.livePaint) { assert.equal(probe.live.expected, dashCapProbeIsMiss(spec, probe.kind) ? 'miss' : 'hit') }
+      else if (dashCapProbeIsMiss(spec, probe.kind)) { assert.equal(sample.expected, 'miss'); assert.deepEqual(sample.candidates, []) }
       else { assert.equal(sample.paintCore, true); assert.equal(sample.paintAlpha, 255); assertDashCapPaintContainment(sample, entry); assert.deepEqual(sample.candidates, ['p']) }
     }
   }
@@ -196,7 +203,8 @@ export function assertDashCapEngineAudit(entry, spec, scale) {
     assert.ok(sample)
     assert.equal(probe.alpha, sample.paintAlpha); assert.equal(probe.nativeStrokeContains, sample.nativeStrokeContains)
     assert.equal(probe.rasterDistance, sample.paintDistance); assert.equal(probe.solidDistance, sample.solidDistance)
-    if (kind === 'audit-cap') { assert.equal(sample.paintCore, true); assert.equal(sample.paintAlpha, 255); assert.ok(sample.solidDistance > .3); assert.equal(sample.insideContour, false) }
+    if (spec.livePaint) { assert.equal(probe.live.expected, kind === 'audit-cap' ? 'hit' : 'miss'); if (kind === 'audit-cap') assert.equal(probe.live.paintCore, true) }
+    else if (kind === 'audit-cap') { assert.equal(sample.paintCore, true); assert.equal(sample.paintAlpha, 255); assert.ok(sample.solidDistance > .3); assert.equal(sample.insideContour, false) }
     else { assert.equal(sample.expected, 'miss'); assert.equal(sample.paintAlpha, 0); assert.ok(sample.paintDistance > 6.14 && sample.solidDistance > 6.14); assert.ok(Math.min(sample.paintDistance, sample.solidDistance) < 8) }
     assert.equal(probe.screenshot, `${dashCapScenario}-${spec.key}-scale-${scale}-${kind}.png`)
   }
@@ -205,15 +213,28 @@ export function assertDashCapEngineAudit(entry, spec, scale) {
 function assertDashCapPaintContainment(sample, entry) {
   assert.equal(typeof sample.nativeStrokeContains, 'boolean')
   if (sample.nativeStrokeContains) return
-  // Retained Chrome observations disagree only in these scheduling families.
-  // A contradictory containment result remains evidence, never an automatic pass:
-  // the independently rendered, unchanged App must paint this exact grid point.
-  assert.ok(['square-zero-off', 'square-positive-before-corner'].includes(entry.key), 'Unexpected native containment exclusion')
+  assert.ok(entry.specification.livePaint, 'Unexpected native containment exclusion')
   assert.ok(sample.local.x > 5 && sample.local.y < -5 && sample.local.x - sample.local.y > 28, 'Exclusion is in the retained seam region')
-  const capture = entry.observation.livePaint?.captures.find((capture) => capture.zoom)
-  const pixel = capture?.samples.find((pixel) => pixel.local.x === sample.local.x && pixel.local.y === sample.local.y)
-  assert.ok(pixel, 'Native exclusion needs independent actual-App paint at this point')
-  assert.deepEqual(pixel.rgba, [0, 0, 0, 255], 'Live App paint corroborates the contradictory raster core')
+  const pixel = entry.observation.livePaint.captures[1].samples.find((pixel) => pixel.local.x === sample.local.x && pixel.local.y === sample.local.y)
+  assert.ok(pixel, 'Retain connected App observation separately from cloned paint')
+  assert.ok(pixel.rgba.slice(0, 3).every((channel) => channel >= 230), 'Connected App background disproves this cloned opaque seam')
+}
+
+function assertLiveProbe(probe, entry, miss) {
+  const live = entry.observation.livePaint, sample = live.interaction.samples.find((sample) => sample.local.x === probe.local.x && sample.local.y === probe.local.y)
+  assert.ok(sample); assert.deepEqual(probe.live, Object.fromEntries(Object.entries(sample).filter(([key]) => key !== 'candidates')))
+  assert.equal(sample.expected, miss ? 'miss' : 'hit', 'Live paint, solid neighborhood and interior determine the independent interaction role')
+  if (['paint', 'audit-cap'].includes(probe.kind)) assert.equal(sample.paintCore, true)
+  const capture = probe.liveCapture, reference = live.captures[0]
+  assert.ok(capture, 'Action has a source-bound pre-click connected screenshot')
+  assert.equal(capture.source, reference.source); assert.equal(capture.sourceSha256, reference.sourceSha256)
+  assert.deepEqual(capture.stroke, reference.stroke); assert.deepEqual(capture.ctm, probe.transform.ctm)
+  assert.equal(capture.selection, null); assert.equal(capture.screenshot, probe.screenshot)
+  assert.match(capture.sha256, /^[a-f0-9]{64}$/u); assert.ok(capture.bytes > 24)
+  assert.deepEqual(capture.viewport, { width: capture.width, height: capture.height })
+  assert.deepEqual(capture.samples, capture.pixelDistances.samples)
+  assert.equal(capture.samples.length, 1); assert.deepEqual(capture.samples[0].local, probe.local)
+  if (['paint', 'audit-cap', 'exact-0'].includes(probe.kind)) assert.deepEqual(capture.samples[0].rgba, [0, 0, 0, 255])
 }
 
 export function assertDashCapLivePaint(entry, spec, scale) {
@@ -233,6 +254,12 @@ export function assertDashCapLivePaint(entry, spec, scale) {
     assert.deepEqual(capture.stroke, { width: 36, pattern: entry.observation.pattern, phase: spec.phase * 1.2, cap: 'square', join: 'bevel', fill: 'none', miterLimit: 10, color: 'rgb(0, 0, 0)', opacity: 1 })
     assert.equal(typeof capture.source, 'string'); assert.ok(capture.source.includes(rawDashCapSquarePoints))
     assert.equal(capture.source, live.captures[0].source)
+    assert.deepEqual(capture.samples, capture.pixelDistances.samples)
+    assert.equal(capture.sourceSha256, createHash('sha256').update(capture.source).digest('hex'))
+    assert.deepEqual(capture.viewport, { width: capture.width, height: capture.height })
+    assert.equal(capture.calibration.threshold, 127); assert.equal(capture.calibration.pixelCenters, true)
+    assert.ok(capture.boundaryPixelCount > 0); assert.deepEqual(capture.calibration.positiveControl.rgba, [0, 0, 0, 255])
+    assert.ok(capture.calibration.backgroundControl.rgba.slice(0, 3).every((channel) => channel >= 230))
     const matrix = capture.ctm
     assert.ok(Object.values(matrix).every(Number.isFinite)); assert.equal(matrix.a, capture.zoom ? 16 : scale); assert.equal(matrix.d, matrix.a); assert.equal(matrix.b, 0); assert.equal(matrix.c, 0)
     assert.ok(Number.isInteger(capture.width) && capture.width >= 1088 && Number.isInteger(capture.height) && capture.height >= 1088)
@@ -246,16 +273,32 @@ export function assertDashCapLivePaint(entry, spec, scale) {
       assert.deepEqual(pixel.pixel, { x: Math.floor(pixel.screen.x), y: Math.floor(pixel.screen.y) })
       assert.ok(pixel.pixel.x >= 0 && pixel.pixel.x < capture.width && pixel.pixel.y >= 0 && pixel.pixel.y < capture.height)
       assert.equal(pixel.rgba.length, 4); assert.ok(pixel.rgba.every((channel) => Number.isInteger(channel) && channel >= 0 && channel <= 255))
-      if (capture.zoom && sample.paintCore) assert.deepEqual(pixel.rgba, [0, 0, 0, 255], 'All clone opaque cores agree with independently rendered App paint')
+      assert.ok(Number.isFinite(pixel.paintDistance) && pixel.paintDistance >= 0)
+      if (pixel.paintCore) assert.deepEqual(pixel.rgba, [0, 0, 0, 255])
       // The existing coordinate axes cross x/y=0; retain their actual pixels but
       // do not mistake them for contour paint. Every other distant pixel is checked.
-      if (capture.zoom && sample.paintDistance > .14 && Math.abs(sample.local.x) > 1 && Math.abs(sample.local.y) > 1) assert.deepEqual(pixel.rgba, background, 'Live App exterior agrees with clone transparency')
+
     }
-    for (const [local, expected] of [[spec.exact[0], [0, 0, 0, 255]], [spec.exact[1], [0, 0, 0, 255]], [spec.exterior, background]]) {
+    for (const [local, expected] of [[spec.exact[0], [0, 0, 0, 255]], [spec.exact[1], background], [spec.exterior, background]]) {
       const pixel = capture.samples.find((pixel) => pixel.local.x === local.x && pixel.local.y === local.y)
       assert.ok(pixel); assert.deepEqual(pixel.rgba, expected, 'Actual responsive App paint retains positive and genuine negative controls')
     }
   }
+  const interaction = live.interaction
+  assert.equal(interaction.method, 'connected live paint plus continuous stroke and contour interior')
+  assert.equal(interaction.tolerance, 6); assert.equal(interaction.uncertainty, .14); assert.equal(interaction.selectionDecorationAllowance, 0)
+  assert.equal(interaction.screenshot, live.captures[1].screenshot); assert.equal(interaction.sha256, live.captures[1].sha256)
+  assert.equal(interaction.samples.length, audit.samples.length)
+  for (const [index, sample] of interaction.samples.entries()) {
+    const original = audit.samples[index], pixel = live.captures[1].samples[index]
+    const minimum = Math.min(pixel.paintDistance, original.solidDistance)
+    const expected = original.insideContour || minimum < 5.86 ? 'hit' : minimum > 6.14 ? 'miss' : 'uncertain'
+    assert.deepEqual(sample, { ...pixel, insideContour: original.insideContour, solidDistance: original.solidDistance, expected, candidates: original.candidates })
+    if (expected === 'hit') assert.deepEqual(sample.candidates, ['p'])
+    else if (expected === 'miss') assert.deepEqual(sample.candidates, [])
+  }
+  assert.deepEqual(interaction.mismatches, [], 'Definite live interaction discrepancies remain strict failures')
+  assert.ok(Array.isArray(entry.observation.cloneProbes), 'Superseded clone witnesses remain diagnostic')
 }
 
 function assertTrianglePhaseNegativeProbes(edit, scale) {

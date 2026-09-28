@@ -1,5 +1,12 @@
 # Native dash endpoint continuation
 
+Historical endpoint handoff. The subsequent real parent `pF6DA7` run and
+independent connected-live recalibration are documented in
+[Connected paint and bounded acceptance](PHASE_32B_LIVE_PAINT_ACCEPTANCE.md).
+That later evidence supersedes the unresolved clone-paint premise below; it
+does not turn this historical failed run into acceptance. The strict gate
+remains active unless the proposed finite profile is explicitly adopted.
+
 32B remains incomplete until matching full parent verification and independent
 review pass. This continuation preserves the isolated zero-dot, solid-join,
 effective-style and visibility work. 32C/32D remain deferred.

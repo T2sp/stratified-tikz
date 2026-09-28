@@ -3,6 +3,7 @@ import { createHash } from 'node:crypto'
 import { resolve } from 'node:path'
 import ts from 'typescript'
 import { boundedPointDiagnostic } from './pointCheckDiagnostics.mjs'
+import { inspectConnectedLivePaintPng } from './connectedLivePaintOracle.mjs'
 import { dashCapMechanismCases, dashCapMechanismColumns, dashCapMechanismGrid, dashCapMechanismStem, dashLivePaintColumns, assertDashCapMechanismEntry, assertDashCapMechanismEvidence } from './pointDashCapMechanismContract.mjs'
 
 // Node 22.12 supports this browser command but does not strip .ts by default.
@@ -130,10 +131,11 @@ async function observeLivePaint(page, spec, observed, save, progress) {
       return { width: image.width, height: image.height, sourceUnchanged: polygon.outerHTML === markup,
         afterCtm: Object.fromEntries(['a', 'b', 'c', 'd', 'e', 'f'].map((key) => [key, matrix[key]])), samples: samples.map(sample), probes: probes.map(sample) }
     }, { png: png.toString('base64'), scale, samples: observed.samples, probes: observed.probes, markup: observed.polygonMarkup }), `live mechanism ${spec.key} scale ${scale} PNG samples`, 6000)
+    const pixelDistances = inspectConnectedLivePaintPng(png, { ctm: metadata.ctm, samples: [...observed.samples, ...observed.probes].map(([x, y]) => ({ local: { x, y } })), region: { minX: -64, minY: -64, maxX: 64, maxY: 64 } })
     const { xml, ...source } = metadata
     if (scale === 16) { await save(livePaint.sourceFile, xml); livePaint.sourceSha256 = createHash('sha256').update(xml).digest('hex') }
     const containmentChanges = (originals, rows) => rows.filter((row, index) => row[7] !== originals[index][7]).map((row) => ({ x: row[0], y: row[1], before: !row[7], after: row[7] }))
-    livePaint.captures.push({ ...source, ...decoded, containmentResolutionChanges: { samples: containmentChanges(observed.samples, decoded.samples), probes: containmentChanges(observed.probes, decoded.probes) }, sourceUnchanged: source.sourceUnchanged && decoded.sourceUnchanged, file, clip, bytes: png.length, sha256: createHash('sha256').update(png).digest('hex') })
+    livePaint.captures.push({ ...source, ...decoded, pixelDistances, containmentResolutionChanges: { samples: containmentChanges(observed.samples, decoded.samples), probes: containmentChanges(observed.probes, decoded.probes) }, sourceUnchanged: source.sourceUnchanged && decoded.sourceUnchanged, file, clip, bytes: png.length, sha256: createHash('sha256').update(png).digest('hex') })
     await progress(livePaint)
   }
   return livePaint
@@ -184,6 +186,19 @@ export async function runPointDashCapMechanismChecks({ page, artifactDir }) {
       delete entry.observedSamples; delete entry.observedProbes
       await save(`${stem}.json`, JSON.stringify(entry, null, 2) + '\n'); await persist()
       entry.livePaint = await observeLivePaint(page, spec, observed, save, async (livePaint) => { entry.livePaint = livePaint; await save(`${stem}.json`, JSON.stringify(entry, null, 2) + '\n'); await persist() })
+      // Keep clone-based rows and mismatches unchanged as a render-path diagnostic.
+      // Expected interaction comes from connected paint, the independent solid
+      // control and contour interiors; production distances remain only actuals.
+      const capture = entry.livePaint.captures.find(({ scale }) => scale === 16)
+      const compareLive = (row, index) => {
+        const pixel = capture.pixelDistances.samples[index], minimum = Math.min(pixel.paintDistance ?? Infinity, row[5] ?? Infinity)
+        return { local: { x: row[0], y: row[1] }, paintDistance: pixel.paintDistance, solidDistance: row[5], insideContour: row[6],
+          expected: row[6] || minimum < 5.86 ? 'hit' : minimum > 6.14 ? 'miss' : 'uncertain', geometryDistance: row[10], hit: row[12] }
+      }
+      const liveSamples = entry.samples.map(compareLive), liveProbes = entry.probes.map((row, index) => compareLive(row, entry.samples.length + index))
+      entry.interactionOracle = { method: 'connected-live-paint-plus-continuous-stroke-and-contour-interior', capture: capture.file, pngSha256: capture.sha256, sourceSha256: entry.livePaint.sourceSha256,
+        tolerance: 6, uncertainty: .14, samples: liveSamples, probes: liveProbes, mismatches: liveSamples.filter(({ expected, hit }) => expected !== 'uncertain' && hit !== (expected === 'hit')) }
+      await save(`${stem}.json`, JSON.stringify(entry, null, 2) + '\n'); await persist()
       assertDashCapMechanismEntry({ ...entry, result: 'passed' }, spec)
       entry.result = 'passed'
     } catch (error) {

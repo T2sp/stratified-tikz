@@ -25,6 +25,10 @@ not cover these new fixes.
 The [native endpoint continuation](PHASE_32B_NATIVE_ENDPOINT_INVESTIGATION.md)
 records the subsequent isolated-dot passes, remaining endpoint defects and
 live-paint gates, retaining all prior 705 artifacts and extending both matrices.
+The [connected-paint followup](PHASE_32B_LIVE_PAINT_ACCEPTANCE.md) supersedes
+the square clone-based interaction premise with independently observed live
+paint. Its finite core inventory remains a proposal, not a policy change;
+strict verification and the bounded full-closed transfer decision remain open.
 
 Implement the following stages in the user's requested order. Each stage must
 remain usable and pass its own acceptance checks before the next stage begins.

@@ -806,14 +806,15 @@ function completePointEvidence(fixture) {
     ...Object.fromEntries(mechanism.cases.flatMap((entry) => {
       const stem = `${dashCapMechanismStem}-${entry.key}`
       return [[`${stem}.json`, entry], [`${stem}.live.svg`, syntheticMechanismLiveSvg(entry)],
-        ...entry.livePaint.captures.map((capture) => [capture.file, { syntheticPngBase64: syntheticMechanismLivePng(capture.scale).toString('base64') }]),
+        ...entry.livePaint.captures.map((capture) => [capture.file, { syntheticPngBase64: syntheticMechanismLivePng(capture.scale, entry.key).toString('base64') }]),
         ...['input.svg', 'solid.input.svg'].map((suffix) =>
         [`${stem}.${suffix}`, `<svg xmlns="http://www.w3.org/2000/svg"><polygon points="${entry.source.rawPoints}" fill="none" stroke="#000000" stroke-width="${entry.specification.width}" stroke-dasharray="${suffix === 'solid.input.svg' ? 'none' : entry.specification.pattern?.join(' ') ?? 'none'}" stroke-dashoffset="${suffix === 'solid.input.svg' ? 0 : entry.specification.phase}" stroke-linecap="${entry.specification.cap}" stroke-linejoin="${entry.specification.join}" stroke-miterlimit="${entry.specification.miterLimit}"></polygon></svg>`])]
     })),
     ...Object.fromEntries(dashCapEvidence().cases.filter((entry) => entry.specification.audit).flatMap((entry) => {
       const stem = `${dashCapScenario}-${entry.key}-scale-${entry.scale}`
       return [[`${stem}-engine-audit.json`, entry.observation.engineAudit],
-        ...(entry.observation.livePaint?.captures ?? []).map((capture) => [capture.screenshot, { syntheticPngBase64: syntheticDashCapLivePng }]),
+        ...[...(entry.observation.livePaint?.captures ?? []), ...entry.probes.flatMap(({ liveCapture }) => liveCapture ? [liveCapture] : [])]
+          .map((capture) => [capture.screenshot, { syntheticPngBase64: syntheticDashCapLivePng(capture, entry.key).toString('base64') }]),
         ...['.input.svg', '-solid.input.svg'].map((suffix) =>
         [`${stem}${suffix}`, `<svg xmlns="http://www.w3.org/2000/svg"><polygon points="${entry.observation.engineAudit.rawPoints}" fill="none" stroke="black"></polygon></svg>`])]
     })),
@@ -1369,7 +1370,7 @@ test('32B synthetic complete endpoint evidence includes new App witnesses and in
     386 + dashCapArtifacts().length + dashCapMechanismArtifacts().length)
 })
 
-for (const fault of ['missing-zero-off-App', 'missing-App-live', 'stale-App-live-PNG', 'missing-mechanism-live', 'stale-mechanism-live-PNG', 'stale-live-SVG']) {
+for (const fault of ['missing-zero-off-App', 'missing-App-live', 'stale-App-live-PNG', 'missing-mechanism-live', 'stale-mechanism-live-PNG', 'stale-live-SVG', 'fabricated-live-calibration']) {
   test(`32B synthetic endpoint policy rejects ${fault}`, (t) => {
     const fixture = checkoutFixture(t); completePointEvidence(fixture)
     const artifacts = JSON.parse(fixture.env.STZ_TEST_POINT_ARTIFACT_VALUES)
@@ -1394,6 +1395,24 @@ for (const fault of ['missing-zero-off-App', 'missing-App-live', 'stale-App-live
       const file = mechanismEntry.livePaint.sourceFile
       artifacts[file] = artifacts[file].replace('stroke-width="36"', 'stroke-width="35"')
     }
+    if (fault === 'fabricated-live-calibration') {
+      mechanismEntry.livePaint.captures[1].pixelDistances.boundaryPixelCount += 1
+      artifacts[`${dashCapMechanismStem}-${mechanismEntry.key}.json`] = structuredClone(mechanismEntry)
+    }
+    fixture.env.STZ_TEST_POINT_ARTIFACT_VALUES = JSON.stringify(artifacts)
+    assert.equal(failedVerification(t, fixture, '32B').report.status, 'failed')
+  })
+}
+
+for (const target of ['named-full-closed-limitation', 'unrelated-App-failure']) {
+  test(`32B strict policy rejects unadopted profile disposition for ${target}`, (t) => {
+    const fixture = checkoutFixture(t); completePointEvidence(fixture)
+    const artifacts = JSON.parse(fixture.env.STZ_TEST_POINT_ARTIFACT_VALUES)
+    const evidence = artifacts[`${target === 'named-full-closed-limitation' ? dashCapMechanismStem : dashCapScenario}.json`]
+    const entry = target === 'named-full-closed-limitation'
+      ? evidence.cases.find(({ key }) => key === 'positive-full-closed-control') : evidence.cases[0]
+    entry.result = 'failed'
+    evidence.acceptanceDisposition = { profile: 'stz-32b-core-v1', result: 'core acceptance passed with named limitations', limitations: ['supplemental-positive-full-closed-triangle'] }
     fixture.env.STZ_TEST_POINT_ARTIFACT_VALUES = JSON.stringify(artifacts)
     assert.equal(failedVerification(t, fixture, '32B').report.status, 'failed')
   })

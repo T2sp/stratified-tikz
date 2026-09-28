@@ -1393,6 +1393,12 @@ The subsequent [endpoint continuation](PHASE_32B_NATIVE_ENDPOINT_INVESTIGATION.m
 distinguishes terminal-only zero dots, positive endpoint edge ownership and
 zero-off caps. Raster/containment disagreements require live painted evidence;
 they cannot be accepted merely by changing the expected candidate list.
+The [connected-live recalibration](PHASE_32B_LIVE_PAINT_ACCEPTANCE.md) records
+the independently justified square oracle correction, remaining full-closed
+triangle discrepancy and proposed finite inventory. Connected paint, clone
+paint, containment and production distances remain separate observations.
+Background alone does not establish a miss within the unchanged six-unit
+neighborhood. Strict acceptance remains active until explicit scope adoption.
 Paint/clearance bounds conservatively retain that continuous stroke envelope;
 they are not paint-only gap masks or final hit oracles. Revision matching compares
 pattern values, phase, cap, join, width and enablement along with existing owner,

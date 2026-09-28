@@ -21,6 +21,7 @@ import { dashCapMechanismStem, dashCapMechanismArtifacts, assertDashCapMechanism
 import { dashCapScenario, dashCapArtifacts, assertDashCapEvidence } from "../pointDashCapContract.mjs";
 
 import { polygonJoinScenario, polygonJoinArtifacts, assertPolygonJoinEvidence } from "../pointPolygonJoinContract.mjs";
+import { inspectConnectedLivePaintPng } from "../connectedLivePaintOracle.mjs";
 
 const freeLabelGroups = [
   "existing-renderer-regressions",
@@ -219,6 +220,21 @@ function evidenceObject(artifactDir, name) {
 
 // Keep independently sampled live pixels tied to the exact retained PNG, rather
 // than accepting a scalar assertion alongside an unrelated screenshot.
+// Repeated identical inputs may reuse their pixel calculation, never their
+// acceptance result: source/PNG bytes, contracts and supplied observations are
+// rechecked each time. The bounded cache is local to the fresh verifier process.
+const livePixelReplayCache = new Map();
+function replayConnectedPixels(bytes, pngHash, capture) {
+  const observed = capture.pixelDistances;
+  const options = { ctm: capture.ctm, samples: observed.samples.map(({ local }) => ({ local })), region: observed.region };
+  const key = sha256(JSON.stringify({ pngHash, options }));
+  if (!livePixelReplayCache.has(key)) {
+    const pixels = inspectConnectedLivePaintPng(bytes, options);
+    if (livePixelReplayCache.size >= 64) livePixelReplayCache.delete(livePixelReplayCache.keys().next().value);
+    livePixelReplayCache.set(key, pixels);
+  }
+  return livePixelReplayCache.get(key);
+}
 function validateDashLivePaintFiles(artifactDir, live) {
   assert.ok(live && Array.isArray(live.captures));
   if (live.sourceFile) {
@@ -228,16 +244,25 @@ function validateDashLivePaintFiles(artifactDir, live) {
       "Live literal SVG matches its recorded source identity");
   }
   for (const capture of live.captures) {
+    if (capture.source) {
+      assert.equal(sha256(capture.source), capture.sourceSha256,
+        "Connected App source matches its recorded identity");
+    }
     const file = capture.file ?? capture.screenshot;
     assert.equal(typeof file, "string");
     assert.ok(!file.includes(".."));
     assert.equal(resolve(artifactDir, file), join(artifactDir, file));
     const bytes = readFileSync(join(artifactDir, file));
     assert.equal(bytes.length, capture.bytes, "Live PNG byte length matches the sampled capture");
-    assert.equal(sha256(bytes), capture.sha256, "Live PNG identity matches the sampled capture");
+    const pngHash = sha256(bytes);
+    assert.equal(pngHash, capture.sha256, "Live PNG identity matches the sampled capture");
     assert.ok(bytes.length >= 24 && bytes.subarray(0, 8).equals(Buffer.from([137, 80, 78, 71, 13, 10, 26, 10])));
     assert.equal(bytes.readUInt32BE(16), capture.width, "Live PNG width matches pixel calibration");
     assert.equal(bytes.readUInt32BE(20), capture.height, "Live PNG height matches pixel calibration");
+    if (capture.pixelDistances) {
+      assert.deepEqual(replayConnectedPixels(bytes, pngHash, capture), capture.pixelDistances,
+        "Interaction distances and calibration are recomputed from retained connected PNG bytes");
+    }
   }
 }
 
@@ -253,7 +278,10 @@ function validateTargetedPaintEvidence(artifactDir, name, group) {
         const source = readFileSync(join(artifactDir, `${stem}${suffix}`), "utf8");
         assert.ok(source.includes(`points="${entry.observation.engineAudit.rawPoints}"`), "Retained App SVG preserves emitted precision");
       }
-      if (entry.specification.livePaint) validateDashLivePaintFiles(artifactDir, entry.observation.livePaint);
+      if (entry.specification.livePaint) {
+        validateDashLivePaintFiles(artifactDir, entry.observation.livePaint);
+        validateDashLivePaintFiles(artifactDir, { captures: entry.probes.map(({ liveCapture }) => liveCapture) });
+      }
     }
     const mechanism = evidenceObject(artifactDir, `${dashCapMechanismStem}.json`);
     assertDashCapMechanismEvidence(mechanism);

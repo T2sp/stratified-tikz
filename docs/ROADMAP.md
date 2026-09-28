@@ -1788,6 +1788,11 @@ retains those artifacts and extends the minimum to 856: 22 App entries with
 14 complete square audits and 21 supplemental entries, including independent
 live-paint checks for the retained raster/containment contradictions. The
 subphase remains incomplete pending matching parent verification and review.
+The [connected-paint followup](PHASE_32B_LIVE_PAINT_ACCEPTANCE.md) retains the
+actual `pF6DA7` failed matrices, corrects the two square interaction premises and
+proposes a finite core inventory. That profile is not adopted; the real
+full-closed supplemental discrepancy and fresh native/review gates remain
+explicit. No additional arbitrary-polygon or engine sweep is scheduled.
 
 | Subphase | Responsibility |
 | --- | --- |

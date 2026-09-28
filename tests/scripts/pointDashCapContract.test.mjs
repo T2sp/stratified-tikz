@@ -8,6 +8,7 @@ import { dashCapCases, dashCapScales } from '../../scripts/pointDashCapContract.
 import { dashCapMechanismCases } from '../../scripts/pointDashCapMechanismContract.mjs'
 import { dashCapArtifacts, assertDashCapEvidence } from '../../scripts/pointDashCapContract.mjs'
 import { dashCapEvidence } from './dashCapEvidenceFixture.mjs'
+import { decodeConnectedPaintPng, inspectConnectedLivePaintPng } from '../../scripts/connectedLivePaintOracle.mjs'
 test('synthetic dash-cap policy contract preserves paint hits, gaps, exterior controls, transformations, live edits and engine audits', () => {
   const evidence = dashCapEvidence()
   assertDashCapEvidence(evidence)
@@ -177,7 +178,7 @@ test('synthetic endpoint policy retains disproven terminal positives as negative
     const positive = evidence.cases.find((entry) => entry.key === 'square-positive-corner' && entry.scale === scale)
     assert.deepEqual(positive.specification.exterior, { x: -22, y: -30 })
     assert.deepEqual(positive.specification.exact, [{ x: 20, y: 20 }, { x: 16, y: -22 }, { x: 22, y: -22 }])
-    for (const entry of [positive, ...evidence.cases.filter((entry) => entry.scale === scale && entry.specification.livePaint)]) {
+    for (const entry of [positive]) {
       for (const probe of entry.probes.filter((probe) => probe.kind.startsWith('exact-'))) {
         assert.equal(probe.alpha, 255); assert.ok(probe.solidDistance > 6.14)
         assert.ok(probe.actions.every((action) => action.candidates.includes('p')))
@@ -197,18 +198,21 @@ for (const [name, key, damage] of [
   ['positive corner missing cycling candidate', 'square-positive-corner', (entry) => { entry.probes.find((probe) => probe.kind === 'exact-2').actions[1].candidates = ['control'] }],
   ['positive corner distant negative', 'square-positive-corner', (entry) => { entry.observation.engineAudit.samples.find((sample) => sample.local.x === -22 && sample.local.y === -30).paintDistance = 80 }],
   ['zero-off omitted independently contained positive', 'square-zero-off', (entry) => { entry.probes.find((probe) => probe.kind === 'exact-0').actions[0].candidates = ['control'] }],
-  ['before-corner omitted live-painted positive', 'square-positive-before-corner', (entry) => { entry.probes.find((probe) => probe.kind === 'exact-1').actions[0].candidates = ['control'] }],
+  ['before-corner phantom candidate at live exterior', 'square-positive-before-corner', (entry) => { entry.probes.find((probe) => probe.kind === 'exact-1').actions[0].candidates = ['control', 'p'] }],
 ]) test(`synthetic endpoint policy rejects ${name}`, () => {
   const evidence = dashCapEvidence(); damage(evidence.cases.find((entry) => entry.key === key)); assert.throws(() => assertDashCapEvidence(evidence))
 })
 
 const liveEntry = (evidence) => evidence.cases.find((entry) => entry.key === 'square-positive-before-corner')
 const liveSample = (entry, x = 16, y = -22) => entry.observation.livePaint.captures[1].samples.find((sample) => sample.local.x === x && sample.local.y === y)
-test('synthetic oracle policy retains contradictory core/native observations and requires actual-App paint plus candidate/click checks', () => {
+test('synthetic oracle policy preserves clone disagreement while live paint independently corrects interaction', () => {
   const evidence = dashCapEvidence(), entry = liveEntry(evidence)
   const sample = entry.observation.engineAudit.samples.find((sample) => sample.local.x === 16 && sample.local.y === -22)
   assert.equal(sample.paintCore, true); assert.equal(sample.paintAlpha, 255); assert.equal(sample.nativeStrokeContains, false)
-  assert.deepEqual(liveSample(entry).rgba, [0, 0, 0, 255]); assert.deepEqual(sample.candidates, ['p'])
+  assert.deepEqual(liveSample(entry).rgba, [245, 245, 245, 255]); assert.deepEqual(sample.candidates, [])
+  assert.equal(entry.probes.find((probe) => probe.kind === 'exact-1').live.expected, 'miss')
+  const zero = evidence.cases.find((entry) => entry.key === 'square-zero-off')
+  assert.deepEqual(liveSample(zero).rgba, [245, 245, 245, 255]); assert.equal(zero.probes.find((probe) => probe.kind === 'exact-1').live.expected, 'hit')
   assert.ok(entry.observation.livePaint.disagreements.some(({ x, y }) => x === 16 && y === -22))
   assertDashCapEvidence(evidence)
 })
@@ -221,7 +225,7 @@ for (const [name, damage] of [
   ['missing live grid cell', (entry) => { entry.observation.livePaint.captures[1].samples.pop() }],
   ['wrong native transform', (entry) => { entry.observation.livePaint.captures[1].ctm.a = 15 }],
   ['misprojected native pixel', (entry) => { liveSample(entry).pixel.x++ }],
-  ['live background disproves cloned paint', (entry) => { liveSample(entry).rgba = [245, 245, 245, 255] }],
+  ['forged live paint restores disproven cloned seam', (entry) => { liveSample(entry).rgba = [0, 0, 0, 255] }],
   ['live paint disproves genuine exterior', (entry) => { liveSample(entry, -22, -30).rgba = [0, 0, 0, 255] }],
   ['dropped contradiction', (entry) => { entry.observation.livePaint.disagreements = [] }],
   ['retained selection decoration', (entry) => { entry.observation.livePaint.captures[1].overlays = 1 }],
@@ -229,6 +233,17 @@ for (const [name, damage] of [
   ['unrestored framing', (entry) => { entry.observation.livePaint.restored = false }],
   ['missing screenshot identity', (entry) => { delete entry.observation.livePaint.captures[1].sha256 }],
   ['invalid screenshot byte length', (entry) => { entry.observation.livePaint.captures[1].bytes = 0 }],
+  ['inflated interaction tolerance', (entry) => { entry.observation.livePaint.interaction.tolerance = 7 }],
+  ['inflated interaction uncertainty', (entry) => { entry.observation.livePaint.interaction.uncertainty = 1 }],
+  ['merged selection decoration allowance', (entry) => { entry.observation.livePaint.interaction.selectionDecorationAllowance = 6 }],
+  ['dropped raw clone disagreement', (entry) => { entry.observation.engineAudit.mismatches = [] }],
+  ['missing source hash', (entry) => { delete entry.observation.livePaint.captures[1].sourceSha256 }],
+  ['missing background calibration', (entry) => { delete entry.observation.livePaint.captures[1].calibration.backgroundControl }],
+  ['missing pre-action live capture', (entry) => { delete entry.probes[0].liveCapture }],
+  ['pre-action source changed', (entry) => { entry.probes[0].liveCapture.source = '<polygon />' }],
+  ['pre-action transform changed', (entry) => { entry.probes[0].liveCapture.ctm.e += 1 }],
+  ['pre-action point opacity changed', (entry) => { entry.probes[0].liveCapture.stroke.opacity = .5 }],
+  ['live grid still has a definite failure', (entry) => { entry.observation.livePaint.interaction.mismatches.push({ local: { x: -22, y: -22 } }) }],
   ['new native exclusion outside retained region', (entry) => {
     const sample = entry.observation.engineAudit.samples.find((sample) => sample.local.x === -22 && sample.local.y === -22)
     sample.nativeStrokeContains = false
@@ -236,6 +251,35 @@ for (const [name, damage] of [
   }],
 ]) test(`synthetic live App oracle rejects ${name}`, () => {
   const evidence = dashCapEvidence(); damage(liveEntry(evidence)); assert.throws(() => assertDashCapEvidence(evidence))
+})
+
+test('PNG oracle reads independent known pixels and measures local boundary-center distances without geometry', () => {
+  // Literal RGB screenshot: a black 8x8 rectangle at pixels [8,16)^2 on white.
+  const png = Buffer.from('iVBORw0KGgoAAAANSUhEUgAAACAAAAAgCAIAAAD8GO2jAAAALUlEQVR4nO3NMREAIAwEsPdvGhR0K8MfiYHkPBaBoDjIQCD4KdgiEAgEgorgAu3YNWaLXhnZAAAAAElFTkSuQmCC', 'base64')
+  const decoded = decodeConnectedPaintPng(png)
+  assert.equal(decoded.width, 32); assert.equal(decoded.height, 32)
+  assert.deepEqual([...decoded.rgba.subarray((8 * 32 + 8) * 4, (8 * 32 + 8) * 4 + 4)], [0, 0, 0, 255])
+  assert.deepEqual([...decoded.rgba.subarray((16 * 32 + 16) * 4, (16 * 32 + 16) * 4 + 4)], [255, 255, 255, 255])
+  const observed = inspectConnectedLivePaintPng(png, { ctm: { a: 2, b: 0, c: 0, d: 2, e: 16, f: 16 },
+    samples: [{ local: { x: -2, y: -2 } }, { local: { x: 2, y: -2 } }], region: { minX: -8, minY: -8, maxX: 8, maxY: 8 } })
+  assert.equal(observed.paintedPixelCount, 64); assert.equal(observed.boundaryPixelCount, 28)
+  assert.deepEqual(observed.paintBounds, { minX: -4, minY: -4, maxX: 0, maxY: 0 })
+  assert.equal(observed.samples[0].paintDistance, 0); assert.equal(observed.samples[0].paintCore, true)
+  assert.equal(observed.samples[1].paintDistance, Math.hypot(2.25, .25))
+  assert.deepEqual(observed.calibration.backgroundControl.rgba, [255, 255, 255, 255])
+  assert.deepEqual(observed.calibration.positiveControl.rgba, [0, 0, 0, 255])
+  assert.throws(() => inspectConnectedLivePaintPng(png, { ctm: { a: 2, b: 0, c: 0, d: 2, e: 16, f: 16 }, samples: [{ local: { x: -9, y: 0 } }], region: { minX: -8, minY: -8, maxX: 8, maxY: 8 } }), /inside measured region/u)
+  assert.throws(() => decodeConnectedPaintPng(png.subarray(0, 20)))
+  const unsupported = Buffer.from(png); unsupported[24] = 16
+  assert.throws(() => decodeConnectedPaintPng(unsupported))
+})
+
+test('PNG oracle records empty paint explicitly instead of inventing a positive or finite distance', () => {
+  const png = Buffer.from('iVBORw0KGgoAAAANSUhEUgAAACAAAAAgCAIAAAD8GO2jAAAAJklEQVR4nO3NMQ0AAAwDoPo33arYsQQMkB6LQCAQCAQCgUAg+BIMi1X0pjxKe0gAAAAASUVORK5CYII=', 'base64')
+  const observed = inspectConnectedLivePaintPng(png, { ctm: { a: 1, b: 0, c: 0, d: 1, e: 16, f: 16 }, samples: [{ local: { x: 0, y: 0 } }], region: { minX: -16, minY: -16, maxX: 16, maxY: 16 } })
+  assert.equal(observed.paintedPixelCount, 0); assert.equal(observed.boundaryPixelCount, 0)
+  assert.equal(observed.paintBounds, null); assert.equal(observed.calibration.positiveControl, null)
+  assert.equal(observed.samples[0].paintDistance, null); assert.equal(observed.samples[0].paintCore, false)
 })
 
 

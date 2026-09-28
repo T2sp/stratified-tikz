@@ -3,6 +3,7 @@ import { createHash } from 'node:crypto'
 import { writeFile } from 'node:fs/promises'
 import { resolve } from 'node:path'
 import { runPointDashCapMechanismChecks } from './checkPointDashCapMechanism.mjs'
+import { inspectConnectedLivePaintPng } from './connectedLivePaintOracle.mjs'
 import { boundedPointDiagnostic } from './pointCheckDiagnostics.mjs'
 import { dashCapScenario, dashCapCases, dashCapScales, dashCapEditFields, triangleDashPhaseNegatives, dashCapProbeIsMiss, assertDashCapEvidence, assertDashCapObservation, assertDashCapEntry } from './pointDashCapContract.mjs'
 const paint = (spec) => ({ text: { color: '#000000', opacity: 1 }, fill: { enabled: false, color: '#000000', opacity: 1 },
@@ -145,34 +146,19 @@ async function observeLivePaint(page, artifactDir, stem, observation, persist) {
         return { rawPoints: contour.getAttribute('points'), vertices: [...contour.points].map(({ x, y }) => ({ x, y })), pathLength: contour.getTotalLength(),
           ctm: Object.fromEntries(['a', 'b', 'c', 'd', 'e', 'f'].map((key) => [key, matrix[key]])), selection: state.selection,
           stroke: { width: parseFloat(css.strokeWidth), pattern: css.strokeDasharray, phase: parseFloat(css.strokeDashoffset), cap: css.strokeLinecap, join: css.strokeLinejoin, fill: css.fill, miterLimit: Number(css.strokeMiterlimit), color: css.stroke, opacity: Number(css.strokeOpacity) },
-          source: contour.outerHTML, overlays: contour.parentElement.querySelectorAll('[data-svg-export-exclude]').length }
+          viewport: { width: innerWidth, height: innerHeight }, source: contour.outerHTML, overlays: contour.parentElement.querySelectorAll('[data-svg-export-exclude]').length }
       }), 'App live paint source before screenshot', 5000)
       const screenshot = `${stem}-${zoom ? 'live-zoom' : 'live'}.screen.png`
       const capture = { ...before, screenshot, zoom, method: 'actual App screenshot PNG; no SVG reconstruction', status: 'observed' }
       captures.push(capture); await persist()
       const png = await page.screenshot({ path: resolve(artifactDir, screenshot), timeout: 5000, scale: 'css' })
       Object.assign(capture, { status: 'captured', bytes: png.length, sha256: createHash('sha256').update(png).digest('hex') }); await persist()
-      const pixels = await boundedPointDiagnostic(() => page.evaluate(async ({ png, samples, ctm }) => {
-        const image = new Image(); image.src = `data:image/png;base64,${png}`
-        let timer
-        try { await Promise.race([image.decode(), new Promise((_, reject) => { timer = setTimeout(() => reject(new Error('App live PNG decode exceeded 5000ms')), 5000) })]) }
-        finally { clearTimeout(timer) }
-        const canvas = document.createElement('canvas'); canvas.width = image.naturalWidth; canvas.height = image.naturalHeight
-        const context = canvas.getContext('2d', { willReadFrequently: true }); context.drawImage(image, 0, 0)
-        const bytes = context.getImageData(0, 0, canvas.width, canvas.height).data
-        return { width: canvas.width, height: canvas.height, samples: samples.map(({ local }) => {
-          const screen = { x: ctm.a * local.x + ctm.c * local.y + ctm.e, y: ctm.b * local.x + ctm.d * local.y + ctm.f }
-          const pixel = { x: Math.floor(screen.x), y: Math.floor(screen.y) }
-          if (pixel.x < 0 || pixel.y < 0 || pixel.x >= canvas.width || pixel.y >= canvas.height) throw new Error('App live sample is outside screenshot')
-          const offset = (pixel.y * canvas.width + pixel.x) * 4
-          return { local, screen, pixel, rgba: [...bytes.slice(offset, offset + 4)] }
-        }) }
-      }, { png: png.toString('base64'), samples: observation.engineAudit.samples.map(({ local }) => ({ local })), ctm: before.ctm }), 'App live PNG inspection', 6000)
+      const pixels = inspectConnectedLivePaintPng(png, { ctm: before.ctm, samples: observation.engineAudit.samples })
       const after = await boundedPointDiagnostic(() => page.evaluate(() => {
         const contour = document.querySelector('[data-point-id="p"] [data-point-contour]'), matrix = contour.getScreenCTM()
         return { source: contour.outerHTML, ctm: Object.fromEntries(['a', 'b', 'c', 'd', 'e', 'f'].map((key) => [key, matrix[key]])) }
       }), 'App live paint source after screenshot', 5000)
-      Object.assign(capture, { status: 'inspected', sourceUnchanged: before.source === after.source, afterCtm: after.ctm, ...pixels }); await persist()
+      Object.assign(capture, { sourceSha256: createHash('sha256').update(before.source).digest('hex'), status: 'inspected', sourceUnchanged: before.source === after.source, afterCtm: after.ctm, ...pixels, pixelDistances: pixels, method: 'actual App screenshot PNG; no SVG reconstruction' }); await persist()
     }
   } catch (error) {
     primary = error; live.error = { message: error.message }
@@ -191,6 +177,35 @@ async function observeLivePaint(page, artifactDir, stem, observation, persist) {
     } catch (error) { if (!primary) primary = error; else console.error('App live framing cleanup:', error) }
   }
   if (primary) throw primary
+  const magnified = captures.find((capture) => capture.zoom)
+  const audit = observation.engineAudit
+  const samples = audit.samples.map((sample, index) => {
+    const pixel = magnified.samples[index], minimum = Math.min(pixel.paintDistance, sample.solidDistance)
+    return { ...pixel, insideContour: sample.insideContour, solidDistance: sample.solidDistance,
+      expected: sample.insideContour || minimum < 6 - .14 ? 'hit' : minimum > 6 + .14 ? 'miss' : 'uncertain', candidates: [...sample.candidates] }
+  })
+  live.interaction = { method: 'connected live paint plus continuous stroke and contour interior', tolerance: 6, uncertainty: .14,
+    selectionDecorationAllowance: 0, screenshot: magnified.screenshot, sha256: magnified.sha256,
+    samples, mismatches: samples.filter((sample) => sample.expected !== 'uncertain' && (sample.candidates.includes('p') !== (sample.expected === 'hit') || sample.candidates.some((id) => id !== 'p'))) }
+  // Supersede clone-selected positive witnesses using only live pixels and the
+  // independent solid control, never the production candidates. Preserve the
+  // original clone witnesses and full contradictory grid as diagnostics.
+  observation.cloneProbes = structuredClone(observation.probes)
+  const cap = samples.filter((sample) => sample.paintCore && sample.solidDistance > .3 && !sample.insideContour)
+    .sort((a, b) => b.solidDistance - a.solidDistance || a.local.x - b.local.x || a.local.y - b.local.y)[0]
+  const outside = samples.filter((sample) => sample.expected === 'miss' && sample.paintDistance > 6.14 && sample.solidDistance > 6.14)
+    .sort((a, b) => Math.min(a.paintDistance, a.solidDistance) - Math.min(b.paintDistance, b.solidDistance))[0]
+  assert.ok(cap && outside, 'Independently live-painted cap and exterior witnesses')
+  observation.probes = observation.probes.map((probe) => {
+    const replacement = ['paint', 'audit-cap'].includes(probe.kind) ? cap : probe.kind === 'audit-outside' ? outside : null
+    const sample = replacement ?? samples.find((sample) => sample.local.x === probe.local.x && sample.local.y === probe.local.y)
+    assert.ok(sample, 'Every live interaction witness is retained in its independent grid')
+    const clone = audit.samples.find((original) => original.local.x === sample.local.x && original.local.y === sample.local.y)
+    return { ...probe, local: sample.local, alpha: clone.paintAlpha, rasterDistance: clone.paintDistance, solidDistance: clone.solidDistance,
+      nativeStrokeContains: clone.nativeStrokeContains, live: Object.fromEntries(Object.entries(sample).filter(([key]) => key !== 'candidates')),
+      ...(replacement ? { replacement: { reason: 'connected live paint supersedes clone-selected interaction witness', original: probe.local } } : {}) }
+  })
+  await persist()
   return live
 }
 
@@ -225,6 +240,20 @@ export async function runPointDashCapChecks({ page, artifactDir, begin, saved, d
     probe.transform = transform
     await page.mouse.click(transform.clear.x, transform.clear.y); assert.equal((await state()).selection, null); probe.selectionCleared = true
     const before = await state()
+    if (spec.livePaint) {
+      const source = await page.evaluate(() => {
+        const contour = document.querySelector('[data-point-id="p"] [data-point-contour]'), css = getComputedStyle(contour)
+        return { source: contour.outerHTML, viewport: { width: innerWidth, height: innerHeight }, selection: window.stzLabels.state().selection,
+          stroke: { width: parseFloat(css.strokeWidth), pattern: css.strokeDasharray, phase: parseFloat(css.strokeDashoffset), cap: css.strokeLinecap, join: css.strokeLinejoin, fill: css.fill, miterLimit: Number(css.strokeMiterlimit), color: css.stroke, opacity: Number(css.strokeOpacity) } }
+      })
+      const png = await page.screenshot({ path: resolve(artifactDir, screenshot), timeout: 5000, scale: 'css' })
+      const pixelDistances = inspectConnectedLivePaintPng(png, { ctm: transform.ctm, samples: [{ local: probe.local }] })
+      probe.liveCapture = { ...source, sourceSha256: createHash('sha256').update(source.source).digest('hex'), screenshot,
+        ctm: transform.ctm, sha256: createHash('sha256').update(png).digest('hex'), bytes: png.length,
+        ...pixelDistances, pixelDistances }
+      probe.screenshot = screenshot
+      await persist()
+    }
     await page.evaluate(() => { window.stzDashClicks = window.stzLabels.observeEmptyPointSelectionClicks() })
     let primary
     try {
@@ -237,12 +266,12 @@ export async function runPointDashCapChecks({ page, artifactDir, begin, saved, d
         assert.deepEqual([...action.candidates].sort(), dashCapProbeIsMiss(spec, probe.kind) ? ['control'] : ['control', 'p'])
       }
       const after = await state(); assert.equal(before.json, after.json); assert.equal(before.history, after.history)
-      probe.screenshot = screenshot; await page.screenshot({ path: resolve(artifactDir, probe.screenshot), timeout: 5000 }); await persist()
+      probe.screenshot = screenshot; if (!spec.livePaint) await page.screenshot({ path: resolve(artifactDir, probe.screenshot), timeout: 5000 }); await persist()
     } catch (error) {
       primary = error
       probe.failure = { message: error.message }
       probe.screenshot = screenshot
-      try { await boundedPointDiagnostic(() => page.screenshot({ path: resolve(artifactDir, screenshot), timeout: 5000 }), 'dash-cap pointer failure screenshot', 5000) }
+      try { if (!probe.liveCapture) await boundedPointDiagnostic(() => page.screenshot({ path: resolve(artifactDir, screenshot), timeout: 5000 }), 'dash-cap pointer failure screenshot', 5000) }
       catch (captureError) { probe.failure.screenshot = captureError.message }
       try { await boundedPointDiagnostic(persist, 'dash-cap pointer failure evidence') }
       catch (diagnosticError) { console.error('Dash-cap pointer failure diagnostics:', diagnosticError) }
@@ -267,6 +296,11 @@ export async function runPointDashCapChecks({ page, artifactDir, begin, saved, d
           const svg = document.querySelector('svg.svg-diagram'); svg.style.width = `${900 * scale}px`; svg.style.height = `${700 * scale}px`; svg.style.transform = ''
         }, { spec, scale, finalPaint })
         await settle()
+        if (spec.livePaint) await page.evaluate(() => {
+          const style = document.createElement('style'); style.id = 'stz-dash-live-paint-isolation'
+          style.textContent = 'body * { visibility:hidden!important } svg.svg-diagram, svg.svg-diagram * { visibility:visible!important } svg.svg-diagram [data-svg-export-exclude]:not([data-svg-background]), svg.svg-diagram [data-svg-export-exclude]:not([data-svg-background]) * { visibility:hidden!important }'
+          document.head.append(style)
+        })
         if (spec.key === 'triangle-square-wide') {
           const strokes = [
             { ...finalPaint.stroke, lineStyle: 'solid', lineCap: 'butt' },
@@ -310,6 +344,9 @@ export async function runPointDashCapChecks({ page, artifactDir, begin, saved, d
         primary ??= error; entry.result = 'failed'; entry.error = { message: error.message, stack: error.stack }
         try { await boundedPointDiagnostic(persist, 'dash-cap case failure evidence') }
         catch (diagnosticError) { console.error('Dash-cap case failure diagnostics:', diagnosticError) }
+      } finally {
+        try { await boundedPointDiagnostic(() => page.evaluate(() => document.getElementById('stz-dash-live-paint-isolation')?.remove()), 'App live paint isolation cleanup') }
+        catch (cleanupError) { primary ??= cleanupError; console.error('App live paint isolation cleanup:', cleanupError) }
       }
     }
     try { await runPointDashCapMechanismChecks({ page, artifactDir }) } catch (error) { primary ??= error }

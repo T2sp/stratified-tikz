@@ -1,5 +1,13 @@
 # Phase 32B: Independent point paint and imported styles
 
+Latest continuation: [connected live paint and proposed bounded acceptance](PHASE_32B_LIVE_PAINT_ACCEPTANCE.md).
+The `pF6DA7` parent reached Chrome, passed tests/build/diff/label-assets, and
+failed free-labels after attempting all 22 App and 21 supplemental dash entries.
+Two square interaction expectations used an inappropriate clone-paint oracle;
+the literal full-closed triangle retains a real discrepancy. The proposed
+`stz-32b-core-v1` scope is not adopted. Strict acceptance remains failed; fresh
+matching parent verification and independent review are still required.
+
 Status: 32B remains incomplete until matching final verification and independent
 review succeed. The `AsZusl` parent passed all five commands, 16 cumulative
 groups, 27 required point scenarios and 281 required artifacts on fingerprint

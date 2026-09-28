@@ -1687,6 +1687,11 @@ the retained Chrome reproduction from Cairo observations. The subsequent
 [endpoint continuation](PHASE_32B_NATIVE_ENDPOINT_INVESTIGATION.md) records native
 diagonal/internal-zero successes, corrected terminal negatives and positive
 endpoints, and the remaining live-paint checks for seam contradictions.
+The [connected-paint followup](PHASE_32B_LIVE_PAINT_ACCEPTANCE.md) distinguishes
+the two square clone/live differences from a real supplemental full-closed
+triangle near-paint miss. Interaction expectations use independent live paint
+with the unchanged gap/interior policy. Export appearance keeps separate checks;
+the proposed finite acceptance profile is not an adopted waiver.
 Committed layouts compare copied pattern contents and all effective geometry
 settings in addition to source, owner, shape, size and font generation.
 SVG emits a signed phase remainder modulo the effective pattern, avoiding native
