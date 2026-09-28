@@ -65,7 +65,7 @@ const defects: Record<string, (file: SavedDiagramFile) => void> = {
   'unrelated document field': (f) => { f.diagram.layers![0].name = 'changed' },
   'extra view data': (f) => { Object.assign(f.diagram.view!, { unexpected: true }) },
   'format': (f) => { Object.assign(f, { format: 'other' }) },
-  'version': (f) => { Object.assign(f, { version: 2 }) },
+  'version': (f) => { Object.assign(f, { version: 999 }) },
 }
 for (const [name, mutate] of Object.entries(defects)) test(`save rejects ${name}`, () => {
   const input = fixture(3, 'inlineMath')

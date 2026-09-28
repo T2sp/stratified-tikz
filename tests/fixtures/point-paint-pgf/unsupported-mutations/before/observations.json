@@ -1,0 +1,16 @@
+{
+  "warnings": [
+    {
+      "message": "Skipped unsupported tikzset entry: myPoint/.append style={fill=blue,text=blue}"
+    }
+  ],
+  "referenceDiagnostics": [],
+  "resolved": {
+    "fillEnabled": true,
+    "fillColor": "#FF0000",
+    "textColor": "#FF0000",
+    "sourceDependencies": [
+      "external-style-source-append-sty"
+    ]
+  }
+}

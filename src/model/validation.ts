@@ -70,6 +70,7 @@ import {
   hiddenCurveLineStyles,
   labelVisibilityPolicies,
   pointVisibilityPolicies,
+  pointPaintFields,
   crossingKinds,
   tikzExportModes,
   visibilitySortModes,
@@ -485,6 +486,9 @@ function validateExternalTikzStyleSources(
       return
     }
 
+    if (source.rawSource !== undefined && typeof source.rawSource !== 'string') {
+      pushError(errors, `${sourcePath}.rawSource`, 'Raw source must be a string.')
+    }
     validateId(source.id, `${sourcePath}.id`, errors)
     addUniqueId(source.id, `${sourcePath}.id`, seenIds, errors)
 
@@ -558,6 +562,13 @@ function validateImportedTikzStyleReferences(
       pushError(errors, `${referencePath}.options`, 'Imported style options must be a string when present.')
     }
 
+    if (reference.rawOptions !== undefined && typeof reference.rawOptions !== 'string') {
+      pushError(errors, `${referencePath}.rawOptions`, 'Raw options must be a string.')
+    }
+    if (reference.previewDiagnostics !== undefined && (!Array.isArray(reference.previewDiagnostics) ||
+        !reference.previewDiagnostics.every((item) => typeof item === 'string'))) {
+      pushError(errors, `${referencePath}.previewDiagnostics`, 'Preview diagnostics must be an array of strings.')
+    }
     validateTikzStyleTargets(reference.targets, `${referencePath}.targets`, errors)
   })
 }
@@ -3241,6 +3252,44 @@ function validatePointStyle(
   }
 
   validatePositiveFinite(style.size, `${path}.size`, errors)
+  if (style.paint !== undefined) validatePointPaint(style.paint, `${path}.paint`, errors)
+  if (style.importedPaint !== undefined) {
+    const intent: unknown = style.importedPaint
+    const intentPath = `${path}.importedPaint`
+    if (!isRecord(intent)) pushError(errors, intentPath, 'Imported paint metadata must be an object.')
+    else {
+      if (typeof intent.referenceId !== 'string' || intent.referenceId.trim().length === 0) pushError(errors, `${intentPath}.referenceId`, 'Imported paint reference must be non-empty.')
+      validatePointPaint(intent.baseline, `${intentPath}.baseline`, errors)
+      if (!Array.isArray(intent.overriddenFields) || intent.overriddenFields.length > pointPaintFields.length ||
+        !intent.overriddenFields.every((field) => typeof field === 'string' && (pointPaintFields as readonly string[]).includes(field)) ||
+        new Set(intent.overriddenFields).size !== intent.overriddenFields.length) {
+        pushError(errors, `${intentPath}.overriddenFields`, 'Imported paint overrides must be unique supported property names.')
+      }
+    }
+  }
+}
+
+function validatePointPaint(value: unknown, path: string, errors: DiagramValidationIssue[]): void {
+  if (!isRecord(value)) { pushError(errors, path, 'Point paint must be an object.'); return }
+  for (const channel of ['text', 'fill', 'stroke'] as const) {
+    const paint = value[channel]
+    const channelPath = `${path}.${channel}`
+    if (!isRecord(paint)) { pushError(errors, channelPath, 'Paint channel must be an object.'); continue }
+    if (typeof paint.color !== 'string' || !isHexColor(paint.color)) pushError(errors, `${channelPath}.color`, 'Color must be a #RRGGBB hex color.')
+    if (typeof paint.opacity !== 'number' || !isOpacity(paint.opacity)) pushError(errors, `${channelPath}.opacity`, 'Opacity must be a number between 0 and 1.')
+    if (channel !== 'text' && typeof paint.enabled !== 'boolean') pushError(errors, `${channelPath}.enabled`, 'Paint enablement must be boolean.')
+    if (channel === 'stroke') {
+      if (typeof paint.width !== 'number' || !Number.isFinite(paint.width) || paint.width <= 0) pushError(errors, `${channelPath}.width`, 'Border width must be finite and positive; disable the border to omit it.')
+      if (typeof paint.lineStyle !== 'string' || !isLineStyle(paint.lineStyle)) pushError(errors, `${channelPath}.lineStyle`, 'Unsupported border line style.')
+      if (typeof paint.dashPhase !== 'number' || !Number.isFinite(paint.dashPhase)) pushError(errors, `${channelPath}.dashPhase`, 'Dash phase must be finite.')
+      if (!['butt', 'round', 'rect'].includes(String(paint.lineCap))) pushError(errors, `${channelPath}.lineCap`, 'Unsupported border cap.')
+      if (!['miter', 'round', 'bevel'].includes(String(paint.lineJoin))) pushError(errors, `${channelPath}.lineJoin`, 'Unsupported border join.')
+      if (paint.dashPattern !== undefined && (!Array.isArray(paint.dashPattern) || paint.dashPattern.length < 2 || paint.dashPattern.length > 64 || paint.dashPattern.length % 2 !== 0 ||
+          !paint.dashPattern.every((length) => typeof length === 'number' && Number.isFinite(length) && length >= 0) || !paint.dashPattern.some((length) => length > 0))) {
+        pushError(errors, `${channelPath}.dashPattern`, 'Dash pattern must have 2–64 nonnegative on/off lengths and a positive total length.')
+      }
+    }
+  }
 }
 
 function validateLabelStyle(
@@ -3517,6 +3566,9 @@ function validateImportedTikzStyleReferenceUsages(
   )
 
   diagram.userStylePresets?.forEach((preset, index) => {
+    if (preset.kind === 'point' && isRecord(preset.style.importedPaint) && preset.style.importedPaint.referenceId !== preset.importedTikzStyleReferenceId) {
+      pushError(errors, `userStylePresets[${index}].style.importedPaint.referenceId`, 'Imported paint metadata must match the active imported reference.')
+    }
     validateImportedTikzStyleReferenceUsage(
       preset.importedTikzStyleReferenceId,
       stylePresetKindTargets(preset.kind),
@@ -3527,6 +3579,9 @@ function validateImportedTikzStyleReferenceUsages(
   })
 
   diagram.strata.forEach((stratum, index) => {
+    if (stratum.geometricKind === 'point' && isRecord(stratum.style.importedPaint) && stratum.style.importedPaint.referenceId !== stratum.importedTikzStyleReferenceId) {
+      pushError(errors, `strata[${index}].style.importedPaint.referenceId`, 'Imported paint metadata must match the active imported reference.')
+    }
     validateImportedTikzStyleReferenceUsage(
       stratum.importedTikzStyleReferenceId,
       stratumTargets(stratum),

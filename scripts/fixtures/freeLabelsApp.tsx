@@ -3,6 +3,7 @@
 import { createRoot } from 'react-dom/client'
 import App from '../../src/App.tsx'
 import { jsonPersistenceExpectation } from './jsonPersistenceExpectation.ts'
+import { pointPaintModelDiagnostics } from './pointPaintModelDiagnostics.ts'
 import type { AppLabelBrowserSnapshot } from '../../src/App.tsx'
 import '../../src/index.css'
 import { createPointStratum, createCurveStratum, createEmptyDiagram } from '../../src/model/constructors.ts'
@@ -12,6 +13,7 @@ import { serializeDiagram } from '../../src/model/serialization.ts'
 import { createBrowserTextMeasurementProvider, createLabelService } from '../../src/rendering/labels/labelService.ts'
 import type { LabelConversionResult } from '../../src/rendering/labels/labelService.ts'
 import { createSvgLabelRuntime } from '../../src/rendering/labels/svgLabelRuntime.ts'
+import { createCoordinateAxesGuide } from '../../src/rendering/coordinateAxesGuide.ts'
 import { inspectAndAssertLabelContent, inspectPositionedLiteral, inspectOracleDocumentContext } from './labelBrowserOracle.ts'
 import type { Diagram, PointStratum } from '../../src/model/types.ts'
 
@@ -68,7 +70,13 @@ const runtime = createSvgLabelRuntime({ measurement, service: {
     return pending
   },
 } })
-const frame = () => new Promise<void>((resolve) => requestAnimationFrame(() => resolve()))
+const frame = () => new Promise<void>((resolve, reject) => {
+  const timer = setTimeout(() => {
+    cancelAnimationFrame(request)
+    reject(new Error('App conversion release animation frame stalled for 2000ms'))
+  }, 2000)
+  const request = requestAnimationFrame(() => { clearTimeout(timer); resolve() })
+})
 const pointRuntime = () => ({ identity: measurement.identity,
   fontGeneration: runtime.getFontGeneration(), documentRevision: snapshot?.labelDocumentRevision })
 function pointExportClickSnapshot(ids: string[]) {
@@ -98,6 +106,10 @@ let releaseExportClick: (() => void) | undefined
 const api = {
   jsonPersistenceExpectation,
   pointRuntime,
+  pointPaintModelDiagnostics(id = 'app-point') {
+    if (!snapshot) throw new Error('App has not committed its diagnostics')
+    return pointPaintModelDiagnostics(snapshot.runtimeDiagramJson, id)
+  },
   // Capture at the native click boundary, before the production handler owns
   // its immutable snapshot. Later edits/loads must not supply these inputs.
   armPointExportClick(ids: string[]) {
@@ -171,6 +183,47 @@ const api = {
     if (text !== undefined) diagram.strata = [createPointStratum({ ambientDimension, id: 'app-point', text,
       position: { x: 0, y: 0, z: 0 }, style: { kind: 'pointStyle', shape: 'circle', size: 3,
         color: '#3870a0', opacity: .65, fill: 'hollow' } })]
+    return serializeDiagram(diagram)
+  },
+  // Literal version-1 input intentionally lacks paint on both point strata and
+  // saved presets. Only the native Load JSON action may normalize this fixture.
+  pointPaintLegacyDocumentJson() {
+    const diagram = createEmptyDiagram({ ambientDimension: 2 })
+    const style = { kind: 'pointStyle' as const, shape: 'circle' as const, size: 3,
+      color: '#3870a0' as const, opacity: 1, fill: 'hollow' as const }
+    diagram.strata = ['app-point', 'copy-point', 'bulk-point'].map((id, index) => createPointStratum({
+      ambientDimension: 2, id, text: index === 0 ? ' 日本 $x+\\color{purple}{y}$ ' : `copy ${index} $g_j$`,
+      position: { x: index === 0 ? 0 : index === 1 ? -2 : 2, y: index === 0 ? 0 : -1.5, z: 0 }, style,
+    }))
+    const raw = JSON.parse(serializeDiagram(diagram)) as { version: number; diagram: Diagram }
+    raw.version = 1
+    for (const stratum of raw.diagram.strata) if (stratum.geometricKind === 'point') delete stratum.style.paint
+    raw.diagram.userStylePresets = [{ id: 'legacy-paint-preset', name: 'Legacy hollow', kind: 'point',
+      tikzStyleName: 'legacyHollow', style: { ...style, shape: 'square' } }]
+    return JSON.stringify(raw)
+  },
+  // Input documents only: native Load JSON, selection and export remain the
+  // production App paths. Literal declarations are independent oracle inputs.
+  pointResponsivePaintDocumentJson(shape: 'circle' | 'triangle' = 'circle', variant: 'solid' | 'disabled' | 'transparent' | 'dashed' = 'solid') {
+    const diagram = createEmptyDiagram({ ambientDimension: 2 })
+    // App fit-to-view includes the coordinate axes, even for a one-point input.
+    // Their model-space midpoint is deliberately interior; an origin fixture
+    // leaves only the fit padding below it and clips the declared 20pt border.
+    // Native preflight separately proves the complete shape/control envelope.
+    const axes = createCoordinateAxesGuide(2)
+    if (!axes) throw new Error('Responsive point fixture requires coordinate axes')
+    const xs = axes.fitPoints.map(({ x }) => x), ys = axes.fitPoints.map(({ y }) => y)
+    const position = { x: (Math.min(...xs) + Math.max(...xs)) / 2,
+      y: (Math.min(...ys) + Math.max(...ys)) / 2, z: 0 }
+    diagram.strata = [createPointStratum({ ambientDimension: 2, id: 'app-point', text: 'Scale',
+      position, style: { kind: 'pointStyle', shape, size: 32,
+        color: '#cc0000', opacity: 1, fill: 'filled', paint: {
+          text: { color: '#000000', opacity: 1 }, fill: { enabled: true, color: '#cceeff', opacity: 1 },
+          stroke: { enabled: variant !== 'disabled', color: '#cc0000', opacity: variant === 'transparent' ? 0 : 1,
+            width: 20, lineStyle: variant === 'dashed' ? 'dashed' : 'solid',
+            ...(variant === 'dashed' ? { dashPattern: [12, 8] } : {}),
+            dashPhase: variant === 'dashed' ? 3 : 0, lineCap: 'butt', lineJoin: 'miter' },
+        } } })]
     return serializeDiagram(diagram)
   },
   exportDocumentJson(ambientDimension: 2 | 3 = 2) {

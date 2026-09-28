@@ -2,23 +2,30 @@ import assert from 'node:assert/strict'
 import { readFile, writeFile } from 'node:fs/promises'
 import { resolve } from 'node:path'
 import { pathToFileURL } from 'node:url'
+import { createHash } from 'node:crypto'
 import { ownPageEvent } from './ownedPageEvent.mjs'
 import { captureStandaloneSvg } from './standaloneSvgCapture.mjs'
-import { cleanupPointCheck, capturePointCheck } from './pointCheckDiagnostics.mjs'
+import { cleanupPointCheck, capturePointCheck, boundedPointDiagnostic } from './pointCheckDiagnostics.mjs'
 import { observePointLiteral, assertPositionedLiteral, inspectStandalonePoint, diagnoseStandalonePointFailure } from './pointLiteralOracle.mjs'
 import { inspectPoint, assertPointLayout } from './checkPointNodes.mjs'
-import { saveAppJson, checkAppJsonReload } from './appJsonPersistence.mjs'
+import { saveAppJson, checkAppJsonReload, readPersistenceControls, assertPointPersistenceChanged, checkNativePointCheckboxAction, checkPersistenceEvidence } from './appJsonPersistence.mjs'
 import { selectPointCoordinateMode, checkPointCoordinateModeBoundary } from './pointNativeCoordinateMode.mjs'
 import { captureNativePointSetup, diagnoseNativePointFailure } from './pointNativeSetupDiagnostics.mjs'
 import { assertPointExportCompatibility } from './pointExportReference.mjs'
+import { createOwnedAppPage } from './ownedAppPage.mjs'
+import { createAppGeometryDiagnostics, waitForAppFrames } from './appGeometryDiagnostics.mjs'
 
 const nativeInvalidSource = '  $\\missingNativePoint$\t\n tail  '
 
 export async function runNativePointChecks({ browser, origin, page: rendererPage, artifactDir, saved, startGroup, completeGroup, observe, diagnose, setStage }) {
   const page = await browser.newPage({ viewport: { width: 1600, height: 1200 }, acceptDownloads: true })
   const errors = [], owned = []
-  page.on('pageerror', (e) => errors.push(e.message))
-  let primary
+  const onPageError = (e) => { if (errors.length < 32) errors.push(e.message.slice(0, 4000)) }
+  page.on('pageerror', onPageError)
+  const expectedUrl = `${origin}/stratified-tikz/scripts/fixtures/freeLabelsApp.html`
+  const app = createOwnedAppPage({ page, expectedUrl, artifactDir, prefix: 'point-native-app' })
+  const geometry = createAppGeometryDiagnostics({ page, artifactDir, prefix: 'point-native-controls', nativeControls: true })
+  let primary, cleanupFailure, nativeBoundary = { action: 'startup' }, savedDownload
   const bodyGroup = 'point-node-body-layout-lifecycle', exportGroup = 'point-node-settled-export'
   let scenario = 'point-native-direct-cursor-workplanes-inspector-persistence'
   setStage?.('point-node-native-input')
@@ -29,9 +36,34 @@ export async function runNativePointChecks({ browser, origin, page: rendererPage
     () => observePointLiteral(page, { source, standalone: true,
       diagnose: (details) => diagnose(exportGroup, scenario, { source, svgPath, standalone: true, ...details }) }),
     (details) => diagnose(exportGroup, scenario, { source, svgPath, standalone: true, ...details }))
-  const state = () => page.evaluate(() => window.stzAppLabels.state())
+  const state = () => app.readState()
   const model = async () => JSON.parse((await state()).json).diagram
   const settle = () => page.waitForFunction(() => !document.querySelector('[data-label-state="pending"]'), undefined, { timeout: 30_000 })
+  // Observe the unchanged real control action on this separately owned page.
+  // Neither diagnostics nor a continuity failure retries/replaces the App.
+  async function nativeControl(action, operation) {
+    nativeBoundary = { ...nativeBoundary, action }
+    const name = `${nativeBoundary.ambientDimension}d-${nativeBoundary.mode}-${action}`
+    await app.checkpoint(`${name}:before`)
+    await geometry.around(name, operation, { ...nativeBoundary, savedDownload })
+    await app.checkpoint(`${name}:after`)
+  }
+  async function persistenceScreenshot(name) {
+    const screenshot = `${name}-before-control-changes.png`
+    let screenshotError
+    try {
+      await boundedPointDiagnostic(() => page.screenshot({ path: resolve(artifactDir, screenshot), fullPage: false, timeout: 2000 }), 'native persistence screenshot', 2100)
+    } catch (error) { screenshotError = { message: error.message, stack: error.stack } }
+    await boundedPointDiagnostic(() => diagnose(bodyGroup, scenario, { boundary: 'before-control-changes-image', ...nativeBoundary,
+      savedDownload, ...(screenshotError ? { screenshotError } : { screenshot }) }), 'native persistence screenshot evidence')
+  }
+  async function changedCheckbox(action, name, checked, operation) {
+    nativeBoundary = { ...nativeBoundary, action }
+    return checkNativePointCheckboxAction({ name, checked,
+      capture: (boundary) => geometry.capture(`${action}:${boundary}`, { ...nativeBoundary, savedDownload, name, checked }),
+      action: () => nativeControl(action, operation),
+    })
+  }
   async function eventAction(name, event, action) {
     const wait = ownPageEvent(page, event, { name, timeoutMs: 30_000 }); owned.push(wait)
     return wait.run(action)
@@ -64,10 +96,13 @@ export async function runNativePointChecks({ browser, origin, page: rendererPage
     return output
   }
   try {
-    await page.goto(`${origin}/stratified-tikz/scripts/fixtures/freeLabelsApp.html`)
-    await page.waitForFunction(() => window.stzAppLabels !== undefined)
+    await app.install()
+    await page.goto(expectedUrl)
+    await app.start()
+    await geometry.install()
     const entries = []
     for (const ambientDimension of [2, 3]) {
+      nativeBoundary = { ambientDimension, action: 'direct-cursor-sequence' }
       await load(await fixture(ambientDimension))
       await page.getByLabel('Add point menu', { exact: true }).click()
       await page.getByRole('button', { name: 'Direct input', exact: true }).click()
@@ -185,32 +220,47 @@ export async function runNativePointChecks({ browser, origin, page: rendererPage
         }
       }
       for (const mode of ['inlineMath', 'standalone']) {
-        await page.getByLabel(/^TikZ export mode:/).selectOption(mode)
+        nativeBoundary = { ambientDimension, mode, action: 'save-controls' }
+        savedDownload = undefined
+        await nativeControl('save-export-mode', () => page.getByLabel(/^TikZ export mode:/).selectOption(mode))
         if (ambientDimension === 3) {
-          await page.getByLabel('Show xyz axes in TikZ output', { exact: true }).setChecked(mode === 'standalone')
-          await page.getByLabel('Enable approximate 3D visibility', { exact: true }).check()
-          await page.getByLabel('Auto depth-sort surfaces', { exact: true }).uncheck()
+          await nativeControl('save-axes', () => page.getByLabel('Show xyz axes in TikZ output', { exact: true }).setChecked(mode === 'standalone'))
+          await nativeControl('save-visibility', () => page.getByLabel('Enable approximate 3D visibility', { exact: true }).check())
+          await nativeControl('save-surface-depth-sort', () => page.getByLabel('Auto depth-sort surfaces', { exact: true }).uncheck())
         }
-        const diagnosePersistence = (details) => diagnose(bodyGroup, scenario, { mode, ...details })
+        const diagnosePersistence = (details) => diagnose(bodyGroup, scenario, { ambientDimension, mode, ...details })
+        const downloadName = `point-native-${ambientDimension}d${mode === 'standalone' ? '-standalone' : ''}`
+        nativeBoundary.action = 'download'
         const download = await saveAppJson({ page, artifactDir, owned,
-          name: `point-native-${ambientDimension}d${mode === 'standalone' ? '-standalone' : ''}`, diagnose: diagnosePersistence })
+          name: downloadName, diagnose: diagnosePersistence,
+          waitForFrames: () => waitForAppFrames(page) })
+        savedDownload = { path: download.path, bytes: Buffer.byteLength(download.json),
+          sha256: createHash('sha256').update(download.json).digest('hex'), documentRevision: download.before.labelDocumentRevision }
+        await geometry.capture('before-control-changes', { ...nativeBoundary, savedDownload })
+        if (ambientDimension === 3) await persistenceScreenshot(downloadName)
         // Change real controls before loading: restoration cannot pass merely
         // because the pre-load settings happened to equal the saved ones.
-        await page.getByLabel(/^TikZ export mode:/).selectOption(mode === 'inlineMath' ? 'standalone' : 'inlineMath')
+        const checkboxActions = []
+        await nativeControl('change-export-mode', () => page.getByLabel(/^TikZ export mode:/).selectOption(mode === 'inlineMath' ? 'standalone' : 'inlineMath'))
         if (ambientDimension === 3) {
-          await page.getByLabel('Show xyz axes in TikZ output', { exact: true }).setChecked(mode !== 'standalone')
-          await page.getByLabel('Auto depth-sort surfaces', { exact: true }).check()
-          await page.getByLabel('Enable approximate 3D visibility', { exact: true }).uncheck()
-          await page.getByRole('spinbutton', { name: 'theta value', exact: true }).fill('63')
+          await nativeControl('change-axes', () => page.getByLabel('Show xyz axes in TikZ output', { exact: true }).setChecked(mode !== 'standalone'))
+          checkboxActions.push(await changedCheckbox('change-surface-depth-sort', 'Auto depth-sort surfaces', true,
+            () => page.getByLabel('Auto depth-sort surfaces', { exact: true }).check()))
+          checkboxActions.push(await changedCheckbox('change-visibility', 'Enable approximate 3D visibility', false,
+            () => page.getByLabel('Enable approximate 3D visibility', { exact: true }).uncheck()))
+          await nativeControl('change-theta', () => page.getByRole('spinbutton', { name: 'theta value', exact: true }).fill('63'))
         }
         const beforeLoad = await state()
-        await diagnosePersistence({ boundary: 'before-reload', beforeLoad, download })
-        await load(download.json); await settle()
+        const changedControls = await readPersistenceControls(page, ambientDimension)
+        await checkPersistenceEvidence({ boundary: 'before-reload', beforeLoad, controls: changedControls, download, savedDownload }, diagnosePersistence,
+          () => assertPointPersistenceChanged({ saved: download, beforeLoad, controls: changedControls }))
+        await nativeControl('reload', async () => { await load(download.json); await settle() })
         const reloaded = await checkAppJsonReload({ page, saved: download, diagnose: diagnosePersistence })
         assert.equal(reloaded.loaded.labelDocumentRevision, beforeLoad.labelDocumentRevision + 1)
         assert.equal(reloaded.loaded.selection, null)
         assert.deepEqual(JSON.parse(reloaded.loaded.history).future, [], 'Document replacement clears the redo branch')
-        persistence.push({ download, reloaded })
+        assert.equal(await readFile(download.path, 'utf8'), download.json, 'Reload leaves downloaded JSON bytes immutable')
+        persistence.push({ download, beforeLoad, changedControls, savedDownload, checkboxActions, reloaded })
       }
       entries.push({ ambientDimension, setup, locatorMatches, direct: rendered, invalidBody, metricComparison, cursors, code, persistence,
         jsonPath: persistence[0].download.path, beforeSave: persistence[0].download.before, loaded: persistence[0].reloaded.loaded })
@@ -438,14 +488,30 @@ export async function runNativePointChecks({ browser, origin, page: rendererPage
     await completeGroup(exportGroup)
   } catch (error) {
     primary = error
+    for (const [name, operation] of [
+      ['native control failure', () => geometry.failure(error, { ...nativeBoundary, savedDownload, errors })],
+      ['native App failure', () => app.failure(error, { ...nativeBoundary, savedDownload, errors })],
+    ]) {
+      try { await boundedPointDiagnostic(operation, name, 20_000) }
+      catch (secondary) { console.error(`${name} diagnostics:`, secondary) }
+    }
     await diagnoseNativePointFailure({ page, primary: error,
       diagnose: async (details) => {
         await diagnose(scenario === 'point-native-direct-cursor-workplanes-inspector-persistence' ? bodyGroup : exportGroup, scenario, details)
         await observe('point-native-primary-failure', { message: error.message, stack: error.stack, errors })
-      }, details: { errors } })
+      }, details: { errors, nativeBoundary, savedDownload } })
   } finally {
     for (const wait of owned) wait.dispose(primary)
-    await cleanupPointCheck(primary, () => page.close())
-    await Promise.all(owned.map((wait) => wait.drain()))
+    for (const [name, operation] of [
+      ['native control observer dispose', () => geometry.dispose()],
+      ['native owned page close', () => page.close()],
+      ['native App ownership dispose', () => app.dispose()],
+      ['native event drain', () => Promise.all(owned.map((wait) => wait.drain()))],
+    ]) {
+      try { await boundedPointDiagnostic(operation, name, 12_000) }
+      catch (error) { cleanupFailure ??= error; console.error(`${name}:`, error) }
+    }
+    page.off('pageerror', onPageError)
   }
+  if (cleanupFailure) throw cleanupFailure
 }

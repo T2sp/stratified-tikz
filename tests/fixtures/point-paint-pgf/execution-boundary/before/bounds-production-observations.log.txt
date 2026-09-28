@@ -1,0 +1,34 @@
+{
+  "sourceLength": 20400,
+  "declarationCount": 512,
+  "warnings": [
+    {
+      "message": "Style file exceeds the 512-definition preview bound."
+    }
+  ],
+  "reference": {
+    "id": "imported-style-mypoint",
+    "key": "myPoint",
+    "sourceId": "external-style-source-bounds-sty",
+    "displayName": "myPoint",
+    "targets": [
+      "draw",
+      "filldraw",
+      "node",
+      "curve",
+      "sheet",
+      "point",
+      "label",
+      "region"
+    ],
+    "options": "text=blue",
+    "rawOptions": "text=red",
+    "previewDiagnostics": []
+  },
+  "preview": {
+    "textColor": "#0000FF",
+    "sourceDependencies": [
+      "external-style-source-bounds-sty"
+    ]
+  }
+}

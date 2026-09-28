@@ -1,0 +1,42 @@
+{
+  "provenance": "Retained independent reviewer terminal-only zero-on dash evidence; original cap omissions and picking distances remain in copied observations",
+  "observationFiles": [
+    {
+      "source": "/private/tmp/stz-review-terminal-dot-valid-observations.json",
+      "file": "review-original-observations.json",
+      "sha256": "3c21b1f70e1f6b6301f59db935dd04008a2edb887a8cfeea3288e2d233067dfe"
+    },
+    {
+      "source": "/private/tmp/stz-review-production-terminal-dot.json",
+      "file": "review-production-observations.json",
+      "sha256": "cdb610b6ba13810d0bce58b615af4d9d6647bf66cc200ce928bb828779043e60"
+    }
+  ],
+  "pairs": {
+    "cartesian-terminal-dot-6-square": {
+      "reviewedSource": "/private/tmp/stz-review-terminal-dot-valid-6-square",
+      "svgSha256": "b88811b3b116985c0274642210b7c7d87a04d789911d3fdaaee70c5011b47a42",
+      "pngSha256": "5f49fd85401668ded2ac104a1cd09863c755c6c0e34a93bedbf6af059a6ac246"
+    },
+    "cartesian-terminal-dot-6-round": {
+      "reviewedSource": "/private/tmp/stz-review-terminal-dot-valid-6-round",
+      "svgSha256": "c9e963f39d65e621d139dfb34d9c2bafdc42995e9d47825eda081ea4d1c768ce",
+      "pngSha256": "6a5c16523e20599fdf02dd5fa5ffbe83158f86978f06f0db89c5902ac3ee6a37"
+    },
+    "cartesian-terminal-dot-36-square": {
+      "reviewedSource": "/private/tmp/stz-review-terminal-dot-valid-36-square",
+      "svgSha256": "7bf2e3599e1ee31555c17baaa17121867f17fa987bd0ba5822cddb5d1e315dcd",
+      "pngSha256": "6c145bce1f21095746de052b0d5164fdd7c600fb163458888247eccc81744c6a"
+    },
+    "cartesian-terminal-dot-36-round": {
+      "reviewedSource": "/private/tmp/stz-review-terminal-dot-valid-36-round",
+      "svgSha256": "0ec582e4e60252c737840448bd0c3f366e3329caaeed10c9671172a5501ceb0d",
+      "pngSha256": "6e86d17d32f9ff793af447e48bc2966628b984655952d124e1875c05460a2323"
+    },
+    "production-terminal-dot": {
+      "reviewedSource": "/private/tmp/stz-review-production-terminal-dot",
+      "svgSha256": "25b6bbcaf0a4fc27b56f4ae27c67bcf39c281c3a245aa74a013e26b86fc1e8f8",
+      "pngSha256": "f90d0451aa659a839af4f49fd13491983c8b19a1cdd66a797ada2767d650298a"
+    }
+  }
+}

@@ -1,11 +1,16 @@
 import { tikzStyleTargets } from './types.ts'
+import { canonicalTikzStyleKey, literalDefinedColor, namedTikzColors, resolveTikzPaint, splitTikzOptions } from './importedTikzPaint.ts'
+import type { TikzColorBindings, TikzPaintPreview, TikzPreviewContext, TikzStylePreviewDefinition } from './importedTikzPaint.ts'
 import { createUserStylePresetFromStyle } from './stylePresets.ts'
 import {
   defaultCurveStyle,
   defaultLabelStyle,
   defaultPointStyle,
+  getPointPaint,
   defaultRegionStyle,
   defaultSheetStyle,
+  createImportedPointPaintSnapshot,
+  refreshImportedPointPaintSnapshot,
 } from './styles.ts'
 import type {
   CurveStyle,
@@ -14,9 +19,6 @@ import type {
   HexColor,
   ImportedTikzStyleReference,
   LabelStyle,
-  LineStyle,
-  PointFill,
-  PointShape,
   PointStyle,
   RegionStyle,
   SheetStyle,
@@ -49,47 +51,30 @@ const shapeStyleTargets: readonly TikzStyleTarget[] = [
   'point',
   'label',
 ]
-const namedTikzColors: Record<string, HexColor> = {
-  black: '#000000',
-  white: '#FFFFFF',
-  gray: '#808080',
-  red: '#FF0000',
-  blue: '#0000FF',
-  green: '#00FF00',
-  yellow: '#FFFF00',
-  orange: '#FFA500',
-  purple: '#800080',
-}
 const colorSignalTokens = Object.keys(namedTikzColors)
-const compactLineStyleOptions: Record<string, LineStyle> = {
-  dashed: 'dashed',
-  dotted: 'dotted',
-  'densely dotted': 'denselyDotted',
-}
-const compactPointShapeOptions: Record<string, PointShape> = {
-  circle: 'circle',
-  rectangle: 'square',
-}
-
-export type TikzStylePreviewApproximation = {
-  color?: HexColor
-  fillColor?: HexColor
-  drawColor?: HexColor
-  textColor?: HexColor
-  opacity?: number
-  fillOpacity?: number
-  drawOpacity?: number
-  lineStyle?: LineStyle
-  lineWidth?: number
-  pointShape?: PointShape
-  pointFill?: PointFill
-  pointSize?: number
-}
+// These handlers store definitions; they do not invoke the target key. Unknown
+// handlers (including .try/.retry) are execution, not key-local invalidations.
+const passiveDeclarationHandlers = new Set([
+  'style', 'append style', 'prefix style', 'add style', 'style args', 'style 2 args',
+  'code', 'append code', 'prefix code', 'code 2 args',
+  'initial', 'default',
+])
+const previewPrimitiveKeys = new Set([
+  'draw', 'fill', 'color', 'text', 'opacity', 'draw opacity', 'fill opacity', 'text opacity',
+  'line width', 'dash pattern', 'dash phase', 'line cap', 'cap', 'line join', 'join',
+  'ultra thin', 'very thin', 'thin', 'semithick', 'thick', 'very thick', 'ultra thick',
+  'solid', 'dashed', 'dotted', 'densely dotted', 'circle', 'shape', 'inner sep',
+])
+export type TikzStylePreviewApproximation = TikzPaintPreview
 
 export type ParsedTikzStyleDefinition = {
   key: string
   options: string
 }
+
+export type ParsedTikzStyleDeclaration =
+  | ({ kind: 'definition' } & ParsedTikzStyleDefinition)
+  | { kind: 'mutation'; key: string; diagnostic: string; dependencyOptions?: readonly string[]; executionUncertain?: boolean }
 
 export type TikzsetParserWarning = {
   message: string
@@ -97,8 +82,13 @@ export type TikzsetParserWarning = {
 
 export type ParseTikzsetStylesResult = {
   styles: ParsedTikzStyleDefinition[]
+  declarations?: ParsedTikzStyleDeclaration[]
   skipped: number
   warnings: TikzsetParserWarning[]
+  rawOptions?: Record<string, string>
+  colors?: TikzColorBindings
+  /** The entire source is outside the supported execution/declaration budget. */
+  executionDiagnostics?: string[]
 }
 
 export type ImportTikzStyleFileResult = {
@@ -200,18 +190,197 @@ export function normalizeImportedTikzStyleOptions(options: string): string {
 
 export function parseTikzsetStyles(text: string): ParseTikzsetStylesResult {
   const warnings: TikzsetParserWarning[] = []
-  const parsedStyles: ParsedTikzStyleDefinition[] = []
-  let skipped = 0
-  const textWithoutComments = stripTexComments(text)
-  const blocks = findTikzsetBlocks(textWithoutComments, warnings)
-
-  for (const block of blocks) {
-    const blockResult = parseTikzsetBlock(block, warnings)
-    parsedStyles.push(...blockResult.styles)
-    skipped += blockResult.skipped
+  const reject = (reason: string): ParseTikzsetStylesResult => {
+    const message = `${reason} Import rejected: use only top-level literal declarations within the preview bounds; no TeX execution or scope evaluation is performed.`
+    return { styles: [], declarations: [], colors: {}, rawOptions: {}, skipped: 1, warnings: [{ message }], executionDiagnostics: [message] }
   }
+  if (text.length > 1_000_000) return reject('Style file exceeds the 1000000-character preview bound.')
+  const declarations: ParsedTikzStyleDeclaration[] = []
+  const colors: Record<string, HexColor | null> = {}
+  const rawOptions: Record<string, string> = Object.create(null) as Record<string, string>
+  let skipped = 0
+  let declarationCount = 0
+  // Mask comments without changing offsets, retaining the exact source separately.
+  const stripped = maskTexComments(text)
+  // A closed, cursor-based grammar: only complete declaration commands may
+  // consume source at top level. Their balanced arguments are opaque here.
+  // Never search ahead into an unknown command, local group or conditional.
+  const commands = /\\(tikzset|tikzstyle|definecolor)(?![a-zA-Z@])/y
+  let cursor = 0
+  while ((cursor = skipWhitespace(stripped, cursor)) < stripped.length) {
+    commands.lastIndex = cursor
+    const command = commands.exec(stripped)
+    if (command === null) return reject(`Unsupported execution/scope context at character ${cursor + 1}: ${summarizeEntry(stripped.slice(cursor, cursor + 80))}.`)
+    const first = readBracedContent(stripped, skipWhitespace(stripped, commands.lastIndex))
+    if (!first.ok) return reject(`Malformed \\${command[1]} argument at character ${cursor + 1}.`)
+    if (command[1] === 'tikzset') {
+      const parsed = parseTikzsetBlock(first.content, warnings, text.slice(first.endIndex - first.content.length, first.endIndex), rawOptions, 512 - declarationCount)
+      if (parsed.rejection !== undefined) return reject(parsed.rejection)
+      declarations.push(...parsed.declarations)
+      declarationCount += parsed.declarations.length
+      skipped += parsed.skipped
+      cursor = first.endIndex + 1
+    } else if (command[1] === 'tikzstyle') {
+      let index = skipWhitespace(stripped, first.endIndex + 1)
+      const append = stripped[index] === '+'
+      if (append) index = skipWhitespace(stripped, index + 1)
+      if (stripped[index] !== '=') return reject('Malformed \\tikzstyle declaration: expected = before the option body.')
+      index = skipWhitespace(stripped, index + 1)
+      const body = readDelimitedContent(stripped, index, '[', ']')
+      if (!body.ok || !isSupportedDeclarationTarget(first.content)) return reject('Malformed, nonliteral or reserved \\tikzstyle declaration target.')
+      if (++declarationCount > 512) return reject('Style file exceeds the 512-declaration preview bound.')
+      const key = normalizeTikzPath(first.content)
+      if (append) {
+        const mutation = parseUnsupportedStyleMutation(`${key}/.append style={${body.content}}`, '')
+        if (mutation !== null) declarations.push(mutation)
+        warnings.push({ message: mutation?.diagnostic ?? 'Skipped unsupported nonliteral \\tikzstyle append target.' })
+        skipped += 1
+      } else {
+        const style = { key, options: normalizeImportedTikzStyleOptions(body.content) }
+        declarations.push({ kind: 'definition', ...style })
+        rawOptions[key] = text.slice(index + 1, body.endIndex)
+      }
+      cursor = body.endIndex + 1
+    } else {
+      const model = readBracedContent(stripped, skipWhitespace(stripped, first.endIndex + 1))
+      const value = model.ok ? readBracedContent(stripped, skipWhitespace(stripped, model.endIndex + 1)) : { ok: false as const }
+      if (!model.ok || !value.ok) return reject('Malformed \\definecolor declaration.')
+      if (/[\\{}#=$%~^&]/.test(model.content + value.content)) return reject('Nonliteral \\definecolor model or value; unknown expansion can affect other bindings.')
+      if (++declarationCount > 512) return reject('Style file exceeds the 512-declaration preview bound.')
+      const color = literalDefinedColor(model.content, value.content)
+      const nameSupported = /^[a-zA-Z][a-zA-Z0-9:_-]*$/.test(first.content)
+      if (!nameSupported) return reject('Nonliteral \\definecolor binding name.')
+      // A recognized declaration shadows an earlier binding even when its
+      // model/value is outside our literal grammar. In particular, CMYK red
+      // cannot silently fall back to the built-in red table.
+      colors[first.content] = color
+      if (color === null) warnings.push({ message: `Unsupported literal \\definecolor: ${first.content}` })
+      cursor = value.endIndex + 1
+    }
+  }
+  return { ...mergeDuplicateParsedStyles(declarations.flatMap((declaration) => declaration.kind === 'definition' ? [{ key: declaration.key, options: declaration.options }] : []), skipped, warnings), declarations, rawOptions, colors }
+}
 
-  return mergeDuplicateParsedStyles(parsedStyles, skipped, warnings)
+/**
+ * The diagram's source array is the load order. Reconstruct the final color
+ * environment and canonical style definitions in that same order everywhere.
+ * Raw sources describe what loading a file defines; saved reference options
+ * remain the fallback for old files that predate raw-source preservation.
+ */
+export function createImportedTikzResolutionContext(
+  diagram: {
+    externalTikzStyleSources?: readonly ExternalTikzStyleSource[]
+    importedTikzStyleReferences?: readonly ImportedTikzStyleReference[]
+  },
+): TikzPreviewContext {
+  const styles = new Map<string, TikzStylePreviewDefinition>()
+  const addFallback = (reference: ImportedTikzStyleReference) => {
+    const identity = canonicalTikzStyleKey(reference.key)
+    // A saved option snapshot is not a later supported source declaration.
+    // Never let it turn an explicitly invalidated definition back into known.
+    if (styles.get(identity)?.state !== 'unresolved') {
+      styles.set(identity, { key: reference.key, options: reference.options, sourceId: reference.sourceId })
+    }
+  }
+  const colors: Record<string, HexColor | null> = {}
+  const colorSourceIds: Record<string, string> = {}
+  const sources = diagram.externalTikzStyleSources ?? []
+  const references = diagram.importedTikzStyleReferences ?? []
+  const sourceIds = sources.map((source) => source.id)
+  const sourceDiagnostics: string[] = []
+  for (const source of sources) {
+    const parsed = source.rawSource === undefined ? undefined : parseTikzsetStyles(source.rawSource)
+    for (const diagnostic of parsed?.executionDiagnostics ?? []) {
+      if (sourceDiagnostics.length < 64) sourceDiagnostics.push(`${source.name}: ${diagnostic} Saved raw source is retained; all imported paint remains unresolved.`)
+    }
+    const parsedKeys = new Set((parsed?.declarations ?? []).map((declaration) => canonicalTikzStyleKey(declaration.key)))
+    for (const declaration of parsed?.declarations ?? []) {
+      const identity = canonicalTikzStyleKey(declaration.key)
+      if (declaration.kind === 'definition') {
+        styles.set(identity, { key: declaration.key, options: declaration.options, sourceId: source.id })
+      } else {
+        const previous = styles.get(identity)
+        styles.set(identity, {
+          key: declaration.key,
+          options: previous?.options,
+          sourceId: source.id,
+          state: 'unresolved',
+          executionUncertain: previous?.executionUncertain || declaration.executionUncertain,
+          diagnostics: [...new Set([...(previous?.state === 'unresolved' ? previous.diagnostics : []), declaration.diagnostic])],
+          dependencyOptions: [...(previous?.dependencyOptions ?? []), ...(declaration.dependencyOptions ?? [])],
+          sourceDependencies: [...new Set([
+            ...(previous?.sourceDependencies ?? []),
+            ...(previous?.sourceId === undefined ? [] : [previous.sourceId]),
+            source.id,
+          ])],
+        })
+      }
+    }
+    for (const reference of references) {
+      if (reference.sourceId === source.id && !parsedKeys.has(canonicalTikzStyleKey(reference.key))) {
+        addFallback(reference)
+      }
+    }
+    for (const [name, value] of Object.entries(parsed?.colors ?? {})) {
+      colors[name] = value
+      colorSourceIds[name] = source.id
+    }
+  }
+  // Preserve readable legacy references even when their source metadata is
+  // missing. Their stable reference order follows all known source loads.
+  for (const reference of references) {
+    if (!sourceIds.includes(reference.sourceId)) {
+      addFallback(reference)
+    }
+  }
+  return {
+    styles: [...styles.values()], colors, colorSourceIds,
+    sourceIds: [...new Set([...sourceIds, ...references.map((reference) => reference.sourceId)])],
+    ...(sourceDiagnostics.length === 0 ? {} : { sourceDiagnostics }),
+  }
+}
+
+/** Reconstruct limitations in old saves without rewriting source or inventing intent. */
+export function restoreImportedTikzSourceDiagnostics(diagram: Diagram): string[] {
+  const context = createImportedTikzResolutionContext(diagram)
+  const warnings = new Set(context.sourceDiagnostics ?? [])
+  if (diagram.importedTikzStyleReferences === undefined) return [...warnings]
+  diagram.importedTikzStyleReferences = diagram.importedTikzStyleReferences.map((reference) => {
+    const preview = resolveImportedTikzStyle(reference, context)
+    // Plain external references without saved input have no runtime body to
+    // reconstruct. Preserve their existing optional metadata representation.
+    if (!preview.executionUncertain || (!context.sourceDiagnostics?.length && reference.options === undefined
+      && !diagram.externalTikzStyleSources?.some((source) => source.id === reference.sourceId && source.rawSource !== undefined))) return reference
+    // Invocation limitations belong to the reference's preview diagnostics;
+    // source rejection continues to supply diagram-load warnings separately.
+    return { ...reference, previewDiagnostics: [...new Set([
+      ...(reference.previewDiagnostics ?? []), ...(preview.diagnostics ?? []),
+    ])] }
+  })
+  return [...warnings]
+}
+
+/** Invoke the key, so an older reference ID never selects a stale root body. */
+export function resolveImportedTikzStyle(
+  reference: ImportedTikzStyleReference,
+  context: TikzPreviewContext,
+): TikzPaintPreview {
+  const preview = resolveTikzPaint(reference.key, { ...context, key: undefined })
+  const dependencies = new Set([reference.sourceId, ...(preview.sourceDependencies ?? [])])
+  return {
+    ...preview,
+    sourceDependencies: [...new Set([...(context.sourceIds ?? []), ...dependencies])].filter((sourceId) => dependencies.has(sourceId)),
+  }
+}
+
+export function importedTikzStylePresetStyle(kind: 'point', reference: ImportedTikzStyleReference, context: TikzPreviewContext): PointStyle
+export function importedTikzStylePresetStyle(kind: StylePresetKind, reference: ImportedTikzStyleReference, context: TikzPreviewContext): CurveStyle | SheetStyle | RegionStyle | LabelStyle | PointStyle
+export function importedTikzStylePresetStyle(
+  kind: StylePresetKind,
+  reference: ImportedTikzStyleReference,
+  context: TikzPreviewContext,
+): CurveStyle | SheetStyle | RegionStyle | LabelStyle | PointStyle {
+  return styleFromPreview(kind, resolveImportedTikzStyle(reference, context))
 }
 
 export function importTikzStyleFile(
@@ -238,6 +407,7 @@ export function importTikzStyleFile(
       (diagram.externalTikzStyleSources ?? []).map((existing) => existing.id),
     ),
     name: sourceName,
+    rawSource: text,
     loadHint: normalizeExternalTikzStyleLoadHint(
       loadHint ?? `\\input{${sourceName}}`,
       sourceName,
@@ -265,6 +435,8 @@ export function importTikzStyleFile(
       ),
       targets: inferImportedTikzStyleTargets(style.key, style.options),
       options: style.options,
+      rawOptions: parseResult.rawOptions?.[style.key] ?? style.options,
+      previewDiagnostics: [] as string[],
     } satisfies ImportedTikzStyleReference
   })
   const diagramWithReferences: Diagram = {
@@ -278,9 +450,18 @@ export function importTikzStyleFile(
       ...references,
     ],
   }
+  const context = createImportedTikzResolutionContext(diagramWithReferences)
+  for (const reference of references) {
+    reference.previewDiagnostics = resolveImportedTikzStyle(reference, context).diagnostics ?? []
+    for (const message of reference.previewDiagnostics) parseResult.warnings.push({ message: `${reference.key}: ${message}` })
+  }
+  diagramWithReferences.importedTikzStyleReferences = diagramWithReferences.importedTikzStyleReferences?.map((reference) => ({
+    ...reference,
+    previewDiagnostics: resolveImportedTikzStyle(reference, context).diagnostics ?? [],
+  }))
 
   return {
-    diagram: addDetectedImportedStylePresets(diagramWithReferences, references),
+    diagram: refreshImportedPointSnapshots(addDetectedImportedStylePresets(diagramWithReferences, references, context), context, createImportedTikzResolutionContext(diagram)),
     source,
     references,
     parseResult,
@@ -319,28 +500,30 @@ export function importedStylePresetKindsForReference(
     detectedKinds.push(...shapePresetKinds)
   }
 
-  return uniqueStylePresetKinds(detectedKinds)
+  return uniqueStylePresetKinds(detectedKinds.length === 0 ? ['point'] : detectedKinds)
 }
 
 export function parseTikzStylePreviewOptions(
   options: string,
+  context: TikzPreviewContext = {},
 ): TikzStylePreviewApproximation {
-  const preview: TikzStylePreviewApproximation = {}
-
-  for (const option of splitTopLevelCommaList(options)) {
-    applyPreviewOption(preview, option.trim())
-  }
-
-  return preview
+  return resolveTikzPaint(options, context)
 }
 
 export function importedStylePresetStyle(
   kind: StylePresetKind,
   options: string | undefined,
+  context: TikzPreviewContext = {},
 ): CurveStyle | SheetStyle | RegionStyle | LabelStyle | PointStyle {
   const preview =
-    options === undefined ? {} : parseTikzStylePreviewOptions(options)
+    options === undefined ? {} : parseTikzStylePreviewOptions(options, context)
+  return styleFromPreview(kind, preview)
+}
 
+function styleFromPreview(
+  kind: StylePresetKind,
+  preview: TikzStylePreviewApproximation,
+): CurveStyle | SheetStyle | RegionStyle | LabelStyle | PointStyle {
   switch (kind) {
     case 'curve':
       return curveStyleFromPreview(preview)
@@ -384,8 +567,9 @@ function isSafeSingleLineCommentCharacter(character: string): boolean {
 }
 
 type TikzsetBlockParseResult = {
-  styles: ParsedTikzStyleDefinition[]
+  declarations: ParsedTikzStyleDeclaration[]
   skipped: number
+  rejection?: string
 }
 
 type BracedContentResult =
@@ -401,13 +585,19 @@ type BracedContentResult =
 function parseTikzsetBlock(
   block: string,
   warnings: TikzsetParserWarning[],
+  rawBlock?: string,
+  rawOptions?: Record<string, string>,
+  remainingDeclarations = 512,
 ): TikzsetBlockParseResult {
   const entries = splitTopLevelCommaList(block)
-  const styles: ParsedTikzStyleDefinition[] = []
+  const declarations: ParsedTikzStyleDeclaration[] = []
   let currentDirectory = ''
   let skipped = 0
+  let entryOffset = 0
 
   for (const entry of entries) {
+    const rawEntry = rawBlock?.slice(entryOffset, entryOffset + entry.length)
+    entryOffset += entry.length + 1
     const trimmedEntry = entry.trim()
 
     if (trimmedEntry.length === 0) {
@@ -416,6 +606,7 @@ function parseTikzsetBlock(
 
     const cdPath = parseCurrentDirectoryEntry(trimmedEntry)
     if (cdPath !== null) {
+      if (!isLiteralDeclarationKey(cdPath)) return { declarations, skipped, rejection: 'Nonliteral declaration key directory.' }
       currentDirectory = resolveTikzKeyPath(currentDirectory, cdPath)
       continue
     }
@@ -423,26 +614,40 @@ function parseTikzsetBlock(
     const styleResult = parseStyleEntry(trimmedEntry, currentDirectory)
 
     if (styleResult.ok) {
-      styles.push(styleResult.style)
+      if (declarations.length >= remainingDeclarations) return { declarations, skipped, rejection: 'Style file exceeds the 512-declaration preview bound.' }
+      declarations.push({ kind: 'definition', ...styleResult.style })
+      if (rawOptions && rawEntry !== undefined) {
+        const opening = entry.indexOf('{', entry.indexOf('/.style'))
+        const body = readBracedContent(entry, opening)
+        if (body.ok) rawOptions[styleResult.style.key] = rawEntry.slice(opening + 1, body.endIndex)
+      }
       continue
     }
 
+    const mutation = parseUnsupportedStyleMutation(trimmedEntry, currentDirectory)
+    if (mutation === null) return { declarations, skipped, rejection: `Unsupported declaration context: ${summarizeEntry(trimmedEntry)}.` }
+    if (declarations.length >= remainingDeclarations) return { declarations, skipped, rejection: 'Style file exceeds the 512-declaration preview bound.' }
+    declarations.push(mutation)
     skipped += 1
-    warnings.push({ message: styleResult.warning })
+    warnings.push({ message: mutation.diagnostic })
   }
 
-  return { styles, skipped }
+  return { declarations, skipped }
 }
 
 function addDetectedImportedStylePresets(
   diagram: Diagram,
   references: readonly ImportedTikzStyleReference[],
+  context: TikzPreviewContext,
 ): Diagram {
   let nextDiagram = diagram
 
   for (const reference of references) {
     for (const kind of importedStylePresetKindsForReference(reference)) {
-      const style = importedStylePresetStyle(kind, reference.options)
+      const resolvedStyle = importedTikzStylePresetStyle(kind, reference, context)
+      const style = resolvedStyle.kind === 'pointStyle'
+        ? createImportedPointPaintSnapshot(resolvedStyle, reference.id)
+        : resolvedStyle
       const result = createUserStylePresetFromStyle(
         nextDiagram,
         kind,
@@ -458,6 +663,38 @@ function addDetectedImportedStylePresets(
   }
 
   return nextDiagram
+}
+
+/** Refresh tracked baselines; execution-uncertain legacy recovery cannot infer intent. */
+function refreshImportedPointSnapshots(diagram: Diagram, context: TikzPreviewContext, previousContext: TikzPreviewContext): Diagram {
+  // A source-wide failure has no established replacement baseline. Keep saved
+  // fallbacks and intent, without promoting old differences during refresh.
+  if (context.sourceDiagnostics?.length) return diagram
+  const references = new Map((diagram.importedTikzStyleReferences ?? []).map((reference) => [reference.id, reference]))
+  const refresh = (style: PointStyle, referenceId: string | undefined): PointStyle => {
+    if (referenceId === undefined) return style
+    const reference = references.get(referenceId)
+    // A runtime execution failure supplies no trustworthy replacement snapshot
+    // and cannot turn old paint differences into inferred local edits.
+    if (reference === undefined || resolveImportedTikzStyle(reference, context).executionUncertain) return style
+    const previouslyUncertain = resolveImportedTikzStyle(reference, previousContext).executionUncertain === true
+    if (style.importedPaint?.referenceId !== referenceId && !previouslyUncertain) return style
+    const resolvedStyle = importedTikzStylePresetStyle('point', reference, context)
+    // Legacy fallback values have no recorded intent either. On a supported
+    // recovery, establish a fresh snapshot rather than infer authorship later.
+    return style.importedPaint?.referenceId !== referenceId
+      ? createImportedPointPaintSnapshot({ ...style, paint: getPointPaint(resolvedStyle), opacity: resolvedStyle.opacity }, referenceId)
+      : refreshImportedPointPaintSnapshot(style, resolvedStyle, referenceId, !previouslyUncertain)
+  }
+  return {
+    ...diagram,
+    strata: diagram.strata.map((stratum) => stratum.geometricKind === 'point'
+      ? { ...stratum, style: refresh(stratum.style, stratum.importedTikzStyleReferenceId) }
+      : stratum),
+    userStylePresets: diagram.userStylePresets?.map((preset) => preset.kind === 'point'
+      ? { ...preset, style: refresh(preset.style, preset.importedTikzStyleReferenceId) }
+      : preset),
+  }
 }
 
 function hasColorStyleSignal(
@@ -556,261 +793,6 @@ function readableImportedTikzStyleDisplayName(key: string): string {
   return `${namespace}: ${rest.join('/')}`
 }
 
-function applyPreviewOption(
-  preview: TikzStylePreviewApproximation,
-  option: string,
-): void {
-  if (option.length === 0) {
-    return
-  }
-
-  const normalizedOption = option.toLowerCase().replace(/\s+/g, ' ').trim()
-  const assignment = parseTikzOptionAssignment(option)
-
-  if (assignment !== null) {
-    applyPreviewAssignment(preview, assignment.key, assignment.value)
-    return
-  }
-
-  const compactLineStyle = compactLineStyleOptions[normalizedOption]
-  if (compactLineStyle !== undefined) {
-    preview.lineStyle = compactLineStyle
-    return
-  }
-
-  if (normalizedOption === 'thick') {
-    preview.lineWidth = 2
-    return
-  }
-
-  if (normalizedOption === 'thin') {
-    preview.lineWidth = 0.8
-    return
-  }
-
-  const pointShape = compactPointShapeOptions[normalizedOption]
-  if (pointShape !== undefined) {
-    preview.pointShape = pointShape
-    return
-  }
-
-  const color = parsePreviewColor(normalizedOption)
-
-  if (color !== null) {
-    preview.color = color
-  }
-}
-
-function applyPreviewAssignment(
-  preview: TikzStylePreviewApproximation,
-  rawKey: string,
-  rawValue: string,
-): void {
-  const key = rawKey.toLowerCase().replace(/\s+/g, ' ').trim()
-  const value = rawValue.trim()
-  const normalizedValue = value.toLowerCase().replace(/\s+/g, ' ').trim()
-
-  switch (key) {
-    case 'opacity':
-      preview.opacity = parsePreviewOpacity(value) ?? preview.opacity
-      return
-    case 'fill opacity':
-      preview.fillOpacity =
-        parsePreviewOpacity(value) ?? preview.fillOpacity
-      return
-    case 'draw opacity':
-      preview.drawOpacity =
-        parsePreviewOpacity(value) ?? preview.drawOpacity
-      return
-    case 'draw': {
-      const color = parsePreviewColor(value)
-      if (color !== null) {
-        preview.drawColor = color
-      }
-      return
-    }
-    case 'fill': {
-      if (normalizedValue === 'none') {
-        preview.pointFill = 'hollow'
-        return
-      }
-
-      const color = parsePreviewColor(value)
-      if (color !== null) {
-        preview.fillColor = color
-        preview.pointFill = 'filled'
-      }
-      return
-    }
-    case 'color': {
-      const color = parsePreviewColor(value)
-      if (color !== null) {
-        preview.color = color
-      }
-      return
-    }
-    case 'text': {
-      const color = parsePreviewColor(value)
-      if (color !== null) {
-        preview.textColor = color
-      }
-      return
-    }
-    case 'line width':
-      preview.lineWidth =
-        parsePreviewDimensionPt(value) ?? preview.lineWidth
-      return
-    case 'inner sep': {
-      const innerSep = parsePreviewDimensionPt(value)
-      if (innerSep !== null) {
-        preview.pointSize = innerSep * 2
-      }
-      return
-    }
-    case 'minimum size':
-      preview.pointSize =
-        parsePreviewDimensionPt(value) ?? preview.pointSize
-      return
-    case 'shape': {
-      const pointShape = compactPointShapeOptions[normalizedValue]
-      if (pointShape !== undefined) {
-        preview.pointShape = pointShape
-      }
-      return
-    }
-  }
-}
-
-function parseTikzOptionAssignment(
-  option: string,
-): { key: string; value: string } | null {
-  const equalsIndex = option.indexOf('=')
-
-  if (equalsIndex < 0) {
-    return null
-  }
-
-  const key = option.slice(0, equalsIndex).trim()
-  const value = option.slice(equalsIndex + 1).trim()
-
-  return key.length === 0 || value.length === 0 ? null : { key, value }
-}
-
-function parsePreviewOpacity(value: string): number | null {
-  const parsed = Number(normalizeLeadingDecimal(value.trim()))
-
-  if (!Number.isFinite(parsed) || parsed < 0 || parsed > 1) {
-    return null
-  }
-
-  return parsed
-}
-
-function parsePreviewDimensionPt(value: string): number | null {
-  const match = value
-    .trim()
-    .toLowerCase()
-    .match(/^([+-]?(?:\d+(?:\.\d*)?|\.\d+))\s*(pt|mm|cm|in)?$/)
-
-  if (match === null) {
-    return null
-  }
-
-  const numericText = match[1]
-  const unit = match[2] ?? 'pt'
-
-  if (numericText === undefined) {
-    return null
-  }
-
-  const parsed = Number(normalizeLeadingDecimal(numericText))
-
-  if (!Number.isFinite(parsed) || parsed <= 0) {
-    return null
-  }
-
-  switch (unit) {
-    case 'pt':
-      return parsed
-    case 'mm':
-      return parsed * 2.83465
-    case 'cm':
-      return parsed * 28.3465
-    case 'in':
-      return parsed * 72
-    default:
-      return null
-  }
-}
-
-function normalizeLeadingDecimal(value: string): string {
-  return value.startsWith('.') ? `0${value}` : value
-}
-
-function parsePreviewColor(value: string): HexColor | null {
-  const normalizedValue = value.toLowerCase().trim()
-  const directColor = namedTikzColors[normalizedValue]
-
-  if (directColor !== undefined) {
-    return directColor
-  }
-
-  const mixMatch = normalizedValue.match(
-    /^(black|white|gray|red|blue|green|yellow|orange|purple)!(\d+(?:\.\d*)?|\.\d+)$/,
-  )
-
-  if (mixMatch === null) {
-    return null
-  }
-
-  const baseName = mixMatch[1]
-  const percentText = mixMatch[2]
-
-  if (baseName === undefined || percentText === undefined) {
-    return null
-  }
-
-  const baseColor = namedTikzColors[baseName]
-  const percent = Number(normalizeLeadingDecimal(percentText))
-
-  if (baseColor === undefined || !Number.isFinite(percent)) {
-    return null
-  }
-
-  return mixColors(baseColor, '#FFFFFF', clamp(percent / 100, 0, 1))
-}
-
-function mixColors(first: HexColor, second: HexColor, firstWeight: number): HexColor {
-  const firstRgb = hexToRgb(first)
-  const secondRgb = hexToRgb(second)
-  const mixed = firstRgb.map((channel, index) =>
-    Math.round(channel * firstWeight + secondRgb[index] * (1 - firstWeight)),
-  )
-
-  return rgbToHex(mixed)
-}
-
-function hexToRgb(color: HexColor): [number, number, number] {
-  return [
-    Number.parseInt(color.slice(1, 3), 16),
-    Number.parseInt(color.slice(3, 5), 16),
-    Number.parseInt(color.slice(5, 7), 16),
-  ]
-}
-
-function rgbToHex(rgb: readonly number[]): HexColor {
-  const hex = rgb
-    .map((channel) => clamp(Math.round(channel), 0, 255))
-    .map((channel) => channel.toString(16).padStart(2, '0').toUpperCase())
-    .join('')
-
-  return `#${hex}`
-}
-
-function clamp(value: number, minimum: number, maximum: number): number {
-  return Math.min(maximum, Math.max(minimum, value))
-}
-
 function curveStyleFromPreview(
   preview: TikzStylePreviewApproximation,
 ): CurveStyle {
@@ -891,22 +873,32 @@ function labelStyleFromPreview(
 function pointStyleFromPreview(
   preview: TikzStylePreviewApproximation,
 ): PointStyle {
+  const defaults = getPointPaint(defaultPointStyle)
+  const fillColor = preview.fillColor ?? preview.color ?? defaults.fill.color
+  const strokeColor = preview.drawColor ?? preview.color ?? defaults.stroke.color
   return {
     ...defaultPointStyle,
-    color:
-      preview.drawColor ??
-      preview.fillColor ??
-      preview.color ??
-      preview.textColor ??
-      defaultPointStyle.color,
-    opacity:
-      preview.opacity ??
-      preview.drawOpacity ??
-      preview.fillOpacity ??
-      defaultPointStyle.opacity,
+    color: strokeColor,
+    opacity: 1,
     shape: preview.pointShape ?? defaultPointStyle.shape,
-    fill: preview.pointFill ?? defaultPointStyle.fill,
+    fill: defaultPointStyle.fill,
     size: preview.pointSize ?? defaultPointStyle.size,
+    paint: {
+      text: { color: preview.textColor ?? preview.color ?? defaults.text.color, opacity: preview.textOpacity ?? preview.fillOpacity ?? preview.opacity ?? 1 },
+      fill: { enabled: preview.fillEnabled ?? defaults.fill.enabled, color: fillColor, opacity: preview.fillOpacity ?? preview.opacity ?? 1 },
+      stroke: {
+        ...defaults.stroke,
+        enabled: preview.drawEnabled ?? defaults.stroke.enabled,
+        color: strokeColor,
+        opacity: preview.drawOpacity ?? preview.opacity ?? 1,
+        width: preview.lineWidth ?? defaults.stroke.width,
+        lineStyle: preview.lineStyle ?? defaults.stroke.lineStyle,
+        ...(preview.dashPattern === undefined ? {} : { dashPattern: [...preview.dashPattern] }),
+        dashPhase: preview.dashPhase ?? defaults.stroke.dashPhase,
+        lineCap: preview.lineCap ?? defaults.stroke.lineCap,
+        lineJoin: preview.lineJoin ?? defaults.stroke.lineJoin,
+      },
+    },
   }
 }
 
@@ -927,6 +919,64 @@ function parseCurrentDirectoryEntry(entry: string): string | null {
   return entry.slice(0, markerIndex).trim()
 }
 
+/** Recognize literal targets, without interpreting or executing handler bodies. */
+function parseUnsupportedStyleMutation(entry: string, currentDirectory: string): Extract<ParsedTikzStyleDeclaration, { kind: 'mutation' }> | null {
+  const marker = entry.indexOf('/.')
+  if (marker < 0) return null
+  const target = entry.slice(0, marker).trim()
+  // TeX control sequences, parameter tokens, groups and active characters do
+  // not identify a literal target. Handler chains are still recognizable even
+  // though their expansion/argument semantics remain unsupported.
+  if (!target || /[\\{}#=$%~^&]/.test(target)) return null
+  const handlerMatch = entry.slice(marker + 2).match(/^([a-zA-Z][a-zA-Z0-9\s]*(?:\/\.[a-zA-Z][a-zA-Z0-9\s]*)*)=/)
+  if (handlerMatch === null) return null
+  const handler = handlerMatch[1].trim().replace(/\s+/g, ' ')
+  const handlers = handler.split('/.')
+  if (!passiveDeclarationHandlers.has(handlers[0])) return null
+  const argumentStart = marker + 2 + handlerMatch[0].length
+  if (handlers[0] === 'style args' || handlers[0] === 'add style') {
+    // PGF consumes two TeX arguments for these handlers. Trailing tokens run
+    // immediately rather than becoming stored style/code; never skip them.
+    const first = readBracedContent(entry, skipWhitespace(entry, argumentStart))
+    const second = first.ok ? readBracedContent(entry, skipWhitespace(entry, first.endIndex + 1)) : { ok: false as const }
+    if (!second.ok || entry.slice(second.endIndex + 1).trim()) return null
+  }
+  // Preserve prior literal expanded-definition controls without evaluating any
+  // expansion. Other chains or expansion-capable arguments have unknown scope.
+  if (handlers.length > 1 && (handlers.length !== 2 || handlers[1] !== 'expanded'
+    || /[\\#~^$&%]/.test(entry.slice(argumentStart)))) return null
+  const key = resolveTikzKeyPath(currentDirectory, target)
+  if (!isSupportedDeclarationTarget(key)) return null
+  const dependencyOptions: string[] = []
+  // These handlers take option lists. Retain their bounded literal arguments
+  // only to discover required load hints and runtime directory uncertainty,
+  // never to apply their paint semantics.
+  const baseHandler = handler.split('/.')[0]
+  const bodies = baseHandler === 'add style' ? 2 : ['append style', 'prefix style'].includes(baseHandler) ? 1 : 0
+  let index = marker + 2 + handlerMatch[0].length
+  for (let bodyIndex = 0; bodyIndex < bodies; bodyIndex += 1) {
+    const body = readBracedContent(entry, skipWhitespace(entry, index))
+    if (!body.ok) {
+      if (bodies === 1) {
+        dependencyOptions.push(entry.slice(index).trim())
+        index = entry.length
+      }
+      break
+    }
+    dependencyOptions.push(body.content)
+    index = body.endIndex + 1
+  }
+  return {
+    kind: 'mutation',
+    key,
+    diagnostic: `Unsupported style mutation ${key}/.${handler}; paint preview uses a fallback and remains unresolved.`,
+    // Only complete literal option lists can be checked for paint/directory-only
+    // effects. Stored code or parameterized/other handlers have no such proof.
+    ...(bodies === 0 || dependencyOptions.length !== bodies || entry.slice(index).trim() ? { executionUncertain: true } : {}),
+    ...(dependencyOptions.length === 0 ? {} : { dependencyOptions }),
+  }
+}
+
 function parseStyleEntry(
   entry: string,
   currentDirectory: string,
@@ -945,10 +995,10 @@ function parseStyleEntry(
 
   const rawKey = entry.slice(0, markerIndex).trim()
 
-  if (rawKey.length === 0) {
+  if (!isLiteralDeclarationKey(rawKey) || !isSupportedDeclarationTarget(resolveTikzKeyPath(currentDirectory, rawKey))) {
     return {
       ok: false,
-      warning: `Skipped style entry with an empty key: ${summarizeEntry(entry)}`,
+      warning: `Skipped style entry with an empty or nonliteral key: ${summarizeEntry(entry)}`,
     }
   }
 
@@ -1004,47 +1054,46 @@ function parseStyleEntry(
   }
 }
 
-function findTikzsetBlocks(
-  text: string,
-  warnings: TikzsetParserWarning[],
-): string[] {
-  const blocks: string[] = []
-  let searchIndex = 0
-
-  while (searchIndex < text.length) {
-    const commandIndex = text.indexOf('\\tikzset', searchIndex)
-
-    if (commandIndex < 0) {
-      break
+function maskTexComments(text: string): string {
+  return text.split(/(\r?\n)/).map((line) => {
+    for (let index = 0; index < line.length; index += 1) {
+      if (line[index] === '\\') { index += 1; continue }
+      if (line[index] === '%') return line.slice(0, index) + ' '.repeat(line.length - index)
     }
+    return line
+  }).join('')
+}
 
-    const openBraceIndex = skipWhitespace(
-      text,
-      commandIndex + '\\tikzset'.length,
-    )
+function isLiteralDeclarationKey(key: string): boolean {
+  return key.trim().length > 0 && !/[\\{},#=$%~^&]/.test(key)
+}
 
-    if (text[openBraceIndex] !== '{') {
-      warnings.push({
-        message: 'Skipped \\tikzset without a braced argument.',
-      })
-      searchIndex = commandIndex + '\\tikzset'.length
-      continue
-    }
+function isSupportedDeclarationTarget(key: string): boolean {
+  if (!isLiteralDeclarationKey(key)) return false
+  const identity = canonicalTikzStyleKey(normalizeTikzPath(key))
+  // Hooks/handler namespaces can change how every later declaration executes.
+  if (identity.split('/').some((part) => part.startsWith('.')) || /^\/(?:handlers|errors|pgf)(?:\/|$)/.test(identity)) return false
+  if (!identity.startsWith('/tikz/')) return true
+  const relative = identity.slice('/tikz/'.length).replace(/\s+/g, ' ')
+  return !previewPrimitiveKeys.has(relative) && !/^(?:every |execute at )/.test(relative)
+}
 
-    const bracedContent = readBracedContent(text, openBraceIndex)
-
-    if (!bracedContent.ok) {
-      warnings.push({
-        message: 'Skipped \\tikzset block with unbalanced braces.',
-      })
-      break
-    }
-
-    blocks.push(bracedContent.content)
-    searchIndex = bracedContent.endIndex + 1
+function readDelimitedContent(text: string, start: number, open: string, close: string): BracedContentResult {
+  if (text[start] !== open) return { ok: false }
+  let depth = 1
+  let braces = 0
+  for (let index = start + 1; index < text.length; index += 1) {
+    const char = text[index]
+    if (char === '\\') { index += 1; continue }
+    if (char === '{') braces += 1
+    if (char === '}') braces -= 1
+    if (braces < 0) return { ok: false }
+    if (braces !== 0) continue
+    if (char === open) depth += 1
+    if (char === close) depth -= 1
+    if (depth === 0) return { ok: true, content: text.slice(start + 1, index), endIndex: index }
   }
-
-  return blocks
+  return { ok: false }
 }
 
 function readBracedContent(text: string, openBraceIndex: number): BracedContentResult {
@@ -1083,64 +1132,7 @@ function readBracedContent(text: string, openBraceIndex: number): BracedContentR
   return { ok: false }
 }
 
-function splitTopLevelCommaList(text: string): string[] {
-  const entries: string[] = []
-  let startIndex = 0
-  let depth = 0
-  let index = 0
-
-  while (index < text.length) {
-    const char = text[index]
-
-    if (char === '\\') {
-      index += 2
-      continue
-    }
-
-    if (char === '{') {
-      depth += 1
-    } else if (char === '}') {
-      depth = Math.max(0, depth - 1)
-    } else if (char === ',' && depth === 0) {
-      entries.push(text.slice(startIndex, index))
-      startIndex = index + 1
-    }
-
-    index += 1
-  }
-
-  entries.push(text.slice(startIndex))
-
-  return entries
-}
-
-function stripTexComments(text: string): string {
-  const lines = text.split(/\r?\n/)
-
-  return lines.map(stripTexCommentLine).join('\n')
-}
-
-function stripTexCommentLine(line: string): string {
-  for (let index = 0; index < line.length; index += 1) {
-    if (line[index] === '%' && !isEscaped(line, index)) {
-      return line.slice(0, index)
-    }
-  }
-
-  return line
-}
-
-function isEscaped(text: string, index: number): boolean {
-  let slashCount = 0
-  let currentIndex = index - 1
-
-  while (currentIndex >= 0 && text[currentIndex] === '\\') {
-    slashCount += 1
-    currentIndex -= 1
-  }
-
-  return slashCount % 2 === 1
-}
+function splitTopLevelCommaList(text: string): string[] { return splitTikzOptions(text) }
 
 function mergeDuplicateParsedStyles(
   styles: ParsedTikzStyleDefinition[],
@@ -1152,16 +1144,17 @@ function mergeDuplicateParsedStyles(
   let skippedDuplicates = 0
 
   for (const style of styles) {
-    if (stylesByKey.has(style.key)) {
+    const identity = canonicalTikzStyleKey(style.key)
+    if (stylesByKey.has(identity)) {
       skippedDuplicates += 1
       warnings.push({
         message: `Duplicate style key "${style.key}" imported once using the later definition.`,
       })
     } else {
-      keyOrder.push(style.key)
+      keyOrder.push(identity)
     }
 
-    stylesByKey.set(style.key, style)
+    stylesByKey.set(identity, style)
   }
 
   return {

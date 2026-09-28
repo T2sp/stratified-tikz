@@ -1,0 +1,25 @@
+{
+  "expectedTextOperator": "1 0 0 rg",
+  "nodes": [
+    {
+      "body": "PGF",
+      "textOperator": "1 0 0 rg"
+    },
+    {
+      "body": "APP",
+      "textOperator": "1 0 0 rg"
+    },
+    {
+      "body": "APP",
+      "textOperator": "1 0 0 rg"
+    },
+    {
+      "body": "APP",
+      "textOperator": "1 0 0 rg"
+    },
+    {
+      "body": "APP",
+      "textOperator": "1 0 0 rg"
+    }
+  ]
+}

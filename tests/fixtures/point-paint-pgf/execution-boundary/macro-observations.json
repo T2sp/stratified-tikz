@@ -1,0 +1,83 @@
+{
+  "rejected": {
+    "sameDiagramIdentity": true,
+    "unchangedJson": true,
+    "references": 0,
+    "styles": 0,
+    "declarations": 0,
+    "colors": {},
+    "rawOptions": {},
+    "diagnostics": [
+      "Unsupported execution/scope context at character 37: \\newcommand{\\unusedPaint}{\\tikzset{myPoint/.style={text=red}}}. Import rejected: use only top-level literal declarations within the preview bounds; no TeX execution or scope evaluation is performed."
+    ]
+  },
+  "reloaded": {
+    "rawSourceUnchanged": true,
+    "reference": {
+      "id": "imported-style-mypoint",
+      "key": "myPoint",
+      "sourceId": "external-style-source-macro-sty",
+      "displayName": "myPoint",
+      "targets": [
+        "draw",
+        "filldraw",
+        "node",
+        "curve",
+        "sheet",
+        "point",
+        "label",
+        "region"
+      ],
+      "options": "text=red",
+      "rawOptions": "text=red",
+      "previewDiagnostics": [
+        "macro.sty: Unsupported execution/scope context at character 37: \\newcommand{\\unusedPaint}{\\tikzset{myPoint/.style={text=red}}}. Import rejected: use only top-level literal declarations within the preview bounds; no TeX execution or scope evaluation is performed. Saved raw source is retained; all imported paint remains unresolved."
+      ]
+    },
+    "resolution": {
+      "diagnostics": [
+        "macro.sty: Unsupported execution/scope context at character 37: \\newcommand{\\unusedPaint}{\\tikzset{myPoint/.style={text=red}}}. Import rejected: use only top-level literal declarations within the preview bounds; no TeX execution or scope evaluation is performed. Saved raw source is retained; all imported paint remains unresolved."
+      ],
+      "unresolvedFields": [
+        "fillColor",
+        "fillEnabled",
+        "drawColor",
+        "drawEnabled",
+        "textColor",
+        "fillOpacity",
+        "drawOpacity",
+        "textOpacity",
+        "lineWidth",
+        "dashPattern",
+        "dashPhase",
+        "lineCap",
+        "lineJoin"
+      ],
+      "sourceDependencies": [
+        "external-style-source-macro-sty"
+      ]
+    },
+    "previewFallback": {
+      "text": {
+        "color": "#FF0000",
+        "opacity": 1
+      },
+      "fill": {
+        "enabled": true,
+        "color": "#000000",
+        "opacity": 1
+      },
+      "stroke": {
+        "enabled": true,
+        "color": "#000000",
+        "opacity": 1,
+        "width": 0.4,
+        "lineStyle": "solid",
+        "dashPhase": 0,
+        "lineCap": "butt",
+        "lineJoin": "miter"
+      }
+    },
+    "presetReapplicationRoundTrip": true
+  }
+}

@@ -1,0 +1,6653 @@
+{
+  "provenance": "Independent librsvg/Cairo SVG rasterization of literal triangle and settings; six source/raster pairs match retained independent reviewer evidence byte-for-byte; no production imports; alpha >= 128",
+  "phaseRule": "Original uses rawPhase * 1.2; corrected uses (rawPhase * 1.2) % sum([3 * 1.2, 3 * 1.2]), preserving the actual emitted floating-point pattern period",
+  "renderer": "rsvg-convert version 2.63.0\n\nlibraries used:\n  cairo 1.18.4\n  pango 1.58.2\n  harfbuzz 14.4.0\n  fontconfig 2.18.3",
+  "pixelReader": "Version: ImageMagick 7.1.2-31 Q16-HDRI aarch64 8309dc92a:20260903 https://imagemagick.org",
+  "scale": 16,
+  "viewBox": {
+    "minX": -80,
+    "minY": -80,
+    "width": 160,
+    "height": 160
+  },
+  "boundsUncertainty": 0.0625,
+  "distanceUncertainty": 0.125,
+  "observations": [
+    {
+      "id": "triangle-phase-1e12-original",
+      "variant": "original",
+      "rawPhase": 1000000000000,
+      "convertedPhase": 1200000000000,
+      "emittedPhase": 1200000000000,
+      "shape": "triangle",
+      "size": 3,
+      "vertices": [
+        {
+          "x": 3.117441802447776e-16,
+          "y": -5.091168824543143
+        },
+        {
+          "x": -4.409081537009722,
+          "y": 2.54558441227157
+        },
+        {
+          "x": 4.40908153700972,
+          "y": 2.5455844122715736
+        }
+      ],
+      "width": 36,
+      "lineJoin": "bevel",
+      "lineCap": "square",
+      "lineStyle": "dashed",
+      "dashPattern": [
+        3.5999999999999996,
+        3.5999999999999996
+      ],
+      "dashPhase": 1200000000000,
+      "reviewedSource": "/private/tmp/stz-review-production-phase-1000000000000",
+      "svgFile": "large-phase/triangle-phase-1e12-original.svg",
+      "pngFile": "large-phase/triangle-phase-1e12-original.png",
+      "reviewedSvgSha256": "ee5fc138032e170fc8887f5c74d0d41aee2c1f221594d1abeee7092b99ad5eeb",
+      "reviewedPngSha256": "3a441400a6ecc8277155c857bd7fadba4fea5b202e063fd3d71be117c856f0af",
+      "miterLimit": 10,
+      "rasterRadius": 29.821506763156687,
+      "farthest": {
+        "x": -28.59375,
+        "y": 8.46875
+      },
+      "svgSha256": "ee5fc138032e170fc8887f5c74d0d41aee2c1f221594d1abeee7092b99ad5eeb",
+      "pngSha256": "3a441400a6ecc8277155c857bd7fadba4fea5b202e063fd3d71be117c856f0af",
+      "rasterBounds": {
+        "minX": -28.625,
+        "minY": -26.1875,
+        "maxX": 28.375,
+        "maxY": 26.4375
+      },
+      "probes": [
+        {
+          "point": {
+            "x": 0,
+            "y": -24
+          },
+          "alpha": 0,
+          "painted": false,
+          "nearestPaintCenterDistance": 2.38361922819061
+        },
+        {
+          "point": {
+            "x": -6,
+            "y": -28
+          },
+          "alpha": 0,
+          "painted": false,
+          "nearestPaintCenterDistance": 3.3027568976538375
+        },
+        {
+          "point": {
+            "x": 20,
+            "y": 20
+          },
+          "alpha": 121,
+          "painted": false,
+          "nearestPaintCenterDistance": 0.04419417382415922
+        },
+        {
+          "point": {
+            "x": 0,
+            "y": -50
+          },
+          "alpha": 0,
+          "painted": false,
+          "nearestPaintCenterDistance": 25.324032866528192
+        },
+        {
+          "point": {
+            "x": 9,
+            "y": -50
+          },
+          "alpha": 0,
+          "painted": false,
+          "nearestPaintCenterDistance": 23.847210594218353
+        },
+        {
+          "point": {
+            "x": 0,
+            "y": 0
+          },
+          "alpha": 255,
+          "painted": true,
+          "nearestPaintCenterDistance": 0
+        },
+        {
+          "point": {
+            "x": -28.59375,
+            "y": 8.46875
+          },
+          "alpha": 160,
+          "painted": true,
+          "nearestPaintCenterDistance": 0
+        },
+        {
+          "point": {
+            "x": -65,
+            "y": -65
+          },
+          "alpha": 0,
+          "painted": false,
+          "nearestPaintCenterDistance": 67.28259258994855
+        },
+        {
+          "point": {
+            "x": -45,
+            "y": -65
+          },
+          "alpha": 0,
+          "painted": false,
+          "nearestPaintCenterDistance": 53.38453149672665
+        },
+        {
+          "point": {
+            "x": -35,
+            "y": -65
+          },
+          "alpha": 0,
+          "painted": false,
+          "nearestPaintCenterDistance": 47.17555726353426
+        },
+        {
+          "point": {
+            "x": -25,
+            "y": -65
+          },
+          "alpha": 0,
+          "painted": false,
+          "nearestPaintCenterDistance": 42.440054230938486
+        },
+        {
+          "point": {
+            "x": -15,
+            "y": -65
+          },
+          "alpha": 0,
+          "painted": false,
+          "nearestPaintCenterDistance": 39.708729558184054
+        },
+        {
+          "point": {
+            "x": 0,
+            "y": -65
+          },
+          "alpha": 0,
+          "painted": false,
+          "nearestPaintCenterDistance": 39.76957556505978
+        },
+        {
+          "point": {
+            "x": 15,
+            "y": -65
+          },
+          "alpha": 0,
+          "painted": false,
+          "nearestPaintCenterDistance": 39.36847664216892
+        },
+        {
+          "point": {
+            "x": 25,
+            "y": -65
+          },
+          "alpha": 0,
+          "painted": false,
+          "nearestPaintCenterDistance": 42.16636044437556
+        },
+        {
+          "point": {
+            "x": 35,
+            "y": -65
+          },
+          "alpha": 0,
+          "painted": false,
+          "nearestPaintCenterDistance": 46.96942572700884
+        },
+        {
+          "point": {
+            "x": 45,
+            "y": -65
+          },
+          "alpha": 0,
+          "painted": false,
+          "nearestPaintCenterDistance": 53.237692973353006
+        },
+        {
+          "point": {
+            "x": 65,
+            "y": -65
+          },
+          "alpha": 0,
+          "painted": false,
+          "nearestPaintCenterDistance": 66.98771167628433
+        },
+        {
+          "point": {
+            "x": -65,
+            "y": -45
+          },
+          "alpha": 0,
+          "painted": false,
+          "nearestPaintCenterDistance": 54.25124206527441
+        },
+        {
+          "point": {
+            "x": -45,
+            "y": -45
+          },
+          "alpha": 0,
+          "painted": false,
+          "nearestPaintCenterDistance": 39.044170699670396
+        },
+        {
+          "point": {
+            "x": -35,
+            "y": -45
+          },
+          "alpha": 0,
+          "painted": false,
+          "nearestPaintCenterDistance": 32.48175569646752
+        },
+        {
+          "point": {
+            "x": -25,
+            "y": -45
+          },
+          "alpha": 0,
+          "painted": false,
+          "nearestPaintCenterDistance": 25.14772759366142
+        },
+        {
+          "point": {
+            "x": -15,
+            "y": -45
+          },
+          "alpha": 0,
+          "painted": false,
+          "nearestPaintCenterDistance": 20.19983175981919
+        },
+        {
+          "point": {
+            "x": 0,
+            "y": -45
+          },
+          "alpha": 0,
+          "painted": false,
+          "nearestPaintCenterDistance": 20.684997960478505
+        },
+        {
+          "point": {
+            "x": 15,
+            "y": -45
+          },
+          "alpha": 0,
+          "painted": false,
+          "nearestPaintCenterDistance": 19.90293830380329
+        },
+        {
+          "point": {
+            "x": 25,
+            "y": -45
+          },
+          "alpha": 0,
+          "painted": false,
+          "nearestPaintCenterDistance": 24.985034583226017
+        },
+        {
+          "point": {
+            "x": 35,
+            "y": -45
+          },
+          "alpha": 0,
+          "painted": false,
+          "nearestPaintCenterDistance": 32.42590712879132
+        },
+        {
+          "point": {
+            "x": 45,
+            "y": -45
+          },
+          "alpha": 0,
+          "painted": false,
+          "nearestPaintCenterDistance": 38.76020530937627
+        },
+        {
+          "point": {
+            "x": 65,
+            "y": -45
+          },
+          "alpha": 0,
+          "painted": false,
+          "nearestPaintCenterDistance": 53.88509548683197
+        },
+        {
+          "point": {
+            "x": -65,
+            "y": -35
+          },
+          "alpha": 0,
+          "painted": false,
+          "nearestPaintCenterDistance": 49.51082978122059
+        },
+        {
+          "point": {
+            "x": -45,
+            "y": -35
+          },
+          "alpha": 0,
+          "painted": false,
+          "nearestPaintCenterDistance": 32.13366249939462
+        },
+        {
+          "point": {
+            "x": -35,
+            "y": -35
+          },
+          "alpha": 0,
+          "painted": false,
+          "nearestPaintCenterDistance": 24.9639192761273
+        },
+        {
+          "point": {
+            "x": -25,
+            "y": -35
+          },
+          "alpha": 0,
+          "painted": false,
+          "nearestPaintCenterDistance": 18.609525870505138
+        },
+        {
+          "point": {
+            "x": -15,
+            "y": -35
+          },
+          "alpha": 0,
+          "painted": false,
+          "nearestPaintCenterDistance": 11.12017100250711
+        },
+        {
+          "point": {
+            "x": 0,
+            "y": -35
+          },
+          "alpha": 0,
+          "painted": false,
+          "nearestPaintCenterDistance": 11.90432235051622
+        },
+        {
+          "point": {
+            "x": 15,
+            "y": -35
+          },
+          "alpha": 0,
+          "painted": false,
+          "nearestPaintCenterDistance": 10.920254261005098
+        },
+        {
+          "point": {
+            "x": 25,
+            "y": -35
+          },
+          "alpha": 0,
+          "painted": false,
+          "nearestPaintCenterDistance": 18.609525870505138
+        },
+        {
+          "point": {
+            "x": 35,
+            "y": -35
+          },
+          "alpha": 0,
+          "painted": false,
+          "nearestPaintCenterDistance": 24.695212402913242
+        },
+        {
+          "point": {
+            "x": 45,
+            "y": -35
+          },
+          "alpha": 0,
+          "painted": false,
+          "nearestPaintCenterDistance": 31.78802472040375
+        },
+        {
+          "point": {
+            "x": 65,
+            "y": -35
+          },
+          "alpha": 0,
+          "painted": false,
+          "nearestPaintCenterDistance": 49.10935262885268
+        },
+        {
+          "point": {
+            "x": -65,
+            "y": -25
+          },
+          "alpha": 0,
+          "painted": false,
+          "nearestPaintCenterDistance": 45.66404579234082
+        },
+        {
+          "point": {
+            "x": -45,
+            "y": -25
+          },
+          "alpha": 0,
+          "painted": false,
+          "nearestPaintCenterDistance": 27.215753996995932
+        },
+        {
+          "point": {
+            "x": -35,
+            "y": -25
+          },
+          "alpha": 0,
+          "painted": false,
+          "nearestPaintCenterDistance": 18.202259904336053
+        },
+        {
+          "point": {
+            "x": -25,
+            "y": -25
+          },
+          "alpha": 0,
+          "painted": false,
+          "nearestPaintCenterDistance": 11.042973586176869
+        },
+        {
+          "point": {
+            "x": -15,
+            "y": -25
+          },
+          "alpha": 0,
+          "painted": false,
+          "nearestPaintCenterDistance": 4.952311644575693
+        },
+        {
+          "point": {
+            "x": 0,
+            "y": -25
+          },
+          "alpha": 0,
+          "painted": false,
+          "nearestPaintCenterDistance": 3.250300466879947
+        },
+        {
+          "point": {
+            "x": 15,
+            "y": -25
+          },
+          "alpha": 0,
+          "painted": false,
+          "nearestPaintCenterDistance": 4.952311644575693
+        },
+        {
+          "point": {
+            "x": 25,
+            "y": -25
+          },
+          "alpha": 0,
+          "painted": false,
+          "nearestPaintCenterDistance": 10.832982766763731
+        },
+        {
+          "point": {
+            "x": 35,
+            "y": -25
+          },
+          "alpha": 0,
+          "painted": false,
+          "nearestPaintCenterDistance": 17.83195209798972
+        },
+        {
+          "point": {
+            "x": 45,
+            "y": -25
+          },
+          "alpha": 0,
+          "painted": false,
+          "nearestPaintCenterDistance": 26.80678115001874
+        },
+        {
+          "point": {
+            "x": 65,
+            "y": -25
+          },
+          "alpha": 0,
+          "painted": false,
+          "nearestPaintCenterDistance": 46.035079185605845
+        },
+        {
+          "point": {
+            "x": -65,
+            "y": -15
+          },
+          "alpha": 0,
+          "painted": false,
+          "nearestPaintCenterDistance": 43.006744565532976
+        },
+        {
+          "point": {
+            "x": -45,
+            "y": -15
+          },
+          "alpha": 0,
+          "painted": false,
+          "nearestPaintCenterDistance": 23.469769451892788
+        },
+        {
+          "point": {
+            "x": -35,
+            "y": -15
+          },
+          "alpha": 0,
+          "painted": false,
+          "nearestPaintCenterDistance": 14.193487172819795
+        },
+        {
+          "point": {
+            "x": -25,
+            "y": -15
+          },
+          "alpha": 0,
+          "painted": false,
+          "nearestPaintCenterDistance": 5.468839284985434
+        },
+        {
+          "point": {
+            "x": -15,
+            "y": -15
+          },
+          "alpha": 255,
+          "painted": true,
+          "nearestPaintCenterDistance": 0
+        },
+        {
+          "point": {
+            "x": 0,
+            "y": -15
+          },
+          "alpha": 255,
+          "painted": true,
+          "nearestPaintCenterDistance": 0
+        },
+        {
+          "point": {
+            "x": 15,
+            "y": -15
+          },
+          "alpha": 255,
+          "painted": true,
+          "nearestPaintCenterDistance": 0
+        },
+        {
+          "point": {
+            "x": 25,
+            "y": -15
+          },
+          "alpha": 0,
+          "painted": false,
+          "nearestPaintCenterDistance": 5.031347048753445
+        },
+        {
+          "point": {
+            "x": 35,
+            "y": -15
+          },
+          "alpha": 0,
+          "painted": false,
+          "nearestPaintCenterDistance": 14.593783458205758
+        },
+        {
+          "point": {
+            "x": 45,
+            "y": -15
+          },
+          "alpha": 0,
+          "painted": false,
+          "nearestPaintCenterDistance": 23.819183773274013
+        },
+        {
+          "point": {
+            "x": 65,
+            "y": -15
+          },
+          "alpha": 0,
+          "painted": false,
+          "nearestPaintCenterDistance": 43.245777431155055
+        },
+        {
+          "point": {
+            "x": -65,
+            "y": 15
+          },
+          "alpha": 0,
+          "painted": false,
+          "nearestPaintCenterDistance": 36.98746092427811
+        },
+        {
+          "point": {
+            "x": -45,
+            "y": 15
+          },
+          "alpha": 0,
+          "painted": false,
+          "nearestPaintCenterDistance": 17.65848990216887
+        },
+        {
+          "point": {
+            "x": -35,
+            "y": 15
+          },
+          "alpha": 0,
+          "painted": false,
+          "nearestPaintCenterDistance": 9.148620968484813
+        },
+        {
+          "point": {
+            "x": -25,
+            "y": 15
+          },
+          "alpha": 0,
+          "painted": false,
+          "nearestPaintCenterDistance": 3.8489548094255404
+        },
+        {
+          "point": {
+            "x": -15,
+            "y": 15
+          },
+          "alpha": 255,
+          "painted": true,
+          "nearestPaintCenterDistance": 0
+        },
+        {
+          "point": {
+            "x": 0,
+            "y": 15
+          },
+          "alpha": 255,
+          "painted": true,
+          "nearestPaintCenterDistance": 0
+        },
+        {
+          "point": {
+            "x": 15,
+            "y": 15
+          },
+          "alpha": 255,
+          "painted": true,
+          "nearestPaintCenterDistance": 0
+        },
+        {
+          "point": {
+            "x": 25,
+            "y": 15
+          },
+          "alpha": 0,
+          "painted": false,
+          "nearestPaintCenterDistance": 4.309555153957309
+        },
+        {
+          "point": {
+            "x": 35,
+            "y": 15
+          },
+          "alpha": 0,
+          "painted": false,
+          "nearestPaintCenterDistance": 9.591764859763817
+        },
+        {
+          "point": {
+            "x": 45,
+            "y": 15
+          },
+          "alpha": 0,
+          "painted": false,
+          "nearestPaintCenterDistance": 18.03127707970237
+        },
+        {
+          "point": {
+            "x": 65,
+            "y": 15
+          },
+          "alpha": 0,
+          "painted": false,
+          "nearestPaintCenterDistance": 37.301165573276656
+        },
+        {
+          "point": {
+            "x": -65,
+            "y": 25
+          },
+          "alpha": 0,
+          "painted": false,
+          "nearestPaintCenterDistance": 39.98371250428104
+        },
+        {
+          "point": {
+            "x": -45,
+            "y": 25
+          },
+          "alpha": 0,
+          "painted": false,
+          "nearestPaintCenterDistance": 23.290497324552778
+        },
+        {
+          "point": {
+            "x": -35,
+            "y": 25
+          },
+          "alpha": 0,
+          "painted": false,
+          "nearestPaintCenterDistance": 16.101302839366756
+        },
+        {
+          "point": {
+            "x": -25,
+            "y": 25
+          },
+          "alpha": 0,
+          "painted": false,
+          "nearestPaintCenterDistance": 7.062361724310077
+        },
+        {
+          "point": {
+            "x": -15,
+            "y": 25
+          },
+          "alpha": 0,
+          "painted": false,
+          "nearestPaintCenterDistance": 4.468859264398467
+        },
+        {
+          "point": {
+            "x": 0,
+            "y": 25
+          },
+          "alpha": 55,
+          "painted": false,
+          "nearestPaintCenterDistance": 0.04419417382415922
+        },
+        {
+          "point": {
+            "x": 15,
+            "y": 25
+          },
+          "alpha": 0,
+          "painted": false,
+          "nearestPaintCenterDistance": 4.468859264398467
+        },
+        {
+          "point": {
+            "x": 25,
+            "y": 25
+          },
+          "alpha": 0,
+          "painted": false,
+          "nearestPaintCenterDistance": 6.729279539817022
+        },
+        {
+          "point": {
+            "x": 35,
+            "y": 25
+          },
+          "alpha": 0,
+          "painted": false,
+          "nearestPaintCenterDistance": 15.68146049081526
+        },
+        {
+          "point": {
+            "x": 45,
+            "y": 25
+          },
+          "alpha": 0,
+          "painted": false,
+          "nearestPaintCenterDistance": 23.732929720643426
+        },
+        {
+          "point": {
+            "x": 65,
+            "y": 25
+          },
+          "alpha": 0,
+          "painted": false,
+          "nearestPaintCenterDistance": 40.36708997593213
+        },
+        {
+          "point": {
+            "x": -65,
+            "y": 35
+          },
+          "alpha": 0,
+          "painted": false,
+          "nearestPaintCenterDistance": 45.04799957406544
+        },
+        {
+          "point": {
+            "x": -45,
+            "y": 35
+          },
+          "alpha": 0,
+          "painted": false,
+          "nearestPaintCenterDistance": 29.29167037102869
+        },
+        {
+          "point": {
+            "x": -35,
+            "y": 35
+          },
+          "alpha": 0,
+          "painted": false,
+          "nearestPaintCenterDistance": 21.18081568601644
+        },
+        {
+          "point": {
+            "x": -25,
+            "y": 35
+          },
+          "alpha": 0,
+          "painted": false,
+          "nearestPaintCenterDistance": 15.467771433693995
+        },
+        {
+          "point": {
+            "x": -15,
+            "y": 35
+          },
+          "alpha": 0,
+          "painted": false,
+          "nearestPaintCenterDistance": 14.468783747260861
+        },
+        {
+          "point": {
+            "x": 0,
+            "y": 35
+          },
+          "alpha": 0,
+          "painted": false,
+          "nearestPaintCenterDistance": 8.941323482851967
+        },
+        {
+          "point": {
+            "x": 15,
+            "y": 35
+          },
+          "alpha": 0,
+          "painted": false,
+          "nearestPaintCenterDistance": 14.468783747260861
+        },
+        {
+          "point": {
+            "x": 25,
+            "y": 35
+          },
+          "alpha": 0,
+          "painted": false,
+          "nearestPaintCenterDistance": 15.318557475330373
+        },
+        {
+          "point": {
+            "x": 35,
+            "y": 35
+          },
+          "alpha": 0,
+          "painted": false,
+          "nearestPaintCenterDistance": 20.863441785213674
+        },
+        {
+          "point": {
+            "x": 45,
+            "y": 35
+          },
+          "alpha": 0,
+          "painted": false,
+          "nearestPaintCenterDistance": 28.91207711536824
+        },
+        {
+          "point": {
+            "x": 65,
+            "y": 35
+          },
+          "alpha": 0,
+          "painted": false,
+          "nearestPaintCenterDistance": 45.471166172916654
+        },
+        {
+          "point": {
+            "x": -65,
+            "y": 45
+          },
+          "alpha": 0,
+          "painted": false,
+          "nearestPaintCenterDistance": 51.57467659253909
+        },
+        {
+          "point": {
+            "x": -45,
+            "y": 45
+          },
+          "alpha": 0,
+          "painted": false,
+          "nearestPaintCenterDistance": 35.31822409358942
+        },
+        {
+          "point": {
+            "x": -35,
+            "y": 45
+          },
+          "alpha": 0,
+          "painted": false,
+          "nearestPaintCenterDistance": 28.948263387032387
+        },
+        {
+          "point": {
+            "x": -25,
+            "y": 45
+          },
+          "alpha": 0,
+          "painted": false,
+          "nearestPaintCenterDistance": 25.07243412844074
+        },
+        {
+          "point": {
+            "x": -15,
+            "y": 45
+          },
+          "alpha": 0,
+          "painted": false,
+          "nearestPaintCenterDistance": 22.56349547665432
+        },
+        {
+          "point": {
+            "x": 0,
+            "y": 45
+          },
+          "alpha": 0,
+          "painted": false,
+          "nearestPaintCenterDistance": 18.756925804219623
+        },
+        {
+          "point": {
+            "x": 15,
+            "y": 45
+          },
+          "alpha": 0,
+          "painted": false,
+          "nearestPaintCenterDistance": 22.352686150102855
+        },
+        {
+          "point": {
+            "x": 25,
+            "y": 45
+          },
+          "alpha": 0,
+          "painted": false,
+          "nearestPaintCenterDistance": 24.980656579141392
+        },
+        {
+          "point": {
+            "x": 35,
+            "y": 45
+          },
+          "alpha": 0,
+          "painted": false,
+          "nearestPaintCenterDistance": 28.716862696419327
+        },
+        {
+          "point": {
+            "x": 45,
+            "y": 45
+          },
+          "alpha": 0,
+          "painted": false,
+          "nearestPaintCenterDistance": 35.00404552512467
+        },
+        {
+          "point": {
+            "x": 65,
+            "y": 45
+          },
+          "alpha": 0,
+          "painted": false,
+          "nearestPaintCenterDistance": 51.24971417603224
+        },
+        {
+          "point": {
+            "x": -65,
+            "y": 65
+          },
+          "alpha": 0,
+          "painted": false,
+          "nearestPaintCenterDistance": 63.59934711241146
+        },
+        {
+          "point": {
+            "x": -45,
+            "y": 65
+          },
+          "alpha": 0,
+          "painted": false,
+          "nearestPaintCenterDistance": 51.24575058602421
+        },
+        {
+          "point": {
+            "x": -35,
+            "y": 65
+          },
+          "alpha": 0,
+          "painted": false,
+          "nearestPaintCenterDistance": 47.08239536307599
+        },
+        {
+          "point": {
+            "x": -25,
+            "y": 65
+          },
+          "alpha": 0,
+          "painted": false,
+          "nearestPaintCenterDistance": 44.80376047972982
+        },
+        {
+          "point": {
+            "x": -15,
+            "y": 65
+          },
+          "alpha": 0,
+          "painted": false,
+          "nearestPaintCenterDistance": 40.839457980303806
+        },
+        {
+          "point": {
+            "x": 0,
+            "y": 65
+          },
+          "alpha": 0,
+          "painted": false,
+          "nearestPaintCenterDistance": 38.67262941183338
+        },
+        {
+          "point": {
+            "x": 15,
+            "y": 65
+          },
+          "alpha": 0,
+          "painted": false,
+          "nearestPaintCenterDistance": 40.538778695528066
+        },
+        {
+          "point": {
+            "x": 25,
+            "y": 65
+          },
+          "alpha": 0,
+          "painted": false,
+          "nearestPaintCenterDistance": 44.626422421307765
+        },
+        {
+          "point": {
+            "x": 35,
+            "y": 65
+          },
+          "alpha": 0,
+          "painted": false,
+          "nearestPaintCenterDistance": 46.940475105446055
+        },
+        {
+          "point": {
+            "x": 45,
+            "y": 65
+          },
+          "alpha": 0,
+          "painted": false,
+          "nearestPaintCenterDistance": 51.02972862092253
+        },
+        {
+          "point": {
+            "x": 65,
+            "y": 65
+          },
+          "alpha": 0,
+          "painted": false,
+          "nearestPaintCenterDistance": 63.287306808909165
+        }
+      ]
+    },
+    {
+      "id": "triangle-phase-1e12-corrected",
+      "variant": "corrected",
+      "rawPhase": 1000000000000,
+      "convertedPhase": 1200000000000,
+      "emittedPhase": 4.800118423789293,
+      "shape": "triangle",
+      "size": 3,
+      "vertices": [
+        {
+          "x": 3.117441802447776e-16,
+          "y": -5.091168824543143
+        },
+        {
+          "x": -4.409081537009722,
+          "y": 2.54558441227157
+        },
+        {
+          "x": 4.40908153700972,
+          "y": 2.5455844122715736
+        }
+      ],
+      "width": 36,
+      "lineJoin": "bevel",
+      "lineCap": "square",
+      "lineStyle": "dashed",
+      "dashPattern": [
+        3.5999999999999996,
+        3.5999999999999996
+      ],
+      "dashPhase": 4.800118423789293,
+      "reviewedSource": "/private/tmp/stz-review-production-phase-1000000000000-canonical",
+      "svgFile": "large-phase/triangle-phase-1e12-corrected.svg",
+      "pngFile": "large-phase/triangle-phase-1e12-corrected.png",
+      "reviewedSvgSha256": "48c17ed53ee237156ff473b3a4ea07a848af76e6b5e594e77899735048b81f02",
+      "reviewedPngSha256": "116cdeff667bf8631eec528343df6ed20143dfd1eea354821cde1fbb7345b3d6",
+      "miterLimit": 10,
+      "rasterRadius": 30.38043289890715,
+      "farthest": {
+        "x": 6.59375,
+        "y": -29.65625
+      },
+      "svgSha256": "48c17ed53ee237156ff473b3a4ea07a848af76e6b5e594e77899735048b81f02",
+      "pngSha256": "116cdeff667bf8631eec528343df6ed20143dfd1eea354821cde1fbb7345b3d6",
+      "rasterBounds": {
+        "minX": -27.5625,
+        "minY": -29.6875,
+        "maxX": 25.8125,
+        "maxY": 24.6875
+      },
+      "probes": [
+        {
+          "point": {
+            "x": 0,
+            "y": -24
+          },
+          "alpha": 255,
+          "painted": true,
+          "nearestPaintCenterDistance": 0
+        },
+        {
+          "point": {
+            "x": -6,
+            "y": -28
+          },
+          "alpha": 0,
+          "painted": false,
+          "nearestPaintCenterDistance": 1.2445192344837424
+        },
+        {
+          "point": {
+            "x": 20,
+            "y": 20
+          },
+          "alpha": 0,
+          "painted": false,
+          "nearestPaintCenterDistance": 2.0314903703931257
+        },
+        {
+          "point": {
+            "x": 0,
+            "y": -50
+          },
+          "alpha": 0,
+          "painted": false,
+          "nearestPaintCenterDistance": 21.385642452940246
+        },
+        {
+          "point": {
+            "x": 9,
+            "y": -50
+          },
+          "alpha": 0,
+          "painted": false,
+          "nearestPaintCenterDistance": 20.48556084477552
+        },
+        {
+          "point": {
+            "x": 0,
+            "y": 0
+          },
+          "alpha": 255,
+          "painted": true,
+          "nearestPaintCenterDistance": 0
+        },
+        {
+          "point": {
+            "x": 6.59375,
+            "y": -29.65625
+          },
+          "alpha": 136,
+          "painted": true,
+          "nearestPaintCenterDistance": 0
+        },
+        {
+          "point": {
+            "x": -65,
+            "y": -65
+          },
+          "alpha": 0,
+          "painted": false,
+          "nearestPaintCenterDistance": 65.9063166784869
+        },
+        {
+          "point": {
+            "x": -45,
+            "y": -65
+          },
+          "alpha": 0,
+          "painted": false,
+          "nearestPaintCenterDistance": 52.81233357961945
+        },
+        {
+          "point": {
+            "x": -35,
+            "y": -65
+          },
+          "alpha": 0,
+          "painted": false,
+          "nearestPaintCenterDistance": 46.31163545076982
+        },
+        {
+          "point": {
+            "x": -25,
+            "y": -65
+          },
+          "alpha": 0,
+          "painted": false,
+          "nearestPaintCenterDistance": 41.23581669040884
+        },
+        {
+          "point": {
+            "x": -15,
+            "y": -65
+          },
+          "alpha": 0,
+          "painted": false,
+          "nearestPaintCenterDistance": 38.15779839200632
+        },
+        {
+          "point": {
+            "x": 0,
+            "y": -65
+          },
+          "alpha": 0,
+          "painted": false,
+          "nearestPaintCenterDistance": 35.95355619580628
+        },
+        {
+          "point": {
+            "x": 15,
+            "y": -65
+          },
+          "alpha": 0,
+          "painted": false,
+          "nearestPaintCenterDistance": 36.329680746257594
+        },
+        {
+          "point": {
+            "x": 25,
+            "y": -65
+          },
+          "alpha": 0,
+          "painted": false,
+          "nearestPaintCenterDistance": 39.84935009664524
+        },
+        {
+          "point": {
+            "x": 35,
+            "y": -65
+          },
+          "alpha": 0,
+          "painted": false,
+          "nearestPaintCenterDistance": 45.34419150370861
+        },
+        {
+          "point": {
+            "x": 45,
+            "y": -65
+          },
+          "alpha": 0,
+          "painted": false,
+          "nearestPaintCenterDistance": 52.19406770050597
+        },
+        {
+          "point": {
+            "x": 65,
+            "y": -65
+          },
+          "alpha": 0,
+          "painted": false,
+          "nearestPaintCenterDistance": 68.267640234045
+        },
+        {
+          "point": {
+            "x": -65,
+            "y": -45
+          },
+          "alpha": 0,
+          "painted": false,
+          "nearestPaintCenterDistance": 52.435916990408394
+        },
+        {
+          "point": {
+            "x": -45,
+            "y": -45
+          },
+          "alpha": 0,
+          "painted": false,
+          "nearestPaintCenterDistance": 37.73118840064543
+        },
+        {
+          "point": {
+            "x": -35,
+            "y": -45
+          },
+          "alpha": 0,
+          "painted": false,
+          "nearestPaintCenterDistance": 32.320930960060544
+        },
+        {
+          "point": {
+            "x": -25,
+            "y": -45
+          },
+          "alpha": 0,
+          "painted": false,
+          "nearestPaintCenterDistance": 24.5284034972723
+        },
+        {
+          "point": {
+            "x": -15,
+            "y": -45
+          },
+          "alpha": 0,
+          "painted": false,
+          "nearestPaintCenterDistance": 18.901523169443248
+        },
+        {
+          "point": {
+            "x": 0,
+            "y": -45
+          },
+          "alpha": 0,
+          "painted": false,
+          "nearestPaintCenterDistance": 16.700544994849718
+        },
+        {
+          "point": {
+            "x": 15,
+            "y": -45
+          },
+          "alpha": 0,
+          "painted": false,
+          "nearestPaintCenterDistance": 17.49559096243965
+        },
+        {
+          "point": {
+            "x": 25,
+            "y": -45
+          },
+          "alpha": 0,
+          "painted": false,
+          "nearestPaintCenterDistance": 23.962902643982844
+        },
+        {
+          "point": {
+            "x": 35,
+            "y": -45
+          },
+          "alpha": 0,
+          "painted": false,
+          "nearestPaintCenterDistance": 32.26855691884903
+        },
+        {
+          "point": {
+            "x": 45,
+            "y": -45
+          },
+          "alpha": 0,
+          "painted": false,
+          "nearestPaintCenterDistance": 40.08089963592384
+        },
+        {
+          "point": {
+            "x": 65,
+            "y": -45
+          },
+          "alpha": 0,
+          "painted": false,
+          "nearestPaintCenterDistance": 54.67033659238801
+        },
+        {
+          "point": {
+            "x": -65,
+            "y": -35
+          },
+          "alpha": 0,
+          "painted": false,
+          "nearestPaintCenterDistance": 46.71884406345046
+        },
+        {
+          "point": {
+            "x": -45,
+            "y": -35
+          },
+          "alpha": 0,
+          "painted": false,
+          "nearestPaintCenterDistance": 30.524868191771116
+        },
+        {
+          "point": {
+            "x": -35,
+            "y": -35
+          },
+          "alpha": 0,
+          "painted": false,
+          "nearestPaintCenterDistance": 23.74115789351901
+        },
+        {
+          "point": {
+            "x": -25,
+            "y": -35
+          },
+          "alpha": 0,
+          "painted": false,
+          "nearestPaintCenterDistance": 18.609525870505138
+        },
+        {
+          "point": {
+            "x": -15,
+            "y": -35
+          },
+          "alpha": 0,
+          "painted": false,
+          "nearestPaintCenterDistance": 10.387135222235244
+        },
+        {
+          "point": {
+            "x": 0,
+            "y": -35
+          },
+          "alpha": 0,
+          "painted": false,
+          "nearestPaintCenterDistance": 7.9038410361671625
+        },
+        {
+          "point": {
+            "x": 15,
+            "y": -35
+          },
+          "alpha": 0,
+          "painted": false,
+          "nearestPaintCenterDistance": 9.960958946055344
+        },
+        {
+          "point": {
+            "x": 25,
+            "y": -35
+          },
+          "alpha": 0,
+          "painted": false,
+          "nearestPaintCenterDistance": 18.609525870505138
+        },
+        {
+          "point": {
+            "x": 35,
+            "y": -35
+          },
+          "alpha": 0,
+          "painted": false,
+          "nearestPaintCenterDistance": 25.961096194594713
+        },
+        {
+          "point": {
+            "x": 45,
+            "y": -35
+          },
+          "alpha": 0,
+          "painted": false,
+          "nearestPaintCenterDistance": 33.37678483055251
+        },
+        {
+          "point": {
+            "x": 65,
+            "y": -35
+          },
+          "alpha": 0,
+          "painted": false,
+          "nearestPaintCenterDistance": 48.79262959838299
+        },
+        {
+          "point": {
+            "x": -65,
+            "y": -25
+          },
+          "alpha": 0,
+          "painted": false,
+          "nearestPaintCenterDistance": 42.61191606376085
+        },
+        {
+          "point": {
+            "x": -45,
+            "y": -25
+          },
+          "alpha": 0,
+          "painted": false,
+          "nearestPaintCenterDistance": 24.434103024768476
+        },
+        {
+          "point": {
+            "x": -35,
+            "y": -25
+          },
+          "alpha": 0,
+          "painted": false,
+          "nearestPaintCenterDistance": 16.48537467347952
+        },
+        {
+          "point": {
+            "x": -25,
+            "y": -25
+          },
+          "alpha": 0,
+          "painted": false,
+          "nearestPaintCenterDistance": 10.18049989563381
+        },
+        {
+          "point": {
+            "x": -15,
+            "y": -25
+          },
+          "alpha": 0,
+          "painted": false,
+          "nearestPaintCenterDistance": 4.952311644575693
+        },
+        {
+          "point": {
+            "x": 0,
+            "y": -25
+          },
+          "alpha": 255,
+          "painted": true,
+          "nearestPaintCenterDistance": 0
+        },
+        {
+          "point": {
+            "x": 15,
+            "y": -25
+          },
+          "alpha": 0,
+          "painted": false,
+          "nearestPaintCenterDistance": 4.952311644575693
+        },
+        {
+          "point": {
+            "x": 25,
+            "y": -25
+          },
+          "alpha": 0,
+          "painted": false,
+          "nearestPaintCenterDistance": 11.894474163450857
+        },
+        {
+          "point": {
+            "x": 35,
+            "y": -25
+          },
+          "alpha": 0,
+          "painted": false,
+          "nearestPaintCenterDistance": 19.306987481867804
+        },
+        {
+          "point": {
+            "x": 45,
+            "y": -25
+          },
+          "alpha": 0,
+          "painted": false,
+          "nearestPaintCenterDistance": 26.577165069378637
+        },
+        {
+          "point": {
+            "x": 65,
+            "y": -25
+          },
+          "alpha": 0,
+          "painted": false,
+          "nearestPaintCenterDistance": 44.41391339574796
+        },
+        {
+          "point": {
+            "x": -65,
+            "y": -15
+          },
+          "alpha": 0,
+          "painted": false,
+          "nearestPaintCenterDistance": 40.60665451160684
+        },
+        {
+          "point": {
+            "x": -45,
+            "y": -15
+          },
+          "alpha": 0,
+          "painted": false,
+          "nearestPaintCenterDistance": 20.740067276289146
+        },
+        {
+          "point": {
+            "x": -35,
+            "y": -15
+          },
+          "alpha": 0,
+          "painted": false,
+          "nearestPaintCenterDistance": 10.98978574063207
+        },
+        {
+          "point": {
+            "x": -25,
+            "y": -15
+          },
+          "alpha": 0,
+          "painted": false,
+          "nearestPaintCenterDistance": 3.0901178173331836
+        },
+        {
+          "point": {
+            "x": -15,
+            "y": -15
+          },
+          "alpha": 255,
+          "painted": true,
+          "nearestPaintCenterDistance": 0
+        },
+        {
+          "point": {
+            "x": 0,
+            "y": -15
+          },
+          "alpha": 255,
+          "painted": true,
+          "nearestPaintCenterDistance": 0
+        },
+        {
+          "point": {
+            "x": 15,
+            "y": -15
+          },
+          "alpha": 255,
+          "painted": true,
+          "nearestPaintCenterDistance": 0
+        },
+        {
+          "point": {
+            "x": 25,
+            "y": -15
+          },
+          "alpha": 0,
+          "painted": false,
+          "nearestPaintCenterDistance": 5.488802521953217
+        },
+        {
+          "point": {
+            "x": 35,
+            "y": -15
+          },
+          "alpha": 0,
+          "painted": false,
+          "nearestPaintCenterDistance": 12.848957277732694
+        },
+        {
+          "point": {
+            "x": 45,
+            "y": -15
+          },
+          "alpha": 0,
+          "painted": false,
+          "nearestPaintCenterDistance": 22.320858028422652
+        },
+        {
+          "point": {
+            "x": 65,
+            "y": -15
+          },
+          "alpha": 0,
+          "painted": false,
+          "nearestPaintCenterDistance": 42.00560323486618
+        },
+        {
+          "point": {
+            "x": -65,
+            "y": 15
+          },
+          "alpha": 0,
+          "painted": false,
+          "nearestPaintCenterDistance": 38.3729895646013
+        },
+        {
+          "point": {
+            "x": -45,
+            "y": 15
+          },
+          "alpha": 0,
+          "painted": false,
+          "nearestPaintCenterDistance": 19.332261329834125
+        },
+        {
+          "point": {
+            "x": -35,
+            "y": 15
+          },
+          "alpha": 0,
+          "painted": false,
+          "nearestPaintCenterDistance": 11.151741035596192
+        },
+        {
+          "point": {
+            "x": -25,
+            "y": 15
+          },
+          "alpha": 0,
+          "painted": false,
+          "nearestPaintCenterDistance": 3.406393345607638
+        },
+        {
+          "point": {
+            "x": -15,
+            "y": 15
+          },
+          "alpha": 255,
+          "painted": true,
+          "nearestPaintCenterDistance": 0
+        },
+        {
+          "point": {
+            "x": 0,
+            "y": 15
+          },
+          "alpha": 255,
+          "painted": true,
+          "nearestPaintCenterDistance": 0
+        },
+        {
+          "point": {
+            "x": 15,
+            "y": 15
+          },
+          "alpha": 255,
+          "painted": true,
+          "nearestPaintCenterDistance": 0
+        },
+        {
+          "point": {
+            "x": 25,
+            "y": 15
+          },
+          "alpha": 0,
+          "painted": false,
+          "nearestPaintCenterDistance": 7.031319444101511
+        },
+        {
+          "point": {
+            "x": 35,
+            "y": 15
+          },
+          "alpha": 0,
+          "painted": false,
+          "nearestPaintCenterDistance": 14.648285415877178
+        },
+        {
+          "point": {
+            "x": 45,
+            "y": 15
+          },
+          "alpha": 0,
+          "painted": false,
+          "nearestPaintCenterDistance": 22.34866641714892
+        },
+        {
+          "point": {
+            "x": 65,
+            "y": 15
+          },
+          "alpha": 0,
+          "painted": false,
+          "nearestPaintCenterDistance": 40.8437619548567
+        },
+        {
+          "point": {
+            "x": -65,
+            "y": 25
+          },
+          "alpha": 0,
+          "painted": false,
+          "nearestPaintCenterDistance": 41.690662361312995
+        },
+        {
+          "point": {
+            "x": -45,
+            "y": 25
+          },
+          "alpha": 0,
+          "painted": false,
+          "nearestPaintCenterDistance": 23.82902149952868
+        },
+        {
+          "point": {
+            "x": -35,
+            "y": 25
+          },
+          "alpha": 0,
+          "painted": false,
+          "nearestPaintCenterDistance": 14.131428293877446
+        },
+        {
+          "point": {
+            "x": -25,
+            "y": 25
+          },
+          "alpha": 0,
+          "painted": false,
+          "nearestPaintCenterDistance": 5.618920325560774
+        },
+        {
+          "point": {
+            "x": -15,
+            "y": 25
+          },
+          "alpha": 0,
+          "painted": false,
+          "nearestPaintCenterDistance": 4.468859264398467
+        },
+        {
+          "point": {
+            "x": 0,
+            "y": 25
+          },
+          "alpha": 0,
+          "painted": false,
+          "nearestPaintCenterDistance": 2.0714766773970688
+        },
+        {
+          "point": {
+            "x": 15,
+            "y": 25
+          },
+          "alpha": 0,
+          "painted": false,
+          "nearestPaintCenterDistance": 4.468859264398467
+        },
+        {
+          "point": {
+            "x": 25,
+            "y": 25
+          },
+          "alpha": 0,
+          "painted": false,
+          "nearestPaintCenterDistance": 8.364849258952608
+        },
+        {
+          "point": {
+            "x": 35,
+            "y": 25
+          },
+          "alpha": 0,
+          "painted": false,
+          "nearestPaintCenterDistance": 17.623725574491903
+        },
+        {
+          "point": {
+            "x": 45,
+            "y": 25
+          },
+          "alpha": 0,
+          "painted": false,
+          "nearestPaintCenterDistance": 27.40840570199223
+        },
+        {
+          "point": {
+            "x": 65,
+            "y": 25
+          },
+          "alpha": 0,
+          "painted": false,
+          "nearestPaintCenterDistance": 44.68039716279389
+        },
+        {
+          "point": {
+            "x": -65,
+            "y": 35
+          },
+          "alpha": 0,
+          "painted": false,
+          "nearestPaintCenterDistance": 45.754204895561244
+        },
+        {
+          "point": {
+            "x": -45,
+            "y": 35
+          },
+          "alpha": 0,
+          "painted": false,
+          "nearestPaintCenterDistance": 27.5172176214275
+        },
+        {
+          "point": {
+            "x": -35,
+            "y": 35
+          },
+          "alpha": 0,
+          "painted": false,
+          "nearestPaintCenterDistance": 19.724914844556363
+        },
+        {
+          "point": {
+            "x": -25,
+            "y": 35
+          },
+          "alpha": 0,
+          "painted": false,
+          "nearestPaintCenterDistance": 14.8642949925316
+        },
+        {
+          "point": {
+            "x": -15,
+            "y": 35
+          },
+          "alpha": 0,
+          "painted": false,
+          "nearestPaintCenterDistance": 14.468783747260861
+        },
+        {
+          "point": {
+            "x": 0,
+            "y": 35
+          },
+          "alpha": 0,
+          "painted": false,
+          "nearestPaintCenterDistance": 10.929908079439643
+        },
+        {
+          "point": {
+            "x": 15,
+            "y": 35
+          },
+          "alpha": 0,
+          "painted": false,
+          "nearestPaintCenterDistance": 14.468783747260861
+        },
+        {
+          "point": {
+            "x": 25,
+            "y": 35
+          },
+          "alpha": 0,
+          "painted": false,
+          "nearestPaintCenterDistance": 16.11415575278457
+        },
+        {
+          "point": {
+            "x": 35,
+            "y": 35
+          },
+          "alpha": 0,
+          "painted": false,
+          "nearestPaintCenterDistance": 22.387958886977614
+        },
+        {
+          "point": {
+            "x": 45,
+            "y": 35
+          },
+          "alpha": 0,
+          "painted": false,
+          "nearestPaintCenterDistance": 30.689504771582744
+        },
+        {
+          "point": {
+            "x": 65,
+            "y": 35
+          },
+          "alpha": 0,
+          "painted": false,
+          "nearestPaintCenterDistance": 49.22495000632301
+        },
+        {
+          "point": {
+            "x": -65,
+            "y": 45
+          },
+          "alpha": 0,
+          "painted": false,
+          "nearestPaintCenterDistance": 49.82792656357476
+        },
+        {
+          "point": {
+            "x": -45,
+            "y": 45
+          },
+          "alpha": 0,
+          "painted": false,
+          "nearestPaintCenterDistance": 33.86107301349146
+        },
+        {
+          "point": {
+            "x": -35,
+            "y": 45
+          },
+          "alpha": 0,
+          "painted": false,
+          "nearestPaintCenterDistance": 27.900667834749044
+        },
+        {
+          "point": {
+            "x": -25,
+            "y": 45
+          },
+          "alpha": 0,
+          "painted": false,
+          "nearestPaintCenterDistance": 24.704701285888884
+        },
+        {
+          "point": {
+            "x": -15,
+            "y": 45
+          },
+          "alpha": 0,
+          "painted": false,
+          "nearestPaintCenterDistance": 24.46876995529199
+        },
+        {
+          "point": {
+            "x": 0,
+            "y": 45
+          },
+          "alpha": 0,
+          "painted": false,
+          "nearestPaintCenterDistance": 20.647951245220433
+        },
+        {
+          "point": {
+            "x": 15,
+            "y": 45
+          },
+          "alpha": 0,
+          "painted": false,
+          "nearestPaintCenterDistance": 23.323179524348735
+        },
+        {
+          "point": {
+            "x": 25,
+            "y": 45
+          },
+          "alpha": 0,
+          "painted": false,
+          "nearestPaintCenterDistance": 25.476283395051954
+        },
+        {
+          "point": {
+            "x": 35,
+            "y": 45
+          },
+          "alpha": 0,
+          "painted": false,
+          "nearestPaintCenterDistance": 29.848216288833743
+        },
+        {
+          "point": {
+            "x": 45,
+            "y": 45
+          },
+          "alpha": 0,
+          "painted": false,
+          "nearestPaintCenterDistance": 36.50302320527712
+        },
+        {
+          "point": {
+            "x": 65,
+            "y": 45
+          },
+          "alpha": 0,
+          "painted": false,
+          "nearestPaintCenterDistance": 53.04451623989986
+        },
+        {
+          "point": {
+            "x": -65,
+            "y": 65
+          },
+          "alpha": 0,
+          "painted": false,
+          "nearestPaintCenterDistance": 62.141550235128506
+        },
+        {
+          "point": {
+            "x": -45,
+            "y": 65
+          },
+          "alpha": 0,
+          "painted": false,
+          "nearestPaintCenterDistance": 50.25258466611444
+        },
+        {
+          "point": {
+            "x": -35,
+            "y": 65
+          },
+          "alpha": 0,
+          "painted": false,
+          "nearestPaintCenterDistance": 46.44563774591754
+        },
+        {
+          "point": {
+            "x": -25,
+            "y": 65
+          },
+          "alpha": 0,
+          "painted": false,
+          "nearestPaintCenterDistance": 44.59901641992791
+        },
+        {
+          "point": {
+            "x": -15,
+            "y": 65
+          },
+          "alpha": 0,
+          "painted": false,
+          "nearestPaintCenterDistance": 44.39623171649819
+        },
+        {
+          "point": {
+            "x": 0,
+            "y": 65
+          },
+          "alpha": 0,
+          "painted": false,
+          "nearestPaintCenterDistance": 40.49799860023949
+        },
+        {
+          "point": {
+            "x": 15,
+            "y": 65
+          },
+          "alpha": 0,
+          "painted": false,
+          "nearestPaintCenterDistance": 41.92517982221424
+        },
+        {
+          "point": {
+            "x": 25,
+            "y": 65
+          },
+          "alpha": 0,
+          "painted": false,
+          "nearestPaintCenterDistance": 45.03100060652661
+        },
+        {
+          "point": {
+            "x": 35,
+            "y": 65
+          },
+          "alpha": 0,
+          "painted": false,
+          "nearestPaintCenterDistance": 47.64101190807139
+        },
+        {
+          "point": {
+            "x": 45,
+            "y": 65
+          },
+          "alpha": 0,
+          "painted": false,
+          "nearestPaintCenterDistance": 52.07245928151464
+        },
+        {
+          "point": {
+            "x": 65,
+            "y": 65
+          },
+          "alpha": 0,
+          "painted": false,
+          "nearestPaintCenterDistance": 64.76859349349034
+        }
+      ]
+    },
+    {
+      "id": "triangle-phase-1e20-original",
+      "variant": "original",
+      "rawPhase": 100000000000000000000,
+      "convertedPhase": 120000000000000000000,
+      "emittedPhase": 120000000000000000000,
+      "shape": "triangle",
+      "size": 3,
+      "vertices": [
+        {
+          "x": 3.117441802447776e-16,
+          "y": -5.091168824543143
+        },
+        {
+          "x": -4.409081537009722,
+          "y": 2.54558441227157
+        },
+        {
+          "x": 4.40908153700972,
+          "y": 2.5455844122715736
+        }
+      ],
+      "width": 36,
+      "lineJoin": "bevel",
+      "lineCap": "square",
+      "lineStyle": "dashed",
+      "dashPattern": [
+        3.5999999999999996,
+        3.5999999999999996
+      ],
+      "dashPhase": 120000000000000000000,
+      "reviewedSource": "/private/tmp/stz-review-production-phase-100000000000000000000",
+      "svgFile": "large-phase/triangle-phase-1e20-original.svg",
+      "pngFile": "large-phase/triangle-phase-1e20-original.png",
+      "reviewedSvgSha256": "8faba021f2624bf492ab4f6d5179d88e7b200af33b98535614b896e2ca5810d7",
+      "reviewedPngSha256": "226697eacbbd4cf7bda08316918b4262f996a787ba83fc5f4749f06e66d9b2f5",
+      "miterLimit": 10,
+      "rasterRadius": 30.38043289890715,
+      "farthest": {
+        "x": -6.59375,
+        "y": -29.65625
+      },
+      "svgSha256": "8faba021f2624bf492ab4f6d5179d88e7b200af33b98535614b896e2ca5810d7",
+      "pngSha256": "226697eacbbd4cf7bda08316918b4262f996a787ba83fc5f4749f06e66d9b2f5",
+      "rasterBounds": {
+        "minX": -25.5,
+        "minY": -29.6875,
+        "maxX": 27.875,
+        "maxY": 25.1875
+      },
+      "probes": [
+        {
+          "point": {
+            "x": 0,
+            "y": -24
+          },
+          "alpha": 255,
+          "painted": true,
+          "nearestPaintCenterDistance": 0
+        },
+        {
+          "point": {
+            "x": -6,
+            "y": -28
+          },
+          "alpha": 255,
+          "painted": true,
+          "nearestPaintCenterDistance": 0
+        },
+        {
+          "point": {
+            "x": 20,
+            "y": 20
+          },
+          "alpha": 255,
+          "painted": true,
+          "nearestPaintCenterDistance": 0
+        },
+        {
+          "point": {
+            "x": 0,
+            "y": -50
+          },
+          "alpha": 0,
+          "painted": false,
+          "nearestPaintCenterDistance": 21.385642452940246
+        },
+        {
+          "point": {
+            "x": 9,
+            "y": -50
+          },
+          "alpha": 0,
+          "painted": false,
+          "nearestPaintCenterDistance": 22.98662144868184
+        },
+        {
+          "point": {
+            "x": 0,
+            "y": 0
+          },
+          "alpha": 255,
+          "painted": true,
+          "nearestPaintCenterDistance": 0
+        },
+        {
+          "point": {
+            "x": -6.59375,
+            "y": -29.65625
+          },
+          "alpha": 136,
+          "painted": true,
+          "nearestPaintCenterDistance": 0
+        },
+        {
+          "point": {
+            "x": -65,
+            "y": -65
+          },
+          "alpha": 0,
+          "painted": false,
+          "nearestPaintCenterDistance": 67.96237757483915
+        },
+        {
+          "point": {
+            "x": -45,
+            "y": -65
+          },
+          "alpha": 0,
+          "painted": false,
+          "nearestPaintCenterDistance": 52.19406770050597
+        },
+        {
+          "point": {
+            "x": -35,
+            "y": -65
+          },
+          "alpha": 0,
+          "painted": false,
+          "nearestPaintCenterDistance": 45.34419150370861
+        },
+        {
+          "point": {
+            "x": -25,
+            "y": -65
+          },
+          "alpha": 0,
+          "painted": false,
+          "nearestPaintCenterDistance": 39.84935009664524
+        },
+        {
+          "point": {
+            "x": -15,
+            "y": -65
+          },
+          "alpha": 0,
+          "painted": false,
+          "nearestPaintCenterDistance": 36.329680746257594
+        },
+        {
+          "point": {
+            "x": 0,
+            "y": -65
+          },
+          "alpha": 0,
+          "painted": false,
+          "nearestPaintCenterDistance": 35.95355619580628
+        },
+        {
+          "point": {
+            "x": 15,
+            "y": -65
+          },
+          "alpha": 0,
+          "painted": false,
+          "nearestPaintCenterDistance": 38.591738307894346
+        },
+        {
+          "point": {
+            "x": 25,
+            "y": -65
+          },
+          "alpha": 0,
+          "painted": false,
+          "nearestPaintCenterDistance": 41.562570488662026
+        },
+        {
+          "point": {
+            "x": 35,
+            "y": -65
+          },
+          "alpha": 0,
+          "painted": false,
+          "nearestPaintCenterDistance": 46.53570957474486
+        },
+        {
+          "point": {
+            "x": 45,
+            "y": -65
+          },
+          "alpha": 0,
+          "painted": false,
+          "nearestPaintCenterDistance": 52.949950572450966
+        },
+        {
+          "point": {
+            "x": 65,
+            "y": -65
+          },
+          "alpha": 0,
+          "painted": false,
+          "nearestPaintCenterDistance": 66.27813376691441
+        },
+        {
+          "point": {
+            "x": -65,
+            "y": -45
+          },
+          "alpha": 0,
+          "painted": false,
+          "nearestPaintCenterDistance": 55.092057191803974
+        },
+        {
+          "point": {
+            "x": -45,
+            "y": -45
+          },
+          "alpha": 0,
+          "painted": false,
+          "nearestPaintCenterDistance": 39.70371223985234
+        },
+        {
+          "point": {
+            "x": -35,
+            "y": -45
+          },
+          "alpha": 0,
+          "painted": false,
+          "nearestPaintCenterDistance": 32.26855691884903
+        },
+        {
+          "point": {
+            "x": -25,
+            "y": -45
+          },
+          "alpha": 0,
+          "painted": false,
+          "nearestPaintCenterDistance": 23.962902643982844
+        },
+        {
+          "point": {
+            "x": -15,
+            "y": -45
+          },
+          "alpha": 0,
+          "painted": false,
+          "nearestPaintCenterDistance": 17.49559096243965
+        },
+        {
+          "point": {
+            "x": 0,
+            "y": -45
+          },
+          "alpha": 0,
+          "painted": false,
+          "nearestPaintCenterDistance": 16.700544994849718
+        },
+        {
+          "point": {
+            "x": 15,
+            "y": -45
+          },
+          "alpha": 0,
+          "painted": false,
+          "nearestPaintCenterDistance": 19.250253650926265
+        },
+        {
+          "point": {
+            "x": 25,
+            "y": -45
+          },
+          "alpha": 0,
+          "painted": false,
+          "nearestPaintCenterDistance": 24.671790888077016
+        },
+        {
+          "point": {
+            "x": 35,
+            "y": -45
+          },
+          "alpha": 0,
+          "painted": false,
+          "nearestPaintCenterDistance": 32.354632830940915
+        },
+        {
+          "point": {
+            "x": 45,
+            "y": -45
+          },
+          "alpha": 0,
+          "painted": false,
+          "nearestPaintCenterDistance": 38.08268655997106
+        },
+        {
+          "point": {
+            "x": 65,
+            "y": -45
+          },
+          "alpha": 0,
+          "painted": false,
+          "nearestPaintCenterDistance": 52.435916990408394
+        },
+        {
+          "point": {
+            "x": -65,
+            "y": -35
+          },
+          "alpha": 0,
+          "painted": false,
+          "nearestPaintCenterDistance": 49.320480184452784
+        },
+        {
+          "point": {
+            "x": -45,
+            "y": -35
+          },
+          "alpha": 0,
+          "painted": false,
+          "nearestPaintCenterDistance": 32.93189587049309
+        },
+        {
+          "point": {
+            "x": -35,
+            "y": -35
+          },
+          "alpha": 0,
+          "painted": false,
+          "nearestPaintCenterDistance": 25.595600513076462
+        },
+        {
+          "point": {
+            "x": -25,
+            "y": -35
+          },
+          "alpha": 0,
+          "painted": false,
+          "nearestPaintCenterDistance": 18.609525870505138
+        },
+        {
+          "point": {
+            "x": -15,
+            "y": -35
+          },
+          "alpha": 0,
+          "painted": false,
+          "nearestPaintCenterDistance": 9.960958946055344
+        },
+        {
+          "point": {
+            "x": 0,
+            "y": -35
+          },
+          "alpha": 0,
+          "painted": false,
+          "nearestPaintCenterDistance": 7.9038410361671625
+        },
+        {
+          "point": {
+            "x": 15,
+            "y": -35
+          },
+          "alpha": 0,
+          "painted": false,
+          "nearestPaintCenterDistance": 10.545011409429579
+        },
+        {
+          "point": {
+            "x": 25,
+            "y": -35
+          },
+          "alpha": 0,
+          "painted": false,
+          "nearestPaintCenterDistance": 18.609525870505138
+        },
+        {
+          "point": {
+            "x": 35,
+            "y": -35
+          },
+          "alpha": 0,
+          "painted": false,
+          "nearestPaintCenterDistance": 24.06327109154115
+        },
+        {
+          "point": {
+            "x": 45,
+            "y": -35
+          },
+          "alpha": 0,
+          "painted": false,
+          "nearestPaintCenterDistance": 30.958294779024893
+        },
+        {
+          "point": {
+            "x": 65,
+            "y": -35
+          },
+          "alpha": 0,
+          "painted": false,
+          "nearestPaintCenterDistance": 46.71884406345046
+        },
+        {
+          "point": {
+            "x": -65,
+            "y": -25
+          },
+          "alpha": 0,
+          "painted": false,
+          "nearestPaintCenterDistance": 44.88189797262366
+        },
+        {
+          "point": {
+            "x": -45,
+            "y": -25
+          },
+          "alpha": 0,
+          "painted": false,
+          "nearestPaintCenterDistance": 27.122587738359332
+        },
+        {
+          "point": {
+            "x": -35,
+            "y": -25
+          },
+          "alpha": 0,
+          "painted": false,
+          "nearestPaintCenterDistance": 19.05937474381046
+        },
+        {
+          "point": {
+            "x": -25,
+            "y": -25
+          },
+          "alpha": 0,
+          "painted": false,
+          "nearestPaintCenterDistance": 11.57085846534301
+        },
+        {
+          "point": {
+            "x": -15,
+            "y": -25
+          },
+          "alpha": 0,
+          "painted": false,
+          "nearestPaintCenterDistance": 4.952311644575693
+        },
+        {
+          "point": {
+            "x": 0,
+            "y": -25
+          },
+          "alpha": 255,
+          "painted": true,
+          "nearestPaintCenterDistance": 0
+        },
+        {
+          "point": {
+            "x": 15,
+            "y": -25
+          },
+          "alpha": 0,
+          "painted": false,
+          "nearestPaintCenterDistance": 4.952311644575693
+        },
+        {
+          "point": {
+            "x": 25,
+            "y": -25
+          },
+          "alpha": 0,
+          "painted": false,
+          "nearestPaintCenterDistance": 10.382245211176626
+        },
+        {
+          "point": {
+            "x": 35,
+            "y": -25
+          },
+          "alpha": 0,
+          "painted": false,
+          "nearestPaintCenterDistance": 16.939979062118113
+        },
+        {
+          "point": {
+            "x": 45,
+            "y": -25
+          },
+          "alpha": 0,
+          "painted": false,
+          "nearestPaintCenterDistance": 24.434103024768476
+        },
+        {
+          "point": {
+            "x": 65,
+            "y": -25
+          },
+          "alpha": 0,
+          "painted": false,
+          "nearestPaintCenterDistance": 42.61191606376085
+        },
+        {
+          "point": {
+            "x": -65,
+            "y": -15
+          },
+          "alpha": 0,
+          "painted": false,
+          "nearestPaintCenterDistance": 42.38230486447144
+        },
+        {
+          "point": {
+            "x": -45,
+            "y": -15
+          },
+          "alpha": 0,
+          "painted": false,
+          "nearestPaintCenterDistance": 22.748840973223228
+        },
+        {
+          "point": {
+            "x": -35,
+            "y": -15
+          },
+          "alpha": 0,
+          "painted": false,
+          "nearestPaintCenterDistance": 13.34671366385748
+        },
+        {
+          "point": {
+            "x": -25,
+            "y": -15
+          },
+          "alpha": 0,
+          "painted": false,
+          "nearestPaintCenterDistance": 6.06684766785849
+        },
+        {
+          "point": {
+            "x": -15,
+            "y": -15
+          },
+          "alpha": 255,
+          "painted": true,
+          "nearestPaintCenterDistance": 0
+        },
+        {
+          "point": {
+            "x": 0,
+            "y": -15
+          },
+          "alpha": 255,
+          "painted": true,
+          "nearestPaintCenterDistance": 0
+        },
+        {
+          "point": {
+            "x": 15,
+            "y": -15
+          },
+          "alpha": 255,
+          "painted": true,
+          "nearestPaintCenterDistance": 0
+        },
+        {
+          "point": {
+            "x": 25,
+            "y": -15
+          },
+          "alpha": 0,
+          "painted": false,
+          "nearestPaintCenterDistance": 3.0888534482878915
+        },
+        {
+          "point": {
+            "x": 35,
+            "y": -15
+          },
+          "alpha": 0,
+          "painted": false,
+          "nearestPaintCenterDistance": 10.98978574063207
+        },
+        {
+          "point": {
+            "x": 45,
+            "y": -15
+          },
+          "alpha": 0,
+          "painted": false,
+          "nearestPaintCenterDistance": 20.740067276289146
+        },
+        {
+          "point": {
+            "x": 65,
+            "y": -15
+          },
+          "alpha": 0,
+          "painted": false,
+          "nearestPaintCenterDistance": 40.60665451160684
+        },
+        {
+          "point": {
+            "x": -65,
+            "y": 15
+          },
+          "alpha": 0,
+          "painted": false,
+          "nearestPaintCenterDistance": 41.26734957111978
+        },
+        {
+          "point": {
+            "x": -45,
+            "y": 15
+          },
+          "alpha": 0,
+          "painted": false,
+          "nearestPaintCenterDistance": 22.841719300985204
+        },
+        {
+          "point": {
+            "x": -35,
+            "y": 15
+          },
+          "alpha": 0,
+          "painted": false,
+          "nearestPaintCenterDistance": 15.202603087136097
+        },
+        {
+          "point": {
+            "x": -25,
+            "y": 15
+          },
+          "alpha": 0,
+          "painted": false,
+          "nearestPaintCenterDistance": 6.468825482651391
+        },
+        {
+          "point": {
+            "x": -15,
+            "y": 15
+          },
+          "alpha": 255,
+          "painted": true,
+          "nearestPaintCenterDistance": 0
+        },
+        {
+          "point": {
+            "x": 0,
+            "y": 15
+          },
+          "alpha": 255,
+          "painted": true,
+          "nearestPaintCenterDistance": 0
+        },
+        {
+          "point": {
+            "x": 15,
+            "y": 15
+          },
+          "alpha": 255,
+          "painted": true,
+          "nearestPaintCenterDistance": 0
+        },
+        {
+          "point": {
+            "x": 25,
+            "y": 15
+          },
+          "alpha": 0,
+          "painted": false,
+          "nearestPaintCenterDistance": 3.96887302958913
+        },
+        {
+          "point": {
+            "x": 35,
+            "y": 15
+          },
+          "alpha": 0,
+          "painted": false,
+          "nearestPaintCenterDistance": 10.611112247309421
+        },
+        {
+          "point": {
+            "x": 45,
+            "y": 15
+          },
+          "alpha": 0,
+          "painted": false,
+          "nearestPaintCenterDistance": 18.864287108846703
+        },
+        {
+          "point": {
+            "x": 65,
+            "y": 15
+          },
+          "alpha": 0,
+          "painted": false,
+          "nearestPaintCenterDistance": 37.97514092304332
+        },
+        {
+          "point": {
+            "x": -65,
+            "y": 25
+          },
+          "alpha": 0,
+          "painted": false,
+          "nearestPaintCenterDistance": 45.16491050168261
+        },
+        {
+          "point": {
+            "x": -45,
+            "y": 25
+          },
+          "alpha": 0,
+          "painted": false,
+          "nearestPaintCenterDistance": 26.843331632362627
+        },
+        {
+          "point": {
+            "x": -35,
+            "y": 25
+          },
+          "alpha": 0,
+          "painted": false,
+          "nearestPaintCenterDistance": 17.06427417515905
+        },
+        {
+          "point": {
+            "x": -25,
+            "y": 25
+          },
+          "alpha": 0,
+          "painted": false,
+          "nearestPaintCenterDistance": 7.862216807300597
+        },
+        {
+          "point": {
+            "x": -15,
+            "y": 25
+          },
+          "alpha": 0,
+          "painted": false,
+          "nearestPaintCenterDistance": 4.468859264398467
+        },
+        {
+          "point": {
+            "x": 0,
+            "y": 25
+          },
+          "alpha": 0,
+          "painted": false,
+          "nearestPaintCenterDistance": 1.4954357642506748
+        },
+        {
+          "point": {
+            "x": 15,
+            "y": 25
+          },
+          "alpha": 0,
+          "painted": false,
+          "nearestPaintCenterDistance": 4.468859264398467
+        },
+        {
+          "point": {
+            "x": 25,
+            "y": 25
+          },
+          "alpha": 0,
+          "painted": false,
+          "nearestPaintCenterDistance": 5.976679941656571
+        },
+        {
+          "point": {
+            "x": 35,
+            "y": 25
+          },
+          "alpha": 0,
+          "painted": false,
+          "nearestPaintCenterDistance": 14.666141385006489
+        },
+        {
+          "point": {
+            "x": 45,
+            "y": 25
+          },
+          "alpha": 0,
+          "painted": false,
+          "nearestPaintCenterDistance": 24.381769893200943
+        },
+        {
+          "point": {
+            "x": 65,
+            "y": 25
+          },
+          "alpha": 0,
+          "painted": false,
+          "nearestPaintCenterDistance": 41.21876184609383
+        },
+        {
+          "point": {
+            "x": -65,
+            "y": 35
+          },
+          "alpha": 0,
+          "painted": false,
+          "nearestPaintCenterDistance": 48.66918381404192
+        },
+        {
+          "point": {
+            "x": -45,
+            "y": 35
+          },
+          "alpha": 0,
+          "painted": false,
+          "nearestPaintCenterDistance": 30.165202686622212
+        },
+        {
+          "point": {
+            "x": -35,
+            "y": 35
+          },
+          "alpha": 0,
+          "painted": false,
+          "nearestPaintCenterDistance": 21.921780336573946
+        },
+        {
+          "point": {
+            "x": -25,
+            "y": 35
+          },
+          "alpha": 0,
+          "painted": false,
+          "nearestPaintCenterDistance": 15.848957477544067
+        },
+        {
+          "point": {
+            "x": -15,
+            "y": 35
+          },
+          "alpha": 0,
+          "painted": false,
+          "nearestPaintCenterDistance": 14.468783747260861
+        },
+        {
+          "point": {
+            "x": 0,
+            "y": 35
+          },
+          "alpha": 0,
+          "painted": false,
+          "nearestPaintCenterDistance": 10.376223572427495
+        },
+        {
+          "point": {
+            "x": 15,
+            "y": 35
+          },
+          "alpha": 0,
+          "painted": false,
+          "nearestPaintCenterDistance": 14.468783747260861
+        },
+        {
+          "point": {
+            "x": 25,
+            "y": 35
+          },
+          "alpha": 0,
+          "painted": false,
+          "nearestPaintCenterDistance": 15.003189765013303
+        },
+        {
+          "point": {
+            "x": 35,
+            "y": 35
+          },
+          "alpha": 0,
+          "painted": false,
+          "nearestPaintCenterDistance": 20.111457011489744
+        },
+        {
+          "point": {
+            "x": 45,
+            "y": 35
+          },
+          "alpha": 0,
+          "painted": false,
+          "nearestPaintCenterDistance": 27.99724456308156
+        },
+        {
+          "point": {
+            "x": 65,
+            "y": 35
+          },
+          "alpha": 0,
+          "painted": false,
+          "nearestPaintCenterDistance": 46.28818103063676
+        },
+        {
+          "point": {
+            "x": -65,
+            "y": 45
+          },
+          "alpha": 0,
+          "painted": false,
+          "nearestPaintCenterDistance": 52.51727766292728
+        },
+        {
+          "point": {
+            "x": -45,
+            "y": 45
+          },
+          "alpha": 0,
+          "painted": false,
+          "nearestPaintCenterDistance": 36.04600467631607
+        },
+        {
+          "point": {
+            "x": -35,
+            "y": 45
+          },
+          "alpha": 0,
+          "painted": false,
+          "nearestPaintCenterDistance": 29.494736023992488
+        },
+        {
+          "point": {
+            "x": -25,
+            "y": 45
+          },
+          "alpha": 0,
+          "painted": false,
+          "nearestPaintCenterDistance": 25.30937480707495
+        },
+        {
+          "point": {
+            "x": -15,
+            "y": 45
+          },
+          "alpha": 0,
+          "painted": false,
+          "nearestPaintCenterDistance": 23.045683231898334
+        },
+        {
+          "point": {
+            "x": 0,
+            "y": 45
+          },
+          "alpha": 0,
+          "painted": false,
+          "nearestPaintCenterDistance": 20.11320500628878
+        },
+        {
+          "point": {
+            "x": 15,
+            "y": 45
+          },
+          "alpha": 0,
+          "painted": false,
+          "nearestPaintCenterDistance": 24.46876995529199
+        },
+        {
+          "point": {
+            "x": 25,
+            "y": 45
+          },
+          "alpha": 0,
+          "painted": false,
+          "nearestPaintCenterDistance": 24.788519583165915
+        },
+        {
+          "point": {
+            "x": 35,
+            "y": 45
+          },
+          "alpha": 0,
+          "painted": false,
+          "nearestPaintCenterDistance": 28.17526757858743
+        },
+        {
+          "point": {
+            "x": 45,
+            "y": 45
+          },
+          "alpha": 0,
+          "painted": false,
+          "nearestPaintCenterDistance": 34.252309456808895
+        },
+        {
+          "point": {
+            "x": 65,
+            "y": 45
+          },
+          "alpha": 0,
+          "painted": false,
+          "nearestPaintCenterDistance": 50.31869138923428
+        },
+        {
+          "point": {
+            "x": -65,
+            "y": 65
+          },
+          "alpha": 0,
+          "painted": false,
+          "nearestPaintCenterDistance": 64.31807252339733
+        },
+        {
+          "point": {
+            "x": -45,
+            "y": 65
+          },
+          "alpha": 0,
+          "painted": false,
+          "nearestPaintCenterDistance": 51.75001887076951
+        },
+        {
+          "point": {
+            "x": -35,
+            "y": 65
+          },
+          "alpha": 0,
+          "painted": false,
+          "nearestPaintCenterDistance": 47.42034851332284
+        },
+        {
+          "point": {
+            "x": -25,
+            "y": 65
+          },
+          "alpha": 0,
+          "painted": false,
+          "nearestPaintCenterDistance": 44.9367828524139
+        },
+        {
+          "point": {
+            "x": -15,
+            "y": 65
+          },
+          "alpha": 0,
+          "painted": false,
+          "nearestPaintCenterDistance": 41.53135581250629
+        },
+        {
+          "point": {
+            "x": 0,
+            "y": 65
+          },
+          "alpha": 0,
+          "painted": false,
+          "nearestPaintCenterDistance": 39.97863198791324
+        },
+        {
+          "point": {
+            "x": 15,
+            "y": 65
+          },
+          "alpha": 0,
+          "painted": false,
+          "nearestPaintCenterDistance": 43.8375240590182
+        },
+        {
+          "point": {
+            "x": 25,
+            "y": 65
+          },
+          "alpha": 0,
+          "painted": false,
+          "nearestPaintCenterDistance": 44.6455003681782
+        },
+        {
+          "point": {
+            "x": 35,
+            "y": 65
+          },
+          "alpha": 0,
+          "painted": false,
+          "nearestPaintCenterDistance": 46.611111369768906
+        },
+        {
+          "point": {
+            "x": 45,
+            "y": 65
+          },
+          "alpha": 0,
+          "painted": false,
+          "nearestPaintCenterDistance": 50.51703379183105
+        },
+        {
+          "point": {
+            "x": 65,
+            "y": 65
+          },
+          "alpha": 0,
+          "painted": false,
+          "nearestPaintCenterDistance": 62.535755397412444
+        }
+      ]
+    },
+    {
+      "id": "triangle-phase-1e20-corrected",
+      "variant": "corrected",
+      "rawPhase": 100000000000000000000,
+      "convertedPhase": 120000000000000000000,
+      "emittedPhase": 3.178929335004266,
+      "shape": "triangle",
+      "size": 3,
+      "vertices": [
+        {
+          "x": 3.117441802447776e-16,
+          "y": -5.091168824543143
+        },
+        {
+          "x": -4.409081537009722,
+          "y": 2.54558441227157
+        },
+        {
+          "x": 4.40908153700972,
+          "y": 2.5455844122715736
+        }
+      ],
+      "width": 36,
+      "lineJoin": "bevel",
+      "lineCap": "square",
+      "lineStyle": "dashed",
+      "dashPattern": [
+        3.5999999999999996,
+        3.5999999999999996
+      ],
+      "dashPhase": 3.178929335004266,
+      "reviewedSource": "/private/tmp/stz-review-production-phase-100000000000000000000-canonical",
+      "svgFile": "large-phase/triangle-phase-1e20-corrected.svg",
+      "pngFile": "large-phase/triangle-phase-1e20-corrected.png",
+      "reviewedSvgSha256": "bab01742354c6f906998c0e5d5a57375f0e05f89b7de71b2b2debf6169cd68cf",
+      "reviewedPngSha256": "f6ee6cdc9502e4597675c4d97c7774644aeee9c59b49ad555bcc1fb78a7622d2",
+      "miterLimit": 10,
+      "rasterRadius": 29.761585191736682,
+      "farthest": {
+        "x": 28.53125,
+        "y": 8.46875
+      },
+      "svgSha256": "bab01742354c6f906998c0e5d5a57375f0e05f89b7de71b2b2debf6169cd68cf",
+      "pngSha256": "f6ee6cdc9502e4597675c4d97c7774644aeee9c59b49ad555bcc1fb78a7622d2",
+      "rasterBounds": {
+        "minX": -28.375,
+        "minY": -26.1875,
+        "maxX": 28.5625,
+        "maxY": 26.4375
+      },
+      "probes": [
+        {
+          "point": {
+            "x": 0,
+            "y": -24
+          },
+          "alpha": 0,
+          "painted": false,
+          "nearestPaintCenterDistance": 2.4015782571051063
+        },
+        {
+          "point": {
+            "x": -6,
+            "y": -28
+          },
+          "alpha": 0,
+          "painted": false,
+          "nearestPaintCenterDistance": 2.8658141295275934
+        },
+        {
+          "point": {
+            "x": 20,
+            "y": 20
+          },
+          "alpha": 0,
+          "painted": false,
+          "nearestPaintCenterDistance": 0.40745015032516557
+        },
+        {
+          "point": {
+            "x": 0,
+            "y": -50
+          },
+          "alpha": 0,
+          "painted": false,
+          "nearestPaintCenterDistance": 25.324032866528192
+        },
+        {
+          "point": {
+            "x": 9,
+            "y": -50
+          },
+          "alpha": 0,
+          "painted": false,
+          "nearestPaintCenterDistance": 24.219737883077926
+        },
+        {
+          "point": {
+            "x": 0,
+            "y": 0
+          },
+          "alpha": 255,
+          "painted": true,
+          "nearestPaintCenterDistance": 0
+        },
+        {
+          "point": {
+            "x": 28.53125,
+            "y": 8.46875
+          },
+          "alpha": 230,
+          "painted": true,
+          "nearestPaintCenterDistance": 0
+        },
+        {
+          "point": {
+            "x": -65,
+            "y": -65
+          },
+          "alpha": 0,
+          "painted": false,
+          "nearestPaintCenterDistance": 66.98771167628433
+        },
+        {
+          "point": {
+            "x": -45,
+            "y": -65
+          },
+          "alpha": 0,
+          "painted": false,
+          "nearestPaintCenterDistance": 53.237692973353006
+        },
+        {
+          "point": {
+            "x": -35,
+            "y": -65
+          },
+          "alpha": 0,
+          "painted": false,
+          "nearestPaintCenterDistance": 46.96942572700884
+        },
+        {
+          "point": {
+            "x": -25,
+            "y": -65
+          },
+          "alpha": 0,
+          "painted": false,
+          "nearestPaintCenterDistance": 42.16636044437556
+        },
+        {
+          "point": {
+            "x": -15,
+            "y": -65
+          },
+          "alpha": 0,
+          "painted": false,
+          "nearestPaintCenterDistance": 39.36847664216892
+        },
+        {
+          "point": {
+            "x": 0,
+            "y": -65
+          },
+          "alpha": 0,
+          "painted": false,
+          "nearestPaintCenterDistance": 39.76957556505978
+        },
+        {
+          "point": {
+            "x": 15,
+            "y": -65
+          },
+          "alpha": 0,
+          "painted": false,
+          "nearestPaintCenterDistance": 39.708729558184054
+        },
+        {
+          "point": {
+            "x": 25,
+            "y": -65
+          },
+          "alpha": 0,
+          "painted": false,
+          "nearestPaintCenterDistance": 42.440054230938486
+        },
+        {
+          "point": {
+            "x": 35,
+            "y": -65
+          },
+          "alpha": 0,
+          "painted": false,
+          "nearestPaintCenterDistance": 47.17555726353426
+        },
+        {
+          "point": {
+            "x": 45,
+            "y": -65
+          },
+          "alpha": 0,
+          "painted": false,
+          "nearestPaintCenterDistance": 53.38453149672665
+        },
+        {
+          "point": {
+            "x": 65,
+            "y": -65
+          },
+          "alpha": 0,
+          "painted": false,
+          "nearestPaintCenterDistance": 67.24037163880789
+        },
+        {
+          "point": {
+            "x": -65,
+            "y": -45
+          },
+          "alpha": 0,
+          "painted": false,
+          "nearestPaintCenterDistance": 53.88509548683197
+        },
+        {
+          "point": {
+            "x": -45,
+            "y": -45
+          },
+          "alpha": 0,
+          "painted": false,
+          "nearestPaintCenterDistance": 38.76020530937627
+        },
+        {
+          "point": {
+            "x": -35,
+            "y": -45
+          },
+          "alpha": 0,
+          "painted": false,
+          "nearestPaintCenterDistance": 32.42590712879132
+        },
+        {
+          "point": {
+            "x": -25,
+            "y": -45
+          },
+          "alpha": 0,
+          "painted": false,
+          "nearestPaintCenterDistance": 24.985034583226017
+        },
+        {
+          "point": {
+            "x": -15,
+            "y": -45
+          },
+          "alpha": 0,
+          "painted": false,
+          "nearestPaintCenterDistance": 19.90293830380329
+        },
+        {
+          "point": {
+            "x": 0,
+            "y": -45
+          },
+          "alpha": 0,
+          "painted": false,
+          "nearestPaintCenterDistance": 20.684997960478505
+        },
+        {
+          "point": {
+            "x": 15,
+            "y": -45
+          },
+          "alpha": 0,
+          "painted": false,
+          "nearestPaintCenterDistance": 20.19983175981919
+        },
+        {
+          "point": {
+            "x": 25,
+            "y": -45
+          },
+          "alpha": 0,
+          "painted": false,
+          "nearestPaintCenterDistance": 25.14772759366142
+        },
+        {
+          "point": {
+            "x": 35,
+            "y": -45
+          },
+          "alpha": 0,
+          "painted": false,
+          "nearestPaintCenterDistance": 32.48175569646752
+        },
+        {
+          "point": {
+            "x": 45,
+            "y": -45
+          },
+          "alpha": 0,
+          "painted": false,
+          "nearestPaintCenterDistance": 39.00343033792028
+        },
+        {
+          "point": {
+            "x": 65,
+            "y": -45
+          },
+          "alpha": 0,
+          "painted": false,
+          "nearestPaintCenterDistance": 54.19887063514331
+        },
+        {
+          "point": {
+            "x": -65,
+            "y": -35
+          },
+          "alpha": 0,
+          "painted": false,
+          "nearestPaintCenterDistance": 49.10935262885268
+        },
+        {
+          "point": {
+            "x": -45,
+            "y": -35
+          },
+          "alpha": 0,
+          "painted": false,
+          "nearestPaintCenterDistance": 31.78802472040375
+        },
+        {
+          "point": {
+            "x": -35,
+            "y": -35
+          },
+          "alpha": 0,
+          "painted": false,
+          "nearestPaintCenterDistance": 24.695212402913242
+        },
+        {
+          "point": {
+            "x": -25,
+            "y": -35
+          },
+          "alpha": 0,
+          "painted": false,
+          "nearestPaintCenterDistance": 18.609525870505138
+        },
+        {
+          "point": {
+            "x": -15,
+            "y": -35
+          },
+          "alpha": 0,
+          "painted": false,
+          "nearestPaintCenterDistance": 10.920254261005098
+        },
+        {
+          "point": {
+            "x": 0,
+            "y": -35
+          },
+          "alpha": 0,
+          "painted": false,
+          "nearestPaintCenterDistance": 11.928907247732292
+        },
+        {
+          "point": {
+            "x": 15,
+            "y": -35
+          },
+          "alpha": 0,
+          "painted": false,
+          "nearestPaintCenterDistance": 11.12017100250711
+        },
+        {
+          "point": {
+            "x": 25,
+            "y": -35
+          },
+          "alpha": 0,
+          "painted": false,
+          "nearestPaintCenterDistance": 18.609525870505138
+        },
+        {
+          "point": {
+            "x": 35,
+            "y": -35
+          },
+          "alpha": 0,
+          "painted": false,
+          "nearestPaintCenterDistance": 24.92523978069218
+        },
+        {
+          "point": {
+            "x": 45,
+            "y": -35
+          },
+          "alpha": 0,
+          "painted": false,
+          "nearestPaintCenterDistance": 32.08414839332657
+        },
+        {
+          "point": {
+            "x": 65,
+            "y": -35
+          },
+          "alpha": 0,
+          "painted": false,
+          "nearestPaintCenterDistance": 49.45343848636816
+        },
+        {
+          "point": {
+            "x": -65,
+            "y": -25
+          },
+          "alpha": 0,
+          "painted": false,
+          "nearestPaintCenterDistance": 45.97708753417293
+        },
+        {
+          "point": {
+            "x": -45,
+            "y": -25
+          },
+          "alpha": 0,
+          "painted": false,
+          "nearestPaintCenterDistance": 26.80678115001874
+        },
+        {
+          "point": {
+            "x": -35,
+            "y": -25
+          },
+          "alpha": 0,
+          "painted": false,
+          "nearestPaintCenterDistance": 17.83195209798972
+        },
+        {
+          "point": {
+            "x": -25,
+            "y": -25
+          },
+          "alpha": 0,
+          "painted": false,
+          "nearestPaintCenterDistance": 10.832982766763731
+        },
+        {
+          "point": {
+            "x": -15,
+            "y": -25
+          },
+          "alpha": 0,
+          "painted": false,
+          "nearestPaintCenterDistance": 4.952311644575693
+        },
+        {
+          "point": {
+            "x": 0,
+            "y": -25
+          },
+          "alpha": 0,
+          "painted": false,
+          "nearestPaintCenterDistance": 3.2599007845331736
+        },
+        {
+          "point": {
+            "x": 15,
+            "y": -25
+          },
+          "alpha": 0,
+          "painted": false,
+          "nearestPaintCenterDistance": 4.952311644575693
+        },
+        {
+          "point": {
+            "x": 25,
+            "y": -25
+          },
+          "alpha": 0,
+          "painted": false,
+          "nearestPaintCenterDistance": 11.012155925385365
+        },
+        {
+          "point": {
+            "x": 35,
+            "y": -25
+          },
+          "alpha": 0,
+          "painted": false,
+          "nearestPaintCenterDistance": 18.14917568720409
+        },
+        {
+          "point": {
+            "x": 45,
+            "y": -25
+          },
+          "alpha": 0,
+          "painted": false,
+          "nearestPaintCenterDistance": 27.157274865586203
+        },
+        {
+          "point": {
+            "x": 65,
+            "y": -25
+          },
+          "alpha": 0,
+          "painted": false,
+          "nearestPaintCenterDistance": 45.66404579234082
+        },
+        {
+          "point": {
+            "x": -65,
+            "y": -15
+          },
+          "alpha": 0,
+          "painted": false,
+          "nearestPaintCenterDistance": 43.245777431155055
+        },
+        {
+          "point": {
+            "x": -45,
+            "y": -15
+          },
+          "alpha": 0,
+          "painted": false,
+          "nearestPaintCenterDistance": 23.759578660510797
+        },
+        {
+          "point": {
+            "x": -35,
+            "y": -15
+          },
+          "alpha": 0,
+          "painted": false,
+          "nearestPaintCenterDistance": 14.539345863036617
+        },
+        {
+          "point": {
+            "x": -25,
+            "y": -15
+          },
+          "alpha": 0,
+          "painted": false,
+          "nearestPaintCenterDistance": 5.031347048753445
+        },
+        {
+          "point": {
+            "x": -15,
+            "y": -15
+          },
+          "alpha": 255,
+          "painted": true,
+          "nearestPaintCenterDistance": 0
+        },
+        {
+          "point": {
+            "x": 0,
+            "y": -15
+          },
+          "alpha": 255,
+          "painted": true,
+          "nearestPaintCenterDistance": 0
+        },
+        {
+          "point": {
+            "x": 15,
+            "y": -15
+          },
+          "alpha": 255,
+          "painted": true,
+          "nearestPaintCenterDistance": 0
+        },
+        {
+          "point": {
+            "x": 25,
+            "y": -15
+          },
+          "alpha": 0,
+          "painted": false,
+          "nearestPaintCenterDistance": 5.406340317164653
+        },
+        {
+          "point": {
+            "x": 35,
+            "y": -15
+          },
+          "alpha": 0,
+          "painted": false,
+          "nearestPaintCenterDistance": 14.193487172819795
+        },
+        {
+          "point": {
+            "x": 45,
+            "y": -15
+          },
+          "alpha": 0,
+          "painted": false,
+          "nearestPaintCenterDistance": 23.469769451892788
+        },
+        {
+          "point": {
+            "x": 65,
+            "y": -15
+          },
+          "alpha": 0,
+          "painted": false,
+          "nearestPaintCenterDistance": 43.006744565532976
+        },
+        {
+          "point": {
+            "x": -65,
+            "y": 15
+          },
+          "alpha": 0,
+          "painted": false,
+          "nearestPaintCenterDistance": 37.301165573276656
+        },
+        {
+          "point": {
+            "x": -45,
+            "y": 15
+          },
+          "alpha": 0,
+          "painted": false,
+          "nearestPaintCenterDistance": 18.03127707970237
+        },
+        {
+          "point": {
+            "x": -35,
+            "y": 15
+          },
+          "alpha": 0,
+          "painted": false,
+          "nearestPaintCenterDistance": 9.590543030767341
+        },
+        {
+          "point": {
+            "x": -25,
+            "y": 15
+          },
+          "alpha": 0,
+          "painted": false,
+          "nearestPaintCenterDistance": 4.290478193045619
+        },
+        {
+          "point": {
+            "x": -15,
+            "y": 15
+          },
+          "alpha": 255,
+          "painted": true,
+          "nearestPaintCenterDistance": 0
+        },
+        {
+          "point": {
+            "x": 0,
+            "y": 15
+          },
+          "alpha": 255,
+          "painted": true,
+          "nearestPaintCenterDistance": 0
+        },
+        {
+          "point": {
+            "x": 15,
+            "y": 15
+          },
+          "alpha": 255,
+          "painted": true,
+          "nearestPaintCenterDistance": 0
+        },
+        {
+          "point": {
+            "x": 25,
+            "y": 15
+          },
+          "alpha": 0,
+          "painted": false,
+          "nearestPaintCenterDistance": 3.8712179123629817
+        },
+        {
+          "point": {
+            "x": 35,
+            "y": 15
+          },
+          "alpha": 0,
+          "painted": false,
+          "nearestPaintCenterDistance": 9.192494390806011
+        },
+        {
+          "point": {
+            "x": 45,
+            "y": 15
+          },
+          "alpha": 0,
+          "painted": false,
+          "nearestPaintCenterDistance": 17.716572838023726
+        },
+        {
+          "point": {
+            "x": 65,
+            "y": 15
+          },
+          "alpha": 0,
+          "painted": false,
+          "nearestPaintCenterDistance": 37.04898045999377
+        },
+        {
+          "point": {
+            "x": -65,
+            "y": 25
+          },
+          "alpha": 0,
+          "painted": false,
+          "nearestPaintCenterDistance": 40.36708997593213
+        },
+        {
+          "point": {
+            "x": -45,
+            "y": 25
+          },
+          "alpha": 0,
+          "painted": false,
+          "nearestPaintCenterDistance": 23.732435939553277
+        },
+        {
+          "point": {
+            "x": -35,
+            "y": 25
+          },
+          "alpha": 0,
+          "painted": false,
+          "nearestPaintCenterDistance": 15.68146049081526
+        },
+        {
+          "point": {
+            "x": -25,
+            "y": 25
+          },
+          "alpha": 0,
+          "painted": false,
+          "nearestPaintCenterDistance": 6.729279539817022
+        },
+        {
+          "point": {
+            "x": -15,
+            "y": 25
+          },
+          "alpha": 0,
+          "painted": false,
+          "nearestPaintCenterDistance": 4.468859264398467
+        },
+        {
+          "point": {
+            "x": 0,
+            "y": 25
+          },
+          "alpha": 0,
+          "painted": false,
+          "nearestPaintCenterDistance": 0.04419417382415922
+        },
+        {
+          "point": {
+            "x": 15,
+            "y": 25
+          },
+          "alpha": 0,
+          "painted": false,
+          "nearestPaintCenterDistance": 4.468859264398467
+        },
+        {
+          "point": {
+            "x": 25,
+            "y": 25
+          },
+          "alpha": 0,
+          "painted": false,
+          "nearestPaintCenterDistance": 7.054060222666092
+        },
+        {
+          "point": {
+            "x": 35,
+            "y": 25
+          },
+          "alpha": 0,
+          "painted": false,
+          "nearestPaintCenterDistance": 16.0587909141691
+        },
+        {
+          "point": {
+            "x": 45,
+            "y": 25
+          },
+          "alpha": 0,
+          "painted": false,
+          "nearestPaintCenterDistance": 23.33456562966193
+        },
+        {
+          "point": {
+            "x": 65,
+            "y": 25
+          },
+          "alpha": 0,
+          "painted": false,
+          "nearestPaintCenterDistance": 40.0406287803401
+        },
+        {
+          "point": {
+            "x": -65,
+            "y": 35
+          },
+          "alpha": 0,
+          "painted": false,
+          "nearestPaintCenterDistance": 45.471166172916654
+        },
+        {
+          "point": {
+            "x": -45,
+            "y": 35
+          },
+          "alpha": 0,
+          "painted": false,
+          "nearestPaintCenterDistance": 28.91207711536824
+        },
+        {
+          "point": {
+            "x": -35,
+            "y": 35
+          },
+          "alpha": 0,
+          "painted": false,
+          "nearestPaintCenterDistance": 20.863441785213674
+        },
+        {
+          "point": {
+            "x": -25,
+            "y": 35
+          },
+          "alpha": 0,
+          "painted": false,
+          "nearestPaintCenterDistance": 15.318557475330373
+        },
+        {
+          "point": {
+            "x": -15,
+            "y": 35
+          },
+          "alpha": 0,
+          "painted": false,
+          "nearestPaintCenterDistance": 14.468783747260861
+        },
+        {
+          "point": {
+            "x": 0,
+            "y": 35
+          },
+          "alpha": 0,
+          "painted": false,
+          "nearestPaintCenterDistance": 8.95878148103859
+        },
+        {
+          "point": {
+            "x": 15,
+            "y": 35
+          },
+          "alpha": 0,
+          "painted": false,
+          "nearestPaintCenterDistance": 14.468783747260861
+        },
+        {
+          "point": {
+            "x": 25,
+            "y": 35
+          },
+          "alpha": 0,
+          "painted": false,
+          "nearestPaintCenterDistance": 15.467771433693995
+        },
+        {
+          "point": {
+            "x": 35,
+            "y": 35
+          },
+          "alpha": 0,
+          "painted": false,
+          "nearestPaintCenterDistance": 21.178049145872713
+        },
+        {
+          "point": {
+            "x": 45,
+            "y": 35
+          },
+          "alpha": 0,
+          "painted": false,
+          "nearestPaintCenterDistance": 29.26832358754085
+        },
+        {
+          "point": {
+            "x": 65,
+            "y": 35
+          },
+          "alpha": 0,
+          "painted": false,
+          "nearestPaintCenterDistance": 45.09852495509138
+        },
+        {
+          "point": {
+            "x": -65,
+            "y": 45
+          },
+          "alpha": 0,
+          "painted": false,
+          "nearestPaintCenterDistance": 51.24971417603224
+        },
+        {
+          "point": {
+            "x": -45,
+            "y": 45
+          },
+          "alpha": 0,
+          "painted": false,
+          "nearestPaintCenterDistance": 35.00404552512467
+        },
+        {
+          "point": {
+            "x": -35,
+            "y": 45
+          },
+          "alpha": 0,
+          "painted": false,
+          "nearestPaintCenterDistance": 28.716862696419327
+        },
+        {
+          "point": {
+            "x": -25,
+            "y": 45
+          },
+          "alpha": 0,
+          "painted": false,
+          "nearestPaintCenterDistance": 24.980656579141392
+        },
+        {
+          "point": {
+            "x": -15,
+            "y": 45
+          },
+          "alpha": 0,
+          "painted": false,
+          "nearestPaintCenterDistance": 22.352686150102855
+        },
+        {
+          "point": {
+            "x": 0,
+            "y": 45
+          },
+          "alpha": 0,
+          "painted": false,
+          "nearestPaintCenterDistance": 18.765254211574117
+        },
+        {
+          "point": {
+            "x": 15,
+            "y": 45
+          },
+          "alpha": 0,
+          "painted": false,
+          "nearestPaintCenterDistance": 22.56349547665432
+        },
+        {
+          "point": {
+            "x": 25,
+            "y": 45
+          },
+          "alpha": 0,
+          "painted": false,
+          "nearestPaintCenterDistance": 25.07243412844074
+        },
+        {
+          "point": {
+            "x": 35,
+            "y": 45
+          },
+          "alpha": 0,
+          "painted": false,
+          "nearestPaintCenterDistance": 28.948263387032387
+        },
+        {
+          "point": {
+            "x": 45,
+            "y": 45
+          },
+          "alpha": 0,
+          "painted": false,
+          "nearestPaintCenterDistance": 35.31656503151177
+        },
+        {
+          "point": {
+            "x": 65,
+            "y": 45
+          },
+          "alpha": 0,
+          "painted": false,
+          "nearestPaintCenterDistance": 51.60920233470966
+        },
+        {
+          "point": {
+            "x": -65,
+            "y": 65
+          },
+          "alpha": 0,
+          "painted": false,
+          "nearestPaintCenterDistance": 63.287306808909165
+        },
+        {
+          "point": {
+            "x": -45,
+            "y": 65
+          },
+          "alpha": 0,
+          "painted": false,
+          "nearestPaintCenterDistance": 51.02972862092253
+        },
+        {
+          "point": {
+            "x": -35,
+            "y": 65
+          },
+          "alpha": 0,
+          "painted": false,
+          "nearestPaintCenterDistance": 46.940475105446055
+        },
+        {
+          "point": {
+            "x": -25,
+            "y": 65
+          },
+          "alpha": 0,
+          "painted": false,
+          "nearestPaintCenterDistance": 44.626422421307765
+        },
+        {
+          "point": {
+            "x": -15,
+            "y": 65
+          },
+          "alpha": 0,
+          "painted": false,
+          "nearestPaintCenterDistance": 40.538778695528066
+        },
+        {
+          "point": {
+            "x": 0,
+            "y": 65
+          },
+          "alpha": 0,
+          "painted": false,
+          "nearestPaintCenterDistance": 38.67666952602047
+        },
+        {
+          "point": {
+            "x": 15,
+            "y": 65
+          },
+          "alpha": 0,
+          "painted": false,
+          "nearestPaintCenterDistance": 40.839457980303806
+        },
+        {
+          "point": {
+            "x": 25,
+            "y": 65
+          },
+          "alpha": 0,
+          "painted": false,
+          "nearestPaintCenterDistance": 44.80376047972982
+        },
+        {
+          "point": {
+            "x": 35,
+            "y": 65
+          },
+          "alpha": 0,
+          "painted": false,
+          "nearestPaintCenterDistance": 47.08239536307599
+        },
+        {
+          "point": {
+            "x": 45,
+            "y": 65
+          },
+          "alpha": 0,
+          "painted": false,
+          "nearestPaintCenterDistance": 51.24575058602421
+        },
+        {
+          "point": {
+            "x": 65,
+            "y": 65
+          },
+          "alpha": 0,
+          "painted": false,
+          "nearestPaintCenterDistance": 63.59842581090353
+        }
+      ]
+    },
+    {
+      "id": "triangle-phase-1e200-original",
+      "variant": "original",
+      "rawPhase": 1e+200,
+      "convertedPhase": 1.1999999999999999e+200,
+      "emittedPhase": 1.1999999999999999e+200,
+      "shape": "triangle",
+      "size": 3,
+      "vertices": [
+        {
+          "x": 3.117441802447776e-16,
+          "y": -5.091168824543143
+        },
+        {
+          "x": -4.409081537009722,
+          "y": 2.54558441227157
+        },
+        {
+          "x": 4.40908153700972,
+          "y": 2.5455844122715736
+        }
+      ],
+      "width": 36,
+      "lineJoin": "bevel",
+      "lineCap": "square",
+      "lineStyle": "dashed",
+      "dashPattern": [
+        3.5999999999999996,
+        3.5999999999999996
+      ],
+      "dashPhase": 1.1999999999999999e+200,
+      "reviewedSource": "/private/tmp/stz-review-production-phase-1e+200",
+      "svgFile": "large-phase/triangle-phase-1e200-original.svg",
+      "pngFile": "large-phase/triangle-phase-1e200-original.png",
+      "reviewedSvgSha256": "354cb4d5460d15ea23e4c7626bc1078323f2ac7087cd61a286ecaaef37d7cd91",
+      "reviewedPngSha256": "9951acea9c296c43dbbe968068535f4cb7d30b639df5bc467bd218ce1d5dbfa8",
+      "miterLimit": 10,
+      "rasterRadius": 30.38043289890715,
+      "farthest": {
+        "x": -6.59375,
+        "y": -29.65625
+      },
+      "svgSha256": "354cb4d5460d15ea23e4c7626bc1078323f2ac7087cd61a286ecaaef37d7cd91",
+      "pngSha256": "9951acea9c296c43dbbe968068535f4cb7d30b639df5bc467bd218ce1d5dbfa8",
+      "rasterBounds": {
+        "minX": -26.375,
+        "minY": -29.6875,
+        "maxX": 27,
+        "maxY": 23.6875
+      },
+      "probes": [
+        {
+          "point": {
+            "x": 0,
+            "y": -24
+          },
+          "alpha": 255,
+          "painted": true,
+          "nearestPaintCenterDistance": 0
+        },
+        {
+          "point": {
+            "x": -6,
+            "y": -28
+          },
+          "alpha": 255,
+          "painted": true,
+          "nearestPaintCenterDistance": 0
+        },
+        {
+          "point": {
+            "x": 20,
+            "y": 20
+          },
+          "alpha": 0,
+          "painted": false,
+          "nearestPaintCenterDistance": 4.468859264398467
+        },
+        {
+          "point": {
+            "x": 0,
+            "y": -50
+          },
+          "alpha": 0,
+          "painted": false,
+          "nearestPaintCenterDistance": 21.385642452940246
+        },
+        {
+          "point": {
+            "x": 9,
+            "y": -50
+          },
+          "alpha": 0,
+          "painted": false,
+          "nearestPaintCenterDistance": 21.542517915160243
+        },
+        {
+          "point": {
+            "x": 0,
+            "y": 0
+          },
+          "alpha": 255,
+          "painted": true,
+          "nearestPaintCenterDistance": 0
+        },
+        {
+          "point": {
+            "x": -6.59375,
+            "y": -29.65625
+          },
+          "alpha": 136,
+          "painted": true,
+          "nearestPaintCenterDistance": 0
+        },
+        {
+          "point": {
+            "x": -65,
+            "y": -65
+          },
+          "alpha": 0,
+          "painted": false,
+          "nearestPaintCenterDistance": 68.16949521688568
+        },
+        {
+          "point": {
+            "x": -45,
+            "y": -65
+          },
+          "alpha": 0,
+          "painted": false,
+          "nearestPaintCenterDistance": 52.19406770050597
+        },
+        {
+          "point": {
+            "x": -35,
+            "y": -65
+          },
+          "alpha": 0,
+          "painted": false,
+          "nearestPaintCenterDistance": 45.34419150370861
+        },
+        {
+          "point": {
+            "x": -25,
+            "y": -65
+          },
+          "alpha": 0,
+          "painted": false,
+          "nearestPaintCenterDistance": 39.84935009664524
+        },
+        {
+          "point": {
+            "x": -15,
+            "y": -65
+          },
+          "alpha": 0,
+          "painted": false,
+          "nearestPaintCenterDistance": 36.329680746257594
+        },
+        {
+          "point": {
+            "x": 0,
+            "y": -65
+          },
+          "alpha": 0,
+          "painted": false,
+          "nearestPaintCenterDistance": 35.95355619580628
+        },
+        {
+          "point": {
+            "x": 15,
+            "y": -65
+          },
+          "alpha": 0,
+          "painted": false,
+          "nearestPaintCenterDistance": 37.289644381852185
+        },
+        {
+          "point": {
+            "x": 25,
+            "y": -65
+          },
+          "alpha": 0,
+          "painted": false,
+          "nearestPaintCenterDistance": 40.572682658717554
+        },
+        {
+          "point": {
+            "x": 35,
+            "y": -65
+          },
+          "alpha": 0,
+          "painted": false,
+          "nearestPaintCenterDistance": 45.84503875148324
+        },
+        {
+          "point": {
+            "x": 45,
+            "y": -65
+          },
+          "alpha": 0,
+          "painted": false,
+          "nearestPaintCenterDistance": 52.5093927609623
+        },
+        {
+          "point": {
+            "x": 65,
+            "y": -65
+          },
+          "alpha": 0,
+          "painted": false,
+          "nearestPaintCenterDistance": 66.93345867819023
+        },
+        {
+          "point": {
+            "x": -65,
+            "y": -45
+          },
+          "alpha": 0,
+          "painted": false,
+          "nearestPaintCenterDistance": 53.59558123693594
+        },
+        {
+          "point": {
+            "x": -45,
+            "y": -45
+          },
+          "alpha": 0,
+          "painted": false,
+          "nearestPaintCenterDistance": 40.337080684216595
+        },
+        {
+          "point": {
+            "x": -35,
+            "y": -45
+          },
+          "alpha": 0,
+          "painted": false,
+          "nearestPaintCenterDistance": 32.26855691884903
+        },
+        {
+          "point": {
+            "x": -25,
+            "y": -45
+          },
+          "alpha": 0,
+          "painted": false,
+          "nearestPaintCenterDistance": 23.962902643982844
+        },
+        {
+          "point": {
+            "x": -15,
+            "y": -45
+          },
+          "alpha": 0,
+          "painted": false,
+          "nearestPaintCenterDistance": 17.49559096243965
+        },
+        {
+          "point": {
+            "x": 0,
+            "y": -45
+          },
+          "alpha": 0,
+          "painted": false,
+          "nearestPaintCenterDistance": 16.700544994849718
+        },
+        {
+          "point": {
+            "x": 15,
+            "y": -45
+          },
+          "alpha": 0,
+          "painted": false,
+          "nearestPaintCenterDistance": 18.214488137880792
+        },
+        {
+          "point": {
+            "x": 25,
+            "y": -45
+          },
+          "alpha": 0,
+          "painted": false,
+          "nearestPaintCenterDistance": 24.232959541191004
+        },
+        {
+          "point": {
+            "x": 35,
+            "y": -45
+          },
+          "alpha": 0,
+          "painted": false,
+          "nearestPaintCenterDistance": 32.2740039060077
+        },
+        {
+          "point": {
+            "x": 45,
+            "y": -45
+          },
+          "alpha": 0,
+          "painted": false,
+          "nearestPaintCenterDistance": 39.0843688784276
+        },
+        {
+          "point": {
+            "x": 65,
+            "y": -45
+          },
+          "alpha": 0,
+          "painted": false,
+          "nearestPaintCenterDistance": 52.435916990408394
+        },
+        {
+          "point": {
+            "x": -65,
+            "y": -35
+          },
+          "alpha": 0,
+          "painted": false,
+          "nearestPaintCenterDistance": 47.794992709749415
+        },
+        {
+          "point": {
+            "x": -45,
+            "y": -35
+          },
+          "alpha": 0,
+          "painted": false,
+          "nearestPaintCenterDistance": 32.2522104378134
+        },
+        {
+          "point": {
+            "x": -35,
+            "y": -35
+          },
+          "alpha": 0,
+          "painted": false,
+          "nearestPaintCenterDistance": 26.66359438682264
+        },
+        {
+          "point": {
+            "x": -25,
+            "y": -35
+          },
+          "alpha": 0,
+          "painted": false,
+          "nearestPaintCenterDistance": 18.609525870505138
+        },
+        {
+          "point": {
+            "x": -15,
+            "y": -35
+          },
+          "alpha": 0,
+          "painted": false,
+          "nearestPaintCenterDistance": 9.960958946055344
+        },
+        {
+          "point": {
+            "x": 0,
+            "y": -35
+          },
+          "alpha": 0,
+          "painted": false,
+          "nearestPaintCenterDistance": 7.9038410361671625
+        },
+        {
+          "point": {
+            "x": 15,
+            "y": -35
+          },
+          "alpha": 0,
+          "painted": false,
+          "nearestPaintCenterDistance": 10.1111981547688
+        },
+        {
+          "point": {
+            "x": 25,
+            "y": -35
+          },
+          "alpha": 0,
+          "painted": false,
+          "nearestPaintCenterDistance": 18.609525870505138
+        },
+        {
+          "point": {
+            "x": 35,
+            "y": -35
+          },
+          "alpha": 0,
+          "painted": false,
+          "nearestPaintCenterDistance": 25.400118417538927
+        },
+        {
+          "point": {
+            "x": 45,
+            "y": -35
+          },
+          "alpha": 0,
+          "painted": false,
+          "nearestPaintCenterDistance": 31.035671261066675
+        },
+        {
+          "point": {
+            "x": 65,
+            "y": -35
+          },
+          "alpha": 0,
+          "painted": false,
+          "nearestPaintCenterDistance": 46.71884406345046
+        },
+        {
+          "point": {
+            "x": -65,
+            "y": -25
+          },
+          "alpha": 0,
+          "painted": false,
+          "nearestPaintCenterDistance": 43.54579575716811
+        },
+        {
+          "point": {
+            "x": -45,
+            "y": -25
+          },
+          "alpha": 0,
+          "painted": false,
+          "nearestPaintCenterDistance": 25.54381193410647
+        },
+        {
+          "point": {
+            "x": -35,
+            "y": -25
+          },
+          "alpha": 0,
+          "painted": false,
+          "nearestPaintCenterDistance": 18.171545837517513
+        },
+        {
+          "point": {
+            "x": -25,
+            "y": -25
+          },
+          "alpha": 0,
+          "painted": false,
+          "nearestPaintCenterDistance": 12.632810084260747
+        },
+        {
+          "point": {
+            "x": -15,
+            "y": -25
+          },
+          "alpha": 0,
+          "painted": false,
+          "nearestPaintCenterDistance": 4.952311644575693
+        },
+        {
+          "point": {
+            "x": 0,
+            "y": -25
+          },
+          "alpha": 255,
+          "painted": true,
+          "nearestPaintCenterDistance": 0
+        },
+        {
+          "point": {
+            "x": 15,
+            "y": -25
+          },
+          "alpha": 0,
+          "painted": false,
+          "nearestPaintCenterDistance": 4.952311644575693
+        },
+        {
+          "point": {
+            "x": 25,
+            "y": -25
+          },
+          "alpha": 0,
+          "painted": false,
+          "nearestPaintCenterDistance": 11.740770976601153
+        },
+        {
+          "point": {
+            "x": 35,
+            "y": -25
+          },
+          "alpha": 0,
+          "painted": false,
+          "nearestPaintCenterDistance": 16.939979062118113
+        },
+        {
+          "point": {
+            "x": 45,
+            "y": -25
+          },
+          "alpha": 0,
+          "painted": false,
+          "nearestPaintCenterDistance": 24.434103024768476
+        },
+        {
+          "point": {
+            "x": 65,
+            "y": -25
+          },
+          "alpha": 0,
+          "painted": false,
+          "nearestPaintCenterDistance": 42.61191606376085
+        },
+        {
+          "point": {
+            "x": -65,
+            "y": -15
+          },
+          "alpha": 0,
+          "painted": false,
+          "nearestPaintCenterDistance": 41.329303503990964
+        },
+        {
+          "point": {
+            "x": -45,
+            "y": -15
+          },
+          "alpha": 0,
+          "painted": false,
+          "nearestPaintCenterDistance": 21.54904471490558
+        },
+        {
+          "point": {
+            "x": -35,
+            "y": -15
+          },
+          "alpha": 0,
+          "painted": false,
+          "nearestPaintCenterDistance": 11.936763720749438
+        },
+        {
+          "point": {
+            "x": -25,
+            "y": -15
+          },
+          "alpha": 0,
+          "painted": false,
+          "nearestPaintCenterDistance": 4.342963058212676
+        },
+        {
+          "point": {
+            "x": -15,
+            "y": -15
+          },
+          "alpha": 255,
+          "painted": true,
+          "nearestPaintCenterDistance": 0
+        },
+        {
+          "point": {
+            "x": 0,
+            "y": -15
+          },
+          "alpha": 255,
+          "painted": true,
+          "nearestPaintCenterDistance": 0
+        },
+        {
+          "point": {
+            "x": 15,
+            "y": -15
+          },
+          "alpha": 255,
+          "painted": true,
+          "nearestPaintCenterDistance": 0
+        },
+        {
+          "point": {
+            "x": 25,
+            "y": -15
+          },
+          "alpha": 0,
+          "painted": false,
+          "nearestPaintCenterDistance": 3.0888534482878915
+        },
+        {
+          "point": {
+            "x": 35,
+            "y": -15
+          },
+          "alpha": 0,
+          "painted": false,
+          "nearestPaintCenterDistance": 10.98978574063207
+        },
+        {
+          "point": {
+            "x": 45,
+            "y": -15
+          },
+          "alpha": 0,
+          "painted": false,
+          "nearestPaintCenterDistance": 20.740067276289146
+        },
+        {
+          "point": {
+            "x": 65,
+            "y": -15
+          },
+          "alpha": 0,
+          "painted": false,
+          "nearestPaintCenterDistance": 40.60665451160684
+        },
+        {
+          "point": {
+            "x": -65,
+            "y": 15
+          },
+          "alpha": 0,
+          "painted": false,
+          "nearestPaintCenterDistance": 40.03243314020521
+        },
+        {
+          "point": {
+            "x": -45,
+            "y": 15
+          },
+          "alpha": 0,
+          "painted": false,
+          "nearestPaintCenterDistance": 21.36224948653582
+        },
+        {
+          "point": {
+            "x": -35,
+            "y": 15
+          },
+          "alpha": 0,
+          "painted": false,
+          "nearestPaintCenterDistance": 13.528110201539606
+        },
+        {
+          "point": {
+            "x": -25,
+            "y": 15
+          },
+          "alpha": 0,
+          "painted": false,
+          "nearestPaintCenterDistance": 8.218809410431659
+        },
+        {
+          "point": {
+            "x": -15,
+            "y": 15
+          },
+          "alpha": 255,
+          "painted": true,
+          "nearestPaintCenterDistance": 0
+        },
+        {
+          "point": {
+            "x": 0,
+            "y": 15
+          },
+          "alpha": 255,
+          "painted": true,
+          "nearestPaintCenterDistance": 0
+        },
+        {
+          "point": {
+            "x": 15,
+            "y": 15
+          },
+          "alpha": 255,
+          "painted": true,
+          "nearestPaintCenterDistance": 0
+        },
+        {
+          "point": {
+            "x": 25,
+            "y": 15
+          },
+          "alpha": 0,
+          "painted": false,
+          "nearestPaintCenterDistance": 7.04297633284395
+        },
+        {
+          "point": {
+            "x": 35,
+            "y": 15
+          },
+          "alpha": 0,
+          "painted": false,
+          "nearestPaintCenterDistance": 12.273653821295433
+        },
+        {
+          "point": {
+            "x": 45,
+            "y": 15
+          },
+          "alpha": 0,
+          "painted": false,
+          "nearestPaintCenterDistance": 20.279733186731033
+        },
+        {
+          "point": {
+            "x": 65,
+            "y": 15
+          },
+          "alpha": 0,
+          "painted": false,
+          "nearestPaintCenterDistance": 39.147382774905914
+        },
+        {
+          "point": {
+            "x": -65,
+            "y": 25
+          },
+          "alpha": 0,
+          "painted": false,
+          "nearestPaintCenterDistance": 43.711791351133165
+        },
+        {
+          "point": {
+            "x": -45,
+            "y": 25
+          },
+          "alpha": 0,
+          "painted": false,
+          "nearestPaintCenterDistance": 27.6452485180546
+        },
+        {
+          "point": {
+            "x": -35,
+            "y": 25
+          },
+          "alpha": 0,
+          "painted": false,
+          "nearestPaintCenterDistance": 18.758800018258096
+        },
+        {
+          "point": {
+            "x": -25,
+            "y": 25
+          },
+          "alpha": 0,
+          "painted": false,
+          "nearestPaintCenterDistance": 9.355083010053946
+        },
+        {
+          "point": {
+            "x": -15,
+            "y": 25
+          },
+          "alpha": 0,
+          "painted": false,
+          "nearestPaintCenterDistance": 4.468859264398467
+        },
+        {
+          "point": {
+            "x": 0,
+            "y": 25
+          },
+          "alpha": 0,
+          "painted": false,
+          "nearestPaintCenterDistance": 3.205525015500581
+        },
+        {
+          "point": {
+            "x": 15,
+            "y": 25
+          },
+          "alpha": 0,
+          "painted": false,
+          "nearestPaintCenterDistance": 4.468859264398467
+        },
+        {
+          "point": {
+            "x": 25,
+            "y": 25
+          },
+          "alpha": 0,
+          "painted": false,
+          "nearestPaintCenterDistance": 10.470289065971388
+        },
+        {
+          "point": {
+            "x": 35,
+            "y": 25
+          },
+          "alpha": 0,
+          "painted": false,
+          "nearestPaintCenterDistance": 19.975033244653186
+        },
+        {
+          "point": {
+            "x": 45,
+            "y": 25
+          },
+          "alpha": 0,
+          "painted": false,
+          "nearestPaintCenterDistance": 26.398723039666145
+        },
+        {
+          "point": {
+            "x": 65,
+            "y": 25
+          },
+          "alpha": 0,
+          "painted": false,
+          "nearestPaintCenterDistance": 42.63968313818713
+        },
+        {
+          "point": {
+            "x": -65,
+            "y": 35
+          },
+          "alpha": 0,
+          "painted": false,
+          "nearestPaintCenterDistance": 49.18176189529001
+        },
+        {
+          "point": {
+            "x": -45,
+            "y": 35
+          },
+          "alpha": 0,
+          "painted": false,
+          "nearestPaintCenterDistance": 31.71186809579341
+        },
+        {
+          "point": {
+            "x": -35,
+            "y": 35
+          },
+          "alpha": 0,
+          "painted": false,
+          "nearestPaintCenterDistance": 23.265158029229028
+        },
+        {
+          "point": {
+            "x": -25,
+            "y": 35
+          },
+          "alpha": 0,
+          "painted": false,
+          "nearestPaintCenterDistance": 16.640089486688463
+        },
+        {
+          "point": {
+            "x": -15,
+            "y": 35
+          },
+          "alpha": 0,
+          "painted": false,
+          "nearestPaintCenterDistance": 14.468783747260861
+        },
+        {
+          "point": {
+            "x": 0,
+            "y": 35
+          },
+          "alpha": 0,
+          "painted": false,
+          "nearestPaintCenterDistance": 12.059828071950278
+        },
+        {
+          "point": {
+            "x": 15,
+            "y": 35
+          },
+          "alpha": 0,
+          "painted": false,
+          "nearestPaintCenterDistance": 14.468783747260861
+        },
+        {
+          "point": {
+            "x": 25,
+            "y": 35
+          },
+          "alpha": 0,
+          "painted": false,
+          "nearestPaintCenterDistance": 17.291672941765928
+        },
+        {
+          "point": {
+            "x": 35,
+            "y": 35
+          },
+          "alpha": 0,
+          "painted": false,
+          "nearestPaintCenterDistance": 24.256482703083726
+        },
+        {
+          "point": {
+            "x": 45,
+            "y": 35
+          },
+          "alpha": 0,
+          "painted": false,
+          "nearestPaintCenterDistance": 32.82913268919848
+        },
+        {
+          "point": {
+            "x": 65,
+            "y": 35
+          },
+          "alpha": 0,
+          "painted": false,
+          "nearestPaintCenterDistance": 47.997578877741326
+        },
+        {
+          "point": {
+            "x": -65,
+            "y": 45
+          },
+          "alpha": 0,
+          "painted": false,
+          "nearestPaintCenterDistance": 54.071874187279654
+        },
+        {
+          "point": {
+            "x": -45,
+            "y": 45
+          },
+          "alpha": 0,
+          "painted": false,
+          "nearestPaintCenterDistance": 37.34993411138767
+        },
+        {
+          "point": {
+            "x": -35,
+            "y": 45
+          },
+          "alpha": 0,
+          "painted": false,
+          "nearestPaintCenterDistance": 30.506435028121523
+        },
+        {
+          "point": {
+            "x": -25,
+            "y": 45
+          },
+          "alpha": 0,
+          "painted": false,
+          "nearestPaintCenterDistance": 25.812159501386162
+        },
+        {
+          "point": {
+            "x": -15,
+            "y": 45
+          },
+          "alpha": 0,
+          "painted": false,
+          "nearestPaintCenterDistance": 23.940396365244247
+        },
+        {
+          "point": {
+            "x": 0,
+            "y": 45
+          },
+          "alpha": 0,
+          "painted": false,
+          "nearestPaintCenterDistance": 21.732796716598628
+        },
+        {
+          "point": {
+            "x": 15,
+            "y": 45
+          },
+          "alpha": 0,
+          "painted": false,
+          "nearestPaintCenterDistance": 24.46876995529199
+        },
+        {
+          "point": {
+            "x": 25,
+            "y": 45
+          },
+          "alpha": 0,
+          "painted": false,
+          "nearestPaintCenterDistance": 26.2369387148158
+        },
+        {
+          "point": {
+            "x": 35,
+            "y": 45
+          },
+          "alpha": 0,
+          "painted": false,
+          "nearestPaintCenterDistance": 31.269025458510857
+        },
+        {
+          "point": {
+            "x": 45,
+            "y": 45
+          },
+          "alpha": 0,
+          "painted": false,
+          "nearestPaintCenterDistance": 38.30309325792109
+        },
+        {
+          "point": {
+            "x": 65,
+            "y": 45
+          },
+          "alpha": 0,
+          "painted": false,
+          "nearestPaintCenterDistance": 54.675337933340664
+        },
+        {
+          "point": {
+            "x": -65,
+            "y": 65
+          },
+          "alpha": 0,
+          "painted": false,
+          "nearestPaintCenterDistance": 65.5935787872944
+        },
+        {
+          "point": {
+            "x": -45,
+            "y": 65
+          },
+          "alpha": 0,
+          "painted": false,
+          "nearestPaintCenterDistance": 52.66656983443102
+        },
+        {
+          "point": {
+            "x": -35,
+            "y": 65
+          },
+          "alpha": 0,
+          "painted": false,
+          "nearestPaintCenterDistance": 48.0561398587631
+        },
+        {
+          "point": {
+            "x": -25,
+            "y": 65
+          },
+          "alpha": 0,
+          "painted": false,
+          "nearestPaintCenterDistance": 45.221870573042416
+        },
+        {
+          "point": {
+            "x": -15,
+            "y": 65
+          },
+          "alpha": 0,
+          "painted": false,
+          "nearestPaintCenterDistance": 42.742163938258905
+        },
+        {
+          "point": {
+            "x": 0,
+            "y": 65
+          },
+          "alpha": 0,
+          "painted": false,
+          "nearestPaintCenterDistance": 41.54593184807629
+        },
+        {
+          "point": {
+            "x": 15,
+            "y": 65
+          },
+          "alpha": 0,
+          "painted": false,
+          "nearestPaintCenterDistance": 43.62009732479972
+        },
+        {
+          "point": {
+            "x": 25,
+            "y": 65
+          },
+          "alpha": 0,
+          "painted": false,
+          "nearestPaintCenterDistance": 45.46566785086303
+        },
+        {
+          "point": {
+            "x": 35,
+            "y": 65
+          },
+          "alpha": 0,
+          "painted": false,
+          "nearestPaintCenterDistance": 48.54381477721956
+        },
+        {
+          "point": {
+            "x": 45,
+            "y": 65
+          },
+          "alpha": 0,
+          "painted": false,
+          "nearestPaintCenterDistance": 53.34676141177644
+        },
+        {
+          "point": {
+            "x": 65,
+            "y": 65
+          },
+          "alpha": 0,
+          "painted": false,
+          "nearestPaintCenterDistance": 66.51786942713213
+        }
+      ]
+    },
+    {
+      "id": "triangle-phase-1e200-corrected",
+      "variant": "corrected",
+      "rawPhase": 1e+200,
+      "convertedPhase": 1.1999999999999999e+200,
+      "emittedPhase": 4.91885494459315,
+      "shape": "triangle",
+      "size": 3,
+      "vertices": [
+        {
+          "x": 3.117441802447776e-16,
+          "y": -5.091168824543143
+        },
+        {
+          "x": -4.409081537009722,
+          "y": 2.54558441227157
+        },
+        {
+          "x": 4.40908153700972,
+          "y": 2.5455844122715736
+        }
+      ],
+      "width": 36,
+      "lineJoin": "bevel",
+      "lineCap": "square",
+      "lineStyle": "dashed",
+      "dashPattern": [
+        3.5999999999999996,
+        3.5999999999999996
+      ],
+      "dashPhase": 4.91885494459315,
+      "reviewedSource": "/private/tmp/stz-review-production-phase-1e+200-canonical",
+      "svgFile": "large-phase/triangle-phase-1e200-corrected.svg",
+      "pngFile": "large-phase/triangle-phase-1e200-corrected.png",
+      "reviewedSvgSha256": "b3998b32762c8809b4e9417d82c08a39c12a6a7ee0e9390333e42d5797eda478",
+      "reviewedPngSha256": "4e4a5e5ee425260d961bb1f0647c6f9f57f90666a7712c3c222f19c7280b09f6",
+      "miterLimit": 10,
+      "rasterRadius": 30.38043289890715,
+      "farthest": {
+        "x": 6.59375,
+        "y": -29.65625
+      },
+      "svgSha256": "b3998b32762c8809b4e9417d82c08a39c12a6a7ee0e9390333e42d5797eda478",
+      "pngSha256": "4e4a5e5ee425260d961bb1f0647c6f9f57f90666a7712c3c222f19c7280b09f6",
+      "rasterBounds": {
+        "minX": -27.5,
+        "minY": -29.6875,
+        "maxX": 25.875,
+        "maxY": 24.5625
+      },
+      "probes": [
+        {
+          "point": {
+            "x": 0,
+            "y": -24
+          },
+          "alpha": 255,
+          "painted": true,
+          "nearestPaintCenterDistance": 0
+        },
+        {
+          "point": {
+            "x": -6,
+            "y": -28
+          },
+          "alpha": 0,
+          "painted": false,
+          "nearestPaintCenterDistance": 1.132785560024491
+        },
+        {
+          "point": {
+            "x": 20,
+            "y": 20
+          },
+          "alpha": 0,
+          "painted": false,
+          "nearestPaintCenterDistance": 2.1564764373857646
+        },
+        {
+          "point": {
+            "x": 0,
+            "y": -50
+          },
+          "alpha": 0,
+          "painted": false,
+          "nearestPaintCenterDistance": 21.385642452940246
+        },
+        {
+          "point": {
+            "x": 9,
+            "y": -50
+          },
+          "alpha": 0,
+          "painted": false,
+          "nearestPaintCenterDistance": 20.48556084477552
+        },
+        {
+          "point": {
+            "x": 0,
+            "y": 0
+          },
+          "alpha": 255,
+          "painted": true,
+          "nearestPaintCenterDistance": 0
+        },
+        {
+          "point": {
+            "x": 6.59375,
+            "y": -29.65625
+          },
+          "alpha": 136,
+          "painted": true,
+          "nearestPaintCenterDistance": 0
+        },
+        {
+          "point": {
+            "x": -65,
+            "y": -65
+          },
+          "alpha": 0,
+          "painted": false,
+          "nearestPaintCenterDistance": 65.82405822057008
+        },
+        {
+          "point": {
+            "x": -45,
+            "y": -65
+          },
+          "alpha": 0,
+          "painted": false,
+          "nearestPaintCenterDistance": 52.76786205281582
+        },
+        {
+          "point": {
+            "x": -35,
+            "y": -65
+          },
+          "alpha": 0,
+          "painted": false,
+          "nearestPaintCenterDistance": 46.24740279869779
+        },
+        {
+          "point": {
+            "x": -25,
+            "y": -65
+          },
+          "alpha": 0,
+          "painted": false,
+          "nearestPaintCenterDistance": 41.14847829051519
+        },
+        {
+          "point": {
+            "x": -15,
+            "y": -65
+          },
+          "alpha": 0,
+          "painted": false,
+          "nearestPaintCenterDistance": 38.04697446085562
+        },
+        {
+          "point": {
+            "x": 0,
+            "y": -65
+          },
+          "alpha": 0,
+          "painted": false,
+          "nearestPaintCenterDistance": 35.95355619580628
+        },
+        {
+          "point": {
+            "x": 15,
+            "y": -65
+          },
+          "alpha": 0,
+          "painted": false,
+          "nearestPaintCenterDistance": 36.329680746257594
+        },
+        {
+          "point": {
+            "x": 25,
+            "y": -65
+          },
+          "alpha": 0,
+          "painted": false,
+          "nearestPaintCenterDistance": 39.84935009664524
+        },
+        {
+          "point": {
+            "x": 35,
+            "y": -65
+          },
+          "alpha": 0,
+          "painted": false,
+          "nearestPaintCenterDistance": 45.34419150370861
+        },
+        {
+          "point": {
+            "x": 45,
+            "y": -65
+          },
+          "alpha": 0,
+          "painted": false,
+          "nearestPaintCenterDistance": 52.19406770050597
+        },
+        {
+          "point": {
+            "x": 65,
+            "y": -65
+          },
+          "alpha": 0,
+          "painted": false,
+          "nearestPaintCenterDistance": 68.267640234045
+        },
+        {
+          "point": {
+            "x": -65,
+            "y": -45
+          },
+          "alpha": 0,
+          "painted": false,
+          "nearestPaintCenterDistance": 52.43144705827792
+        },
+        {
+          "point": {
+            "x": -45,
+            "y": -45
+          },
+          "alpha": 0,
+          "painted": false,
+          "nearestPaintCenterDistance": 37.65377325879838
+        },
+        {
+          "point": {
+            "x": -35,
+            "y": -45
+          },
+          "alpha": 0,
+          "painted": false,
+          "nearestPaintCenterDistance": 32.30848016581715
+        },
+        {
+          "point": {
+            "x": -25,
+            "y": -45
+          },
+          "alpha": 0,
+          "painted": false,
+          "nearestPaintCenterDistance": 24.48361218499019
+        },
+        {
+          "point": {
+            "x": -15,
+            "y": -45
+          },
+          "alpha": 0,
+          "painted": false,
+          "nearestPaintCenterDistance": 18.810163891497595
+        },
+        {
+          "point": {
+            "x": 0,
+            "y": -45
+          },
+          "alpha": 0,
+          "painted": false,
+          "nearestPaintCenterDistance": 16.700544994849718
+        },
+        {
+          "point": {
+            "x": 15,
+            "y": -45
+          },
+          "alpha": 0,
+          "painted": false,
+          "nearestPaintCenterDistance": 17.49559096243965
+        },
+        {
+          "point": {
+            "x": 25,
+            "y": -45
+          },
+          "alpha": 0,
+          "painted": false,
+          "nearestPaintCenterDistance": 23.962902643982844
+        },
+        {
+          "point": {
+            "x": 35,
+            "y": -45
+          },
+          "alpha": 0,
+          "painted": false,
+          "nearestPaintCenterDistance": 32.26855691884903
+        },
+        {
+          "point": {
+            "x": 45,
+            "y": -45
+          },
+          "alpha": 0,
+          "painted": false,
+          "nearestPaintCenterDistance": 40.16530783057688
+        },
+        {
+          "point": {
+            "x": 65,
+            "y": -45
+          },
+          "alpha": 0,
+          "painted": false,
+          "nearestPaintCenterDistance": 54.54178802189198
+        },
+        {
+          "point": {
+            "x": -65,
+            "y": -35
+          },
+          "alpha": 0,
+          "painted": false,
+          "nearestPaintCenterDistance": 46.71884406345046
+        },
+        {
+          "point": {
+            "x": -45,
+            "y": -35
+          },
+          "alpha": 0,
+          "painted": false,
+          "nearestPaintCenterDistance": 30.429124874452107
+        },
+        {
+          "point": {
+            "x": -35,
+            "y": -35
+          },
+          "alpha": 0,
+          "painted": false,
+          "nearestPaintCenterDistance": 23.67079721143756
+        },
+        {
+          "point": {
+            "x": -25,
+            "y": -35
+          },
+          "alpha": 0,
+          "painted": false,
+          "nearestPaintCenterDistance": 18.609525870505138
+        },
+        {
+          "point": {
+            "x": -15,
+            "y": -35
+          },
+          "alpha": 0,
+          "painted": false,
+          "nearestPaintCenterDistance": 10.341531106417463
+        },
+        {
+          "point": {
+            "x": 0,
+            "y": -35
+          },
+          "alpha": 0,
+          "painted": false,
+          "nearestPaintCenterDistance": 7.9038410361671625
+        },
+        {
+          "point": {
+            "x": 15,
+            "y": -35
+          },
+          "alpha": 0,
+          "painted": false,
+          "nearestPaintCenterDistance": 9.960958946055344
+        },
+        {
+          "point": {
+            "x": 25,
+            "y": -35
+          },
+          "alpha": 0,
+          "painted": false,
+          "nearestPaintCenterDistance": 18.609525870505138
+        },
+        {
+          "point": {
+            "x": 35,
+            "y": -35
+          },
+          "alpha": 0,
+          "painted": false,
+          "nearestPaintCenterDistance": 26.043270783928044
+        },
+        {
+          "point": {
+            "x": 45,
+            "y": -35
+          },
+          "alpha": 0,
+          "painted": false,
+          "nearestPaintCenterDistance": 33.248032131616455
+        },
+        {
+          "point": {
+            "x": 65,
+            "y": -35
+          },
+          "alpha": 0,
+          "painted": false,
+          "nearestPaintCenterDistance": 48.674240010759284
+        },
+        {
+          "point": {
+            "x": -65,
+            "y": -25
+          },
+          "alpha": 0,
+          "painted": false,
+          "nearestPaintCenterDistance": 42.61191606376085
+        },
+        {
+          "point": {
+            "x": -45,
+            "y": -25
+          },
+          "alpha": 0,
+          "painted": false,
+          "nearestPaintCenterDistance": 24.434103024768476
+        },
+        {
+          "point": {
+            "x": -35,
+            "y": -25
+          },
+          "alpha": 0,
+          "painted": false,
+          "nearestPaintCenterDistance": 16.383883563581623
+        },
+        {
+          "point": {
+            "x": -25,
+            "y": -25
+          },
+          "alpha": 0,
+          "painted": false,
+          "nearestPaintCenterDistance": 10.139360957427249
+        },
+        {
+          "point": {
+            "x": -15,
+            "y": -25
+          },
+          "alpha": 0,
+          "painted": false,
+          "nearestPaintCenterDistance": 4.952311644575693
+        },
+        {
+          "point": {
+            "x": 0,
+            "y": -25
+          },
+          "alpha": 255,
+          "painted": true,
+          "nearestPaintCenterDistance": 0
+        },
+        {
+          "point": {
+            "x": 15,
+            "y": -25
+          },
+          "alpha": 0,
+          "painted": false,
+          "nearestPaintCenterDistance": 4.952311644575693
+        },
+        {
+          "point": {
+            "x": 25,
+            "y": -25
+          },
+          "alpha": 0,
+          "painted": false,
+          "nearestPaintCenterDistance": 11.96879079627512
+        },
+        {
+          "point": {
+            "x": 35,
+            "y": -25
+          },
+          "alpha": 0,
+          "painted": false,
+          "nearestPaintCenterDistance": 19.181544271121655
+        },
+        {
+          "point": {
+            "x": 45,
+            "y": -25
+          },
+          "alpha": 0,
+          "painted": false,
+          "nearestPaintCenterDistance": 26.45385870955313
+        },
+        {
+          "point": {
+            "x": 65,
+            "y": -25
+          },
+          "alpha": 0,
+          "painted": false,
+          "nearestPaintCenterDistance": 44.31203719786532
+        },
+        {
+          "point": {
+            "x": -65,
+            "y": -15
+          },
+          "alpha": 0,
+          "painted": false,
+          "nearestPaintCenterDistance": 40.60665451160684
+        },
+        {
+          "point": {
+            "x": -45,
+            "y": -15
+          },
+          "alpha": 0,
+          "painted": false,
+          "nearestPaintCenterDistance": 20.740067276289146
+        },
+        {
+          "point": {
+            "x": -35,
+            "y": -15
+          },
+          "alpha": 0,
+          "painted": false,
+          "nearestPaintCenterDistance": 10.98978574063207
+        },
+        {
+          "point": {
+            "x": -25,
+            "y": -15
+          },
+          "alpha": 0,
+          "painted": false,
+          "nearestPaintCenterDistance": 3.0901178173331836
+        },
+        {
+          "point": {
+            "x": -15,
+            "y": -15
+          },
+          "alpha": 255,
+          "painted": true,
+          "nearestPaintCenterDistance": 0
+        },
+        {
+          "point": {
+            "x": 0,
+            "y": -15
+          },
+          "alpha": 255,
+          "painted": true,
+          "nearestPaintCenterDistance": 0
+        },
+        {
+          "point": {
+            "x": 15,
+            "y": -15
+          },
+          "alpha": 255,
+          "painted": true,
+          "nearestPaintCenterDistance": 0
+        },
+        {
+          "point": {
+            "x": 25,
+            "y": -15
+          },
+          "alpha": 0,
+          "painted": false,
+          "nearestPaintCenterDistance": 5.370092236172485
+        },
+        {
+          "point": {
+            "x": 35,
+            "y": -15
+          },
+          "alpha": 0,
+          "painted": false,
+          "nearestPaintCenterDistance": 12.739962347864298
+        },
+        {
+          "point": {
+            "x": 45,
+            "y": -15
+          },
+          "alpha": 0,
+          "painted": false,
+          "nearestPaintCenterDistance": 22.230196594384854
+        },
+        {
+          "point": {
+            "x": 65,
+            "y": -15
+          },
+          "alpha": 0,
+          "painted": false,
+          "nearestPaintCenterDistance": 41.92769538890732
+        },
+        {
+          "point": {
+            "x": -65,
+            "y": 15
+          },
+          "alpha": 0,
+          "painted": false,
+          "nearestPaintCenterDistance": 38.461146181893746
+        },
+        {
+          "point": {
+            "x": -45,
+            "y": 15
+          },
+          "alpha": 0,
+          "painted": false,
+          "nearestPaintCenterDistance": 19.442473238376852
+        },
+        {
+          "point": {
+            "x": -35,
+            "y": 15
+          },
+          "alpha": 0,
+          "painted": false,
+          "nearestPaintCenterDistance": 11.281985779329807
+        },
+        {
+          "point": {
+            "x": -25,
+            "y": 15
+          },
+          "alpha": 0,
+          "painted": false,
+          "nearestPaintCenterDistance": 3.281398806149597
+        },
+        {
+          "point": {
+            "x": -15,
+            "y": 15
+          },
+          "alpha": 255,
+          "painted": true,
+          "nearestPaintCenterDistance": 0
+        },
+        {
+          "point": {
+            "x": 0,
+            "y": 15
+          },
+          "alpha": 255,
+          "painted": true,
+          "nearestPaintCenterDistance": 0
+        },
+        {
+          "point": {
+            "x": 15,
+            "y": 15
+          },
+          "alpha": 255,
+          "painted": true,
+          "nearestPaintCenterDistance": 0
+        },
+        {
+          "point": {
+            "x": 25,
+            "y": 15
+          },
+          "alpha": 0,
+          "painted": false,
+          "nearestPaintCenterDistance": 7.156318231115773
+        },
+        {
+          "point": {
+            "x": 35,
+            "y": 15
+          },
+          "alpha": 0,
+          "painted": false,
+          "nearestPaintCenterDistance": 14.520526957552194
+        },
+        {
+          "point": {
+            "x": 45,
+            "y": 15
+          },
+          "alpha": 0,
+          "painted": false,
+          "nearestPaintCenterDistance": 22.23125087854932
+        },
+        {
+          "point": {
+            "x": 65,
+            "y": 15
+          },
+          "alpha": 0,
+          "painted": false,
+          "nearestPaintCenterDistance": 40.748969503841444
+        },
+        {
+          "point": {
+            "x": -65,
+            "y": 25
+          },
+          "alpha": 0,
+          "painted": false,
+          "nearestPaintCenterDistance": 41.80173161036514
+        },
+        {
+          "point": {
+            "x": -45,
+            "y": 25
+          },
+          "alpha": 0,
+          "painted": false,
+          "nearestPaintCenterDistance": 23.70625082388609
+        },
+        {
+          "point": {
+            "x": -35,
+            "y": 25
+          },
+          "alpha": 0,
+          "painted": false,
+          "nearestPaintCenterDistance": 14.012898633937233
+        },
+        {
+          "point": {
+            "x": -25,
+            "y": 25
+          },
+          "alpha": 0,
+          "painted": false,
+          "nearestPaintCenterDistance": 5.5440353646960085
+        },
+        {
+          "point": {
+            "x": -15,
+            "y": 25
+          },
+          "alpha": 0,
+          "painted": false,
+          "nearestPaintCenterDistance": 4.468859264398467
+        },
+        {
+          "point": {
+            "x": 0,
+            "y": 25
+          },
+          "alpha": 0,
+          "painted": false,
+          "nearestPaintCenterDistance": 2.1941862101927443
+        },
+        {
+          "point": {
+            "x": 15,
+            "y": 25
+          },
+          "alpha": 0,
+          "painted": false,
+          "nearestPaintCenterDistance": 4.468859264398467
+        },
+        {
+          "point": {
+            "x": 25,
+            "y": 25
+          },
+          "alpha": 0,
+          "painted": false,
+          "nearestPaintCenterDistance": 8.470191298016829
+        },
+        {
+          "point": {
+            "x": 35,
+            "y": 25
+          },
+          "alpha": 0,
+          "painted": false,
+          "nearestPaintCenterDistance": 17.744552421095328
+        },
+        {
+          "point": {
+            "x": 45,
+            "y": 25
+          },
+          "alpha": 0,
+          "painted": false,
+          "nearestPaintCenterDistance": 27.531693384624923
+        },
+        {
+          "point": {
+            "x": 65,
+            "y": 25
+          },
+          "alpha": 0,
+          "painted": false,
+          "nearestPaintCenterDistance": 44.565721307132456
+        },
+        {
+          "point": {
+            "x": -65,
+            "y": 35
+          },
+          "alpha": 0,
+          "painted": false,
+          "nearestPaintCenterDistance": 45.63563660260477
+        },
+        {
+          "point": {
+            "x": -45,
+            "y": 35
+          },
+          "alpha": 0,
+          "painted": false,
+          "nearestPaintCenterDistance": 27.41097094458713
+        },
+        {
+          "point": {
+            "x": -35,
+            "y": 35
+          },
+          "alpha": 0,
+          "painted": false,
+          "nearestPaintCenterDistance": 19.64017128553109
+        },
+        {
+          "point": {
+            "x": -25,
+            "y": 35
+          },
+          "alpha": 0,
+          "painted": false,
+          "nearestPaintCenterDistance": 14.836149369866833
+        },
+        {
+          "point": {
+            "x": -15,
+            "y": 35
+          },
+          "alpha": 0,
+          "painted": false,
+          "nearestPaintCenterDistance": 14.468783747260861
+        },
+        {
+          "point": {
+            "x": 0,
+            "y": 35
+          },
+          "alpha": 0,
+          "painted": false,
+          "nearestPaintCenterDistance": 11.068412967765523
+        },
+        {
+          "point": {
+            "x": 15,
+            "y": 35
+          },
+          "alpha": 0,
+          "painted": false,
+          "nearestPaintCenterDistance": 14.468783747260861
+        },
+        {
+          "point": {
+            "x": 25,
+            "y": 35
+          },
+          "alpha": 0,
+          "painted": false,
+          "nearestPaintCenterDistance": 16.169572601803672
+        },
+        {
+          "point": {
+            "x": 35,
+            "y": 35
+          },
+          "alpha": 0,
+          "painted": false,
+          "nearestPaintCenterDistance": 22.483196850648266
+        },
+        {
+          "point": {
+            "x": 45,
+            "y": 35
+          },
+          "alpha": 0,
+          "painted": false,
+          "nearestPaintCenterDistance": 30.79966137192096
+        },
+        {
+          "point": {
+            "x": 65,
+            "y": 35
+          },
+          "alpha": 0,
+          "painted": false,
+          "nearestPaintCenterDistance": 49.344393203534274
+        },
+        {
+          "point": {
+            "x": -65,
+            "y": 45
+          },
+          "alpha": 0,
+          "painted": false,
+          "nearestPaintCenterDistance": 49.719074087567236
+        },
+        {
+          "point": {
+            "x": -45,
+            "y": 45
+          },
+          "alpha": 0,
+          "painted": false,
+          "nearestPaintCenterDistance": 33.77478835055817
+        },
+        {
+          "point": {
+            "x": -35,
+            "y": 45
+          },
+          "alpha": 0,
+          "painted": false,
+          "nearestPaintCenterDistance": 27.840821254499662
+        },
+        {
+          "point": {
+            "x": -25,
+            "y": 45
+          },
+          "alpha": 0,
+          "painted": false,
+          "nearestPaintCenterDistance": 24.687776897181326
+        },
+        {
+          "point": {
+            "x": -15,
+            "y": 45
+          },
+          "alpha": 0,
+          "painted": false,
+          "nearestPaintCenterDistance": 24.46876995529199
+        },
+        {
+          "point": {
+            "x": 0,
+            "y": 45
+          },
+          "alpha": 0,
+          "painted": false,
+          "nearestPaintCenterDistance": 20.78183739771342
+        },
+        {
+          "point": {
+            "x": 15,
+            "y": 45
+          },
+          "alpha": 0,
+          "painted": false,
+          "nearestPaintCenterDistance": 23.40193134390835
+        },
+        {
+          "point": {
+            "x": 25,
+            "y": 45
+          },
+          "alpha": 0,
+          "painted": false,
+          "nearestPaintCenterDistance": 25.51137154535208
+        },
+        {
+          "point": {
+            "x": 35,
+            "y": 45
+          },
+          "alpha": 0,
+          "painted": false,
+          "nearestPaintCenterDistance": 29.91997790983476
+        },
+        {
+          "point": {
+            "x": 45,
+            "y": 45
+          },
+          "alpha": 0,
+          "painted": false,
+          "nearestPaintCenterDistance": 36.59568472682264
+        },
+        {
+          "point": {
+            "x": 65,
+            "y": 45
+          },
+          "alpha": 0,
+          "painted": false,
+          "nearestPaintCenterDistance": 53.15537734439479
+        },
+        {
+          "point": {
+            "x": -65,
+            "y": 65
+          },
+          "alpha": 0,
+          "painted": false,
+          "nearestPaintCenterDistance": 62.0543014474017
+        },
+        {
+          "point": {
+            "x": -45,
+            "y": 65
+          },
+          "alpha": 0,
+          "painted": false,
+          "nearestPaintCenterDistance": 50.19448503695401
+        },
+        {
+          "point": {
+            "x": -35,
+            "y": 65
+          },
+          "alpha": 0,
+          "painted": false,
+          "nearestPaintCenterDistance": 46.40971157123259
+        },
+        {
+          "point": {
+            "x": -25,
+            "y": 65
+          },
+          "alpha": 0,
+          "painted": false,
+          "nearestPaintCenterDistance": 44.589643731756816
+        },
+        {
+          "point": {
+            "x": -15,
+            "y": 65
+          },
+          "alpha": 0,
+          "painted": false,
+          "nearestPaintCenterDistance": 44.41998160315918
+        },
+        {
+          "point": {
+            "x": 0,
+            "y": 65
+          },
+          "alpha": 0,
+          "painted": false,
+          "nearestPaintCenterDistance": 40.62800469657598
+        },
+        {
+          "point": {
+            "x": 15,
+            "y": 65
+          },
+          "alpha": 0,
+          "painted": false,
+          "nearestPaintCenterDistance": 42.02856636414094
+        },
+        {
+          "point": {
+            "x": 25,
+            "y": 65
+          },
+          "alpha": 0,
+          "painted": false,
+          "nearestPaintCenterDistance": 45.050861014247
+        },
+        {
+          "point": {
+            "x": 35,
+            "y": 65
+          },
+          "alpha": 0,
+          "painted": false,
+          "nearestPaintCenterDistance": 47.68600505520461
+        },
+        {
+          "point": {
+            "x": 45,
+            "y": 65
+          },
+          "alpha": 0,
+          "painted": false,
+          "nearestPaintCenterDistance": 52.1376071384658
+        },
+        {
+          "point": {
+            "x": 65,
+            "y": 65
+          },
+          "alpha": 0,
+          "painted": false,
+          "nearestPaintCenterDistance": 64.85941828774753
+        }
+      ]
+    }
+  ]
+}

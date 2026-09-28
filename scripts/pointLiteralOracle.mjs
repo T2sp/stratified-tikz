@@ -117,8 +117,8 @@ export async function inspectStandalonePoint(page, source) {
       math: [...content.children].filter((e) => e.localName === 'svg').length,
       paths: content.querySelectorAll('svg path').length,
       texts: [...content.children].filter((e) => e.localName === 'text').map((e) => e.textContent),
-      opacity: contour.getAttribute('opacity'), parentOpacity: point.parentElement.getAttribute('opacity'),
-      paints: { fill: contour.getAttribute('fill'), stroke: contour.getAttribute('stroke'), text: paint.getAttribute('fill') },
+      opacity: String(Number(getComputedStyle(contour).fillOpacity) * Number(getComputedStyle(contour).opacity)), parentOpacity: point.parentElement.getAttribute('opacity'),
+      paints: { fill: contour.getAttribute('fill')?.toLowerCase(), stroke: contour.getAttribute('stroke')?.toLowerCase(), text: paint.getAttribute('fill')?.toLowerCase() },
       // Sanitization removes all runtime markers, including the background marker.
       backgrounds: [...document.documentElement.children].filter((e) => e.localName === 'rect' && e.getAttribute('fill') === '#ffffff').length,
       forbidden: document.querySelectorAll('parsererror, script, style, image, foreignObject, [data-svg-export-exclude]').length,

@@ -1,5 +1,6 @@
 import assert from 'node:assert/strict'
 import { readFile, stat } from 'node:fs/promises'
+import { boundedPointDiagnostic } from './pointCheckDiagnostics.mjs'
 
 const svgNamespace = 'http://www.w3.org/2000/svg'
 const maxSide = 8192
@@ -29,7 +30,7 @@ export function standaloneSvgViewport(document) {
 }
 
 export async function measureStandaloneSvg(page) {
-  return page.evaluate(() => {
+  return boundedPointDiagnostic(() => page.evaluate(() => {
     const root = document.documentElement
     const bounds = root.getBoundingClientRect()
     return {
@@ -43,7 +44,30 @@ export async function measureStandaloneSvg(page) {
       viewport: { width: innerWidth, height: innerHeight },
       scroll: { x: scrollX, y: scrollY }, devicePixelRatio,
     }
-  })
+  }), 'Standalone SVG measurements', 5000)
+}
+
+/** SVG XML has no HTML body. Settle at the document origin before retaining
+ * coordinates, with both browser and host deadlines owning late failures. */
+export async function settleStandaloneSvg(page) {
+  await boundedPointDiagnostic(() => page.evaluate(async function settleStandaloneDocument() {
+    window.scrollTo({ left: 0, top: 0, behavior: 'instant' })
+    let timer
+    try {
+      await Promise.race([
+        new Promise((resolve) => requestAnimationFrame(() => requestAnimationFrame(resolve))),
+        new Promise((_, reject) => { timer = setTimeout(() => reject(new Error('Standalone SVG layout settling exceeded 2000ms')), 2000) }),
+      ])
+    } finally { clearTimeout(timer) }
+  }), 'Standalone SVG layout settling', 2500)
+}
+
+export function assertStandaloneSvgCaptureStable(before, after) {
+  const snapshot = (value) => ({ url: value.url, contentType: value.contentType, readyState: value.readyState,
+    root: value.root, viewport: value.viewport, scroll: value.scroll, devicePixelRatio: value.devicePixelRatio,
+    parserErrors: value.parserErrors, bodyExists: value.bodyExists, htmlBodyExists: value.htmlBodyExists })
+  assert.deepEqual(snapshot(after), snapshot(before), 'Standalone SVG capture coordinate mismatch: retained measurements changed during screenshot')
+  standaloneSvgViewport(after)
 }
 
 /** Retain observations BEFORE image work. SVG XML has no HTML body, so
@@ -53,38 +77,46 @@ export async function measureStandaloneSvg(page) {
 export async function captureStandaloneSvg(page, path, persist) {
   const capture = { status: 'pending', requestedPath: path, fileExists: false,
     options: { path, fullPage: false, scale: 'css', timeout: 5000 }, measurements: [] }
+  const save = () => boundedPointDiagnostic(() => persist(capture), 'Standalone SVG capture evidence', 5000)
   try {
-    await persist(capture)
+    await save()
+    await settleStandaloneSvg(page)
     const initial = await measureStandaloneSvg(page)
     capture.measurements.push(initial)
-    await persist(capture)
+    await save()
     const viewport = standaloneSvgViewport(initial)
     if (viewport.width !== initial.viewport.width || viewport.height !== initial.viewport.height) {
       await page.setViewportSize(viewport)
+      await settleStandaloneSvg(page)
       capture.measurements.push(await measureStandaloneSvg(page))
-      await persist(capture)
+      await save()
     }
     const measured = capture.measurements.at(-1)
     const required = standaloneSvgViewport(measured)
     assert.ok(required.width <= measured.viewport.width && required.height <= measured.viewport.height,
       'Resized viewport must cover the complete SVG without further resizing')
     capture.coverage = { completeRoot: true, bounds: measured.root.bounds, viewport: measured.viewport }
-    await persist(capture)
+    capture.before = measured
+    await save()
     await page.screenshot(capture.options)
+    capture.after = await measureStandaloneSvg(page)
+    await save()
+    assertStandaloneSvgCaptureStable(capture.before, capture.after)
+    capture.coordinatesStable = true
     const bytes = await readFile(path)
     assert.ok(bytes.length >= 24 && bytes.subarray(0, 8).equals(Buffer.from([137, 80, 78, 71, 13, 10, 26, 10])),
       'Capture wrote a real PNG')
     const png = { width: bytes.readUInt32BE(16), height: bytes.readUInt32BE(20), bytes: bytes.length }
     assert.deepEqual({ width: png.width, height: png.height }, measured.viewport, 'PNG covers the measured CSS viewport')
     Object.assign(capture, { status: 'saved', fileExists: true, retainedPath: path, png })
-    await persist(capture)
+    await save()
     return capture
   } catch (error) {
     capture.status = 'failed'
     delete capture.retainedPath
     capture.fileExists = await stat(path).then((file) => file.isFile(), () => false)
     capture.error = { message: error.message, stack: error.stack }
-    await persist(capture).catch(() => {})
+    await save().catch(() => {})
     throw error
   }
 }

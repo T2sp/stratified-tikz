@@ -63,13 +63,16 @@ import {
 import {
   cloneCurveStyle,
   cloneLabelStyle,
-  clonePointStyle,
+  recordPointPaintEdit,
+  markPointPaintOverrides,
   cloneSheetStyle,
   defaultCurveStyle,
   defaultLabelStyle,
   defaultPointStyle,
+  normalizePointStyle,
   defaultSheetStyle,
 } from '../model/styles.ts'
+import { preparePointStyleForImportedEdit } from '../model/pointPaintEditing.ts'
 import { resolveSymbolicVariables } from '../model/variables.ts'
 import type {
   AmbientDimension,
@@ -94,6 +97,7 @@ import type {
   PathTemplate,
   PathSegment,
   PointStratum,
+  PointPaintField,
   PolygonSheetStratum,
   SheetStyle,
   Stratum,
@@ -304,6 +308,7 @@ export function updateStratumStyleById(
   diagram: Diagram,
   id: string,
   updater: (style: StratumStyle) => StratumStyle,
+  explicitPointPaintFields: readonly PointPaintField[] = [],
 ): Diagram {
   return updateStratumById(diagram, id, (stratum) => {
     switch (stratum.geometricKind) {
@@ -326,9 +331,10 @@ export function updateStratumStyleById(
           : stratum
       }
       case 'point': {
-        const style = updater(stratum.style)
+        const previous = preparePointStyleForImportedEdit(diagram, stratum.style, stratum.importedTikzStyleReferenceId)
+        const style = updater(previous)
         return style.kind === 'pointStyle'
-          ? clearStylePresetReference({ ...stratum, style })
+          ? clearStylePresetReference({ ...stratum, style: markPointPaintOverrides(recordPointPaintEdit(previous, style), explicitPointPaintFields) })
           : stratum
       }
     }
@@ -2434,7 +2440,7 @@ function createPointForDiagram(
     id: options.id ?? makeUniqueId(diagram, 'point'),
     name: options.name ?? 'Point',
     ...(options.text === undefined ? {} : { text: options.text }),
-    style: clonePointStyle(defaultPointStyle),
+    style: normalizePointStyle(defaultPointStyle),
     position: normalizePointForAmbientDimension(diagram.ambientDimension, position),
     layer: options.layer ?? nextLayer(diagram),
   }

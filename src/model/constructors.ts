@@ -1,7 +1,7 @@
 import {
   cloneCurveStyle,
   cloneLabelStyle,
-  clonePointStyle,
+  normalizePointStyle,
   cloneRegionStyle,
   cloneSheetStyle,
   defaultCurveStyle,
@@ -661,7 +661,7 @@ export function createPointStratum({
       geometricKind: 'point',
       name,
       ...(text === undefined ? {} : { text }),
-      style: clonePointStyle(style),
+      style: normalizePointStyle(style),
       ...(importedTikzStyleReferenceId === undefined
         ? {}
         : { importedTikzStyleReferenceId }),

@@ -1,4 +1,5 @@
-import { pointFills, pointShapes } from '../../model/types.ts'
+import { PointPaintFields } from './PointPaintFields.tsx'
+import { pointFills, pointShapes, pointPaintFields } from '../../model/types.ts'
 import type {
   Diagram,
   HexColor,
@@ -9,6 +10,9 @@ import type {
 import {
   cloneStylePreset,
   pointStylePresets,
+  getPointPaint,
+  updatePointColor,
+  updatePointFill,
 } from '../../model/styles.ts'
 import { updateStratumStyleById } from '../diagramUpdates.ts'
 import {
@@ -31,9 +35,12 @@ export function PointStyleEditor({
   point,
   onDiagramChange,
 }: PointStyleEditorProps) {
+  const diagnostics = (diagram.importedTikzStyleReferences ?? [])
+    .find((reference) => reference.id === point.importedTikzStyleReferenceId)?.previewDiagnostics ?? []
   return (
     <section className="inspector-section">
       <h3>Style</h3>
+      {diagnostics.map((message, index) => <p key={`${index}-${message}`} className="style-preset-warning">{message}</p>)}
       <div className="inspector-form">
         <div className="inspector-field">
           <span className="inspector-field-label">Built-in presets</span>
@@ -49,6 +56,7 @@ export function PointStyleEditor({
                       style.kind === 'pointStyle'
                         ? cloneStylePreset(preset)
                         : style,
+                      pointPaintFields,
                     ),
                   )
                 }
@@ -67,17 +75,19 @@ export function PointStyleEditor({
         />
         <EditableColorField
           label="Color"
-          value={point.style.color}
+          value={getPointPaint(point.style).stroke.color}
           onChange={(color) =>
             onDiagramChange((diagram) =>
               updateStratumStyleById(diagram, point.id, (style) =>
                 style.kind === 'pointStyle'
-                  ? { ...style, color: color as HexColor }
+                  ? updatePointColor(style, color as HexColor)
                   : style,
               ),
             )
           }
         />
+        <PointPaintFields style={point.style} onChange={(next, fields) =>
+          onDiagramChange((diagram) => updateStratumStyleById(diagram, point.id, () => next, fields))} />
         <EditableOpacityField
           label="Opacity"
           value={point.style.opacity}
@@ -85,6 +95,7 @@ export function PointStyleEditor({
             onDiagramChange((diagram) =>
               updateStratumStyleById(diagram, point.id, (style) =>
                 style.kind === 'pointStyle' ? { ...style, opacity } : style,
+                ['opacity'],
               ),
             )
           }
@@ -119,7 +130,7 @@ export function PointStyleEditor({
           onChange={(fill) =>
             onDiagramChange((diagram) =>
               updateStratumStyleById(diagram, point.id, (style) =>
-                style.kind === 'pointStyle' ? { ...style, fill } : style,
+                style.kind === 'pointStyle' ? updatePointFill(style, fill) : style,
               ),
             )
           }

@@ -1,0 +1,106 @@
+[
+  {
+    "name": "macro",
+    "expectedTextOperator": "0 0 1 rg",
+    "nodes": [
+      {
+        "body": "PGF",
+        "textOperator": "0 0 1 rg"
+      },
+      {
+        "body": "APP",
+        "textOperator": "0 0 1 rg"
+      },
+      {
+        "body": "APP",
+        "textOperator": "0 0 1 rg"
+      },
+      {
+        "body": "APP",
+        "textOperator": "0 0 1 rg"
+      },
+      {
+        "body": "APP",
+        "textOperator": "0 0 1 rg"
+      }
+    ]
+  },
+  {
+    "name": "conditional",
+    "expectedTextOperator": "0 0 1 rg",
+    "nodes": [
+      {
+        "body": "PGF",
+        "textOperator": "0 0 1 rg"
+      },
+      {
+        "body": "APP",
+        "textOperator": "0 0 1 rg"
+      },
+      {
+        "body": "APP",
+        "textOperator": "0 0 1 rg"
+      },
+      {
+        "body": "APP",
+        "textOperator": "0 0 1 rg"
+      },
+      {
+        "body": "APP",
+        "textOperator": "0 0 1 rg"
+      }
+    ]
+  },
+  {
+    "name": "groupedColor",
+    "expectedTextOperator": "0 0 1 rg",
+    "nodes": [
+      {
+        "body": "PGF",
+        "textOperator": "0 0 1 rg"
+      },
+      {
+        "body": "APP",
+        "textOperator": "0 0 1 rg"
+      },
+      {
+        "body": "APP",
+        "textOperator": "0 0 1 rg"
+      },
+      {
+        "body": "APP",
+        "textOperator": "0 0 1 rg"
+      },
+      {
+        "body": "APP",
+        "textOperator": "0 0 1 rg"
+      }
+    ]
+  },
+  {
+    "name": "bounds",
+    "expectedTextOperator": "1 0 0 rg",
+    "nodes": [
+      {
+        "body": "PGF",
+        "textOperator": "1 0 0 rg"
+      },
+      {
+        "body": "APP",
+        "textOperator": "1 0 0 rg"
+      },
+      {
+        "body": "APP",
+        "textOperator": "1 0 0 rg"
+      },
+      {
+        "body": "APP",
+        "textOperator": "1 0 0 rg"
+      },
+      {
+        "body": "APP",
+        "textOperator": "1 0 0 rg"
+      }
+    ]
+  }
+]

@@ -648,6 +648,9 @@ function labelVisibilityPolicyFromSelectValue(
  * Inputs, document replacement, selection, and history still use the App UI. */
 export type AppLabelBrowserSnapshot = Readonly<{
   json: string
+  // Preserve the live model separately: saved JSON omits runtime camera data
+  // and normalizes styles, so it cannot prove immediate model validity.
+  runtimeDiagramJson: string
   // UI observation is separate from the model/history signature.
   uiSettings: string
   history: string
@@ -1044,6 +1047,7 @@ function App({ labelBrowserTest }: AppProps = {}) {
     if (import.meta.env.DEV) {
       labelBrowserTest?.observe({
         json: editableDiagramSignature,
+        runtimeDiagramJson: JSON.stringify(editableDiagram),
         uiSettings: JSON.stringify({
           exportMode: tikzExportMode,
           includeCoordinateAxesInTikz,
@@ -1055,7 +1059,7 @@ function App({ labelBrowserTest }: AppProps = {}) {
         labelDocumentRevision,
       })
     }
-  }, [editableDiagramSignature, editableDiagram.ambientDimension, history, selectedElement, labelDocumentRevision, labelBrowserTest, tikzExportMode, includeCoordinateAxesInTikz, cameraControl, visibilityOptions])
+  }, [editableDiagramSignature, editableDiagram, history, selectedElement, labelDocumentRevision, labelBrowserTest, tikzExportMode, includeCoordinateAxesInTikz, cameraControl, visibilityOptions])
   const effectiveExampleBarState = shouldCollapseExampleBarForDiagramChange(
     diagramMatchesSelectedExample,
   )

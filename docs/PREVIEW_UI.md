@@ -1022,7 +1022,10 @@ Explicit paint, opacity, transforms, baseline/anchor placement, whitespace
 layout, and path-label white outlines remain. Formula geometry uses local,
 collision-free definitions/paths without application styles, remote fonts,
 `foreignObject`, or bitmap formulas. Transparent output has no added background
-rectangle; white output has exactly one behind the captured diagram.
+rectangle; white output has exactly one behind the captured diagram. This first
+SVG-root element covers the local viewBox and intentionally retains the
+unnamespaced `data-stratified-tikz-export-background="white"` marker; it is export
+metadata, not editor/runtime metadata.
 
 SVG export is independent from TikZ export. Using `Export SVG` never changes the
 diagram model, undo history, TikZ source, or TikZ export mode. The most recently
@@ -1641,3 +1644,147 @@ The JSON load variable-resolution dialog is a modal outside the preview overlay
 stack. It traps focus while open, handles Escape inside the modal flow, and sits
 above the toolbar, quick style bar, popovers, layer window, work-plane overlay,
 direct input drawer, and inspector drawer.
+
+
+## Independent point paint (Phase 32B)
+
+The point inspector and saved point-preset editor expose Text color/opacity,
+Fill enabled/color/opacity, and Border enabled/color/opacity/width/line style,
+dash phase, cap and join. Width and dash phase are in TeX points. Numeric edits
+commit through the existing validated inspector transaction; invalid/nonfinite
+drafts do not modify the diagram. Bulk point styles and style copy/paste retain
+the independent fields. The combined Color and filled/hollow quick controls
+remain convenience operations; hollow explicitly selects white fill. Disable
+Fill for genuine transparency, and disable Border for no outline. Zero alpha is
+saved separately from either enabled switch.
+
+Text paint reaches inherited MathJax paths and literal fallback. Explicit color
+inside supported math remains intact. Paint changes do not request another body
+conversion. Fill and border overlap using their own operation alphas; overall
+Opacity and hidden-point dimming each apply once. Wide borders participate in
+painted bounds, highlighting and picking without increasing body padding.
+Point contours scale normally with the SVG display transform: border width,
+dash lengths and phase use local units (`TeX pt * 1.2`) just like the body and
+bounds. At responsive scales 0.5 and 2, a 20pt border displays at 12 and 48 CSS
+pixels respectively, with local half-width 12. Picking retains its additional
+6 local units measured from the actual polygon stroke: edge strips plus the
+outside join at each local turn, including concave star corners. Miters keep
+their genuine tips within limit 10; bevels keep their straight corner edge.
+Overlapping wide strips contribute to both bounds and distance. Interior
+selection of hollow nodes is unchanged. Bounds are not a final hit oracle. The
+editor selection ring alone keeps its non-scaling outline.
+
+Dashed borders add the real endpoint caps to this region. Named patterns,
+explicit-pattern precedence, phase, caps, joins and the TeX-point conversion
+come from the same effective settings used to emit SVG. Dash gaps and original
+contour interiors remain selectable; there is still exactly a six-local-unit
+exterior allowance. Positive-length endpoints use oriented rectangles or outward
+semicircles. Isolated zero-on subpaths use full upright squares or disks,
+including at corners. A dash crossing a corner does not acquire a cap there.
+Raw coordinates and zero pattern entries are preserved. The
+[native zero-dash investigation](PHASE_32B_ZERO_DASH_INVESTIGATION.md) distinguishes
+the retained Chrome reproduction from Cairo observations. The subsequent
+[endpoint continuation](PHASE_32B_NATIVE_ENDPOINT_INVESTIGATION.md) records native
+diagonal/internal-zero successes, corrected terminal negatives and positive
+endpoints, and the remaining live-paint checks for seam contradictions.
+The [connected-paint followup](PHASE_32B_LIVE_PAINT_ACCEPTANCE.md) distinguishes
+the two square clone/live differences from a real supplemental full-closed
+triangle near-paint miss. Interaction expectations use independent live paint
+with the unchanged gap/interior policy. Export appearance keeps separate checks;
+the proposed finite acceptance profile is not an adopted waiver.
+Committed layouts compare copied pattern contents and all effective geometry
+settings in addition to source, owner, shape, size and font generation.
+SVG emits a signed phase remainder modulo the effective pattern, avoiding native
+precision loss at huge offsets while preserving the saved raw phase.
+
+For square-capped dashed circles with actual endpoints, SVG uses a fixed
+256-edge inscribed contour shared with the cap geometry. Native curved-path
+dash interpolation gave visibly different tangent angles on tiny circles with
+wide borders. This bounded approximation avoids engine-specific picking: its
+centerline error is at most `r*(1-cos(pi/256))`, tangent error at most `pi/256`.
+It does not change width or tolerance. Solid, uninterrupted, disabled, butt-cap
+and round-cap circles retain the native circle representation. The original
+circle interior remains selectable. See the independent original/corrected
+[dash-cap observations](../tests/fixtures/dash-cap-svg/README.md).
+
+Both `\tikzstyle` and `\tikzset` imported presets resolve supported literal
+paint and bounded named-style references in order. Unsupported values/options
+appear as preview diagnostics and remain available to external TikZ export.
+Relative style references resolve in the invocation's active TikZ directory,
+not the declaring style's directory. Bare `base` and `/tikz/base` share canonical
+identity and last-definition-wins order; raw source and external key spelling
+remain unchanged. A missing root reference is diagnosed even if `ns/base` exists.
+Imported partial styles use materialized application node defaults consistently
+in preview and export. This is not arbitrary TeX execution or support for the
+deferred 32C/32D shapes and layout options. See
+[paint grammar and compatibility](PHASE_32B_IMPLEMENTATION.md).
+
+New JSON saves use envelope version 2 and explicit point paint, including saved
+presets; version 1 files retain legacy white hollow, black text and 0.4pt borders.
+Point body source remains unchanged. SVG capture owns an immutable deep copy of
+paint before settlement. The `yeWQVG` parent passed all five commands, 16 groups
+and 16 point scenarios; independent review then found namespace lookup and
+responsive-stroke defects. Fresh parent verification and review are required
+for their correction. The harness history below predates that accepted parent.
+
+Circle selection includes the current contour radius, half the enabled border
+width (`width in TeX points * 1.2 / 2`), and the existing 6-unit selection
+padding. Disabled borders add zero even with a positive stored width; enabled
+zero-opacity borders still add their half-width. Polygon miter expansion keeps
+its separate geometry contract. The native font-readiness checks now verify
+this paint-aware circle expectation independently, with selected-view negative
+controls and pre-assertion diagnostics. The earlier parent failure omitted the
+legacy border's 0.24-unit half-width in its assertion; production selection
+geometry was unchanged. The later `yLwzPX` parent completed all eleven 32A point
+scenarios, including font readiness and whole-point settled exports. See the
+[targeted correction evidence and handoff](PHASE_32B_IMPLEMENTATION.md#targeted-circle-selection-assertion-correction).
+
+That parent then stopped at the first 32B Border line style lookup: exact
+associated-label text included nested option text. The paint harness now resolves
+the exact `.inspector-field-label` caption within the active Inspector, validates
+its wrapper and expected native input/select, and rejects ambiguous, hidden or
+disabled targets. Saved-preset captions retain their `Preset ` prefix. Native
+selects verify options, returned/current values, model paint and history. The
+same resolver handles Border width when its real inline warning changes label
+text; invalid `NaN` remains a draft with `aria-describedby` and unchanged history.
+Production fields and paint behavior are unchanged.
+
+The registered browser boundary clones actual production Inspector markup for
+scope, rerender and negative controls; the real App still performs all paint and
+invalid-draft edits. Before/after diagnostics retain original exact-label counts,
+corrected control counts, DOM/ARIA, selection, paint and request/history identity.
+The later `7bdmDz` parent natively executed the corrected lookups, live
+dashed/round/bevel paint and `2 → NaN → 2` recovery with unchanged invalid/recovery
+model/history. It then stopped after 25 clone checks: disabling the select made
+Playwright's wrapping-label enabled query false, so the correct wrapper rejection
+did not match the clone's overly narrow native-select error expectation.
+This was an oracle mismatch; zero of five complete paint scenarios passed.
+
+The earlier 2026-09-24 read-only revalidation found the resolver correction already committed at
+`9953551`; 110 focused and 2,739 full tests passed. Child browser checks again
+stopped at localhost `EPERM` before native execution. The later parent result
+supersedes that inspection's no-additional-defect finding.
+
+The disabled-control oracle now accepts only the exact field's disabled
+wrapper/native-select assertion, with independent disabled/unique/visible state
+preconditions, unchanged-value and zero-event proof, and ordinary enabled recovery.
+Diagnostics retain the local DOM predicate separately from Playwright's enabled
+query and `label.control` identity. The helper suite has 74 tests; 140 focused
+and 2,769 full tests passed at that stage. The subsequent `yeWQVG` parent passed
+these native checks and reached independent review. The child startup limitation
+is separate from either historical parent harness failures or the two production
+findings. See [the current correction report](PHASE_32B_IMPLEMENTATION.md) for
+the findings and fresh corrected-tree gates.
+
+The later `cI6r6H` parent passed namespace aliases and all five earlier paint
+scenarios, then exposed responsive fixture clipping: at scale 0.5 the circle
+needed a PNG bottom of 188.75px, but the root capture ended at 180px. The valid
+20pt border still measured 12px at its east edge; the injected non-scaling control
+measured 24px. The fixture now uses the axes-fit model midpoint, shared by preview
+and fresh downloads. An independent preflight reserves complete paint, triangle
+miters, selection and native probes—including the larger control—before any
+pixel/click judgement. Captures retain and compare before/after coordinates;
+clipped controls cannot count as successful negatives. The final child native
+attempt and browser-capable parent handoff are documented in the
+[framing repair report](PHASE_32B_IMPLEMENTATION.md#responsive-fixture-framing-and-coherent-capture-2026-09-24).
+All 16 groups, 20 point scenarios and subsequent independent review remain required.

@@ -1,0 +1,382 @@
+{
+  "source": "/private/tmp/stz-review-endpoint-matrix/observations.json",
+  "sourceSha256": "fc28bf6b402cbdbc4378acfa4076387cd01d3d506c20a2d378d5ee9959ccd5cd",
+  "retainedSourceAndRasterHashes": {
+    "p0-square-phase10.svg": "55c362cfe2d90c17bd1c3d1c4eee2c590bd5223d0c1a1c788a876e5700aa0b34",
+    "p0-square-phase10.png": "7f2eb60edc003d8400eb42ba268df240ca7970fc9202127172d711952ccd0b6b",
+    "p0-round-phase10.svg": "1e11d0f2113af2d24b33708b93b5c43686def47bedce0ffff22dff4a5a61a79a",
+    "p0-round-phase10.png": "e243b1f37c31e7213a6e6cba2a7a659f679de54beab309a4b50cc1c2d676a68e",
+    "p1-square-phase10.svg": "8b513590ba018036aa09500a17e88168df99eec94855aed334e871c5f0430890",
+    "p1-square-phase10.png": "340a5824139893b50d169692c196ae012b817c456d1a8f737ef0f1f6ce613d79",
+    "p1-round-phase10.svg": "82779bf1acd24b18c701788113b61d58ffa38e7121dc1f435c0127719066f4b1",
+    "p1-round-phase10.png": "2274717a48537351a627467bb5c1a3ec4231efbd31c5ab25fa26af038945cb05",
+    "p5-square-phase0.svg": "e31c511bf188f7462e9517d6a2e60d0527ecbb4d4bb6e756b489b647ee9266a4",
+    "p5-square-phase0.png": "7557deb4a97635524422229ed581b114701fef2a4d2f1c8111b0601cc37d5948",
+    "p5-round-phase0.svg": "c0a5a58f2372d16c919e9e40692cfa29f8522685a925ef7dcfd238c7f3c1438c",
+    "p5-round-phase0.png": "c43282db5b9b58f8ff7d02b11628a2b667582a19ea85a1e4ad23ec5116f73963",
+    "p5-square-phase20.svg": "ca12fca90288a552a802a03e259148fc253c6c4bccad30cb38251920a08fc9a3",
+    "p5-square-phase20.png": "0d8a857a7f4462f75a35b66456c6da6e1be76db9ca1420ff50a69793128a97ac",
+    "p5-round-phase20.svg": "f06c9986e162d7ee7912144ab2052b587a40d67e5cdf9b80dd9c93289427c160",
+    "p5-round-phase20.png": "87cbc864d64aa9764dcba4a024a6b5d72808cfcc772b91834bf8ee587e5f2fd2"
+  },
+  "observations": [
+    {
+      "id": "p0-square-phase10",
+      "pattern": [
+        10,
+        15
+      ],
+      "phase": 10,
+      "cap": "square",
+      "width": 36,
+      "missedPaint": 30,
+      "exteriorFalseHits": 0,
+      "positiveExamples": [
+        {
+          "p": {
+            "x": -18,
+            "y": -18
+          },
+          "alpha": 255,
+          "sd": 12.727922061357855,
+          "cd": 11.180339887498949
+        },
+        {
+          "p": {
+            "x": -17,
+            "y": -18
+          },
+          "alpha": 255,
+          "sd": 12.020815280171309,
+          "cd": 10.295630140987
+        },
+        {
+          "p": {
+            "x": -16,
+            "y": -18
+          },
+          "alpha": 255,
+          "sd": 11.313708498984761,
+          "cd": 9.433981132056603
+        },
+        {
+          "p": {
+            "x": -15,
+            "y": -18
+          },
+          "alpha": 255,
+          "sd": 10.606601717798213,
+          "cd": 8.602325267042627
+        }
+      ],
+      "negativeExamples": []
+    },
+    {
+      "id": "p0-round-phase10",
+      "pattern": [
+        10,
+        15
+      ],
+      "phase": 10,
+      "cap": "round",
+      "width": 36,
+      "missedPaint": 0,
+      "exteriorFalseHits": 0,
+      "positiveExamples": [],
+      "negativeExamples": []
+    },
+    {
+      "id": "p1-square-phase10",
+      "pattern": [
+        15,
+        10
+      ],
+      "phase": 10,
+      "cap": "square",
+      "width": 36,
+      "missedPaint": 0,
+      "exteriorFalseHits": 161,
+      "positiveExamples": [],
+      "negativeExamples": [
+        {
+          "p": {
+            "x": -18,
+            "y": -24
+          },
+          "alpha": 0,
+          "sd": 16.970562748477143,
+          "cd": 6,
+          "rd": 14.910213047605993
+        },
+        {
+          "p": {
+            "x": -17,
+            "y": -24
+          },
+          "alpha": 0,
+          "sd": 16.263455967290593,
+          "cd": 6,
+          "rd": 14.256645928303053
+        },
+        {
+          "p": {
+            "x": -16,
+            "y": -24
+          },
+          "alpha": 0,
+          "sd": 15.556349186104047,
+          "cd": 6,
+          "rd": 13.645125617780147
+        },
+        {
+          "p": {
+            "x": -15,
+            "y": -24
+          },
+          "alpha": 0,
+          "sd": 14.849242404917497,
+          "cd": 6,
+          "rd": 13.08155010405877
+        }
+      ]
+    },
+    {
+      "id": "p1-round-phase10",
+      "pattern": [
+        15,
+        10
+      ],
+      "phase": 10,
+      "cap": "round",
+      "width": 36,
+      "missedPaint": 0,
+      "exteriorFalseHits": 105,
+      "positiveExamples": [],
+      "negativeExamples": [
+        {
+          "p": {
+            "x": -6,
+            "y": -23
+          },
+          "alpha": 0,
+          "sd": 7.778174593052023,
+          "cd": 5.769728648009423,
+          "rd": 7.7783001436689245
+        },
+        {
+          "p": {
+            "x": -5,
+            "y": -23
+          },
+          "alpha": 0,
+          "sd": 7.0710678118654755,
+          "cd": 5.5372045918796395,
+          "rd": 7.071205917310002
+        },
+        {
+          "p": {
+            "x": -4,
+            "y": -23
+          },
+          "alpha": 0,
+          "sd": 6.4031242374328485,
+          "cd": 5.3452350598575045,
+          "rd": 6.408155204503087
+        },
+        {
+          "p": {
+            "x": -9,
+            "y": -22
+          },
+          "alpha": 0,
+          "sd": 9.192388155425117,
+          "cd": 5.769728648009426,
+          "rd": 9.192494390806011
+        }
+      ]
+    },
+    {
+      "id": "p5-square-phase0",
+      "pattern": [
+        0,
+        5,
+        10,
+        15
+      ],
+      "phase": 0,
+      "cap": "square",
+      "width": 36,
+      "missedPaint": 0,
+      "exteriorFalseHits": 60,
+      "positiveExamples": [],
+      "negativeExamples": [
+        {
+          "p": {
+            "x": -18,
+            "y": -24
+          },
+          "alpha": 0,
+          "sd": 16.970562748477143,
+          "cd": 6,
+          "rd": 7.854263372525778
+        },
+        {
+          "p": {
+            "x": -17,
+            "y": -24
+          },
+          "alpha": 0,
+          "sd": 16.263455967290593,
+          "cd": 6,
+          "rd": 7.254443681289421
+        },
+        {
+          "p": {
+            "x": -16,
+            "y": -24
+          },
+          "alpha": 0,
+          "sd": 15.556349186104047,
+          "cd": 6,
+          "rd": 6.750144674375506
+        },
+        {
+          "p": {
+            "x": -15,
+            "y": -24
+          },
+          "alpha": 0,
+          "sd": 14.849242404917497,
+          "cd": 6,
+          "rd": 6.364114480821349
+        }
+      ]
+    },
+    {
+      "id": "p5-square-phase20",
+      "pattern": [
+        0,
+        5,
+        10,
+        15
+      ],
+      "phase": 20,
+      "cap": "square",
+      "width": 36,
+      "missedPaint": 23,
+      "exteriorFalseHits": 0,
+      "positiveExamples": [
+        {
+          "p": {
+            "x": -18,
+            "y": -18
+          },
+          "alpha": 255,
+          "sd": 12.727922061357855,
+          "cd": 10
+        },
+        {
+          "p": {
+            "x": -17,
+            "y": -18
+          },
+          "alpha": 255,
+          "sd": 12.020815280171309,
+          "cd": 9
+        },
+        {
+          "p": {
+            "x": -16,
+            "y": -18
+          },
+          "alpha": 255,
+          "sd": 11.313708498984761,
+          "cd": 8
+        },
+        {
+          "p": {
+            "x": -15,
+            "y": -18
+          },
+          "alpha": 255,
+          "sd": 10.606601717798213,
+          "cd": 7
+        }
+      ],
+      "negativeExamples": []
+    },
+    {
+      "id": "p5-round-phase0",
+      "pattern": [
+        0,
+        5,
+        10,
+        15
+      ],
+      "phase": 0,
+      "cap": "round",
+      "width": 36,
+      "missedPaint": 0,
+      "exteriorFalseHits": 83,
+      "positiveExamples": [],
+      "negativeExamples": [
+        {
+          "p": {
+            "x": -6,
+            "y": -23
+          },
+          "alpha": 0,
+          "sd": 7.778174593052023,
+          "cd": 5.769728648009423,
+          "rd": 7.504816161972256
+        },
+        {
+          "p": {
+            "x": -5,
+            "y": -23
+          },
+          "alpha": 0,
+          "sd": 7.0710678118654755,
+          "cd": 5.5372045918796395,
+          "rd": 7.071205917310002
+        },
+        {
+          "p": {
+            "x": -4,
+            "y": -23
+          },
+          "alpha": 0,
+          "sd": 6.4031242374328485,
+          "cd": 5.3452350598575045,
+          "rd": 6.408155204503087
+        },
+        {
+          "p": {
+            "x": -9,
+            "y": -22
+          },
+          "alpha": 0,
+          "sd": 9.192388155425117,
+          "cd": 5.769728648009426,
+          "rd": 8.0870507989625
+        }
+      ]
+    },
+    {
+      "id": "p5-round-phase20",
+      "pattern": [
+        0,
+        5,
+        10,
+        15
+      ],
+      "phase": 20,
+      "cap": "round",
+      "width": 36,
+      "missedPaint": 0,
+      "exteriorFalseHits": 0,
+      "positiveExamples": [],
+      "negativeExamples": []
+    }
+  ]
+}

@@ -115,6 +115,7 @@ export function assertPointExportCompatibility({ click, saved, reference }) {
     assert.notEqual(click.style?.[key], undefined, `export click: missing point style ${key}`)
     assert.equal(reference.style?.[key], click.style[key], `renderer reference: captured point style ${key}`)
   }
+  if (click.style.paint) assert.deepEqual(reference.style?.paint, click.style.paint, 'renderer reference: captured independent point paint')
   assert.equal(saved.source, normalizedSource(click.source), 'saved SVG: captured source with XML newline normalization')
   assert.equal(saved.literalObservation?.title, saved.source, 'saved SVG: native observation source title')
   assert.equal(saved.contourKind, click.style.shape === 'circle' ? 'circle' : 'polygon', 'saved SVG: captured contour kind')

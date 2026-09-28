@@ -390,7 +390,8 @@ bounds remain negative controls. Diagnostics tests cover measurement failure
 plus secondary evidence-write failure.
 
 Inspection also demonstrated a later artifact-gate mismatch: the sanitizer
-removes all `data-*` attributes, but the verifier required point runtime markers
+removes runtime `data-*` attributes (the intentional white export-background
+marker is added afterward), but the verifier required point runtime markers
 in downloaded SVG. Replacing the fake command's SVG with a complete sanitized
 point reproduced rejection in the existing cumulative tests; failure log:
 `/private/tmp/stz-32a-metrics-sanitized-gate-before.log`. The gate now checks a

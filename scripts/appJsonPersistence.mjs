@@ -64,9 +64,90 @@ export function assertPersistenceControls(settings, controls) {
   }
 }
 
-export async function saveAppJson({ page, artifactDir, name, diagnose, owned }) {
+/** The native point scenario deliberately changes live controls before reload.
+ * This assertion proves the saved values differ from the current controls and
+ * committed UI state, without changing the saved model or its history. */
+export function assertPointPersistenceChanged({ saved, beforeLoad, controls }) {
+  assert.ok(saved.ambientDimension === 2 || saved.ambientDimension === 3, 'Point persistence dimension is 2 or 3')
+  assert.ok(['inlineMath', 'standalone'].includes(saved.controls.exportMode), 'Saved point export mode is explicit')
+  for (const key of ['json', 'history', 'labelDocumentRevision']) {
+    assert.equal(beforeLoad[key], saved.after[key], `Point control changes preserve ${key}`)
+  }
+  const savedSettings = JSON.parse(saved.after.uiSettings)
+  const settings = JSON.parse(beforeLoad.uiSettings)
+  assertPersistenceControls(savedSettings, saved.controls)
+  assertPersistenceControls(settings, controls)
+  const expectedMode = saved.controls.exportMode === 'inlineMath' ? 'standalone' : 'inlineMath'
+  assert.equal(controls.exportMode, expectedMode, 'Point reload begins with the opposite export mode')
+  const expectedSettings = structuredClone(savedSettings)
+  expectedSettings.exportMode = expectedMode
+  if (saved.ambientDimension === 3) {
+    assert.equal(saved.controls.axes, saved.controls.exportMode === 'standalone', 'Saved point axes match the selected mode')
+    assert.equal(saved.controls.visibility, true, 'Saved point visibility is enabled')
+    assert.equal(saved.controls.surfaceDepthSort, false, 'Saved point surface sorting is disabled')
+    assert.deepEqual(Object.keys(saved.controls.camera).sort(), ['pan x', 'pan y', 'phi', 'theta', 'zoom'],
+      'Saved point camera includes every expanded control')
+    assert.ok(Object.values(saved.controls.camera).every(Number.isFinite), 'Saved point camera controls are finite')
+    assert.equal(saved.controls.camera.theta, 41, 'Saved point theta is 41')
+    assert.equal(controls.axes, !saved.controls.axes, 'Point reload begins with opposite axes')
+    assert.equal(controls.visibility, false, 'Point visibility changes from true to false before reload')
+    assert.equal(controls.surfaceDepthSort, true, 'Point surface sorting changes from false to true before reload')
+    assert.deepEqual(controls.camera, { ...saved.controls.camera, theta: 63 },
+      'Point theta changes to 63 while other camera controls remain saved')
+    expectedSettings.includeCoordinateAxesInTikz = !saved.controls.axes
+    expectedSettings.visibility.enabled = false
+    expectedSettings.visibility.surfaceDepthSort = true
+    expectedSettings.camera3d.thetaDeg = 63
+  }
+  assert.deepEqual(settings, expectedSettings, 'Point pre-reload UI state contains exactly the intended changes')
+}
+
+/** A successful no-op check/uncheck is insufficient: retain a real trusted
+ * input/change pair bracketed by this same document's control observations. */
+export function assertNativePointCheckboxAction({ before, after, name, checked }) {
+  const controls = [before, after].map((record) => {
+    assert.equal(record.browser.status, 'available', 'Native checkbox observation is available')
+    const snapshot = record.browser.snapshot
+    assert.equal(snapshot.api.sameInstance, true, 'Native checkbox keeps the original App API')
+    const group = snapshot.nativeControls.controls.find((control) => control.name === name)
+    assert.equal(group?.matchCount, 1, 'Native checkbox has exactly one associated label match')
+    assert.equal(group.matches.length, 1)
+    const control = group.matches[0]
+    assert.equal(control.connected, true)
+    assert.equal(control.enabled, true)
+    return control
+  })
+  const first = before.browser.snapshot, last = after.browser.snapshot
+  assert.ok(first.generation, 'Native checkbox document generation is present')
+  assert.equal(last.generation, first.generation, 'Native checkbox document is unchanged')
+  assert.equal(last.url, first.url, 'Native checkbox URL is unchanged')
+  assert.equal(controls[1].id, controls[0].id, 'Native checkbox node is unchanged')
+  assert.equal(controls[0].checked, !checked, 'Native checkbox action begins with the opposite value')
+  assert.equal(controls[1].checked, checked, 'Native checkbox action commits its target value')
+  const events = last.nativeControls.events.samples.filter((event) => event.names.includes(name)
+    && event.nodeId === controls[0].id && event.monotonic >= first.monotonic && event.monotonic <= last.monotonic)
+  for (const type of ['input', 'change']) {
+    assert.ok(events.some((event) => event.event === type && event.trusted === true && event.checked === checked),
+      `Native checkbox ${type} event is trusted and belongs to this action`)
+  }
+  return { name, checked, generation: first.generation, url: first.url,
+    before: { monotonic: first.monotonic, control: controls[0] },
+    after: { monotonic: last.monotonic, control: controls[1] }, events }
+}
+
+/** Mandatory observations bracket the entire monitored action, including its
+ * monitor drain. An optional in-flight sample must not collide with them. */
+export async function checkNativePointCheckboxAction({ capture, action, name, checked }) {
+  const before = await capture('before-input')
+  await action()
+  const after = await capture('after-input')
+  return assertNativePointCheckboxAction({ before, after, name, checked })
+}
+
+export async function saveAppJson({ page, artifactDir, name, diagnose, owned,
+  waitForFrames = () => page.evaluate(() => new Promise((done) => requestAnimationFrame(() => requestAnimationFrame(done)))) }) {
   // Flush committed read-only observations after the preceding native UI action.
-  await page.evaluate(() => new Promise((done) => requestAnimationFrame(() => requestAnimationFrame(done))))
+  await waitForFrames()
   const before = await page.evaluate(() => window.stzAppLabels.state())
   const originalModel = JSON.parse(before.json)
   const ambientDimension = originalModel.diagram.ambientDimension

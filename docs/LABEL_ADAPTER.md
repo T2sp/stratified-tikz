@@ -738,3 +738,88 @@ legacy contour size. Runtime failures, parser failures, and export deadlines
 retain complete literal source. Point browser acceptance is pending in this
 child environment; see `PHASE_32A_IMPLEMENTATION.md`. Paint expansion, new shape
 algorithms and layout/anchor controls remain 32B–32D work.
+
+
+## Phase 32B paint boundary
+
+32B reuses the same source/font request identity, cached validated SVG and body
+measurements. Point paint is applied only by the synchronous view: inherited
+MathJax paint takes the node's text color while explicit internal colors remain
+unchanged. Independent text/fill/stroke alphas and disabled paints are resolved
+outside the adapter. They are never input to parsing or conversion.
+
+`captureSvgLabelExport` deep-copies and freezes the optional point paint,
+including all nested objects and dash arrays. `SvgPointNodeView` applies the
+captured paint during detached whole-node reconstruction; subsequent edits cannot
+alter captured output. Free-label and path-inline semantics remain unchanged.
+Contours use ordinary geometric SVG scaling: border width, dash lengths and
+phase use the same local TeX-point conversion (`* 1.2`) as layout and picking.
+Responsive viewport scaling therefore preserves border/body proportions in
+preview and detached exports. The selection ring retains its separate
+non-scaling overlay. Font sizing, body conversion/cache keys, camera projection
+and immutable pending capture are unchanged.
+
+Polygon stroke bounds and exterior picking share a local union of edge strips
+and turn-selected joins (miter limit 10), including concave corners and thick
+overlaps. Picking measures its six-unit allowance from that region; it preserves
+the original contour's interior selection. Pending and committed empty bodies
+use the same layout contract. No stroke geometry enters the adapter/cache key.
+
+Effective SVG dash settings also belong to this synchronous geometry boundary.
+Layouts retain an independent copy of effective pattern values and compare
+width, enablement, phase, cap and join before accepting a commit. Dash endpoint
+rectangles/semicircles extend the continuous selection neighborhood without
+rejecting gaps. Square-capped dashed circles with endpoints share a fixed
+256-edge contour between SVG and geometry; original circle/body bounds and
+all label conversion identities stay unchanged. Both contour fill and stroke
+use that bounded inscribed approximation; other circle styles retain circles.
+See the [independent cap fixtures](../tests/fixtures/dash-cap-svg/README.md) for
+original engine observations, corrected outputs and analytic approximation limits.
+
+The accepted 32B `yeWQVG` parent passed all five checks, 16 groups and 16 point
+scenarios with no page errors. Independent review then rejected namespace
+lookup and responsive border geometry, with zero Critical and two Medium
+findings. That valid baseline supersedes the pending harness notes below, but
+does not validate the corrected tree; fresh parent verification and subsequent
+independent review remain required. 32C/32D remain deferred.
+
+The later `stz-phase32b-before-review-yLwzPX` parent completed all eleven cumulative
+32A point scenarios, then timed out on the first 32B Inspector select's exact
+associated-label lookup. Seven native paint edits had reached the model with
+request count unchanged at 3. This establishes a harness locator failure, not an
+adapter/paint rendering defect or a complete mixed-paint pass. At that historical
+run the adjacent invalid-width warning lookup had not executed.
+The targeted harness correction matches captions independently of options and
+warnings and retains before/after DOM counts, model/history and request evidence.
+The subsequent `7bdmDz` parent supplies native dashed/round/bevel edits and mixed
+paint, plus actual `2 → NaN → 2` warning/recovery with unchanged model/history.
+It reached 25 production-markup clone checks, then failed an overly narrow
+disabled-control rejection expectation: Playwright follows `label.control`, so
+disabling the select correctly rejects at the wrapping label first. The local
+DOM `enabled` observation and Playwright's queried enabled state measure
+different things; diagnostics now name and retain both separately.
+
+The bounded test correction requires the exact disabled-field assertion,
+unchanged native value/no events, and normal selection after restoration. Real
+App conversion, history, and paint checks remain in place. That historical parent completed
+all eleven cumulative 32A scenarios but zero complete 32B paint scenarios;
+later variants, imports/persistence, lifecycle/dimming and paint exports remained
+unverified until the subsequent successful `yeWQVG` parent. Child localhost
+`EPERM` is a separate startup limitation. See
+[the current correction report](PHASE_32B_IMPLEMENTATION.md) for the production
+findings and corrected-tree verification/review status.
+
+The `cI6r6H` parent subsequently passed namespace aliases and the five earlier
+paint cases, but its first responsive circle was clipped by the SVG root:
+expected bottom 188.75px in a 180px PNG. This is a fixture framing failure;
+source/font conversion and the measured 20pt geometric border are unchanged.
+The responsive fixture now uses the axes-fit midpoint before invariant baselines,
+including each fresh real-export input. Independent expected envelopes reserve
+all geometry and the larger non-scaling control even for invisible paint.
+Bounded captures settle first, retain root/body/contour transforms before and
+after screenshots, reject coordinate drift and decode the original native PNG
+using the safe XML Canvas path. Model/history/request identities remain invariant.
+The [framing repair report](PHASE_32B_IMPLEMENTATION.md#responsive-fixture-framing-and-coherent-capture-2026-09-24)
+records 2,836 passing tests and the exact final-tree handoff; child localhost
+`EPERM` establishes no native pass. Complete final-tree browser acceptance and
+subsequent independent review remain pending; 32C/32D remain deferred.

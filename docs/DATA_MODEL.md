@@ -2430,3 +2430,140 @@ In 2D mode, this maps screen coordinates to `(x, y, 0)`.
 In 3D mode, this maps screen coordinates to the chosen work plane.
 
 For MVP, this function may initially support only simple orthographic cameras.
+
+
+## Phase 32B saved point paint
+
+Imported point paint additionally supports optional `PointStyle.importedPaint`:
+`{ referenceId, baseline: PointPaint, overriddenFields: PointPaintField[] }`.
+This is an additive saved-file v2 extension; `Diagram.version` remains 1.
+The baseline is the importer's last materialized preview, including deterministic
+fallbacks. The override list is authoritative editing state, containing unique
+dotted paint property names (for example `fill.color`, `stroke.width`, or
+`stroke.dashPattern`) and the overall `opacity` property. It is not a rendering
+cache. Validation rejects malformed metadata, invalid baseline paint, unsupported
+or duplicate property names, and metadata whose reference ID differs from the
+point or preset's active imported reference.
+
+New imported point presets start with an empty list. Inspector, bulk/quick and
+saved-preset updates record accepted fields, including equal-valued edits. The
+numeric controls do not accept values on an untouched focus/blur; typing and
+explicit Enter acceptance retain intent even when the numeric value is equal. The
+combined color control claims fill color (when filled) and stroke color; hollow
+or filled controls claim fill enabled/color/opacity; line-style selection claims
+line style and clears a custom dash pattern. Built-in point preset selection
+deliberately chooses all paint fields while retaining the existing external
+reference behavior. Reapplying an imported preset replaces a point's local
+overrides with that preset's own state. Replacing the reference never carries
+intent from the previous reference. Saving an independent user preset or pasting
+into a diagram without the external reference keeps explicit paint and removes
+the provenance. Copies, duplicates and history own deep copies of the list and
+baseline, including any dash arrays.
+
+The quick bar's actual external-style detachment removes `stylePresetId`,
+`importedTikzStyleReferenceId` and point `style.importedPaint` atomically through
+`pointStyleForImportedReference(style, undefined)`. It retains every explicit
+paint value and overall opacity with independent nested copies. Validation is
+unchanged and succeeds immediately, before serialization. The similarly named
+bulk-edit helper only removes a preset association: ordinary paint edits keep
+the external reference and its local-intent metadata. Undo restores the complete
+association/provenance; redo detaches it again without changing explicit paint.
+
+When later imports change effective definitions, only matching importer-tracked
+snapshots may refresh unoverridden fields; explicit user edits and distinguishable
+manual changes survive. Styles without this metadata retain their saved explicit
+values. On their next accepted edit, the update boundary reconstructs the current
+import baseline, records distinguishable existing values and the edited fields,
+and persists that state. Historical equal-valued edits are unavoidably ambiguous:
+older files did not record intent, so equality alone does not become an override.
+Normal loading does not invent intent or silently regenerate historical styles.
+Untouched unresolved fields retain their external TikZ effect, while deliberate
+local fields remain authoritative after the external key in both output modes.
+
+Unsupported literal-target style mutations are transient ordered declaration
+events reconstructed from saved `rawSource`, not a new saved schema. The shared
+context stores an explicit unresolved definition with its last-known fallback,
+diagnostics and ordered source dependencies. Full definitions, invalidations
+and later full definitions replay in source/declaration order. Saved reference
+fallbacks cannot resurrect an invalidated body as known. All affected paint is
+uncertain until later supported options resolve their individual fields when
+the mutation is demonstrably paint-only; local
+edits remain authoritative independently of equality with the fallback. Raw
+source/options, stable references and source load order are preserved.
+
+Recognizable unsupported mutation bodies and nested literal dependencies also
+propagate invocation-time directory uncertainty. Once runtime `/.cd` is found,
+later relative paint keys stay unresolved; after a fully scanned directory-only
+change, supported absolute `/tikz/...` keys may still resolve their own fields.
+Ordinary paint-only mutation recovery remains supported. Declaration-level `.cd` only
+qualifies declarations and does not change invocation certainty. This state is
+reconstructed from raw sources, with no new saved field or TeX execution.
+
+An unsupported execution-capable option such as `/utils/exec`, an unknown
+runtime key/handler or an invoked retained code mutation additionally invalidates
+color-binding and handler certainty for the entire resolution. The transient
+preview records `executionUncertain` and every paint field remains unresolved,
+including after nested/aliased calls return to an outer list. Retained mutation
+lists are inspected for executable effects as well as dependencies/directories.
+Work, depth, body-length or cycle termination can leave executable effects
+unvisited, so they also preserve this uncertainty. Later literal colors, mixtures
+and absolute `/tikz/...` options cannot recover certainty from stale bindings or
+handlers. Known paint-key invalid literals and demonstrably paint-only mutations
+retain their narrower recovery rules. No code body is interpreted.
+
+This invocation-time policy retains the accepted declaration and exact source;
+it does not reject otherwise supported top-level `.style` storage. The flag is
+derived during reconstruction, not a persisted authority or new schema field.
+It also applies to executable values of recognized paint keys: dimension,
+opacity, color/mixture, dash and cap/join handlers can expand TeX even when their
+names are supported. A shared bounded classification runs before literal parsing
+and during retained-list dependency scans, including unknown-directory paths.
+Grouping braces and ordinary invalid literals do not cause this global state;
+their established field-specific diagnostics and recovery remain intact.
+JSON reload reestablishes the uncertainty and reference diagnostics from raw
+source or existing legacy reference options. Import refresh, first editing and
+both exports cannot infer local intent from stale saved snapshot differences
+under this policy. Recorded `overriddenFields` remain authoritative, including
+an explicit value equal to the visible fallback; the first untracked edit claims
+only the fields actually edited. Existing-preset reapplication and Undo/Redo
+preserve that distinction. Untouched uncertain paint is omitted after the actual
+external key, and exact source/options, key spelling and load hints remain intact.
+Recovery through a later supported definition also checks the previous context:
+stale snapshot differences cannot be promoted into new overrides. Recorded fields
+survive onto the supported baseline; an untracked legacy fallback receives a fresh
+snapshot. Directory-dependent effect scans cover possible namespaced handlers
+and all retained lists, including prefix order, within their shared work bound.
+Recovery resets unrecorded overall opacity with the uncertain channel paint;
+recorded opacity intent survives. Legacy recovery preserves nonpaint style,
+including point shape and size.
+
+Execution-context failures and declaration overflow are also reconstructed from
+raw sources, without adding a saved schema field. Initial import rejects them
+atomically with empty parse metadata and an unchanged diagram. The supported
+source grammar is a sequence of top-level literal declaration commands/comments;
+macro definitions, conditionals, local groups and arbitrary execution are outside
+it. Passive declaration handlers use an explicit allowlist and complete argument
+boundaries; execution handlers such as `/.try`, unknown chains, and replacements
+of built-in paint/handler hooks reject the source rather than invalidating only
+the last literal key. A shared 512-event budget includes definitions, mutations and colors; event
+513 rejects the entire source rather than resolving its prefix.
+
+When such a source already exists in saved JSON, it remains byte-for-byte intact.
+Reconstruction invalidates all imported paint, including earlier sources, aliases,
+colors and stale reference/preset options. JSON loading retains old diagnostics
+and appends the reconstructed source limitation. These diagnostics round-trip;
+no stored fallback can restore certainty. Explicit imported-paint intent remains
+authoritative, including equal-valued edits. Legacy values without intent are
+kept as preview fallbacks but cannot imply local overrides under source-wide
+uncertainty. Their first accepted edit snapshots the saved fallback and records
+only the actual edited fields. No TeX is executed during import, loading or preview.
+
+New saves use envelope version **2**, superseding the historical version-1
+wrapper examples above. `Diagram.version` remains 1. Both envelope versions
+load; point strata and saved user point presets materialize independent paint
+without changing raw text, geometry, codimension or old shape/size semantics.
+`PointStyle.paint` owns text, fill and stroke settings. If present it is
+authoritative; the legacy `color`/`fill` fields are compatibility metadata.
+See [normalization and precedence](IMPORTED_POINT_PAINT.md) and
+[32B implementation/evidence](PHASE_32B_IMPLEMENTATION.md) for the precise schema,
+validation, migration, cloning and export contracts.

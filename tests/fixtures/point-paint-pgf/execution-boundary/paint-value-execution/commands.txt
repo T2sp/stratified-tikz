@@ -1,0 +1,18 @@
+Original reproduction: /private/tmp/stz-review-paint-value-exec (all original bytes preserved).
+Corrected compiler output directory: /private/tmp/stz-paint-value-execution-pgf-dpg1ww7y
+Working directory: /Users/takamatoshinori/Desktop/stratified-tikz/tests/fixtures/point-paint-pgf/execution-boundary/paint-value-execution
+
+PATH=/opt/homebrew/bin:$PATH node generate.mjs
+Exit code: 0
+PATH=/opt/homebrew/bin:/Library/TeX/texbin:$PATH node --version
+PATH=/opt/homebrew/bin:/Library/TeX/texbin:$PATH pdflatex --version
+PATH=/opt/homebrew/bin:/Library/TeX/texbin:$PATH pdflatex -interaction=nonstopmode -halt-on-error -output-directory=/private/tmp/stz-paint-value-execution-pgf-dpg1ww7y runtime-standalone.tex > standalone-compilation.txt 2>&1
+Exit code: 0
+cp /private/tmp/stz-paint-value-execution-pgf-dpg1ww7y/runtime-standalone.pdf runtime-standalone.pdf
+cp /private/tmp/stz-paint-value-execution-pgf-dpg1ww7y/runtime-standalone.log runtime-standalone.log.txt
+PATH=/opt/homebrew/bin:/Library/TeX/texbin:$PATH pdflatex -interaction=nonstopmode -halt-on-error -output-directory=/private/tmp/stz-paint-value-execution-pgf-dpg1ww7y runtime-inlineMath.tex > inlineMath-compilation.txt 2>&1
+Exit code: 0
+cp /private/tmp/stz-paint-value-execution-pgf-dpg1ww7y/runtime-inlineMath.pdf runtime-inlineMath.pdf
+cp /private/tmp/stz-paint-value-execution-pgf-dpg1ww7y/runtime-inlineMath.log runtime-inlineMath.log.txt
+PATH=/opt/homebrew/bin:$PATH node extract-operators.mjs
+Exit code: 0

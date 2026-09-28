@@ -1,0 +1,46 @@
+{
+  "parse": {
+    "styles": [
+      {
+        "key": "myPoint",
+        "options": "text=blue"
+      }
+    ],
+    "skipped": 2,
+    "warnings": [
+      {
+        "message": "Unsupported style mutation run/.code; paint preview uses a fallback and remains unresolved."
+      },
+      {
+        "message": "Unsupported style mutation run/.try; paint preview uses a fallback and remains unresolved."
+      }
+    ],
+    "declarations": [
+      {
+        "kind": "definition",
+        "key": "myPoint",
+        "options": "text=blue"
+      },
+      {
+        "kind": "mutation",
+        "key": "run",
+        "diagnostic": "Unsupported style mutation run/.code; paint preview uses a fallback and remains unresolved."
+      },
+      {
+        "kind": "mutation",
+        "key": "run",
+        "diagnostic": "Unsupported style mutation run/.try; paint preview uses a fallback and remains unresolved."
+      }
+    ],
+    "rawOptions": {
+      "myPoint": "text=blue"
+    },
+    "colors": {}
+  },
+  "resolution": {
+    "textColor": "#0000FF",
+    "sourceDependencies": [
+      "external-style-source-try-sty"
+    ]
+  }
+}

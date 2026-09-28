@@ -1,0 +1,26 @@
+{
+  "fillEnabled": true,
+  "fillColor": "#FF0000",
+  "textColor": "#00FF00",
+  "diagnostics": [
+    "Unsupported style mutation myPoint/.append style; paint preview uses a fallback and remains unresolved.",
+    "Style dependency scan has an unsupported runtime directory change; retaining all imported source hints."
+  ],
+  "unresolvedFields": [
+    "fillColor",
+    "fillEnabled",
+    "drawColor",
+    "drawEnabled",
+    "fillOpacity",
+    "drawOpacity",
+    "textOpacity",
+    "lineWidth",
+    "dashPattern",
+    "dashPhase",
+    "lineCap",
+    "lineJoin"
+  ],
+  "sourceDependencies": [
+    "external-style-source-source-sty"
+  ]
+}

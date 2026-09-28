@@ -1,5 +1,7 @@
 import { pathIntersectionDetectionForDiagram } from '../geometry/pathIntersections.ts'
 import { sampleCurvedSheetPrimitive } from '../geometry/curvedSheets.ts'
+import { distanceToPolygonStroke } from '../geometry/polygonStroke.ts'
+import { distanceToDashCaps } from '../geometry/dashCaps.ts'
 import {
   arcSegmentToCubicBezierSegments,
   pathSegmentEnd,
@@ -38,7 +40,7 @@ import {
 import { currentSvgLabelBounds, type SvgFreeLabelBoundsSnapshot } from './svgLabelBounds.ts'
 import { literalSvgLabelLayout, normalizeSvgLabelFontSize, placeSvgLabel, svgLabelLayoutSettings } from './labels/svgLabelLayout.ts'
 import { maxSvgPathInlineNodePreviews } from './svgPathInlineNodes.ts'
-import { currentSvgPointNodeGeometry, pendingSvgPointNodeGeometry, type SvgPointNodeCommits } from './svgPointNodeLayout.ts'
+import { currentSvgPointNodeLayout, pendingSvgPointNodeLayout, type SvgPointNodeCommits } from './svgPointNodeLayout.ts'
 
 export type SvgPreviewHitTestTargetKind =
   | 'geometryHandle'
@@ -1166,17 +1168,21 @@ function collectPointCandidate(
   }
 
   const distance = distanceVec2(center, point)
-  const geometry = pointCommits === undefined ? pendingSvgPointNodeGeometry(pointStratum)
-    : currentSvgPointNodeGeometry(pointStratum, pointCommits, documentRevision, fontGeneration)
-  if (geometry === null) return true
+  const layout = pointCommits === undefined ? pendingSvgPointNodeLayout(pointStratum)
+    : currentSvgPointNodeLayout(pointStratum, pointCommits, documentRevision, fontGeneration)
+  if (layout === null) return true
+  const { geometry } = layout
   const localPoint = { x: point.x - center.x, y: point.y - center.y }
   const boundaryDistance = geometry.kind === 'circle'
-    ? Math.max(distance - geometry.radius, 0)
+    ? Math.max(distance - geometry.radius - layout.stroke / 2, 0)
     : pointInPolygon(localPoint, geometry.vertices)
       ? 0
-      : distanceToClosedPolyline(localPoint, geometry.vertices)
+      : layout.stroke > 0 && layout.strokeRegion
+        ? distanceToPolygonStroke(localPoint, layout.strokeRegion)
+        : distanceToClosedPolyline(localPoint, geometry.vertices)
 
-  if (boundaryDistance > 6) {
+  if (Math.min(boundaryDistance, distanceToDashCaps(localPoint, layout.dashCaps),
+    geometry.kind === 'circle' && layout.strokeRegion ? distanceToPolygonStroke(localPoint, layout.strokeRegion) : Infinity) > 6) {
     return true
   }
 

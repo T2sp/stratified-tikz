@@ -7,6 +7,7 @@ import {
 import { normalizeColorInputValue } from '../colorInput.ts'
 import {
   finiteNumberDraftWarning,
+  inspectorNumericCommitValue,
   opacityDraftWarning,
   positiveNumberDraftWarning,
   updateInspectorNumericDraft,
@@ -168,21 +169,22 @@ export function EditableParsedNumberField({
     setHasEditedDraft(false)
   }, [committedValue])
 
-  function commitDraftIfValid(nextDraft: string, canonicalize: boolean): void {
+  function commitDraftIfValid(nextDraft: string, trigger: 'input' | 'blur' | 'enter'): void {
     const nextUpdate = updateInspectorNumericDraft(
       nextDraft,
       parse,
       invalidMessage,
     )
 
-    if (nextUpdate.commitValue === null) {
+    const acceptedValue = inspectorNumericCommitValue(nextUpdate, trigger, hasEditedDraft)
+    if (acceptedValue === null) {
       return
     }
 
-    onChange(nextUpdate.commitValue)
+    onChange(acceptedValue)
 
-    if (canonicalize) {
-      setDraft(formatNumberInput(nextUpdate.commitValue))
+    if (trigger !== 'input') {
+      setDraft(formatNumberInput(acceptedValue))
       setHasEditedDraft(false)
     }
   }
@@ -204,12 +206,12 @@ export function EditableParsedNumberField({
 
           setDraft(nextDraft)
           setHasEditedDraft(true)
-          commitDraftIfValid(nextDraft, false)
+          commitDraftIfValid(nextDraft, 'input')
         }}
-        onBlur={() => commitDraftIfValid(draft, true)}
+        onBlur={() => commitDraftIfValid(draft, 'blur')}
         onKeyDown={(event) => {
           if (event.key === 'Enter') {
-            commitDraftIfValid(draft, true)
+            commitDraftIfValid(draft, 'enter')
           }
         }}
       />

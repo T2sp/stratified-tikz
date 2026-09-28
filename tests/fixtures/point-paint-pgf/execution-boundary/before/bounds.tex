@@ -1,0 +1,12 @@
+\documentclass{article}
+\usepackage{tikz}
+\pagestyle{empty}
+\pdfcompresslevel=0
+\pdfobjcompresslevel=0
+\begin{document}
+\typeout{STZ-PGF-VERSION=\pgfversion}
+\input{bounds.sty}
+\begin{tikzpicture}\node[myPoint] at (0,0) {PGF};\end{tikzpicture}
+\input{bounds-standalone.tex}
+\[\input{bounds-inlineMath.tex}\]
+\end{document}

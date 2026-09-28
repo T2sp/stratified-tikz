@@ -1,0 +1,30 @@
+\documentclass{article}
+\usepackage{tikz}
+\pagestyle{empty}
+\pdfcompresslevel=0
+\pdfobjcompresslevel=0
+\begin{document}
+\typeout{STZ-PGF-VERSION=\pgfversion}
+\input{base.sty}
+\input{outer.sty}
+\begin{tikzpicture}
+\node[outer] at (0,0) {A};
+\node[named] at (2,0) {B};
+\node[root] at (4,0) {C};
+\node[late] at (6,0) {D};
+\begin{scope}
+\def\mycolor{cyan}
+\tikzstyle{example}=[fill=\mycolor,text=red]
+\node[example] at (0,-2) {E};
+\node[example,fill=black] at (2,-2) {F};
+\end{scope}
+\begin{scope}
+\definecolor{red}{cmyk}{1,0,0,0}
+\tikzstyle{myPoint}=[fill=red,text=red]
+\node[myPoint] at (0,-4) {G};
+\node[myPoint,fill=black,text=black] at (2,-4) {H};
+\definecolor{red}{HTML}{654321}
+\node[myPoint] at (4,-4) {I};
+\end{scope}
+\end{tikzpicture}
+\end{document}

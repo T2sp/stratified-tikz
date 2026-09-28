@@ -17,6 +17,15 @@ export type InspectorNumericDraftUpdate = {
   warning: string | null
 }
 
+/** Focus/blur alone is not an edit; Enter remains an explicit acceptance. */
+export function inspectorNumericCommitValue(
+  update: InspectorNumericDraftUpdate,
+  trigger: 'input' | 'blur' | 'enter',
+  hasEditedDraft: boolean,
+): number | null {
+  return trigger === 'blur' && !hasEditedDraft ? null : update.commitValue
+}
+
 export function validateInspectorNumericDraft(
   draft: string,
   parse: InspectorNumberParser,

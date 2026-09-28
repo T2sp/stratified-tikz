@@ -4,6 +4,7 @@ import {
   cloneCurveStyle,
   cloneLabelStyle,
   clonePointStyle,
+  pointStyleForImportedReference,
   cloneRegionStyle,
   cloneSheetStyle,
 } from '../model/styles.ts'
@@ -443,7 +444,7 @@ function pasteStyleToStratum(
             diagram,
             {
               ...stratum,
-              style: clonePointStyle(clipboard.style),
+              style: pointStyleForImportedReference(clipboard.style, validImportedTikzStyleReferenceId(diagram, 'point', clipboard.importedTikzStyleReferenceId)),
             },
             clipboard,
           )

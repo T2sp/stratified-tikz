@@ -1151,8 +1151,10 @@ shared view into a detached snapshot. Later edits or loads affect the live
 Preview and the next export, without mixing revisions into the pending file.
 Successful labels are typeset and failed labels contain complete captured
 source. Transparent mode adds no background; white mode adds one white
-viewBox-sized background rectangle. Sanitization removes editor overlays and
-metadata while preserving formula geometry, explicit paint, opacity, measured
+viewBox-sized background rectangle as the first SVG-root element, with the
+intentional unnamespaced `data-stratified-tikz-export-background="white"` marker.
+Sanitization removes editor overlays and runtime metadata while preserving this
+export marker, formula geometry, explicit paint, opacity, measured
 placement, whitespace and path outlines. One export runs at a time; errors
 restore the action without downloading invalid SVG. See
 [Preview UI](./PREVIEW_UI.md#export-svg) and the
@@ -1346,9 +1348,68 @@ existing deadline and full-source fallback, reconstructs the whole point using
 the shared view, validates both contour and body, and retains cloned parent
 visibility/opacity. Overlay exclusion and duplicate-click policy are unchanged.
 
-32A acceptance remains gated on fresh parent browser evidence and independent
-review. Native assertions are registered for the three point groups in addition
+32A acceptance is established by the `gtRban` parent evidence and independent
+review (see the 32B prerequisite audit). Native assertions are registered for the three point groups in addition
 to all twelve Phase 31F groups; missing scenario records/artifacts, terminal
 failure, page errors, and checkout mismatches stop the runner before review.
 The fresh-process verifier loading contract remains in force. 32B–32D slugs
 inherit completed groups; their future groups must be activated in those stages.
+
+
+## Phase 32B point paint contract
+
+Saved-file envelope v2 adds explicit independent `PointStyle.paint`; the internal
+diagram version stays 1. Both old envelope v1 and v2 are accepted, with legacy
+point strata and user presets normalized to the same effective paint. Legacy
+`color`/`fill` metadata is consulted only when paint is absent. Explicit paint
+is authoritative and validated as a whole. The source text, codim, ambient
+dimension, shape and size conventions are unchanged.
+
+Text has color/opacity; fill has enabled/color/opacity; stroke has enabled/color/
+opacity/width/lineStyle/dashPattern/dashPhase/lineCap/lineJoin. Width and dash
+lengths are finite TeX-point values: width is positive and dash lengths are
+nonnegative; phase may be signed. Alphas are
+finite in [0,1]; colors are six-digit hex values after literal import resolution.
+Disabled paint is distinct from alpha zero. Legacy hollow remains white-filled.
+The overall application opacity multiplies each resolved paint once. Imported
+general/specific PGF opacity keys resolve in option order before that multiplier;
+they are not all multiplied together.
+
+Clone, preset, clipboard, bulk editing and export-capture boundaries deep-copy
+paint objects and dash arrays. The existing body/layout lifecycle remains
+source-dependent; color/opacity edits do not trigger MathJax compilation.
+Contour fill and stroke have independent SVG alphas, body color inherits into
+validated math geometry, and explicit math color survives. Stroke width affects
+painted bounds and picking, separate from body and shape bounds.
+
+Dash endpoint geometry shares the emitted effective stroke settings. Interaction
+unions the original contour, continuous stroke neighborhood and actual oriented
+caps, retaining selection through dash gaps and the six-local-unit allowance.
+Isolated zero-on subpaths use full square/disk cap geometry, separately from
+oriented positive-length endpoint caps. Raw dash patterns and coordinates remain
+unchanged. See the [native zero-dash investigation](PHASE_32B_ZERO_DASH_INVESTIGATION.md)
+for the retained Chrome/Cairo distinction and the expanded native verification gate.
+The subsequent [endpoint continuation](PHASE_32B_NATIVE_ENDPOINT_INVESTIGATION.md)
+distinguishes terminal-only zero dots, positive endpoint edge ownership and
+zero-off caps. Raster/containment disagreements require live painted evidence;
+they cannot be accepted merely by changing the expected candidate list.
+The [connected-live recalibration](PHASE_32B_LIVE_PAINT_ACCEPTANCE.md) records
+the independently justified square oracle correction, remaining full-closed
+triangle discrepancy and proposed finite inventory. Connected paint, clone
+paint, containment and production distances remain separate observations.
+Background alone does not establish a miss within the unchanged six-unit
+neighborhood. Strict acceptance remains active until explicit scope adoption.
+Paint/clearance bounds conservatively retain that continuous stroke envelope;
+they are not paint-only gap masks or final hit oracles. Revision matching compares
+pattern values, phase, cap, join, width and enablement along with existing owner,
+source, font and shape guards. Immutable export reconstructs the same contour.
+Square-capped dashed circles with endpoints use a fixed 256-edge inscribed
+contour in both SVG and geometry, with radial error bounded by
+`r*(1-cos(pi/256))` and tangent-angle error by `pi/256`. The original mathematical
+circle and body bounds remain authoritative; other circle styles are unchanged.
+This is a bounded rendering approximation, not a saved shape/schema change.
+
+The browser policy adds `point-node-paint-import-persistence` cumulatively to all
+31F and 32A groups. Completion still requires fresh terminal success, named
+scenario observations, actual standalone downloads, matching checkout identity,
+and independent review. See [32B evidence and grammar](PHASE_32B_IMPLEMENTATION.md).

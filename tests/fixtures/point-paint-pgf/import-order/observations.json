@@ -1,0 +1,61 @@
+{
+  "pgfVersion": "3.1.11a",
+  "engine": "pdfTeX 3.141592653-2.6-1.40.29 (TeX Live 2026)",
+  "compilationExitCode": 0,
+  "observations": [
+    {
+      "body": "A",
+      "fill": "#FF0000",
+      "text": "#00FF00",
+      "stroke": "#0000FF",
+      "textOperator": "0 1 0 rg"
+    },
+    {
+      "body": "B",
+      "fill": "#123456",
+      "text": "#123456",
+      "textOperator": "0.0706 0.20392 0.33725 rg"
+    },
+    {
+      "body": "C",
+      "text": "#0000FF",
+      "textOperator": "0 0 1 rg"
+    },
+    {
+      "body": "D",
+      "fill": "#2468AC",
+      "text": "#2468AC",
+      "textOperator": "0.14119 0.40784 0.67451 rg"
+    },
+    {
+      "body": "E",
+      "fill": "#00FFFF",
+      "text": "#FF0000",
+      "textOperator": "1 0 0 rg"
+    },
+    {
+      "body": "F",
+      "fill": "#000000",
+      "text": "#FF0000",
+      "textOperator": "1 0 0 rg"
+    },
+    {
+      "body": "G",
+      "fill": "#00FFFF",
+      "text": "#00FFFF",
+      "textOperator": "1 0 0 0 k"
+    },
+    {
+      "body": "H",
+      "fill": "#000000",
+      "text": "#000000",
+      "textOperator": "0 g"
+    },
+    {
+      "body": "I",
+      "fill": "#654321",
+      "text": "#654321",
+      "textOperator": "0.39609 0.26276 0.12941 rg"
+    }
+  ]
+}

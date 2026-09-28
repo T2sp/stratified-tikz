@@ -1,0 +1,59 @@
+\begin{tikzpicture}[baseline={([yshift=-.5ex]current bounding box.center)}, line cap=round, line join=round]
+    %----------------------------------------
+    % Styles and colors
+    %----------------------------------------
+    % TikZ export mode: inline math. Setup is local to this tikzpicture.
+    %----------------------------------------
+    % External TikZ styles
+    %----------------------------------------
+    % External TikZ styles referenced below.
+    % Load these files in your LaTeX preamble or before the picture:
+    % - append.sty
+    % Suggested:
+    %   \input{append.sty}
+    %----------------------------------------
+    % Local colors
+    %----------------------------------------
+    \definecolor{stzPointpFill}{HTML}{FF0000}
+    \definecolor{stzPointpStroke}{HTML}{000000}
+    \definecolor{stzPointpText}{HTML}{FF0000}
+    \definecolor{stzPointpFill2}{HTML}{FF0000}
+    \definecolor{stzPointpStroke2}{HTML}{000000}
+    \definecolor{stzPointpText2}{HTML}{FF0000}
+    %----------------------------------------
+    % TikZ layers
+    %----------------------------------------
+    \pgfdeclarelayer{stratifiedLayer0}
+    \pgfsetlayers{stratifiedLayer0,main}
+    %----------------------------------------
+    % Coordinates
+    %----------------------------------------
+    \coordinate (pointPoint0p0) at (0,0);
+    %----------------------------------------
+    % Layered drawing commands
+    %----------------------------------------
+    % Layer 0: stratifiedLayer0
+    \begin{pgfonlayer}{stratifiedLayer0}
+        %----------------------------------------
+        % Codimension 2 strata: points
+        %----------------------------------------
+        \node[
+            fill=stzPointpFill,
+            draw=stzPointpStroke,
+            text=stzPointpText,
+            fill opacity=1,
+            draw opacity=1,
+            line width=0.4pt,
+            solid,
+            dash phase=0pt,
+            line cap=butt,
+            line join=miter,
+            circle,
+            inner sep=1.5pt,
+            myPoint
+        ] at (pointPoint0p0) {APP};
+    \end{pgfonlayer}
+    % Codimension 0 strata: regions
+    % Codimension 1 strata: curves
+    % Labels
+\end{tikzpicture}

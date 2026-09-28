@@ -1,0 +1,102 @@
+{
+  "pgfVersion": "3.1.11a",
+  "pgfVersionDate": "2025-08-29",
+  "engine": "pdfTeX 3.141592653-2.6-1.40.29 (TeX Live 2026)",
+  "unit": "TeX pt, 72.27 per inch",
+  "observations": [
+    {
+      "body": "A",
+      "options": "draw=green,fill=blue,text=red,draw opacity=.8,fill opacity=.7,opacity=.2",
+      "fill": 0.2,
+      "stroke": 0.2,
+      "text": 0.2,
+      "textColor": "#FF0000"
+    },
+    {
+      "body": "B",
+      "options": "draw=green,fill=blue,text=red,opacity=.2,draw opacity=.8,fill opacity=.7",
+      "fill": 0.7,
+      "stroke": 0.8,
+      "text": 0.7,
+      "textColor": "#FF0000"
+    },
+    {
+      "body": "C",
+      "options": "draw=green,fill=blue,text=red,text opacity=.6,opacity=.2",
+      "fill": 0.2,
+      "stroke": 0.2,
+      "text": 0.6,
+      "textColor": "#FF0000"
+    },
+    {
+      "body": "D",
+      "options": "draw=green,fill=blue,text=red,opacity=.2,text opacity=.6",
+      "fill": 0.2,
+      "stroke": 0.2,
+      "text": 0.6,
+      "textColor": "#FF0000"
+    },
+    {
+      "body": "E",
+      "options": "draw=green,fill=blue,text=red,color=blue",
+      "fill": 1,
+      "stroke": 1,
+      "text": 1,
+      "textColor": "#0000FF"
+    },
+    {
+      "body": "F",
+      "options": "draw=green,fill=blue,color=blue,text=red",
+      "fill": 1,
+      "stroke": 1,
+      "text": 1,
+      "textColor": "#FF0000"
+    },
+    {
+      "body": "G",
+      "options": "draw=green,fill=none,text=red",
+      "fill": 1,
+      "stroke": 1,
+      "text": 1,
+      "textColor": "#FF0000",
+      "fillEnabled": false
+    },
+    {
+      "body": "H",
+      "options": "draw=none,fill=white,text=red,text opacity=0",
+      "fill": 1,
+      "stroke": 1,
+      "text": 0,
+      "textColor": "#FF0000",
+      "strokeEnabled": false
+    },
+    {
+      "body": "I",
+      "options": "draw=green,fill=none,text=red,dotted,line width=2pt",
+      "fill": 1,
+      "stroke": 1,
+      "text": 1,
+      "textColor": "#FF0000",
+      "fillEnabled": false,
+      "strokeWidth": 2,
+      "dashPattern": [
+        2,
+        2
+      ]
+    },
+    {
+      "body": "J",
+      "options": "draw=green,fill=none,text=red,line width=2pt,dotted",
+      "fill": 1,
+      "stroke": 1,
+      "text": 1,
+      "textColor": "#FF0000",
+      "fillEnabled": false,
+      "strokeWidth": 2,
+      "dashPattern": [
+        2,
+        2
+      ]
+    }
+  ]
+}

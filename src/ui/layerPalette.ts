@@ -1,3 +1,4 @@
+import { getPointPaint } from '../model/styles.ts'
 import {
   countElementsByLayer,
   elementsOnLayer,
@@ -178,7 +179,7 @@ export function createLayerThumbnail(
       case 'point':
         return {
           kind: 'point',
-          color: stratum.style.color,
+          color: getPointPaint(stratum.style).stroke.enabled ? getPointPaint(stratum.style).stroke.color : getPointPaint(stratum.style).fill.color,
           opacity: stratum.style.opacity,
         }
     }

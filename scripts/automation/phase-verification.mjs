@@ -11,9 +11,17 @@ import {
 } from "node:fs";
 import { spawnSync } from "node:child_process";
 import { createHash } from "node:crypto";
+import assert from "node:assert/strict";
 import { createRequire } from "node:module";
 import { homedir, tmpdir } from "node:os";
 import { join, resolve } from "node:path";
+import { observePostExternalPointPaint, assertPostExternalPointPaint, observeLiteralPointPaint, assertPointPaint, assertExplicitPointPaint } from "../pointPaintOracle.mjs";
+
+import { dashCapMechanismStem, dashCapMechanismArtifacts, assertDashCapMechanismEvidence } from "../pointDashCapMechanismContract.mjs";
+import { dashCapScenario, dashCapArtifacts, assertDashCapEvidence } from "../pointDashCapContract.mjs";
+
+import { polygonJoinScenario, polygonJoinArtifacts, assertPolygonJoinEvidence } from "../pointPolygonJoinContract.mjs";
+import { inspectConnectedLivePaintPng } from "../connectedLivePaintOracle.mjs";
 
 const freeLabelGroups = [
   "existing-renderer-regressions",
@@ -49,16 +57,77 @@ export const pointNodeScenarios = {
     "point-native-pending-transparent-edit", "point-native-pending-white-load",
     "point-whole-node-fallback-opacity-validation",
   ],
+  "point-node-paint-import-persistence": [
+    "point-paint-native-inspector-history", "point-paint-imported-presets-persistence",
+    "point-paint-lifecycle-dimming", "point-paint-pending-transparent-edit",
+    "point-paint-pending-white-load",
+    "point-paint-namespace-aliases",
+    "point-paint-responsive-circle", "point-paint-responsive-triangle",
+    "point-paint-responsive-downloads",
+    "point-paint-local-override-intent", "point-paint-cross-file-resolution",
+    "point-paint-unsupported-color-bindings",
+    "point-paint-unsupported-mutations", "point-paint-clear-imported-style",
+    "point-paint-mutation-directory-uncertainty", "point-paint-app-continuity", polygonJoinScenario, dashCapScenario,
+  ],
 };
 export function pointNodeScenarioArtifacts(name) {
-  return [`${name}.json`, ...(name.startsWith("point-native-pending-")
+  if (name === dashCapScenario) return [...dashCapArtifacts(), ...dashCapMechanismArtifacts()];
+  if (name === polygonJoinScenario) return polygonJoinArtifacts();
+  if (name === "point-paint-app-continuity") {
+    return [`${name}.json`, "point-paint-app-lifecycle.json", "point-paint-app-transitions.json", "point-paint-app-controls.json",
+      ...["missing-api", "wrong-api", "same-url-reload"].flatMap((fault) =>
+        ["failure.json", "failure.png", "lifecycle.json"].map((suffix) => `point-paint-app-control-${fault}-${suffix}`))];
+  }
+  const importRegressionSources = {
+    "point-paint-local-override-intent": ["intent.sty"],
+    "point-paint-cross-file-resolution": ["base.sty", "outer.sty", "base-colors.sty", "outer-colors.sty", "redefined.sty", "missing.sty", "later.sty"],
+    "point-paint-unsupported-color-bindings": ["unsupported.sty"],
+    "point-paint-unsupported-mutations": ["mutation.sty"],
+    "point-paint-mutation-directory-uncertainty": ["directory-mutation.sty", "directory-independent.sty"],
+  };
+  if (name === "point-paint-clear-imported-style") {
+    return [`${name}.json`, `${name}-clear.sty`, `${name}-independent.sty`,
+      ...["", "-multi"].flatMap((suffix) => ["-saved.json", ".svg", ".png", "-standalone.json", "-standalone.tex", "-inlineMath.tex"]
+        .map((extension) => `${name}${suffix}${extension}`))];
+  }
+  if (Object.hasOwn(importRegressionSources, name)) {
+    return [`${name}.json`, ...importRegressionSources[name].map((source) => `${name}-${source}`),
+      `${name}-saved.json`, `${name}.svg`, `${name}.png`, `${name}-standalone.json`,
+      ...(name === "point-paint-cross-file-resolution" ? [`${name}-later-saved.json`] : []),
+      ...["standalone", "inlineMath"].flatMap((mode) => [`${name}-${mode}.tex`,
+        ...(name === "point-paint-cross-file-resolution" ? [] : [`${name}-untouched-${mode}.tex`])])];
+  }
+  if (name === "point-paint-namespace-aliases") {
+    return [`${name}.json`, ...["shadowing", "missing", "aliases"].flatMap((entry) => {
+      const stem = `point-paint-namespace-${entry}`;
+      return [`${stem}.sty`, `${stem}-saved.json`, `${stem}-edited.json`, `${stem}-standalone.tex`, `${stem}-inlineMath.tex`];
+    })];
+  }
+  if (["point-paint-responsive-circle", "point-paint-responsive-triangle"].includes(name)) {
+    const variants = ["", "-non-scaling", "-disabled", "-transparent",
+      ...(name.endsWith("circle") ? ["-dashed"] : [])];
+    return [`${name}.json`, ...["0.5", "2"].flatMap((scale) => variants.flatMap((variant) =>
+      ["json", "svg", "png"].map((extension) => `${name}-scale-${scale}${variant}.${extension}`)))];
+  }
+  if (name === "point-paint-responsive-downloads") {
+    return [`${name}.json`, ...["transparent", "white"].flatMap((background) => ["", "-triangle", "-dashed"].flatMap((shape) => {
+      const stem = `point-paint-responsive-${background}${shape}`;
+      return [`${stem}.svg`, `${stem}-body-baseline.json`, `${stem}-body-controls.json`,
+        ...["scale-0.5", "scale-2", "return-scale-0.5"].flatMap((capture) =>
+          [`${stem}-${capture}.json`, `${stem}-${capture}.png`, `${stem}-${capture}-full.png`, `${stem}-${capture}.raster.svg`])];
+    }))];
+  }
+  return [`${name}.json`, ...((name.startsWith("point-native-pending-") || name.startsWith("point-paint-pending-"))
     ? [`${name}.svg`, `${name}.png`, `${name}-standalone.json`]
     : name === "point-whole-node-fallback-opacity-validation" ? ["point-fallback.svg"]
+      : name === "point-paint-imported-presets-persistence" ? ["point-paint-saved.json", "point-paint-import.sty"]
+      : name === "point-paint-native-inspector-history" ? ["point-paint-legacy.json"]
       : name === "point-native-direct-cursor-workplanes-inspector-persistence"
         ? ["point-native-2d.json", "point-native-3d.json"] : [])];
 }
 const pointNodeGroups = [...combinedLabelGroups, ...Object.keys(pointNodeScenarios)];
-const phase32Groups = { "32A": pointNodeGroups, "32B": pointNodeGroups,
+const pointNodeMathGroups = pointNodeGroups.filter((group) => group !== "point-node-paint-import-persistence");
+const phase32Groups = { "32A": pointNodeMathGroups, "32B": pointNodeGroups,
   "32C": pointNodeGroups, "32D": pointNodeGroups };
 
 export function browserChecksForPhase(phase) {
@@ -149,9 +218,481 @@ function evidenceObject(artifactDir, name) {
   return evidence;
 }
 
+// Keep independently sampled live pixels tied to the exact retained PNG, rather
+// than accepting a scalar assertion alongside an unrelated screenshot.
+// Repeated identical inputs may reuse their pixel calculation, never their
+// acceptance result: source/PNG bytes, contracts and supplied observations are
+// rechecked each time. The bounded cache is local to the fresh verifier process.
+const livePixelReplayCache = new Map();
+function replayConnectedPixels(bytes, pngHash, capture) {
+  const observed = capture.pixelDistances;
+  const options = { ctm: capture.ctm, samples: observed.samples.map(({ local }) => ({ local })), region: observed.region };
+  const key = sha256(JSON.stringify({ pngHash, options }));
+  if (!livePixelReplayCache.has(key)) {
+    const pixels = inspectConnectedLivePaintPng(bytes, options);
+    if (livePixelReplayCache.size >= 64) livePixelReplayCache.delete(livePixelReplayCache.keys().next().value);
+    livePixelReplayCache.set(key, pixels);
+  }
+  return livePixelReplayCache.get(key);
+}
+function validateDashLivePaintFiles(artifactDir, live) {
+  assert.ok(live && Array.isArray(live.captures));
+  if (live.sourceFile) {
+    assert.equal(resolve(artifactDir, live.sourceFile), join(artifactDir, live.sourceFile));
+    assert.ok(!live.sourceFile.includes(".."));
+    assert.equal(sha256(readFileSync(join(artifactDir, live.sourceFile))), live.sourceSha256,
+      "Live literal SVG matches its recorded source identity");
+  }
+  for (const capture of live.captures) {
+    if (capture.source) {
+      assert.equal(sha256(capture.source), capture.sourceSha256,
+        "Connected App source matches its recorded identity");
+    }
+    const file = capture.file ?? capture.screenshot;
+    assert.equal(typeof file, "string");
+    assert.ok(!file.includes(".."));
+    assert.equal(resolve(artifactDir, file), join(artifactDir, file));
+    const bytes = readFileSync(join(artifactDir, file));
+    assert.equal(bytes.length, capture.bytes, "Live PNG byte length matches the sampled capture");
+    const pngHash = sha256(bytes);
+    assert.equal(pngHash, capture.sha256, "Live PNG identity matches the sampled capture");
+    assert.ok(bytes.length >= 24 && bytes.subarray(0, 8).equals(Buffer.from([137, 80, 78, 71, 13, 10, 26, 10])));
+    assert.equal(bytes.readUInt32BE(16), capture.width, "Live PNG width matches pixel calibration");
+    assert.equal(bytes.readUInt32BE(20), capture.height, "Live PNG height matches pixel calibration");
+    if (capture.pixelDistances) {
+      assert.deepEqual(replayConnectedPixels(bytes, pngHash, capture), capture.pixelDistances,
+        "Interaction distances and calibration are recomputed from retained connected PNG bytes");
+    }
+  }
+}
+
+function validateTargetedPaintEvidence(artifactDir, name, group) {
+  if (name === dashCapScenario) {
+    const evidence = evidenceObject(artifactDir, `${name}.json`);
+    assertDashCapEvidence(evidence);
+    for (const entry of evidence.cases) if (entry.specification.audit) {
+      const stem = `${name}-${entry.key}-scale-${entry.scale}`;
+      assert.deepEqual(evidenceObject(artifactDir, `${stem}-engine-audit.json`),
+        entry.observation.engineAudit, "Retained independent audit artifact matches the recorded native case");
+      for (const suffix of [".input.svg", "-solid.input.svg"]) {
+        const source = readFileSync(join(artifactDir, `${stem}${suffix}`), "utf8");
+        assert.ok(source.includes(`points="${entry.observation.engineAudit.rawPoints}"`), "Retained App SVG preserves emitted precision");
+      }
+      if (entry.specification.livePaint) {
+        validateDashLivePaintFiles(artifactDir, entry.observation.livePaint);
+        validateDashLivePaintFiles(artifactDir, { captures: entry.probes.map(({ liveCapture }) => liveCapture) });
+      }
+    }
+    const mechanism = evidenceObject(artifactDir, `${dashCapMechanismStem}.json`);
+    assertDashCapMechanismEvidence(mechanism);
+    for (const entry of mechanism.cases) {
+      const stem = `${dashCapMechanismStem}-${entry.key}`;
+      assert.deepEqual(evidenceObject(artifactDir, `${stem}.json`), entry,
+        "Retained mechanism entry matches the complete matrix");
+      validateDashLivePaintFiles(artifactDir, entry.livePaint);
+      for (const suffix of ["input.svg", "solid.input.svg", "live.svg"]) {
+        const source = readFileSync(join(artifactDir, `${stem}.${suffix}`), "utf8");
+        assert.ok(source.includes(`points="${entry.source.rawPoints}"`), "Retained literal SVG preserves source precision");
+        const spec = entry.specification;
+        for (const [attribute, value] of Object.entries({ fill: "none", stroke: "#000000", "stroke-width": spec.width,
+          "stroke-dasharray": suffix === "solid.input.svg" ? "none" : spec.pattern?.join(" ") ?? "none",
+          "stroke-dashoffset": suffix === "solid.input.svg" ? 0 : spec.phase, "stroke-linecap": spec.cap,
+          "stroke-linejoin": spec.join, "stroke-miterlimit": spec.miterLimit })) {
+          assert.ok(source.includes(`${attribute}="${value}"`), `Retained literal SVG preserves ${attribute}`);
+        }
+      }
+    }
+    return;
+  }
+  if (name === polygonJoinScenario) {
+    assertPolygonJoinEvidence(evidenceObject(artifactDir, `${name}.json`));
+    return;
+  }
+  if (name === "point-paint-app-continuity") {
+    validateAppContinuityEvidence(artifactDir, name, group);
+    return;
+  }
+  if (name === "point-paint-clear-imported-style") {
+    validateDetachedPaintEvidence(artifactDir, name, group);
+    return;
+  }
+  if (["point-paint-local-override-intent", "point-paint-cross-file-resolution", "point-paint-unsupported-color-bindings", "point-paint-unsupported-mutations", "point-paint-mutation-directory-uncertainty"].includes(name)) {
+    validateImportedPaintEvidence(artifactDir, name, group);
+    return;
+  }
+  if (name !== "point-paint-namespace-aliases" && !name.startsWith("point-paint-responsive-")) return;
+  const evidence = evidenceObject(artifactDir, `${name}.json`);
+  if (evidence.scenario !== name || evidence.group !== group || evidence.result !== "passed") {
+    throw new Error(`Targeted point paint scenario did not complete: ${name}`);
+  }
+  if (name === "point-paint-namespace-aliases") {
+    const completeOutput = (output) => ["standalone", "inlineMath"].every((mode) =>
+      typeof output?.[mode] === "string" && output[mode].trim() !== "");
+    const completePersistence = (entry, boundary) => entry?.boundary === boundary
+      && Array.isArray(entry.differencePaths) && entry.differencePaths.length === 0;
+    if (!Array.isArray(evidence.cases) || evidence.cases.length !== 3
+      || !["shadowing", "missing", "aliases"].every((caseName) => evidence.cases.filter((entry) =>
+        entry?.name === caseName && typeof entry.source === "string" && entry.source !== ""
+        && completeOutput(entry.output) && completeOutput(entry.reloadedOutput) && completeOutput(entry.editedOutput)
+        && completePersistence(entry.uneditedDownload, "download") && completePersistence(entry.uneditedReload, "reload")
+        && completePersistence(entry.editedDownload, "download") && completePersistence(entry.editedReload, "reload")).length === 1)) {
+      throw new Error("Namespace paint must complete shadowing, missing-reference and alias import/edit/save/reload in both TikZ modes");
+    }
+    return;
+  }
+  if (!Array.isArray(evidence.cases)) throw new Error(`Missing responsive point paint cases: ${name}`);
+  if (name === "point-paint-responsive-downloads") {
+    const required = ["transparent", "white"].flatMap((background) =>
+      [["circle", "solid"], ["triangle", "solid"], ["circle", "dashed"]].map(([shape, variant]) =>
+        ({ background, shape, variant })));
+    const matchesCase = (entry, expected) => Object.entries(expected).every(([key, value]) => entry?.[key] === value);
+    if (evidence.cases.length !== required.length || !required.every((expected) =>
+      evidence.cases.filter((entry) => matchesCase(entry, expected)
+        && Array.isArray(entry.scales) && entry.scales.length === 2 && [0.5, 2].every((scale) =>
+          entry.scales.filter((sample) => matchesCase(sample, expected) && sample.scale === scale).length === 1)).length === 1)) {
+      throw new Error("Responsive point downloads must cover both backgrounds, both scales, solid circle/triangle and dashed circle");
+    }
+    const recordedObject = (value) => value !== null && typeof value === "object" && !Array.isArray(value)
+      && Object.keys(value).length > 0;
+    const recordedBackground = (structure, background) => recordedObject(structure)
+      && structure.expectedBackground === background && recordedObject(structure.exportBackground);
+    const checkedBody = (sample, background) => sample?.bodyContractPassed === true && recordedObject(sample.bodyObservation)
+      && recordedBackground(sample.bodyObservation.structure, background)
+      && sample.output?.capture?.coordinatesStable === true
+      && sample.bodyObservation.literal?.documentUnchanged === true
+      && sample.bodyObservation.literal.fontReadiness?.status === "loaded"
+      && sample.bodyObservation.literal.fontReadiness.checked === true
+      && sample.bodyObservation.settling?.documentUnchanged === true
+      && sample.bodyObservation.settling.status === "loaded"
+      && Array.isArray(sample.bodyObservation.settling.leaves) && sample.bodyObservation.settling.leaves.length > 0
+      && sample.bodyObservation.settling.leaves.every((leaf) => leaf?.readiness?.status === "loaded" && leaf.readiness.checked === true);
+    const controls = [["text-mutation", /foreground content\/order/u],
+      ["body-displacement", /body local placement transform/u], ["font-change", /text font family/u]];
+    if (!evidence.cases.every((entry) => recordedObject(entry.baseline)
+      && entry.baseline.expectedBackground === entry.background
+      && recordedObject(entry.baseline.fixture) && recordedBackground(entry.baseline.saved, entry.background)
+      && entry.fileUnchanged === true && entry.documentRestored === true
+      && entry.scales.every((sample) => checkedBody(sample, entry.background))
+      && checkedBody(entry.returnScale, entry.background) && entry.returnScale.scale === 0.5
+      && matchesCase(entry.returnScale, { background: entry.background, shape: entry.shape, variant: entry.variant })
+      && Array.isArray(entry.negativeControls) && entry.negativeControls.length === controls.length
+      && controls.every(([kind, reason]) => entry.negativeControls.filter((control) => control?.kind === kind
+        && control.rejected === true && control.documentUnchanged === true
+        && typeof control.reason === "string" && reason.test(control.reason)).length === 1))) {
+      throw new Error("Responsive point downloads must complete immutable body/font checks, restored negative controls and the return-scale capture");
+    }
+  } else if (evidence.cases.length !== 2 || ![0.5, 2].every((scale) =>
+    evidence.cases.filter((entry) => entry?.scale === scale && entry.negativeControlRejected === true).length === 1)) {
+    throw new Error(`Responsive point paint must reject the non-scaling control at both display scales: ${name}`);
+  }
+}
+
+function validateAppContinuityEvidence(artifactDir, name, group) {
+  const evidence = evidenceObject(artifactDir, `${name}.json`);
+  assert.equal(evidence.scenario, name); assert.equal(evidence.group, group); assert.equal(evidence.result, "passed");
+  assert.equal(evidence.schema, 1);
+  const initial = evidence.startup;
+  assert.match(initial?.pageId ?? "", /^app-/);
+  assert.match(initial.expectedUrl, /\/stratified-tikz\/scripts\/fixtures\/freeLabelsApp\.html$/);
+  assert.ok(typeof initial.document?.generation === "string" && initial.document.generation.length > 0);
+  const checkSnapshot = (entry) => {
+    assert.equal(entry?.pageId, initial.pageId, "Continuity evidence belongs to owned App");
+    assert.equal(entry.expectedUrl, initial.expectedUrl);
+    assert.equal(entry.closed, false); assert.equal(entry.crashed, false);
+    assert.equal(entry.document?.url, initial.expectedUrl);
+    assert.equal(entry.document.generation, initial.document.generation, "Same URL cannot hide document replacement");
+    assert.equal(entry.document.api?.type, "object"); assert.equal(entry.document.api.stateType, "function");
+    assert.equal(entry.document.api.sameInstance, true);
+    assert.ok(["interactive", "complete"].includes(entry.document.readyState));
+    assert.ok(entry.document.root?.children > 0);
+    assert.ok(entry.document.scripts?.some((script) => script.type === "module" && script.src.endsWith("/freeLabelsApp.tsx")));
+    for (const key of ["json", "runtimeDiagramJson", "history"]) {
+      assert.ok(typeof entry.state?.[key] === "string" && entry.state[key].length > 0 && entry.state[key].length <= 8_000_000);
+      JSON.parse(entry.state[key]);
+    }
+    assert.ok(Number.isFinite(entry.state.labelDocumentRevision));
+  };
+  checkSnapshot(initial);
+  const required = ["point-paint-local-override-intent", "point-paint-cross-file-resolution", "point-paint-unsupported-color-bindings",
+    "point-paint-unsupported-mutations", "point-paint-mutation-directory-uncertainty", "point-paint-clear-imported-style", "point-paint-clear-imported-style-multi"];
+  assert.equal(evidence.transitions?.length, required.length);
+  for (const name of required) {
+    const entries = evidence.transitions.filter((entry) => entry.name === name);
+    assert.equal(entries.length, 1, `Native App/SVG/App transition required: ${name}`);
+    const entry = entries[0]; assert.equal(entry.result, "passed");
+    checkSnapshot(entry.before); checkSnapshot(entry.after);
+    assert.deepEqual(entry.after.state, entry.before.state, "Standalone work preserves saved/runtime model, history and editor revision");
+    assert.equal(entry.standalonePages?.length, 1);
+    const svg = entry.standalonePages[0];
+    assert.match(svg.pageId, /^svg-/); assert.notEqual(svg.pageId, initial.pageId); assert.equal(svg.closed, true);
+    assert.ok(svg.events.some((event) => event.event === "main-frame-navigation" && event.url.startsWith("file:") && event.url.endsWith(`${name}.svg`)));
+    assert.ok(svg.events.some((event) => event.event === "close"));
+    assert.equal(svg.events.some((event) => event.event === "crash"), false);
+  }
+  checkSnapshot(evidence.helperReturn); checkSnapshot(evidence.beforeNextLoad); checkSnapshot(evidence.afterControls);
+  assert.equal(evidence.helperReturn.boundary, "import-helper-return");
+  assert.equal(evidence.beforeNextLoad.boundary, "before-next-app-load");
+  assert.deepEqual(evidence.helperReturn.state, evidence.transitions.at(-1).after.state);
+  assert.deepEqual(evidence.beforeNextLoad.state, evidence.helperReturn.state);
+  assert.equal(evidence.afterControls.boundary, "after-native-continuity-controls");
+  assert.deepEqual(evidence.afterControls.state, evidence.beforeNextLoad.state);
+  const transitions = evidenceObject(artifactDir, "point-paint-app-transitions.json");
+  assert.deepEqual(transitions.transitions, evidence.transitions);
+  const lifecycle = evidenceObject(artifactDir, "point-paint-app-lifecycle.json");
+  assert.equal(lifecycle.schema, 1); assert.equal(lifecycle.pageId, initial.pageId);
+  assert.equal(lifecycle.expectedUrl, initial.expectedUrl);
+  assert.equal(lifecycle.expected?.generation, initial.document.generation);
+  assert.ok(Array.isArray(lifecycle.events) && lifecycle.events.length > 0 && lifecycle.events.length <= 256);
+  assert.ok(lifecycle.events.some((entry) => entry.event === "document-observation" && entry.boundary === "import-helper-return"));
+  const controls = evidenceObject(artifactDir, "point-paint-app-controls.json");
+  assert.equal(controls.schema, 1); assert.deepEqual(controls.controls, evidence.controls);
+  assert.equal(evidence.controls?.length, 3);
+  for (const fault of ["missing-api", "wrong-api", "same-url-reload"]) {
+    const matches = evidence.controls.filter((entry) => entry.fault === fault);
+    assert.equal(matches.length, 1); const control = matches[0];
+    assert.equal(control.result, "passed"); assert.notEqual(control.before.pageId, initial.pageId);
+    const prefix = `point-paint-app-control-${fault}`;
+    const failure = evidenceObject(artifactDir, `${prefix}-failure.json`);
+    assert.deepEqual(failure, control.evidence);
+    assert.equal(failure.pageId, control.before.pageId); assert.equal(failure.snapshot?.pageId, control.before.pageId);
+    assert.equal(failure.expectedUrl, initial.expectedUrl); assert.equal(failure.snapshot.document.url, initial.expectedUrl);
+    assert.equal(failure.deliberateNegativeControl, true); assert.equal(failure.fault, fault);
+    assert.equal(failure.screenshot, `${prefix}-failure.png`);
+    assert.match(failure.error?.message ?? "", fault === "same-url-reload" ? /generation changed/ : fault === "missing-api" ? /API missing/ : /API instance changed/);
+    const dom = failure.snapshot.document.dom;
+    assert.ok(dom?.nodes?.length > 0 && dom.nodes.length <= 512 && dom.bytes <= 64_000);
+    assert.equal(dom.maxNodes, 512); assert.equal(dom.maxBytes, 64_000);
+    if (fault === "same-url-reload") assert.notEqual(failure.snapshot.document.generation, control.before.document.generation);
+    else assert.equal(failure.snapshot.document.generation, control.before.document.generation);
+    if (fault === "missing-api") assert.equal(failure.snapshot.document.api.type, "undefined");
+    if (fault === "wrong-api") assert.equal(failure.snapshot.document.api.sameInstance, false);
+    const owned = evidenceObject(artifactDir, `${prefix}-lifecycle.json`);
+    assert.equal(owned.pageId, control.before.pageId); assert.equal(owned.expectedUrl, initial.expectedUrl);
+    assert.ok(owned.events.some((entry) => entry.event === "document-observation" && entry.boundary === "failure"));
+  }
+}
+
+function validateImportedPaintEvidence(artifactDir, name, group) {
+  const evidence = evidenceObject(artifactDir, `${name}.json`);
+  const persistence = (entry, boundary) => entry?.boundary === boundary
+    && Array.isArray(entry.differencePaths) && entry.differencePaths.length === 0;
+  if (evidence.scenario !== name || evidence.group !== group || evidence.result !== "passed"
+    || !persistence(evidence.download, "download") || !persistence(evidence.reload, "reload")
+    || !Array.isArray(evidence.standalone?.pageErrors) || evidence.standalone.pageErrors.length !== 0
+    || !evidence.standalone.observation?.contour || !Array.isArray(evidence.standalone.observation.leaves)
+    || evidence.standalone.observation.leaves.length === 0) {
+    throw new Error(`Imported paint must complete native save/reload and standalone SVG: ${name}`);
+  }
+  const check = (boundary, key, expected) => {
+    const entry = evidence[boundary];
+    if (entry?.key !== key || !entry.current?.importedTikzStyleReferenceId
+      || !entry.observation?.contour || !Array.isArray(entry.observation.leaves) || entry.observation.leaves.length === 0
+      || !entry.state?.json || !entry.state?.history || !Array.isArray(entry.warnings)) {
+      throw new Error(`Missing native imported paint observation: ${name} ${boundary}`);
+    }
+    for (const mode of ["standalone", "inlineMath"]) {
+      if (typeof entry.output?.[mode] !== "string") throw new Error(`Missing imported paint ${mode}: ${name} ${boundary}`);
+      assertPostExternalPointPaint(observePostExternalPointPaint(entry.output[mode], key), expected);
+    }
+  };
+  if (name === "point-paint-local-override-intent") {
+    const externalPaint = { fill: null, text: null, draw: null, color: null, opacity: null,
+      "fill opacity": null, "draw opacity": null, "text opacity": null, "line width": null,
+      "dash pattern": null, "dash phase": null, "line cap": null, "line join": null };
+    for (const boundary of ["untouched", "reset"]) check(boundary, "example", externalPaint);
+    for (const boundary of ["away", "undone"]) check(boundary, "example", { ...externalPaint, fill: "#123456" });
+    for (const boundary of ["back", "redone", "reloaded"]) check(boundary, "example", { ...externalPaint, fill: "#000000" });
+    check("settingsBefore", "unknown controls", externalPaint);
+    check("settingsFocusBlur", "unknown controls", externalPaint);
+    const noEdit = evidence.settingsFocusBlur, overrides = noEdit.current.style?.importedPaint?.overriddenFields;
+    if (!Array.isArray(overrides) || overrides.length !== 0
+      || noEdit.state.json !== evidence.settingsBefore.state.json || noEdit.state.history !== evidence.settingsBefore.state.history
+      || !Array.isArray(noEdit.focusBlurControls) || noEdit.focusBlurControls.length !== 2
+      || !["Fill opacity", "Border width"].every((name) => noEdit.focusBlurControls.filter((control) => control?.name === name
+        && control.focused === true && control.blurred === true && typeof control.before === "string" && control.before === control.after).length === 1)) {
+      throw new Error("Unedited native numeric focus/blur must preserve unknown paint, local intent and history");
+    }
+    check("settingsBack", "unknown controls", { ...externalPaint, "fill opacity": "1", "line width": "0.4pt" });
+    const source = "\\tikzstyle{example}=[fill=\\mycolor,text=red]\n\\tikzstyle{unknown controls}=[fill=\\mycolor,text=\\mytext,draw=\\myborder,fill opacity=\\myalpha,line width=\\mywidth]\n";
+    for (const boundary of ["untouched", "away", "back", "undone", "redone", "reloaded", "reset", "settingsBefore", "settingsFocusBlur", "settingsBack"]) {
+      const entry = evidence[boundary], diagnostics = entry.modelDiagnostics, resolution = diagnostics?.resolution;
+      assert.equal(diagnostics?.validation?.valid, true, "Executable recognized value model remains valid");
+      assert.equal(resolution?.executionUncertain, true, "Recognized value execution uncertainty persists at every native boundary");
+      for (const field of ["fillColor", "fillEnabled", "drawColor", "drawEnabled", "textColor", "fillOpacity", "drawOpacity",
+        "textOpacity", "lineWidth", "dashPattern", "dashPhase", "lineCap", "lineJoin"]) {
+        assert.ok(resolution.unresolvedFields?.includes(field), `${field} remains unresolved after executable values and local edits`);
+      }
+      for (const warnings of [resolution.diagnostics, diagnostics.reference?.previewDiagnostics, entry.warnings]) {
+        assert.ok(warnings?.some((warning) => /executable paint option:/.test(warning)), "Recognized executable value diagnostic survives");
+        assert.ok(warnings?.some((warning) => /bindings and option handlers remain unknown/.test(warning)), "Binding and handler uncertainty remains actionable");
+      }
+      assert.ok(entry.diagram?.externalTikzStyleSources?.some((entry) => entry.rawSource === source), "Exact executable value source survives every boundary");
+      const expectedOverrides = ["untouched", "reset", "settingsBefore", "settingsFocusBlur"].includes(boundary) ? []
+        : boundary === "settingsBack" ? ["fill.opacity", "stroke.width"] : ["fill.color"];
+      assert.deepEqual(entry.current.style?.importedPaint?.overriddenFields, expectedOverrides, "Only accepted local edits can override uncertain external paint");
+    }
+    for (const boundary of ["untouched", "back", "redone", "reloaded", "reset", "settingsBefore", "settingsFocusBlur", "settingsBack"]) {
+      assertPointPaint(evidence[boundary].observation, { fill: "rgb(0, 0, 0)", text: "rgb(0, 0, 0)", textAlpha: 1 });
+    }
+    assertPointPaint(evidence.standalone.observation, { fill: "rgb(0, 0, 0)", text: "rgb(0, 0, 0)", textAlpha: 1 });
+    assert.deepEqual(evidence.undone.current, evidence.away.current, "Undo preserves local fill and untouched external text");
+    assert.deepEqual(evidence.redone.current, evidence.back.current, "Redo preserves fallback-equal fill intent and untouched external text");
+  } else if (name === "point-paint-cross-file-resolution") {
+    for (const boundary of ["crossFile", "reloaded"]) check(boundary, "outer", { fill: "#ff0000", text: "#00ff00", draw: "#0000ff" });
+    check("priorColor", "outer", { fill: "#123456", text: "#00ff00", draw: "#0000ff" });
+    check("redefined", "outer", { fill: "#ffff00", text: "#0000ff", draw: "#00ff00" });
+    check("missing", "outer", { fill: null, text: null, draw: null });
+    const missingResolution = evidence.missing.modelDiagnostics?.resolution;
+    if (missingResolution?.executionUncertain !== true || !missingResolution.diagnostics?.length
+      || !["fillColor", "drawColor", "textColor"].every((field) => missingResolution.unresolvedFields?.includes(field))) {
+      throw new Error("Missing dependency execution uncertainty must survive later paint options");
+    }
+    check("laterUndone", "outer", { fill: "#000000", text: null });
+    for (const boundary of ["later", "laterRedone", "laterReloaded"]) check(boundary, "outer", { fill: "#000000", text: "#00ff00", draw: "#0000ff" });
+    if (!persistence(evidence.laterDownload, "download") || !persistence(evidence.laterReload, "reload")) throw new Error("Later import must preserve local paint through save/reload");
+    if (!evidence.missing.warnings.some((warning) => warning.includes("absent base"))) throw new Error("Missing dependency diagnostic evidence");
+    for (const output of Object.values(evidence.crossFile.output)) {
+      const base = output.indexOf("%   \\input{base.sty}"), outer = output.indexOf("%   \\input{outer.sty}");
+      if (base < 0 || outer <= base) throw new Error("Cross-file dependency hints must follow source load order");
+    }
+  } else if (name === "point-paint-mutation-directory-uncertainty") {
+    check("directory", "outer", { fill: null, text: null, draw: null });
+    check("independent", "independent", { fill: "#0000ff", text: "#00ff00", draw: "#ff0000" });
+    for (const boundary of ["away", "undone"]) check(boundary, "outer", { fill: null, text: "#123456", draw: null });
+    for (const boundary of ["back", "redone", "reloaded"]) check(boundary, "outer", { fill: null, text: "#ff0000", draw: null });
+    const source = "\\tikzset{\n  myPoint/.style={fill=red,text=red},\n  myPoint/.append style={/other/.cd},\n  /other/text/.style={/tikz/text=blue,/tikz/.cd},\n  outer/.style={myPoint,text=green}\n}";
+    for (const boundary of ["directory", "away", "back", "undone", "redone", "reloaded"]) {
+      const entry = evidence[boundary], diagnostics = entry.modelDiagnostics;
+      assert.equal(diagnostics?.validation?.valid, true, "Directory mutation model remains valid");
+      assert.ok(diagnostics.resolution?.unresolvedFields?.includes("textColor"), "Relative text remains unresolved after runtime directory uncertainty");
+      assert.ok(diagnostics.reference?.previewDiagnostics?.some((warning) => /directory|\.cd/.test(warning)), "Reference retains directory diagnostic");
+      assert.ok(entry.warnings.some((warning) => /directory|\.cd/.test(warning)), "Directory uncertainty is visible");
+      assert.ok(entry.diagram?.externalTikzStyleSources?.some((entry) => entry.rawSource === source), "Exact directory mutation source survives");
+      assert.deepEqual(entry.current.style?.importedPaint?.overriddenFields, boundary === "directory" ? [] : ["text.color"], "Only accepted local text intent overrides uncertainty");
+      assert.equal(entry.current.importedTikzStyleReferenceId, evidence.directory.current.importedTikzStyleReferenceId, "Reference identity survives edits and persistence");
+    }
+    assert.equal(evidence.independent.modelDiagnostics?.validation?.valid, true);
+    assert.deepEqual(evidence.independent.modelDiagnostics.resolution?.unresolvedFields ?? [], []);
+    assert.deepEqual(evidence.independent.modelDiagnostics.resolution?.diagnostics ?? [], []);
+    assertPointPaint(evidence.independent.observation, { fill: "rgb(0, 0, 255)", text: "rgb(0, 255, 0)", textAlpha: 1, stroke: "rgb(255, 0, 0)" });
+    for (const boundary of ["directory", "back", "redone", "reloaded"]) assertPointPaint(evidence[boundary].observation,
+      { fill: "rgb(255, 0, 0)", text: "rgb(255, 0, 0)", textAlpha: 1 });
+    assertPointPaint(evidence.standalone.observation, { fill: "rgb(255, 0, 0)", text: "rgb(255, 0, 0)", textAlpha: 1 });
+    assert.deepEqual(evidence.undone.current.style.paint, evidence.away.current.style.paint);
+    assert.deepEqual(evidence.redone.current.style.paint, evidence.back.current.style.paint);
+    const prior = JSON.parse(evidence.away.state.history), back = JSON.parse(evidence.back.state.history);
+    assert.ok(prior.present && back.present);
+    assert.deepEqual(back.past, [...prior.past, prior.present].slice(-100), "Local return edit commits exact bounded history");
+    assert.notDeepEqual(back.present, prior.present);
+    assert.deepEqual(back.future, []);
+  } else if (name === "point-paint-unsupported-mutations") {
+    check("mutation", "myPoint", { fill: null, text: null, draw: null });
+    for (const boundary of ["away", "undone"]) check(boundary, "myPoint", { fill: "#123456", text: null, draw: null });
+    for (const boundary of ["back", "redone", "reloaded"]) check(boundary, "myPoint", { fill: "#ff0000", text: null, draw: null });
+    const source = "\\tikzset{\n  myPoint/.style={fill=red,text=red},\n  myPoint/.append style={fill=blue,text=blue}\n}";
+    for (const boundary of ["mutation", "away", "back", "undone", "redone", "reloaded"]) {
+      const entry = evidence[boundary], diagnostics = entry.modelDiagnostics;
+      assert.equal(diagnostics?.validation?.valid, true, "Mutation boundary model is valid");
+      for (const field of ["fillColor", "textColor"]) assert.ok(diagnostics.resolution?.unresolvedFields?.includes(field), "Mutation retains unresolved paint");
+      assert.ok(diagnostics.reference?.previewDiagnostics?.some((warning) => warning.includes(".append style")), "Reference mutation diagnostic persists");
+      assert.ok(entry.warnings.some((warning) => warning.includes(".append style")), "Mutation diagnostic is visible");
+      assert.ok(entry.diagram?.externalTikzStyleSources?.some((entry) => entry.rawSource === source), "Exact mutation source survives");
+      const overrides = entry.current.style?.importedPaint?.overriddenFields;
+      assert.ok(Array.isArray(overrides));
+      assert.equal(overrides.some((field) => field.startsWith("text.")), false, "Fill edits never claim untouched text");
+      if (boundary === "mutation") assert.deepEqual(overrides, []);
+      else assert.ok(overrides.includes("fill.color"), "Return edit remains explicit");
+    }
+    for (const boundary of ["mutation", "back", "redone", "reloaded"]) assertPointPaint(evidence[boundary].observation,
+      { fill: "rgb(255, 0, 0)", text: "rgb(255, 0, 0)", textAlpha: 1 });
+    assertPointPaint(evidence.standalone.observation, { fill: "rgb(255, 0, 0)", text: "rgb(255, 0, 0)", textAlpha: 1 });
+    assert.deepEqual(evidence.undone.current.style.paint, evidence.away.current.style.paint);
+    assert.deepEqual(evidence.redone.current.style.paint, evidence.back.current.style.paint);
+  } else {
+    check("unsupported", "myPoint", { fill: null, text: null, draw: "#000000" });
+    if (!evidence.unsupported.warnings.some((warning) => warning.includes("red"))) throw new Error("Unsupported red diagnostic evidence is required");
+    for (const boundary of ["away", "undone"]) check(boundary, "myPoint", { fill: "#123456", text: null });
+    for (const boundary of ["back", "redone", "reloaded"]) check(boundary, "myPoint", { fill: "#000000", text: null });
+  }
+}
+
+/** Deliberately separate from imported-state checks: a detached point requires
+ * BOTH the external association and importer provenance to be absent. */
+function validateDetachedPaintEvidence(artifactDir, name, group) {
+  const evidence = evidenceObject(artifactDir, `${name}.json`);
+  assert.equal(evidence.scenario, name); assert.equal(evidence.group, group); assert.equal(evidence.result, "passed");
+  const observed = (entry) => {
+    assert.equal(entry?.modelDiagnostics?.validation?.valid, true, "Clear model is immediately valid");
+    assert.ok(entry.state?.json && entry.state.history && Array.isArray(entry.points));
+    assert.deepEqual(JSON.parse(entry.state.json).diagram.strata, entry.diagram.strata);
+    assert.deepEqual(entry.points.map((point) => point.current), entry.diagram.strata);
+    for (const point of entry.points) assert.ok(point.observation?.contour && point.observation.leaves?.length);
+    for (const mode of ["standalone", "inlineMath"]) assert.equal(typeof entry.output?.[mode], "string");
+  };
+  for (const [kind, ids] of [["single", ["app-point"]], ["multiple", ["app-point", "bulk-point"]]]) {
+    const entry = evidence[kind];
+    assert.deepEqual(entry?.ids, ids);
+    assert.deepEqual(entry.nativeAction, { selector: "TikZ style selector", action: "Clear TikZ style" });
+    for (const boundary of ["before", "cleared", "undone", "redone", "reloaded"]) observed(entry[boundary]);
+    for (const boundary of ["before", "undone"]) for (const id of ids) {
+      const point = entry[boundary].points.find((point) => point.current.id === id).current;
+      assert.ok(point.importedTikzStyleReferenceId);
+      assert.equal(point.style.importedPaint?.referenceId, point.importedTikzStyleReferenceId);
+    }
+    for (const boundary of ["cleared", "redone", "reloaded"]) {
+      const after = entry[boundary];
+      for (const prior of entry.before.points) {
+        const expected = structuredClone(prior.current), actual = after.points.find((point) => point.current.id === expected.id);
+        if (ids.includes(expected.id)) {
+          const key = entry.before.diagram.importedTikzStyleReferences.find((ref) => ref.id === expected.importedTikzStyleReferenceId).key;
+          delete expected.stylePresetId; delete expected.importedTikzStyleReferenceId; delete expected.style.importedPaint;
+          assert.equal(Object.hasOwn(actual.current, "stylePresetId"), false);
+          assert.equal(Object.hasOwn(actual.current, "importedTikzStyleReferenceId"), false);
+          assert.equal(Object.hasOwn(actual.current.style, "importedPaint"), false);
+          for (const code of Object.values(after.output)) {
+            const paint = observeLiteralPointPaint(code, expected.text);
+            assert.equal(paint.options.includes(key), false, "Target point external invocation is detached");
+            assertExplicitPointPaint(paint, expected.style);
+          }
+        }
+        assert.deepEqual(actual.current, expected, "Clear preserves explicit point data and unselected controls");
+        for (const field of ["contour", "bodyBounds", "shapeBounds", "leaves"]) assert.deepEqual(actual.observation[field], prior.observation[field], "Clear preserves native preview");
+      }
+      for (const field of ["userStylePresets", "externalTikzStyleSources", "importedTikzStyleReferences"]) assert.deepEqual(after.diagram[field], entry.before.diagram[field]);
+    }
+    assert.deepEqual(entry.undone.diagram.strata, entry.before.diagram.strata, "Native undo restores imported points");
+    const previous = JSON.parse(entry.before.state.history), committed = JSON.parse(entry.cleared.state.history);
+    assert.ok(previous.present && committed.present, "Clear history includes both current diagrams");
+    // Match the editor's 100-entry undo contract, including oldest-entry eviction.
+    assert.equal(committed.past.length, Math.min(previous.past.length + 1, 100), "One native clear history action");
+    assert.deepEqual(committed.past, [...previous.past, previous.present].slice(-100), "Clear retains earlier snapshots and appends its exact undo state");
+    assert.notDeepEqual(committed.present, previous.present, "Clear changes the current diagram");
+    assert.deepEqual(committed.future, [], "Clear discards redo history");
+    for (const boundary of ["download", "reload"]) {
+      assert.equal(entry[boundary]?.boundary, boundary); assert.deepEqual(entry[boundary].differencePaths, []);
+    }
+    assert.deepEqual(entry.standalone?.pageErrors, []);
+    assert.ok(entry.standalone.observation?.leaves?.length);
+  }
+  const multiple = evidence.multiple, target = multiple.before.points.find((entry) => entry.current.id === "app-point").current;
+  assert.deepEqual(target.style.paint, {
+    text: { color: "#654321", opacity: .5 }, fill: { enabled: true, color: "#123456", opacity: .25 },
+    stroke: { enabled: true, color: "#008000", opacity: .75, width: 3, lineStyle: "solid", dashPattern: [3, 2], dashPhase: 1, lineCap: "round", lineJoin: "bevel" },
+  });
+  assert.ok(multiple.before.points.find((entry) => entry.current.id === "copy-point").current.importedTikzStyleReferenceId, "Unselected imported control exists");
+  assertPointPaint(evidence.single.standalone.observation, { fill: "rgb(255, 0, 0)", text: "rgb(0, 0, 0)", textAlpha: 1 });
+  assertPointPaint(multiple.standalone.observation, { fill: "rgb(18, 52, 86)", fillAlpha: .25, text: "rgb(101, 67, 33)", textAlpha: .5,
+    stroke: "rgb(0, 128, 0)", strokeAlpha: .75, strokeWidth: 3.6, dashed: true, cap: "round", join: "bevel", dashOffset: 1.2 });
+  assert.equal(multiple.standalone.points?.length, 1);
+  assert.equal(multiple.standalone.points[0].id, "bulk-point");
+  assertPointPaint(multiple.standalone.points[0].observation, { fill: "rgb(0, 0, 255)", fillAlpha: .35, text: "rgb(255, 0, 0)", textAlpha: .6,
+    stroke: "rgb(0, 255, 0)", strokeAlpha: .7, strokeWidth: 2.4, dashed: true, cap: "round", join: "bevel", dashOffset: 1.2 });
+}
+
 /** Artifact envelope check, not an XML safety/parser replacement. Native reopen
- * checks validate rendering/paint/geometry. Sanitized SVG has no data-* markers;
- * require balanced elements and an actual sibling contour + titled body tree. */
+ * checks validate rendering/paint/geometry and the intentional white export
+ * background marker; other runtime data-* attributes remain forbidden.
+ * Require balanced elements and an actual sibling contour + titled body tree. */
 export function hasWholePointSvg(svg) {
   const stack = [], roots = [];
   const tokens = svg.match(/<!--[\s\S]*?-->|<\?[\s\S]*?\?>|<(?:"[^"]*"|'[^']*'|[^'">])*>/gu) ?? [];
@@ -208,7 +749,7 @@ function validateBrowserEvidence(name, artifactDir, phase, checkout) {
     || new Set(completed).size !== completed.length
     || completed.some((group) => !pointNodeGroups.includes(group))
     || !requiredGroups.every((group) => completed.includes(group))
-    || ![freeLabelGroups, inlineCompleteGroups, allLabelGroups, combinedLabelGroups, pointNodeGroups].some((groups) =>
+    || ![freeLabelGroups, inlineCompleteGroups, allLabelGroups, combinedLabelGroups, pointNodeMathGroups, pointNodeGroups].some((groups) =>
       groups.length === completed.length && groups.every((group) => completed.includes(group)))) {
     throw new Error(`Phase ${phase} browser evidence must complete ${requiredGroups.length} required groups; only complete supported group sets are accepted`);
   }
@@ -225,6 +766,7 @@ function validateBrowserEvidence(name, artifactDir, phase, checkout) {
       throw new Error("Point-node browser evidence checkout mismatch");
     }
     for (const [group, names] of Object.entries(pointNodeScenarios)) {
+      if (!completed.includes(group)) continue;
       for (const name of names) {
         const records = evidence.evidence?.filter((entry) => entry.name === name) ?? [];
         if (records.length !== 1 || records[0].group !== group || records[0].result !== "passed"
@@ -244,7 +786,11 @@ function validateBrowserEvidence(name, artifactDir, phase, checkout) {
             if (!value || typeof value !== "object") throw new Error(`Invalid point-node JSON: ${artifact}`);
           } else if (artifact.endsWith(".svg")) {
             const svg = bytes.toString();
-            if (!hasWholePointSvg(svg)) {
+            if ((artifact.startsWith(`${polygonJoinScenario}-`) || artifact.startsWith(`${dashCapScenario}-`) || artifact.startsWith(`${dashCapMechanismStem}-`))
+              && (artifact.endsWith(".input.svg") || artifact.startsWith(`${dashCapMechanismStem}-`) && artifact.endsWith(".live.svg"))) {
+              if (!/^<svg\s[^>]*><(polygon|circle)\s[^>]*><\/\1><\/svg>$/u.test(svg)
+                || /(?:href|onload|script|data-)=/u.test(svg)) throw new Error(`Invalid polygon stroke SVG input: ${artifact}`);
+            } else if (!hasWholePointSvg(svg)) {
               throw new Error(`Invalid whole-point SVG artifact: ${artifact}`);
             }
           } else if (artifact.endsWith(".png") && (bytes.length < 24
@@ -252,6 +798,7 @@ function validateBrowserEvidence(name, artifactDir, phase, checkout) {
             throw new Error(`Invalid point-node PNG artifact: ${artifact}`);
           }
         }
+        validateTargetedPaintEvidence(artifactDir, name, group);
       }
     }
   }

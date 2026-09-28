@@ -1,0 +1,12 @@
+Original reproduction artifacts remain unchanged in /private/tmp/stz-32b-execution-fix-hCVgf2/reviewer-probes.
+Corrected compiler output directory: /private/tmp/stz-32b-handler-pgf-9yqqxeji
+Working directory: /Users/takamatoshinori/Desktop/stratified-tikz/tests/fixtures/point-paint-pgf/execution-boundary/handler-execution
+
+PATH=/opt/homebrew/bin:$PATH node generate.mjs
+PATH=/opt/homebrew/bin:$PATH node --version
+PATH=/opt/homebrew/bin:$PATH pdflatex --version
+PATH=/opt/homebrew/bin:$PATH pdflatex -interaction=nonstopmode -halt-on-error -output-directory=/private/tmp/stz-32b-handler-pgf-9yqqxeji try.tex > compilation.txt 2>&1
+Exit code: 0
+cp /private/tmp/stz-32b-handler-pgf-9yqqxeji/try.pdf try.pdf
+cp /private/tmp/stz-32b-handler-pgf-9yqqxeji/try.log try.log.txt
+PATH=/opt/homebrew/bin:$PATH node extract-operators.mjs

@@ -1,0 +1,100 @@
+{
+  "allMatch": true,
+  "files": [
+    {
+      "originalName": "commands.txt",
+      "originalUnchanged": true,
+      "copyMatches": true
+    },
+    {
+      "originalName": "compilation.txt",
+      "originalUnchanged": true,
+      "copyMatches": true
+    },
+    {
+      "originalName": "inlineMath.tex",
+      "originalUnchanged": true,
+      "copyMatches": true
+    },
+    {
+      "originalName": "observations.json",
+      "originalUnchanged": true,
+      "copyMatches": true
+    },
+    {
+      "originalName": "operators.txt",
+      "originalUnchanged": true,
+      "copyMatches": true
+    },
+    {
+      "originalName": "probe.aux",
+      "originalUnchanged": true,
+      "copyMatches": true
+    },
+    {
+      "originalName": "probe.log",
+      "originalUnchanged": true,
+      "copyMatches": true
+    },
+    {
+      "originalName": "probe.pdf",
+      "originalUnchanged": true,
+      "copyMatches": true
+    },
+    {
+      "originalName": "probe.tex",
+      "originalUnchanged": true,
+      "copyMatches": true
+    },
+    {
+      "originalName": "repro.mjs",
+      "originalUnchanged": true,
+      "copyMatches": true
+    },
+    {
+      "originalName": "resolver.json",
+      "originalUnchanged": true,
+      "copyMatches": true
+    },
+    {
+      "originalName": "runtime.sty",
+      "originalUnchanged": true,
+      "copyMatches": true
+    },
+    {
+      "originalName": "sha256.json",
+      "originalUnchanged": true,
+      "copyMatches": true
+    },
+    {
+      "originalName": "simple-compilation.txt",
+      "originalUnchanged": true,
+      "copyMatches": true
+    },
+    {
+      "originalName": "simple.aux",
+      "originalUnchanged": true,
+      "copyMatches": true
+    },
+    {
+      "originalName": "simple.log",
+      "originalUnchanged": true,
+      "copyMatches": true
+    },
+    {
+      "originalName": "simple.pdf",
+      "originalUnchanged": true,
+      "copyMatches": true
+    },
+    {
+      "originalName": "simple.tex",
+      "originalUnchanged": true,
+      "copyMatches": true
+    },
+    {
+      "originalName": "standalone.tex",
+      "originalUnchanged": true,
+      "copyMatches": true
+    }
+  ]
+}

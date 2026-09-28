@@ -1,0 +1,43 @@
+\documentclass{article}
+\usepackage{tikz}
+\pagestyle{empty}
+\pdfcompresslevel=0
+\pdfobjcompresslevel=0
+\begin{document}
+\typeout{STZ-PGF-VERSION=\pgfversion}
+% Each group starts from the normal /tikz invocation directory. No app code.
+\begin{tikzpicture}
+\begin{scope}
+\tikzset{base/.style={text=red},ns/.cd,base/.style={text=blue},outer/.style={base}}
+\node[ns/outer] at (0,0) {A};
+\end{scope}
+\begin{scope}
+\tikzset{base/.style={text=green},ns/.cd,base/.style={text=blue},inner/.style={base},outer/.style={ns/inner}}
+\node[ns/outer] at (2,0) {B};
+\end{scope}
+\begin{scope}
+\tikzset{base/.style={text=red},/tikz/base/.style={text=blue}}
+\node[base] at (4,0) {C};
+\end{scope}
+\begin{scope}
+\tikzset{/tikz/base/.style={text=red},base/.style={text=green}}
+\node[/tikz/base] at (6,0) {D};
+\end{scope}
+\begin{scope}
+\tikzset{base/.style={text=red},/tikz/base/.style={text=blue},base/.style={text=green}}
+\node[base] at (0,-2) {E};
+\node[/tikz/base] at (2,-2) {F};
+\end{scope}
+\begin{scope}
+\tikzset{/tikz/base/.style={text=red},base/.style={text=blue},/tikz/base/.style={text=green}}
+\node[base] at (4,-2) {G};
+\end{scope}
+\begin{scope}
+\tikzset{base/.style={text=red},/other/base/.style={text=blue},tikz/base/.style={text=green},/other/outer/.style={/tikz/base}}
+\node[base] at (0,-4) {H};
+\node[/other/base] at (2,-4) {I};
+\node[tikz/base] at (4,-4) {J};
+\node[/other/outer] at (6,-4) {K};
+\end{scope}
+\end{tikzpicture}
+\end{document}

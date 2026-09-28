@@ -1,0 +1,14 @@
+{
+  "pgfVersion": "3.1.11a",
+  "engine": "pdfTeX 3.141592653-2.6-1.40.29 (TeX Live 2026)",
+  "compilationExitCode": 0,
+  "before": [
+    { "body": "PGF", "fill": "#0000FF", "text": "#0000FF", "operator": "0 0 1 rg" },
+    { "body": "APP", "fill": "#FF0000", "text": "#FF0000", "operator": "1 0 0 rg" }
+  ],
+  "after": [
+    { "body": "PGF", "mode": "external", "fill": "#0000FF", "text": "#0000FF", "operator": "0 0 1 rg" },
+    { "body": "APP", "mode": "standalone", "fill": "#0000FF", "text": "#0000FF", "operator": "0 0 1 rg" },
+    { "body": "APP", "mode": "inlineMath", "fill": "#0000FF", "text": "#0000FF", "operator": "0 0 1 rg" }
+  ]
+}

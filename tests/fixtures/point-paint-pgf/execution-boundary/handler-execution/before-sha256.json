@@ -1,0 +1,70 @@
+{
+  "originalDirectory": "/private/tmp/stz-32b-execution-fix-hCVgf2/reviewer-probes",
+  "files": [
+    {
+      "name": "commands.txt",
+      "bytes": 759,
+      "sha256": "f42fe1fbd4209df56a87381c6e68790fbab2d97b2d7685c44c781138665b286a"
+    },
+    {
+      "name": "compilation.txt",
+      "bytes": 7200,
+      "sha256": "d149a37b0e7cdb9178ab20595c09c935f05bc7892baa7fd1fc28970a12957ec5"
+    },
+    {
+      "name": "pdf-operators.txt",
+      "bytes": 1932,
+      "sha256": "fbb4be7ca85eee85424d4f789d13b0cb27c87fbb0dd76cabb34cd729c5433c7c"
+    },
+    {
+      "name": "pgf-observations.json",
+      "bytes": 168,
+      "sha256": "6e03df2ec90d8dea22af2cfdf91ddb4d1bf94d38a47d3ae89e25d114eb8db3dc"
+    },
+    {
+      "name": "production-observations.json",
+      "bytes": 1111,
+      "sha256": "91ab84cc5f0c207540cc1a43e8b0726c51ce5576e263fda23783543cde98e39e"
+    },
+    {
+      "name": "repro.mjs",
+      "bytes": 1794,
+      "sha256": "8ccbc67aaad51b0b17c2b040392294341bf2fc61f53ded0255906ae08fe6d068"
+    },
+    {
+      "name": "try-inlineMath.tex",
+      "bytes": 2073,
+      "sha256": "f1068b642c8814247dda3cd97b0a4eef5ce50d416e735e6d0743fd6f6300cbe8"
+    },
+    {
+      "name": "try-standalone.tex",
+      "bytes": 1795,
+      "sha256": "1673eccd957601235d2c2d6216afc520cad4d8bd8ef813ea37194c90671dafa9"
+    },
+    {
+      "name": "try.aux",
+      "bytes": 32,
+      "sha256": "fbabe80c887f95a1ede6847f22dd91b380bda9d17ae8bfaa72e1741b16aa41e9"
+    },
+    {
+      "name": "try.log",
+      "bytes": 15836,
+      "sha256": "1ae80a61963e4f11ed6d6c3876247918425ce3922fc0dbc54f5bf12e2ef907b5"
+    },
+    {
+      "name": "try.pdf",
+      "bytes": 14570,
+      "sha256": "4b59c21de4a3e397b3226bf0b21b36b9d1384d5ec7a8c8ebf37432d28440a300"
+    },
+    {
+      "name": "try.sty",
+      "bytes": 96,
+      "sha256": "eef565362509afda37b268cabfed0ea07feda46abc2a6f80d4a7a48aab1163a7"
+    },
+    {
+      "name": "try.tex",
+      "bytes": 314,
+      "sha256": "725b46a2cc43ff90da124468e1bfc95fb0a321ac7165f0f99d5a7bbd2ff4b67b"
+    }
+  ]
+}

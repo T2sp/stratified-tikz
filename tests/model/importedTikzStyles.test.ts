@@ -248,8 +248,8 @@ test('preview parser reads common line styles', () => {
   )
 })
 
-test('preview parser approximates thick line width', () => {
-  assert.equal(parseTikzStylePreviewOptions('thick').lineWidth, 2)
+test('preview parser follows PGF thick line width', () => {
+  assert.equal(parseTikzStylePreviewOptions('thick').lineWidth, 0.8)
 })
 
 test('imported color styles create editable presets in the preset list', () => {
@@ -273,7 +273,7 @@ test('imported color styles create editable presets in the preset list', () => {
   )
 })
 
-test('imported preview style ignores unsupported options but keeps parsed values', () => {
+test('imported preview retains only paint established before unsupported executable options', () => {
   const style = importedStylePresetStyle(
     'curve',
     'red!60,decorate,decoration={snake},dashed',
@@ -284,7 +284,7 @@ test('imported preview style ignores unsupported options but keeps parsed values
     strokeColor: '#FF6666',
     strokeOpacity: 1,
     lineWidth: 1.2,
-    lineStyle: 'dashed',
+    lineStyle: 'solid',
   })
 })
 
@@ -462,7 +462,7 @@ test('combined imported and user preset workflow preserves export and persistenc
       preset.importedTikzStyleReferenceId === reference?.id,
   )
 
-  if (reference === undefined || importedCurvePreset === undefined) {
+  if (reference === undefined || importedCurvePreset?.kind !== 'curve') {
     throw new Error('Expected imported style reference and curve preset.')
   }
 
@@ -521,10 +521,7 @@ test('combined imported and user preset workflow preserves export and persistenc
 
   const loaded = parseSavedDiagramJson(serializeDiagram(withUserPreset))
 
-  assert.equal(loaded.ok, true)
-  if (!loaded.ok) {
-    throw new Error(loaded.error)
-  }
+  assert.ok(loaded.ok)
 
   assert.ok(
     loaded.diagram.userStylePresets?.some(

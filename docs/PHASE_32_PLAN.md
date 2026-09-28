@@ -1,18 +1,34 @@
 # Phase 32 Plan: Point-node math, paint, geometric shapes, and layout
 
-Status: 32A implementation and the source/metric/persistence/coordinate/XML-Canvas
-corrections are preserved. The latest historical parent (`cCLyYw`) completed
-11/15 groups and eight point scenarios, then failed the first point export's
-radius comparison against a renderer contaminated by the font-readiness test.
-Chrome reported the injected family's name as `"Times New Roman"`; name-based
-cleanup missed it. The targeted harness fix owns and removes that exact face,
-checks native metric/contour restoration in the reused page, and validates
-click-time App/download/reference font compatibility before geometry assertions.
-Fresh complete parent browser acceptance and independent review remain pending.
-The child cannot start the localhost server (`EPERM`); this supplies no native
-pass. All 15 groups / 11 point scenarios and required artifacts remain mandatory.
-32B–32D remain deferred. See PHASE_32A_IMPLEMENTATION.md for actual results and
-final-checkout handoff.
+Status: 32A is accepted. The `gtRban` parent report completed all 15 groups,
+all 11 named point scenarios and required artifacts, followed by an independent
+passing review. Its tracked diff and four then-untracked file hashes match the
+32A changes committed in `1d3e748` and merged into `595139d`. This supersedes the
+historical contaminated-reference failure and the earlier child-only handoff.
+See the prerequisite audit in [32B implementation](PHASE_32B_IMPLEMENTATION.md).
+
+32B's accepted `wPPGzN` parent verification passed all five commands, 16 groups,
+28 point scenarios and 386 required artifacts on fingerprint
+`121aaf324b9b9945e785e9aaf0bdc0e07a0f68895b703007e22cda5b1dba5e42`.
+The independent review subsequently found a Medium dashed square-cap bounds/
+picking defect and a distinct full-suite lifecycle-test timeout (3,986/3,987
+passed; the separate 11/11 rerun did not explain the failure). The targeted
+correction shares effective dash settings, adds endpoint cap geometry and stale
+layout guards, and separates controlled diagnostic timeout testing from real
+filesystem scheduling. The native policy now requires 29 scenarios in the same
+16 groups and 856 artifacts, preserving all earlier coverage, including six
+responsive downloads and their 91 artifacts. Fresh matching parent verification
+and independent review must accept the new tree before 32B is complete.
+32C/32D remain deferred. See the final section of the implementation report for
+executed checks and the frozen-tree handoff; historical browser evidence does
+not cover these new fixes.
+The [native endpoint continuation](PHASE_32B_NATIVE_ENDPOINT_INVESTIGATION.md)
+records the subsequent isolated-dot passes, remaining endpoint defects and
+live-paint gates, retaining all prior 705 artifacts and extending both matrices.
+The [connected-paint followup](PHASE_32B_LIVE_PAINT_ACCEPTANCE.md) supersedes
+the square clone-based interaction premise with independently observed live
+paint. Its finite core inventory remains a proposal, not a policy change;
+strict verification and the bounded full-closed transfer decision remain open.
 
 Implement the following stages in the user's requested order. Each stage must
 remain usable and pass its own acceptance checks before the next stage begins.

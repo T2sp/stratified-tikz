@@ -1,0 +1,14 @@
+\documentclass{article}
+\usepackage{tikz}
+\pagestyle{empty}
+\pdfcompresslevel=0
+\pdfobjcompresslevel=0
+\begin{document}
+\typeout{STZ-PGF-VERSION=\pgfversion}
+\input{macro.sty}
+\begin{tikzpicture}\node[myPoint] at (0,0) {PGF};\end{tikzpicture}
+\input{macro-standalone.tex}
+\[\input{macro-inlineMath.tex}\]
+\input{macro-reapplied-standalone.tex}
+\[\input{macro-reapplied-inlineMath.tex}\]
+\end{document}

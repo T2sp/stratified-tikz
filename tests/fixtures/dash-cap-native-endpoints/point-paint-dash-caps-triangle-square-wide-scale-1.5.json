@@ -1,0 +1,2065 @@
+{
+  "key": "triangle-square-wide",
+  "scale": 1.5,
+  "specification": {
+    "key": "triangle-square-wide",
+    "shape": "triangle",
+    "size": 3,
+    "widthPt": 30,
+    "lineStyle": "dashed",
+    "phase": 0,
+    "exterior": {
+      "x": 0,
+      "y": -40
+    },
+    "exact": [
+      {
+        "x": 0,
+        "y": -24
+      },
+      {
+        "x": -6,
+        "y": -28
+      }
+    ]
+  },
+  "result": "passed",
+  "edits": [
+    {
+      "field": "lineStyle",
+      "sameNode": true,
+      "modelChanged": true,
+      "observation": {
+        "xml": "<svg xmlns=\"http://www.w3.org/2000/svg\" width=\"2880\" height=\"2880\" viewBox=\"-90 -90 180 180\"><polygon fill=\"none\" fill-opacity=\"1\" stroke=\"#000000\" stroke-opacity=\"1\" stroke-width=\"36\" stroke-dashoffset=\"0\" stroke-linecap=\"butt\" stroke-linejoin=\"bevel\" stroke-miterlimit=\"10\" points=\"3.117441802447775e-16,-5.091168824543141 -4.409081537009721,2.545584412271569 4.409081537009718,2.5455844122715727\" stroke-dasharray=\"3.5999999999999996 3.5999999999999996\"></polygon></svg>",
+        "resolution": 16,
+        "radius": null,
+        "rasterRadius": 20.998744382105325,
+        "rasterBounds": {
+          "minX": -20,
+          "minY": -15.4375,
+          "maxX": 20,
+          "maxY": 20.5625
+        },
+        "declaredBounds": [
+          -19.997538805129615,
+          -15.45441558772843,
+          19.997538805129615,
+          20.545584412271573
+        ],
+        "contourKind": "polygon",
+        "vertexCount": 3,
+        "selectionRadius": 21.013353821838546,
+        "boundsEnclosePaint": true,
+        "boundaryPixelCount": 4070,
+        "ctm": {
+          "a": 1.5,
+          "b": 0,
+          "c": 0,
+          "d": 1.5,
+          "e": 675,
+          "f": 525
+        },
+        "strokeWidth": 36,
+        "cap": "butt",
+        "join": "bevel",
+        "pattern": "3.6px, 3.6px",
+        "phase": 0,
+        "fill": "none",
+        "miterLimit": 10,
+        "source": "",
+        "bodyStatus": "ready",
+        "probes": [
+          {
+            "kind": "paint",
+            "local": {
+              "x": -19.84375,
+              "y": -6.46875
+            },
+            "alpha": 255,
+            "rasterDistance": 0,
+            "nativeStrokeContains": true
+          },
+          {
+            "kind": "outside",
+            "local": {
+              "x": 0,
+              "y": -40
+            },
+            "alpha": 0,
+            "rasterDistance": 24.62392922798878,
+            "nativeStrokeContains": false
+          },
+          {
+            "kind": "interior",
+            "local": {
+              "x": 0,
+              "y": 0
+            },
+            "alpha": 255,
+            "rasterDistance": 0,
+            "nativeStrokeContains": true
+          },
+          {
+            "kind": "exact-0",
+            "local": {
+              "x": 0,
+              "y": -24
+            },
+            "alpha": 0,
+            "rasterDistance": 8.679740239488737,
+            "nativeStrokeContains": false
+          },
+          {
+            "kind": "exact-1",
+            "local": {
+              "x": -6,
+              "y": -28
+            },
+            "alpha": 0,
+            "rasterDistance": 12.69419466232498,
+            "nativeStrokeContains": false
+          }
+        ]
+      },
+      "probe": {
+        "kind": "paint",
+        "local": {
+          "x": -19.84375,
+          "y": -6.46875
+        },
+        "alpha": 255,
+        "rasterDistance": 0,
+        "nativeStrokeContains": true,
+        "actions": [
+          {
+            "trusted": true,
+            "alt": false,
+            "client": {
+              "x": 645,
+              "y": 515
+            },
+            "point": {
+              "x": 430.15625,
+              "y": 343.53125
+            },
+            "beforeSelection": null,
+            "candidates": [
+              "control",
+              "p"
+            ],
+            "overlayExcluded": true,
+            "selection": {
+              "kind": "stratum",
+              "id": "p"
+            },
+            "feedback": null,
+            "screen": {
+              "x": 645,
+              "y": 515
+            }
+          },
+          {
+            "trusted": true,
+            "alt": true,
+            "client": {
+              "x": 645,
+              "y": 515
+            },
+            "point": {
+              "x": 430.15625,
+              "y": 343.53125
+            },
+            "beforeSelection": null,
+            "candidates": [
+              "control",
+              "p"
+            ],
+            "overlayExcluded": true,
+            "selection": {
+              "kind": "stratum",
+              "id": "p"
+            },
+            "feedback": "Selected 2/2: point \"Point\"",
+            "screen": {
+              "x": 645,
+              "y": 515
+            }
+          },
+          {
+            "trusted": true,
+            "alt": true,
+            "client": {
+              "x": 645,
+              "y": 515
+            },
+            "point": {
+              "x": 430.15625,
+              "y": 343.53125
+            },
+            "beforeSelection": {
+              "kind": "stratum",
+              "id": "p"
+            },
+            "candidates": [
+              "control",
+              "p"
+            ],
+            "overlayExcluded": true,
+            "selection": {
+              "kind": "stratum",
+              "id": "control"
+            },
+            "feedback": "Selected 1/2: point \"Point\"",
+            "screen": {
+              "x": 645,
+              "y": 515
+            }
+          },
+          {
+            "trusted": true,
+            "alt": true,
+            "client": {
+              "x": 645,
+              "y": 515
+            },
+            "point": {
+              "x": 430.15625,
+              "y": 343.53125
+            },
+            "beforeSelection": {
+              "kind": "stratum",
+              "id": "control"
+            },
+            "candidates": [
+              "control",
+              "p"
+            ],
+            "overlayExcluded": true,
+            "selection": {
+              "kind": "stratum",
+              "id": "p"
+            },
+            "feedback": "Selected 2/2: point \"Point\"",
+            "screen": {
+              "x": 645,
+              "y": 515
+            }
+          }
+        ],
+        "transform": {
+          "screen": {
+            "x": 645,
+            "y": 515
+          },
+          "clear": {
+            "x": 11.765625,
+            "y": 11.703125
+          },
+          "ctm": {
+            "a": 1.5,
+            "b": 0,
+            "c": 0,
+            "d": 1.5,
+            "e": 674.765625,
+            "f": 524.703125
+          }
+        },
+        "selectionCleared": true,
+        "screenshot": "point-paint-dash-caps-triangle-square-wide-scale-1.5-edit-lineStyle.screen.png"
+      }
+    },
+    {
+      "field": "lineCap",
+      "sameNode": true,
+      "modelChanged": true,
+      "observation": {
+        "xml": "<svg xmlns=\"http://www.w3.org/2000/svg\" width=\"2880\" height=\"2880\" viewBox=\"-90 -90 180 180\"><polygon fill=\"none\" fill-opacity=\"1\" stroke=\"#000000\" stroke-opacity=\"1\" stroke-width=\"36\" stroke-dashoffset=\"0\" stroke-linecap=\"square\" stroke-linejoin=\"bevel\" stroke-miterlimit=\"10\" points=\"3.117441802447775e-16,-5.091168824543141 -4.409081537009721,2.545584412271569 4.409081537009718,2.5455844122715727\" stroke-dasharray=\"3.5999999999999996 3.5999999999999996\"></polygon></svg>",
+        "resolution": 16,
+        "radius": null,
+        "rasterRadius": 30.3194257551986,
+        "rasterBounds": {
+          "minX": -26.375,
+          "minY": -29.625,
+          "maxX": 27,
+          "maxY": 23.6875
+        },
+        "declaredBounds": [
+          -26.388457268119893,
+          -29.679626092663035,
+          27.01570187914905,
+          23.70139943227701
+        ],
+        "contourKind": "polygon",
+        "vertexCount": 3,
+        "selectionRadius": 30.402104765527767,
+        "boundsEnclosePaint": true,
+        "boundaryPixelCount": 2652,
+        "ctm": {
+          "a": 1.5,
+          "b": 0,
+          "c": 0,
+          "d": 1.5,
+          "e": 674.765625,
+          "f": 524.703125
+        },
+        "strokeWidth": 36,
+        "cap": "square",
+        "join": "bevel",
+        "pattern": "3.6px, 3.6px",
+        "phase": 0,
+        "fill": "none",
+        "miterLimit": 10,
+        "source": "",
+        "bodyStatus": "ready",
+        "probes": [
+          {
+            "kind": "paint",
+            "local": {
+              "x": -6.53125,
+              "y": -29.46875
+            },
+            "alpha": 255,
+            "rasterDistance": 0,
+            "nativeStrokeContains": true
+          },
+          {
+            "kind": "outside",
+            "local": {
+              "x": 0,
+              "y": -40
+            },
+            "alpha": 0,
+            "rasterDistance": 12.244657636087666,
+            "nativeStrokeContains": false
+          },
+          {
+            "kind": "interior",
+            "local": {
+              "x": 0,
+              "y": 0
+            },
+            "alpha": 255,
+            "rasterDistance": 0,
+            "nativeStrokeContains": true
+          },
+          {
+            "kind": "exact-0",
+            "local": {
+              "x": 0,
+              "y": -24
+            },
+            "alpha": 255,
+            "rasterDistance": 0,
+            "nativeStrokeContains": true
+          },
+          {
+            "kind": "exact-1",
+            "local": {
+              "x": -6,
+              "y": -28
+            },
+            "alpha": 255,
+            "rasterDistance": 0,
+            "nativeStrokeContains": true
+          }
+        ]
+      },
+      "probe": {
+        "kind": "paint",
+        "local": {
+          "x": -6.53125,
+          "y": -29.46875
+        },
+        "alpha": 255,
+        "rasterDistance": 0,
+        "nativeStrokeContains": true,
+        "actions": [
+          {
+            "trusted": true,
+            "alt": false,
+            "client": {
+              "x": 665,
+              "y": 481
+            },
+            "point": {
+              "x": 443.46875,
+              "y": 320.53125
+            },
+            "beforeSelection": null,
+            "candidates": [
+              "control",
+              "p"
+            ],
+            "overlayExcluded": true,
+            "selection": {
+              "kind": "stratum",
+              "id": "p"
+            },
+            "feedback": null,
+            "screen": {
+              "x": 665,
+              "y": 481
+            }
+          },
+          {
+            "trusted": true,
+            "alt": true,
+            "client": {
+              "x": 665,
+              "y": 481
+            },
+            "point": {
+              "x": 443.46875,
+              "y": 320.53125
+            },
+            "beforeSelection": null,
+            "candidates": [
+              "control",
+              "p"
+            ],
+            "overlayExcluded": true,
+            "selection": {
+              "kind": "stratum",
+              "id": "p"
+            },
+            "feedback": "Selected 2/2: point \"Point\"",
+            "screen": {
+              "x": 665,
+              "y": 481
+            }
+          },
+          {
+            "trusted": true,
+            "alt": true,
+            "client": {
+              "x": 665,
+              "y": 481
+            },
+            "point": {
+              "x": 443.46875,
+              "y": 320.53125
+            },
+            "beforeSelection": {
+              "kind": "stratum",
+              "id": "p"
+            },
+            "candidates": [
+              "control",
+              "p"
+            ],
+            "overlayExcluded": true,
+            "selection": {
+              "kind": "stratum",
+              "id": "control"
+            },
+            "feedback": "Selected 1/2: point \"Point\"",
+            "screen": {
+              "x": 665,
+              "y": 481
+            }
+          },
+          {
+            "trusted": true,
+            "alt": true,
+            "client": {
+              "x": 665,
+              "y": 481
+            },
+            "point": {
+              "x": 443.46875,
+              "y": 320.53125
+            },
+            "beforeSelection": {
+              "kind": "stratum",
+              "id": "control"
+            },
+            "candidates": [
+              "control",
+              "p"
+            ],
+            "overlayExcluded": true,
+            "selection": {
+              "kind": "stratum",
+              "id": "p"
+            },
+            "feedback": "Selected 2/2: point \"Point\"",
+            "screen": {
+              "x": 665,
+              "y": 481
+            }
+          }
+        ],
+        "transform": {
+          "screen": {
+            "x": 665,
+            "y": 481
+          },
+          "clear": {
+            "x": 11.796875,
+            "y": 12.203125
+          },
+          "ctm": {
+            "a": 1.5,
+            "b": 0,
+            "c": 0,
+            "d": 1.5,
+            "e": 674.796875,
+            "f": 525.203125
+          }
+        },
+        "selectionCleared": true,
+        "screenshot": "point-paint-dash-caps-triangle-square-wide-scale-1.5-edit-lineCap.screen.png"
+      }
+    },
+    {
+      "field": "dashPattern",
+      "sameNode": true,
+      "modelChanged": true,
+      "observation": {
+        "xml": "<svg xmlns=\"http://www.w3.org/2000/svg\" width=\"2880\" height=\"2880\" viewBox=\"-90 -90 180 180\"><polygon fill=\"none\" fill-opacity=\"1\" stroke=\"#000000\" stroke-opacity=\"1\" stroke-width=\"36\" stroke-dashoffset=\"0\" stroke-linecap=\"square\" stroke-linejoin=\"bevel\" stroke-miterlimit=\"10\" points=\"3.117441802447775e-16,-5.091168824543141 -4.409081537009721,2.545584412271569 4.409081537009718,2.5455844122715727\" stroke-dasharray=\"12 2.4\"></polygon></svg>",
+        "resolution": 16,
+        "radius": null,
+        "rasterRadius": 30.3194257551986,
+        "rasterBounds": {
+          "minX": -24.5625,
+          "minY": -29.625,
+          "maxX": 24.5625,
+          "maxY": 20.5625
+        },
+        "declaredBounds": [
+          -24.56121265709073,
+          -29.679626092663035,
+          24.588457268119896,
+          20.545584412271577
+        ],
+        "contourKind": "polygon",
+        "vertexCount": 3,
+        "selectionRadius": 30.402104765527767,
+        "boundsEnclosePaint": true,
+        "boundaryPixelCount": 2503,
+        "ctm": {
+          "a": 1.5,
+          "b": 0,
+          "c": 0,
+          "d": 1.5,
+          "e": 674.796875,
+          "f": 525.203125
+        },
+        "strokeWidth": 36,
+        "cap": "square",
+        "join": "bevel",
+        "pattern": "12px, 2.4px",
+        "phase": 0,
+        "fill": "none",
+        "miterLimit": 10,
+        "source": "",
+        "bodyStatus": "ready",
+        "probes": [
+          {
+            "kind": "paint",
+            "local": {
+              "x": -6.53125,
+              "y": -29.46875
+            },
+            "alpha": 255,
+            "rasterDistance": 0,
+            "nativeStrokeContains": true
+          },
+          {
+            "kind": "outside",
+            "local": {
+              "x": 0,
+              "y": -40
+            },
+            "alpha": 0,
+            "rasterDistance": 12.244657636087666,
+            "nativeStrokeContains": false
+          },
+          {
+            "kind": "interior",
+            "local": {
+              "x": 0,
+              "y": 0
+            },
+            "alpha": 255,
+            "rasterDistance": 0,
+            "nativeStrokeContains": true
+          },
+          {
+            "kind": "exact-0",
+            "local": {
+              "x": 0,
+              "y": -24
+            },
+            "alpha": 255,
+            "rasterDistance": 0,
+            "nativeStrokeContains": true
+          },
+          {
+            "kind": "exact-1",
+            "local": {
+              "x": -6,
+              "y": -28
+            },
+            "alpha": 255,
+            "rasterDistance": 0,
+            "nativeStrokeContains": true
+          }
+        ]
+      },
+      "probe": {
+        "kind": "paint",
+        "local": {
+          "x": -6.53125,
+          "y": -29.46875
+        },
+        "alpha": 255,
+        "rasterDistance": 0,
+        "nativeStrokeContains": true,
+        "actions": [
+          {
+            "trusted": true,
+            "alt": false,
+            "client": {
+              "x": 665,
+              "y": 481
+            },
+            "point": {
+              "x": 443.46875,
+              "y": 320.53125
+            },
+            "beforeSelection": null,
+            "candidates": [
+              "control",
+              "p"
+            ],
+            "overlayExcluded": true,
+            "selection": {
+              "kind": "stratum",
+              "id": "p"
+            },
+            "feedback": null,
+            "screen": {
+              "x": 665,
+              "y": 481
+            }
+          },
+          {
+            "trusted": true,
+            "alt": true,
+            "client": {
+              "x": 665,
+              "y": 481
+            },
+            "point": {
+              "x": 443.46875,
+              "y": 320.53125
+            },
+            "beforeSelection": null,
+            "candidates": [
+              "control",
+              "p"
+            ],
+            "overlayExcluded": true,
+            "selection": {
+              "kind": "stratum",
+              "id": "p"
+            },
+            "feedback": "Selected 2/2: point \"Point\"",
+            "screen": {
+              "x": 665,
+              "y": 481
+            }
+          },
+          {
+            "trusted": true,
+            "alt": true,
+            "client": {
+              "x": 665,
+              "y": 481
+            },
+            "point": {
+              "x": 443.46875,
+              "y": 320.53125
+            },
+            "beforeSelection": {
+              "kind": "stratum",
+              "id": "p"
+            },
+            "candidates": [
+              "control",
+              "p"
+            ],
+            "overlayExcluded": true,
+            "selection": {
+              "kind": "stratum",
+              "id": "control"
+            },
+            "feedback": "Selected 1/2: point \"Point\"",
+            "screen": {
+              "x": 665,
+              "y": 481
+            }
+          },
+          {
+            "trusted": true,
+            "alt": true,
+            "client": {
+              "x": 665,
+              "y": 481
+            },
+            "point": {
+              "x": 443.46875,
+              "y": 320.53125
+            },
+            "beforeSelection": {
+              "kind": "stratum",
+              "id": "control"
+            },
+            "candidates": [
+              "control",
+              "p"
+            ],
+            "overlayExcluded": true,
+            "selection": {
+              "kind": "stratum",
+              "id": "p"
+            },
+            "feedback": "Selected 2/2: point \"Point\"",
+            "screen": {
+              "x": 665,
+              "y": 481
+            }
+          }
+        ],
+        "transform": {
+          "screen": {
+            "x": 665,
+            "y": 481
+          },
+          "clear": {
+            "x": 11.796875,
+            "y": 12.203125
+          },
+          "ctm": {
+            "a": 1.5,
+            "b": 0,
+            "c": 0,
+            "d": 1.5,
+            "e": 674.796875,
+            "f": 525.203125
+          }
+        },
+        "selectionCleared": true,
+        "screenshot": "point-paint-dash-caps-triangle-square-wide-scale-1.5-edit-dashPattern.screen.png"
+      }
+    },
+    {
+      "field": "dashPhase",
+      "sameNode": true,
+      "modelChanged": true,
+      "observation": {
+        "xml": "<svg xmlns=\"http://www.w3.org/2000/svg\" width=\"2880\" height=\"2880\" viewBox=\"-90 -90 180 180\"><polygon fill=\"none\" fill-opacity=\"1\" stroke=\"#000000\" stroke-opacity=\"1\" stroke-width=\"36\" stroke-dashoffset=\"8.4\" stroke-linecap=\"square\" stroke-linejoin=\"bevel\" stroke-miterlimit=\"10\" points=\"3.117441802447775e-16,-5.091168824543141 -4.409081537009721,2.545584412271569 4.409081537009718,2.5455844122715727\" stroke-dasharray=\"12 2.4\"></polygon></svg>",
+        "resolution": 16,
+        "radius": null,
+        "rasterRadius": 28.399940856012357,
+        "rasterBounds": {
+          "minX": -26.375,
+          "minY": -24.4375,
+          "maxX": 27.625,
+          "maxY": 24.6875
+        },
+        "declaredBounds": [
+          -26.388457268119893,
+          -24.483473669956403,
+          27.61570187914905,
+          24.740629916818335
+        ],
+        "contourKind": "polygon",
+        "vertexCount": 3,
+        "selectionRadius": 28.426450393138133,
+        "boundsEnclosePaint": true,
+        "boundaryPixelCount": 2230,
+        "ctm": {
+          "a": 1.5,
+          "b": 0,
+          "c": 0,
+          "d": 1.5,
+          "e": 674.796875,
+          "f": 525.203125
+        },
+        "strokeWidth": 36,
+        "cap": "square",
+        "join": "bevel",
+        "pattern": "12px, 2.4px",
+        "phase": 8.4,
+        "fill": "none",
+        "miterLimit": 10,
+        "source": "",
+        "bodyStatus": "ready",
+        "probes": [
+          {
+            "kind": "paint",
+            "local": {
+              "x": 27.40625,
+              "y": 6.65625
+            },
+            "alpha": 255,
+            "rasterDistance": 0,
+            "nativeStrokeContains": true
+          },
+          {
+            "kind": "outside",
+            "local": {
+              "x": 0,
+              "y": -40
+            },
+            "alpha": 0,
+            "rasterDistance": 18.236992367849474,
+            "nativeStrokeContains": false
+          },
+          {
+            "kind": "interior",
+            "local": {
+              "x": 0,
+              "y": 0
+            },
+            "alpha": 255,
+            "rasterDistance": 0,
+            "nativeStrokeContains": true
+          },
+          {
+            "kind": "exact-0",
+            "local": {
+              "x": 0,
+              "y": -24
+            },
+            "alpha": 0,
+            "rasterDistance": 4.377008467549498,
+            "nativeStrokeContains": false
+          },
+          {
+            "kind": "exact-1",
+            "local": {
+              "x": -6,
+              "y": -28
+            },
+            "alpha": 0,
+            "rasterDistance": 4.846269506022132,
+            "nativeStrokeContains": false
+          }
+        ]
+      },
+      "probe": {
+        "kind": "paint",
+        "local": {
+          "x": 27.40625,
+          "y": 6.65625
+        },
+        "alpha": 255,
+        "rasterDistance": 0,
+        "nativeStrokeContains": true,
+        "actions": [
+          {
+            "trusted": true,
+            "alt": false,
+            "client": {
+              "x": 716,
+              "y": 535
+            },
+            "point": {
+              "x": 477.40625,
+              "y": 356.65625
+            },
+            "beforeSelection": null,
+            "candidates": [
+              "control",
+              "p"
+            ],
+            "overlayExcluded": true,
+            "selection": {
+              "kind": "stratum",
+              "id": "p"
+            },
+            "feedback": null,
+            "screen": {
+              "x": 716,
+              "y": 535
+            }
+          },
+          {
+            "trusted": true,
+            "alt": true,
+            "client": {
+              "x": 716,
+              "y": 535
+            },
+            "point": {
+              "x": 477.40625,
+              "y": 356.65625
+            },
+            "beforeSelection": null,
+            "candidates": [
+              "control",
+              "p"
+            ],
+            "overlayExcluded": true,
+            "selection": {
+              "kind": "stratum",
+              "id": "p"
+            },
+            "feedback": "Selected 2/2: point \"Point\"",
+            "screen": {
+              "x": 716,
+              "y": 535
+            }
+          },
+          {
+            "trusted": true,
+            "alt": true,
+            "client": {
+              "x": 716,
+              "y": 535
+            },
+            "point": {
+              "x": 477.40625,
+              "y": 356.65625
+            },
+            "beforeSelection": {
+              "kind": "stratum",
+              "id": "p"
+            },
+            "candidates": [
+              "control",
+              "p"
+            ],
+            "overlayExcluded": true,
+            "selection": {
+              "kind": "stratum",
+              "id": "control"
+            },
+            "feedback": "Selected 1/2: point \"Point\"",
+            "screen": {
+              "x": 716,
+              "y": 535
+            }
+          },
+          {
+            "trusted": true,
+            "alt": true,
+            "client": {
+              "x": 716,
+              "y": 535
+            },
+            "point": {
+              "x": 477.40625,
+              "y": 356.65625
+            },
+            "beforeSelection": {
+              "kind": "stratum",
+              "id": "control"
+            },
+            "candidates": [
+              "control",
+              "p"
+            ],
+            "overlayExcluded": true,
+            "selection": {
+              "kind": "stratum",
+              "id": "p"
+            },
+            "feedback": "Selected 2/2: point \"Point\"",
+            "screen": {
+              "x": 716,
+              "y": 535
+            }
+          }
+        ],
+        "transform": {
+          "screen": {
+            "x": 716,
+            "y": 535
+          },
+          "clear": {
+            "x": 11.890625,
+            "y": 12.015625
+          },
+          "ctm": {
+            "a": 1.5,
+            "b": 0,
+            "c": 0,
+            "d": 1.5,
+            "e": 674.890625,
+            "f": 525.015625
+          }
+        },
+        "selectionCleared": true,
+        "screenshot": "point-paint-dash-caps-triangle-square-wide-scale-1.5-edit-dashPhase.screen.png"
+      }
+    },
+    {
+      "field": "restore",
+      "sameNode": true,
+      "modelChanged": true,
+      "observation": {
+        "xml": "<svg xmlns=\"http://www.w3.org/2000/svg\" width=\"2880\" height=\"2880\" viewBox=\"-90 -90 180 180\"><polygon fill=\"none\" fill-opacity=\"1\" stroke=\"#000000\" stroke-opacity=\"1\" stroke-width=\"36\" stroke-dashoffset=\"0\" stroke-linecap=\"square\" stroke-linejoin=\"bevel\" stroke-miterlimit=\"10\" points=\"3.117441802447775e-16,-5.091168824543141 -4.409081537009721,2.545584412271569 4.409081537009718,2.5455844122715727\" stroke-dasharray=\"3.5999999999999996 3.5999999999999996\"></polygon></svg>",
+        "resolution": 16,
+        "radius": null,
+        "rasterRadius": 30.3194257551986,
+        "rasterBounds": {
+          "minX": -26.375,
+          "minY": -29.625,
+          "maxX": 27,
+          "maxY": 23.6875
+        },
+        "declaredBounds": [
+          -26.388457268119893,
+          -29.679626092663035,
+          27.01570187914905,
+          23.70139943227701
+        ],
+        "contourKind": "polygon",
+        "vertexCount": 3,
+        "selectionRadius": 30.402104765527767,
+        "boundsEnclosePaint": true,
+        "boundaryPixelCount": 2652,
+        "ctm": {
+          "a": 1.5,
+          "b": 0,
+          "c": 0,
+          "d": 1.5,
+          "e": 674.890625,
+          "f": 525.015625
+        },
+        "strokeWidth": 36,
+        "cap": "square",
+        "join": "bevel",
+        "pattern": "3.6px, 3.6px",
+        "phase": 0,
+        "fill": "none",
+        "miterLimit": 10,
+        "source": "",
+        "bodyStatus": "ready",
+        "probes": [
+          {
+            "kind": "paint",
+            "local": {
+              "x": -6.53125,
+              "y": -29.46875
+            },
+            "alpha": 255,
+            "rasterDistance": 0,
+            "nativeStrokeContains": true
+          },
+          {
+            "kind": "outside",
+            "local": {
+              "x": 0,
+              "y": -40
+            },
+            "alpha": 0,
+            "rasterDistance": 12.244657636087666,
+            "nativeStrokeContains": false
+          },
+          {
+            "kind": "interior",
+            "local": {
+              "x": 0,
+              "y": 0
+            },
+            "alpha": 255,
+            "rasterDistance": 0,
+            "nativeStrokeContains": true
+          },
+          {
+            "kind": "exact-0",
+            "local": {
+              "x": 0,
+              "y": -24
+            },
+            "alpha": 255,
+            "rasterDistance": 0,
+            "nativeStrokeContains": true
+          },
+          {
+            "kind": "exact-1",
+            "local": {
+              "x": -6,
+              "y": -28
+            },
+            "alpha": 255,
+            "rasterDistance": 0,
+            "nativeStrokeContains": true
+          }
+        ]
+      },
+      "probe": {
+        "kind": "paint",
+        "local": {
+          "x": -6.53125,
+          "y": -29.46875
+        },
+        "alpha": 255,
+        "rasterDistance": 0,
+        "nativeStrokeContains": true,
+        "actions": [
+          {
+            "trusted": true,
+            "alt": false,
+            "client": {
+              "x": 665,
+              "y": 481
+            },
+            "point": {
+              "x": 443.46875,
+              "y": 320.53125
+            },
+            "beforeSelection": null,
+            "candidates": [
+              "control",
+              "p"
+            ],
+            "overlayExcluded": true,
+            "selection": {
+              "kind": "stratum",
+              "id": "p"
+            },
+            "feedback": null,
+            "screen": {
+              "x": 665,
+              "y": 481
+            }
+          },
+          {
+            "trusted": true,
+            "alt": true,
+            "client": {
+              "x": 665,
+              "y": 481
+            },
+            "point": {
+              "x": 443.46875,
+              "y": 320.53125
+            },
+            "beforeSelection": null,
+            "candidates": [
+              "control",
+              "p"
+            ],
+            "overlayExcluded": true,
+            "selection": {
+              "kind": "stratum",
+              "id": "p"
+            },
+            "feedback": "Selected 2/2: point \"Point\"",
+            "screen": {
+              "x": 665,
+              "y": 481
+            }
+          },
+          {
+            "trusted": true,
+            "alt": true,
+            "client": {
+              "x": 665,
+              "y": 481
+            },
+            "point": {
+              "x": 443.46875,
+              "y": 320.53125
+            },
+            "beforeSelection": {
+              "kind": "stratum",
+              "id": "p"
+            },
+            "candidates": [
+              "control",
+              "p"
+            ],
+            "overlayExcluded": true,
+            "selection": {
+              "kind": "stratum",
+              "id": "control"
+            },
+            "feedback": "Selected 1/2: point \"Point\"",
+            "screen": {
+              "x": 665,
+              "y": 481
+            }
+          },
+          {
+            "trusted": true,
+            "alt": true,
+            "client": {
+              "x": 665,
+              "y": 481
+            },
+            "point": {
+              "x": 443.46875,
+              "y": 320.53125
+            },
+            "beforeSelection": {
+              "kind": "stratum",
+              "id": "control"
+            },
+            "candidates": [
+              "control",
+              "p"
+            ],
+            "overlayExcluded": true,
+            "selection": {
+              "kind": "stratum",
+              "id": "p"
+            },
+            "feedback": "Selected 2/2: point \"Point\"",
+            "screen": {
+              "x": 665,
+              "y": 481
+            }
+          }
+        ],
+        "transform": {
+          "screen": {
+            "x": 665,
+            "y": 481
+          },
+          "clear": {
+            "x": 11.796875,
+            "y": 12.203125
+          },
+          "ctm": {
+            "a": 1.5,
+            "b": 0,
+            "c": 0,
+            "d": 1.5,
+            "e": 674.796875,
+            "f": 525.203125
+          }
+        },
+        "selectionCleared": true,
+        "screenshot": "point-paint-dash-caps-triangle-square-wide-scale-1.5-edit-restore.screen.png"
+      }
+    }
+  ],
+  "probes": [
+    {
+      "kind": "paint",
+      "local": {
+        "x": -6.53125,
+        "y": -29.46875
+      },
+      "alpha": 255,
+      "rasterDistance": 0,
+      "nativeStrokeContains": true,
+      "actions": [
+        {
+          "trusted": true,
+          "alt": false,
+          "client": {
+            "x": 665,
+            "y": 481
+          },
+          "point": {
+            "x": 443.46875,
+            "y": 320.53125
+          },
+          "beforeSelection": null,
+          "candidates": [
+            "control",
+            "p"
+          ],
+          "overlayExcluded": true,
+          "selection": {
+            "kind": "stratum",
+            "id": "p"
+          },
+          "feedback": null,
+          "screen": {
+            "x": 665,
+            "y": 481
+          }
+        },
+        {
+          "trusted": true,
+          "alt": true,
+          "client": {
+            "x": 665,
+            "y": 481
+          },
+          "point": {
+            "x": 443.46875,
+            "y": 320.53125
+          },
+          "beforeSelection": null,
+          "candidates": [
+            "control",
+            "p"
+          ],
+          "overlayExcluded": true,
+          "selection": {
+            "kind": "stratum",
+            "id": "p"
+          },
+          "feedback": "Selected 2/2: point \"Point\"",
+          "screen": {
+            "x": 665,
+            "y": 481
+          }
+        },
+        {
+          "trusted": true,
+          "alt": true,
+          "client": {
+            "x": 665,
+            "y": 481
+          },
+          "point": {
+            "x": 443.46875,
+            "y": 320.53125
+          },
+          "beforeSelection": {
+            "kind": "stratum",
+            "id": "p"
+          },
+          "candidates": [
+            "control",
+            "p"
+          ],
+          "overlayExcluded": true,
+          "selection": {
+            "kind": "stratum",
+            "id": "control"
+          },
+          "feedback": "Selected 1/2: point \"Point\"",
+          "screen": {
+            "x": 665,
+            "y": 481
+          }
+        },
+        {
+          "trusted": true,
+          "alt": true,
+          "client": {
+            "x": 665,
+            "y": 481
+          },
+          "point": {
+            "x": 443.46875,
+            "y": 320.53125
+          },
+          "beforeSelection": {
+            "kind": "stratum",
+            "id": "control"
+          },
+          "candidates": [
+            "control",
+            "p"
+          ],
+          "overlayExcluded": true,
+          "selection": {
+            "kind": "stratum",
+            "id": "p"
+          },
+          "feedback": "Selected 2/2: point \"Point\"",
+          "screen": {
+            "x": 665,
+            "y": 481
+          }
+        }
+      ],
+      "transform": {
+        "screen": {
+          "x": 665,
+          "y": 481
+        },
+        "clear": {
+          "x": 11.796875,
+          "y": 12.203125
+        },
+        "ctm": {
+          "a": 1.5,
+          "b": 0,
+          "c": 0,
+          "d": 1.5,
+          "e": 674.796875,
+          "f": 525.203125
+        }
+      },
+      "selectionCleared": true,
+      "screenshot": "point-paint-dash-caps-triangle-square-wide-scale-1.5-paint.png"
+    },
+    {
+      "kind": "outside",
+      "local": {
+        "x": 0,
+        "y": -40
+      },
+      "alpha": 0,
+      "rasterDistance": 12.244657636087666,
+      "nativeStrokeContains": false,
+      "actions": [
+        {
+          "trusted": true,
+          "alt": false,
+          "client": {
+            "x": 675,
+            "y": 465
+          },
+          "point": {
+            "x": 450,
+            "y": 310
+          },
+          "beforeSelection": null,
+          "candidates": [
+            "control"
+          ],
+          "overlayExcluded": true,
+          "selection": {
+            "kind": "stratum",
+            "id": "control"
+          },
+          "feedback": null,
+          "screen": {
+            "x": 675,
+            "y": 465
+          }
+        },
+        {
+          "trusted": true,
+          "alt": true,
+          "client": {
+            "x": 675,
+            "y": 465
+          },
+          "point": {
+            "x": 450,
+            "y": 310
+          },
+          "beforeSelection": null,
+          "candidates": [
+            "control"
+          ],
+          "overlayExcluded": true,
+          "selection": {
+            "kind": "stratum",
+            "id": "control"
+          },
+          "feedback": "Selected 1/1: point \"Point\"",
+          "screen": {
+            "x": 675,
+            "y": 465
+          }
+        },
+        {
+          "trusted": true,
+          "alt": true,
+          "client": {
+            "x": 675,
+            "y": 465
+          },
+          "point": {
+            "x": 450,
+            "y": 310
+          },
+          "beforeSelection": {
+            "kind": "stratum",
+            "id": "control"
+          },
+          "candidates": [
+            "control"
+          ],
+          "overlayExcluded": true,
+          "selection": {
+            "kind": "stratum",
+            "id": "control"
+          },
+          "feedback": "Selected 1/1: point \"Point\"",
+          "screen": {
+            "x": 675,
+            "y": 465
+          }
+        },
+        {
+          "trusted": true,
+          "alt": true,
+          "client": {
+            "x": 675,
+            "y": 465
+          },
+          "point": {
+            "x": 450,
+            "y": 310
+          },
+          "beforeSelection": {
+            "kind": "stratum",
+            "id": "control"
+          },
+          "candidates": [
+            "control"
+          ],
+          "overlayExcluded": true,
+          "selection": {
+            "kind": "stratum",
+            "id": "control"
+          },
+          "feedback": "Selected 1/1: point \"Point\"",
+          "screen": {
+            "x": 675,
+            "y": 465
+          }
+        }
+      ],
+      "transform": {
+        "screen": {
+          "x": 675,
+          "y": 465
+        },
+        "clear": {
+          "x": 12,
+          "y": 12
+        },
+        "ctm": {
+          "a": 1.5,
+          "b": 0,
+          "c": 0,
+          "d": 1.5,
+          "e": 675,
+          "f": 525
+        }
+      },
+      "selectionCleared": true,
+      "screenshot": "point-paint-dash-caps-triangle-square-wide-scale-1.5-outside.png"
+    },
+    {
+      "kind": "interior",
+      "local": {
+        "x": 0,
+        "y": 0
+      },
+      "alpha": 255,
+      "rasterDistance": 0,
+      "nativeStrokeContains": true,
+      "actions": [
+        {
+          "trusted": true,
+          "alt": false,
+          "client": {
+            "x": 675,
+            "y": 525
+          },
+          "point": {
+            "x": 450,
+            "y": 350
+          },
+          "beforeSelection": null,
+          "candidates": [
+            "control",
+            "p"
+          ],
+          "overlayExcluded": true,
+          "selection": {
+            "kind": "stratum",
+            "id": "p"
+          },
+          "feedback": null,
+          "screen": {
+            "x": 675,
+            "y": 525
+          }
+        },
+        {
+          "trusted": true,
+          "alt": true,
+          "client": {
+            "x": 675,
+            "y": 525
+          },
+          "point": {
+            "x": 450,
+            "y": 350
+          },
+          "beforeSelection": null,
+          "candidates": [
+            "control",
+            "p"
+          ],
+          "overlayExcluded": true,
+          "selection": {
+            "kind": "stratum",
+            "id": "p"
+          },
+          "feedback": "Selected 2/2: point \"Point\"",
+          "screen": {
+            "x": 675,
+            "y": 525
+          }
+        },
+        {
+          "trusted": true,
+          "alt": true,
+          "client": {
+            "x": 675,
+            "y": 525
+          },
+          "point": {
+            "x": 450,
+            "y": 350
+          },
+          "beforeSelection": {
+            "kind": "stratum",
+            "id": "p"
+          },
+          "candidates": [
+            "control",
+            "p"
+          ],
+          "overlayExcluded": true,
+          "selection": {
+            "kind": "stratum",
+            "id": "control"
+          },
+          "feedback": "Selected 1/2: point \"Point\"",
+          "screen": {
+            "x": 675,
+            "y": 525
+          }
+        },
+        {
+          "trusted": true,
+          "alt": true,
+          "client": {
+            "x": 675,
+            "y": 525
+          },
+          "point": {
+            "x": 450,
+            "y": 350
+          },
+          "beforeSelection": {
+            "kind": "stratum",
+            "id": "control"
+          },
+          "candidates": [
+            "control",
+            "p"
+          ],
+          "overlayExcluded": true,
+          "selection": {
+            "kind": "stratum",
+            "id": "p"
+          },
+          "feedback": "Selected 2/2: point \"Point\"",
+          "screen": {
+            "x": 675,
+            "y": 525
+          }
+        }
+      ],
+      "transform": {
+        "screen": {
+          "x": 675,
+          "y": 525
+        },
+        "clear": {
+          "x": 12,
+          "y": 12
+        },
+        "ctm": {
+          "a": 1.5,
+          "b": 0,
+          "c": 0,
+          "d": 1.5,
+          "e": 675,
+          "f": 525
+        }
+      },
+      "selectionCleared": true,
+      "screenshot": "point-paint-dash-caps-triangle-square-wide-scale-1.5-interior.png"
+    },
+    {
+      "kind": "exact-0",
+      "local": {
+        "x": 0,
+        "y": -24
+      },
+      "alpha": 255,
+      "rasterDistance": 0,
+      "nativeStrokeContains": true,
+      "actions": [
+        {
+          "trusted": true,
+          "alt": false,
+          "client": {
+            "x": 675,
+            "y": 489
+          },
+          "point": {
+            "x": 450,
+            "y": 326
+          },
+          "beforeSelection": null,
+          "candidates": [
+            "control",
+            "p"
+          ],
+          "overlayExcluded": true,
+          "selection": {
+            "kind": "stratum",
+            "id": "p"
+          },
+          "feedback": null,
+          "screen": {
+            "x": 675,
+            "y": 489
+          }
+        },
+        {
+          "trusted": true,
+          "alt": true,
+          "client": {
+            "x": 675,
+            "y": 489
+          },
+          "point": {
+            "x": 450,
+            "y": 326
+          },
+          "beforeSelection": null,
+          "candidates": [
+            "control",
+            "p"
+          ],
+          "overlayExcluded": true,
+          "selection": {
+            "kind": "stratum",
+            "id": "p"
+          },
+          "feedback": "Selected 2/2: point \"Point\"",
+          "screen": {
+            "x": 675,
+            "y": 489
+          }
+        },
+        {
+          "trusted": true,
+          "alt": true,
+          "client": {
+            "x": 675,
+            "y": 489
+          },
+          "point": {
+            "x": 450,
+            "y": 326
+          },
+          "beforeSelection": {
+            "kind": "stratum",
+            "id": "p"
+          },
+          "candidates": [
+            "control",
+            "p"
+          ],
+          "overlayExcluded": true,
+          "selection": {
+            "kind": "stratum",
+            "id": "control"
+          },
+          "feedback": "Selected 1/2: point \"Point\"",
+          "screen": {
+            "x": 675,
+            "y": 489
+          }
+        },
+        {
+          "trusted": true,
+          "alt": true,
+          "client": {
+            "x": 675,
+            "y": 489
+          },
+          "point": {
+            "x": 450,
+            "y": 326
+          },
+          "beforeSelection": {
+            "kind": "stratum",
+            "id": "control"
+          },
+          "candidates": [
+            "control",
+            "p"
+          ],
+          "overlayExcluded": true,
+          "selection": {
+            "kind": "stratum",
+            "id": "p"
+          },
+          "feedback": "Selected 2/2: point \"Point\"",
+          "screen": {
+            "x": 675,
+            "y": 489
+          }
+        }
+      ],
+      "transform": {
+        "screen": {
+          "x": 675,
+          "y": 489
+        },
+        "clear": {
+          "x": 12,
+          "y": 12
+        },
+        "ctm": {
+          "a": 1.5,
+          "b": 0,
+          "c": 0,
+          "d": 1.5,
+          "e": 675,
+          "f": 525
+        }
+      },
+      "selectionCleared": true,
+      "screenshot": "point-paint-dash-caps-triangle-square-wide-scale-1.5-exact-0.png"
+    },
+    {
+      "kind": "exact-1",
+      "local": {
+        "x": -6,
+        "y": -28
+      },
+      "alpha": 255,
+      "rasterDistance": 0,
+      "nativeStrokeContains": true,
+      "actions": [
+        {
+          "trusted": true,
+          "alt": false,
+          "client": {
+            "x": 666,
+            "y": 483
+          },
+          "point": {
+            "x": 444,
+            "y": 322
+          },
+          "beforeSelection": null,
+          "candidates": [
+            "control",
+            "p"
+          ],
+          "overlayExcluded": true,
+          "selection": {
+            "kind": "stratum",
+            "id": "p"
+          },
+          "feedback": null,
+          "screen": {
+            "x": 666,
+            "y": 483
+          }
+        },
+        {
+          "trusted": true,
+          "alt": true,
+          "client": {
+            "x": 666,
+            "y": 483
+          },
+          "point": {
+            "x": 444,
+            "y": 322
+          },
+          "beforeSelection": null,
+          "candidates": [
+            "control",
+            "p"
+          ],
+          "overlayExcluded": true,
+          "selection": {
+            "kind": "stratum",
+            "id": "p"
+          },
+          "feedback": "Selected 2/2: point \"Point\"",
+          "screen": {
+            "x": 666,
+            "y": 483
+          }
+        },
+        {
+          "trusted": true,
+          "alt": true,
+          "client": {
+            "x": 666,
+            "y": 483
+          },
+          "point": {
+            "x": 444,
+            "y": 322
+          },
+          "beforeSelection": {
+            "kind": "stratum",
+            "id": "p"
+          },
+          "candidates": [
+            "control",
+            "p"
+          ],
+          "overlayExcluded": true,
+          "selection": {
+            "kind": "stratum",
+            "id": "control"
+          },
+          "feedback": "Selected 1/2: point \"Point\"",
+          "screen": {
+            "x": 666,
+            "y": 483
+          }
+        },
+        {
+          "trusted": true,
+          "alt": true,
+          "client": {
+            "x": 666,
+            "y": 483
+          },
+          "point": {
+            "x": 444,
+            "y": 322
+          },
+          "beforeSelection": {
+            "kind": "stratum",
+            "id": "control"
+          },
+          "candidates": [
+            "control",
+            "p"
+          ],
+          "overlayExcluded": true,
+          "selection": {
+            "kind": "stratum",
+            "id": "p"
+          },
+          "feedback": "Selected 2/2: point \"Point\"",
+          "screen": {
+            "x": 666,
+            "y": 483
+          }
+        }
+      ],
+      "transform": {
+        "screen": {
+          "x": 666,
+          "y": 483
+        },
+        "clear": {
+          "x": 12,
+          "y": 12
+        },
+        "ctm": {
+          "a": 1.5,
+          "b": 0,
+          "c": 0,
+          "d": 1.5,
+          "e": 675,
+          "f": 525
+        }
+      },
+      "selectionCleared": true,
+      "screenshot": "point-paint-dash-caps-triangle-square-wide-scale-1.5-exact-1.png"
+    }
+  ],
+  "modelUnchanged": true,
+  "observation": {
+    "xml": "<svg xmlns=\"http://www.w3.org/2000/svg\" width=\"2880\" height=\"2880\" viewBox=\"-90 -90 180 180\"><polygon fill=\"none\" fill-opacity=\"1\" stroke=\"#000000\" stroke-opacity=\"1\" stroke-width=\"36\" stroke-dashoffset=\"0\" stroke-linecap=\"square\" stroke-linejoin=\"bevel\" stroke-miterlimit=\"10\" points=\"3.117441802447775e-16,-5.091168824543141 -4.409081537009721,2.545584412271569 4.409081537009718,2.5455844122715727\" stroke-dasharray=\"3.5999999999999996 3.5999999999999996\"></polygon></svg>",
+    "resolution": 16,
+    "radius": null,
+    "rasterRadius": 30.3194257551986,
+    "rasterBounds": {
+      "minX": -26.375,
+      "minY": -29.625,
+      "maxX": 27,
+      "maxY": 23.6875
+    },
+    "declaredBounds": [
+      -26.388457268119893,
+      -29.679626092663035,
+      27.01570187914905,
+      23.70139943227701
+    ],
+    "contourKind": "polygon",
+    "vertexCount": 3,
+    "selectionRadius": 30.402104765527767,
+    "boundsEnclosePaint": true,
+    "boundaryPixelCount": 2652,
+    "ctm": {
+      "a": 1.5,
+      "b": 0,
+      "c": 0,
+      "d": 1.5,
+      "e": 674.796875,
+      "f": 525.203125
+    },
+    "strokeWidth": 36,
+    "cap": "square",
+    "join": "bevel",
+    "pattern": "3.6px, 3.6px",
+    "phase": 0,
+    "fill": "none",
+    "miterLimit": 10,
+    "source": "",
+    "bodyStatus": "ready",
+    "probes": [
+      {
+        "kind": "paint",
+        "local": {
+          "x": -6.53125,
+          "y": -29.46875
+        },
+        "alpha": 255,
+        "rasterDistance": 0,
+        "nativeStrokeContains": true
+      },
+      {
+        "kind": "outside",
+        "local": {
+          "x": 0,
+          "y": -40
+        },
+        "alpha": 0,
+        "rasterDistance": 12.244657636087666,
+        "nativeStrokeContains": false
+      },
+      {
+        "kind": "interior",
+        "local": {
+          "x": 0,
+          "y": 0
+        },
+        "alpha": 255,
+        "rasterDistance": 0,
+        "nativeStrokeContains": true
+      },
+      {
+        "kind": "exact-0",
+        "local": {
+          "x": 0,
+          "y": -24
+        },
+        "alpha": 255,
+        "rasterDistance": 0,
+        "nativeStrokeContains": true
+      },
+      {
+        "kind": "exact-1",
+        "local": {
+          "x": -6,
+          "y": -28
+        },
+        "alpha": 255,
+        "rasterDistance": 0,
+        "nativeStrokeContains": true
+      }
+    ]
+  }
+}

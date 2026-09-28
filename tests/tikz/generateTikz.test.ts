@@ -4347,8 +4347,8 @@ test('element imported node style exports the raw key in node options', () => {
     layerBlock,
     /3cat\/phys\/3strata\/shape\/L[\s\S]*fill=stzPointvertex[\s\S]*draw=stzPointvertex/,
   )
-  assert.doesNotMatch(pointNodeBlock, /inner sep=1\.5pt/)
-  assert.doesNotMatch(pointNodeBlock, /opacity=1/)
+  assert.match(pointNodeBlock, /inner sep=1\.5pt/)
+  assert.match(pointNodeBlock, /text opacity=1/)
 })
 
 test('element imported label style exports the raw key in node options', () => {
