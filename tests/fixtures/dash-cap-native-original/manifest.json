@@ -1,0 +1,53 @@
+{
+  "provenance": "Original failed Chrome observation from parent YAt03b; unchanged bytes, not corrected native acceptance. No pointer actions ran for this entry.",
+  "sourceReport": "/var/folders/vk/7kf940pd4bx8f6cg3rzlmtc80000gn/T/stz-phase32b-before-review-YAt03b/verification.json",
+  "sourceReportSha256": "cf8f3b14e2f3075d2c718ced7d158168c446a2f92e18321c0dfce02dfc1247cb",
+  "checkout": {
+    "revision": "5c1ef003fe14b6cbc8f857214ec28e66541dfaea",
+    "trackedDiffSha256": "b44c8d60cdb1d7517d84568e1c4a803b0debaa61915d2a8b939896078b17376a",
+    "untrackedSha256": {
+      "docs/PHASE_32B_NATIVE_VISIBILITY_INVESTIGATION.md": "816b2b42bc0ef397f0f511d6d9b8dc011c962c3e3d2fd35f9b4310a03de08059",
+      "scripts/checkPointNodesAppFocused.mjs": "f6fd04ae76196b425ab84556b746d724b86e2c2ee4745b919efe59236fafde43",
+      "tests/scripts/pointNativeFailureBoundary.test.mjs": "d5a8ec08eb0096ae46a09235e002d2c51c669a7af5731d51d03d717ab19d29a2",
+      "tests/scripts/pointNativeFocused.test.mjs": "8edab2b41b61d63d97c83740c13be3b55b425cc140e9f3143a2f113a011999fd"
+    },
+    "fingerprint": "ac28529b414946a27ff5b706976fbacaaecfdf94e3ab2ff8b08d53231c11e67b"
+  },
+  "browserVersion": "154.0.8037.57",
+  "nodeVersion": "v26.9.0",
+  "sourceReady": true,
+  "rawPoints": "5.000000000000001,-5 -5,-5.000000000000001 -5.000000000000002,5 5,5.000000000000002",
+  "model": {
+    "text": "",
+    "shape": "square",
+    "size": 5.892556509887896,
+    "fillEnabled": false,
+    "stroke": {
+      "enabled": true,
+      "color": "#000000",
+      "opacity": 1,
+      "width": 30,
+      "lineStyle": "solid",
+      "dashPattern": [
+        0,
+        8.333333333333334
+      ],
+      "dashPhase": 0,
+      "lineCap": "rect",
+      "lineJoin": "bevel"
+    }
+  },
+  "resolution": 16,
+  "rasterUncertainty": 0.14,
+  "decorationAllowance": 6,
+  "pickingTolerance": 6,
+  "files": {
+    "point-paint-dash-caps-square-exact-zero-scale-0.5.json": "21de6d30068db9ea2ed572757acdf82fd0ce488185d941ebd55a0345c093e9b8",
+    "point-paint-dash-caps-square-exact-zero-scale-0.5.input.svg": "1d63cea26d1ffde8267a04513dfdd0affc958c26170863084ddcd3dd981a6c7e",
+    "point-paint-dash-caps-square-exact-zero-scale-0.5.raster.png": "6cd8fb4cf34bd86627435059ad7b1e9038a30e13963c071a82b2c9bcf9e1c929",
+    "point-paint-dash-caps-square-exact-zero-scale-0.5.screen.png": "15e150d1f5aa8a72422a1d5aabc9406b03c7ec69aab178f94fc171d9de459a1e",
+    "point-paint-dash-caps-square-exact-zero-scale-0.5-solid.input.svg": "ad47e0b7149aa60f6313efa431ae0d2f97b1685f4cf63ff3d226e7492e959537",
+    "point-paint-dash-caps-square-exact-zero-scale-0.5-solid.raster.png": "3ad6edfd54d20a2d57779822b6494b1fb22f2707506249714cebf46e855658eb",
+    "point-paint-dash-caps-square-exact-zero-scale-0.5-engine-audit.json": "13e00cac44bab3a8a3b444519a8fd7dd3e672337c38dacfdf0ef38199d79c9ee"
+  }
+}
