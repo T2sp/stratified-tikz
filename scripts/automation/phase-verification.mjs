@@ -217,6 +217,30 @@ function evidenceObject(artifactDir, name) {
   return evidence;
 }
 
+// Keep independently sampled live pixels tied to the exact retained PNG, rather
+// than accepting a scalar assertion alongside an unrelated screenshot.
+function validateDashLivePaintFiles(artifactDir, live) {
+  assert.ok(live && Array.isArray(live.captures));
+  if (live.sourceFile) {
+    assert.equal(resolve(artifactDir, live.sourceFile), join(artifactDir, live.sourceFile));
+    assert.ok(!live.sourceFile.includes(".."));
+    assert.equal(sha256(readFileSync(join(artifactDir, live.sourceFile))), live.sourceSha256,
+      "Live literal SVG matches its recorded source identity");
+  }
+  for (const capture of live.captures) {
+    const file = capture.file ?? capture.screenshot;
+    assert.equal(typeof file, "string");
+    assert.ok(!file.includes(".."));
+    assert.equal(resolve(artifactDir, file), join(artifactDir, file));
+    const bytes = readFileSync(join(artifactDir, file));
+    assert.equal(bytes.length, capture.bytes, "Live PNG byte length matches the sampled capture");
+    assert.equal(sha256(bytes), capture.sha256, "Live PNG identity matches the sampled capture");
+    assert.ok(bytes.length >= 24 && bytes.subarray(0, 8).equals(Buffer.from([137, 80, 78, 71, 13, 10, 26, 10])));
+    assert.equal(bytes.readUInt32BE(16), capture.width, "Live PNG width matches pixel calibration");
+    assert.equal(bytes.readUInt32BE(20), capture.height, "Live PNG height matches pixel calibration");
+  }
+}
+
 function validateTargetedPaintEvidence(artifactDir, name, group) {
   if (name === dashCapScenario) {
     const evidence = evidenceObject(artifactDir, `${name}.json`);
@@ -229,6 +253,7 @@ function validateTargetedPaintEvidence(artifactDir, name, group) {
         const source = readFileSync(join(artifactDir, `${stem}${suffix}`), "utf8");
         assert.ok(source.includes(`points="${entry.observation.engineAudit.rawPoints}"`), "Retained App SVG preserves emitted precision");
       }
+      if (entry.specification.livePaint) validateDashLivePaintFiles(artifactDir, entry.observation.livePaint);
     }
     const mechanism = evidenceObject(artifactDir, `${dashCapMechanismStem}.json`);
     assertDashCapMechanismEvidence(mechanism);
@@ -236,7 +261,8 @@ function validateTargetedPaintEvidence(artifactDir, name, group) {
       const stem = `${dashCapMechanismStem}-${entry.key}`;
       assert.deepEqual(evidenceObject(artifactDir, `${stem}.json`), entry,
         "Retained mechanism entry matches the complete matrix");
-      for (const suffix of ["input.svg", "solid.input.svg"]) {
+      validateDashLivePaintFiles(artifactDir, entry.livePaint);
+      for (const suffix of ["input.svg", "solid.input.svg", "live.svg"]) {
         const source = readFileSync(join(artifactDir, `${stem}.${suffix}`), "utf8");
         assert.ok(source.includes(`points="${entry.source.rawPoints}"`), "Retained literal SVG preserves source precision");
         const spec = entry.specification;
@@ -732,7 +758,8 @@ function validateBrowserEvidence(name, artifactDir, phase, checkout) {
             if (!value || typeof value !== "object") throw new Error(`Invalid point-node JSON: ${artifact}`);
           } else if (artifact.endsWith(".svg")) {
             const svg = bytes.toString();
-            if ((artifact.startsWith(`${polygonJoinScenario}-`) || artifact.startsWith(`${dashCapScenario}-`) || artifact.startsWith(`${dashCapMechanismStem}-`)) && artifact.endsWith(".input.svg")) {
+            if ((artifact.startsWith(`${polygonJoinScenario}-`) || artifact.startsWith(`${dashCapScenario}-`) || artifact.startsWith(`${dashCapMechanismStem}-`))
+              && (artifact.endsWith(".input.svg") || artifact.startsWith(`${dashCapMechanismStem}-`) && artifact.endsWith(".live.svg"))) {
               if (!/^<svg\s[^>]*><(polygon|circle)\s[^>]*><\/\1><\/svg>$/u.test(svg)
                 || /(?:href|onload|script|data-)=/u.test(svg)) throw new Error(`Invalid polygon stroke SVG input: ${artifact}`);
             } else if (!hasWholePointSvg(svg)) {

@@ -95,9 +95,6 @@ export function createDashCaps(contour: Contour, width: number, pattern: readonl
   if (!Number.isFinite(phase) || pattern.some((part) => !Number.isFinite(part) || part < 0)) return result
   const rawPeriod = pattern.reduce((sum, part) => sum + part, 0)
   if (!(rawPeriod > 0)) return result
-  // SVG treats an all-zero off pattern as a continuous stroke. Mixed patterns
-  // retain zero-length on entries (including their two endpoint caps).
-  if (!pattern.some((part, index) => index % 2 === 1 && part > 0)) return result
   const smallest = Math.min(...pattern.filter((part) => part > 0))
   // Leave the ordinary paint path numeric. Extreme mixtures need exact sums,
   // phase reduction and corner comparisons: normalization alone can lose a
@@ -145,7 +142,7 @@ export function createDashCaps(contour: Contour, width: number, pattern: readonl
       // not an incoming half-cap plus an outgoing half-cap at the vertex.
       // A dash merely crossing the vertex does not acquire another cap.
       // Explicit seam endpoints below instead use their initial/final edge.
-      const outgoing = singleton && !dot ? sign < 0 : dot && sign > 0
+      const outgoing = dot ? sign > 0 : sign < 0
       let range: Repetitions | null
       if (typeof position === 'bigint') {
         const startUnits = binaryUnits(edge.start)
@@ -166,51 +163,44 @@ export function createDashCaps(contour: Contour, width: number, pattern: readonl
     }
   }
   let start = 0
-  let rightAtStart = false, leftAtEnd = false, startsAtEnd = false
-  let dotAtStart = false, dotAtEnd = false
+  let rightAtStart = false, leftAtEnd = false
+  let dotAtStart = false
   const tail = length % period
   const endOffset = offset >= 0 && offset >= period - tail ? offset - (period - tail) : offset + tail
   const exactEndOffset = exactPeriod === undefined ? undefined : exactMod(exactOffset! + binaryUnits(length), exactPeriod)
   for (let i = 0; i < pattern.length; i += 2) {
     const end = start + pattern[i]
-    let previous = (i + pattern.length - 1) % pattern.length
-    let next = (i + 1) % pattern.length
-    for (let n = 0; n < pattern.length && pattern[previous] === 0; n++) previous = (previous + pattern.length - 1) % pattern.length
-    for (let n = 0; n < pattern.length && pattern[next] === 0; n++) next = (next + 1) % pattern.length
-    // Touching positive on intervals coalesce. A zero-length on interval is
-    // still an independently capped dot, even beside a positive on interval.
+    // Zero-length off entries still separate independently capped on paths.
     if (exactPrefix && exactPeriod !== undefined && exactOffset !== undefined && exactEndOffset !== undefined) {
       const first = exactPrefix[i], last = exactPrefix[i + 1]
-      if (first === last || previous % 2 === 1) add(exactMod(first - exactOffset, exactPeriod), -1, false, first === last)
-      if (first === last || next % 2 === 1) add(exactMod(last - exactOffset, exactPeriod), 1, false, first === last)
+      add(exactMod(first - exactOffset, exactPeriod), -1, false, first === last)
+      add(exactMod(last - exactOffset, exactPeriod), 1, false, first === last)
       rightAtStart ||= exactOffset >= first && exactOffset < last
-      startsAtEnd ||= first < last && exactEndOffset === first
       leftAtEnd ||= (exactEndOffset > first && exactEndOffset <= last)
         || (exactEndOffset === 0n && last === exactPeriod && last > first)
       dotAtStart ||= first === last && exactOffset === first
-      dotAtEnd ||= first === last && exactEndOffset === first
     } else {
-      if (start === end || previous % 2 === 1) add(endpoint(start, suffix[i]), -1, false, start === end)
-      if (start === end || next % 2 === 1) add(endpoint(end, suffix[i + 1]), 1, false, start === end)
+      add(endpoint(start, suffix[i]), -1, false, start === end)
+      add(endpoint(end, suffix[i + 1]), 1, false, start === end)
       rightAtStart ||= offset >= 0 ? offset >= start && offset < end
         : offset >= -suffix[i] && offset < -suffix[i + 1]
-      startsAtEnd ||= start < end && (endOffset >= 0 ? endOffset === start : endOffset === -suffix[i])
       leftAtEnd ||= (endOffset >= 0 ? endOffset > start && endOffset <= end
         : endOffset > -suffix[i] && endOffset <= -suffix[i + 1])
         || (endOffset === 0 && suffix[i + 1] === 0 && end > start)
       dotAtStart ||= start === end && (offset >= 0 ? offset === start : offset === -suffix[i])
-      dotAtEnd ||= start === end && (endOffset >= 0 ? endOffset === start : endOffset === -suffix[i])
     }
     start = end + (pattern[i + 1] ?? pattern[i])
   }
-  // Join the first and last painted intervals at the closepath seam, including
-  // a zero-length terminal interval or a positive dash starting exactly there.
-  // Only their outer endpoints retain oriented caps. If the boundary subpath
-  // is an isolated dot, neither half may inherit an adjacent edge direction.
+  // The schedule is half-open at the terminal seam: a zero-on entry or a
+  // positive interval only starting at `length` paints no additional subpath.
+  // Initial isolated dots still have their full native square/disk extent.
   const firstPainted = rightAtStart || dotAtStart
-  const lastPainted = leftAtEnd || startsAtEnd || dotAtEnd
+  const lastPainted = leftAtEnd
   if (firstPainted && lastPainted) {
-    if (!leftAtEnd) add(length, -1, true, false, dotAtEnd && !rightAtStart)
+    // Preserve a joined positive seam. Adding either oriented seam cap would
+    // contradict retained native triangle paint. Two square raster/containment
+    // disagreements remain explicit failures in the native harness; they do
+    // not justify extending every closed dashed contour's painted region.
     if (!rightAtStart) add(0, 1, true, true, !leftAtEnd)
   } else {
     if (firstPainted) {
@@ -218,8 +208,7 @@ export function createDashCaps(contour: Contour, width: number, pattern: readonl
       if (!rightAtStart) add(0, 1, true, true, true)
     }
     if (lastPainted) {
-      add(length, 1, true, false, dotAtEnd && !leftAtEnd)
-      if (!leftAtEnd) add(length, -1, true, false, dotAtEnd)
+      add(length, 1, true)
     }
   }
   measure(result)

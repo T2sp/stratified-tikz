@@ -1389,6 +1389,10 @@ Isolated zero-on subpaths use full square/disk cap geometry, separately from
 oriented positive-length endpoint caps. Raw dash patterns and coordinates remain
 unchanged. See the [native zero-dash investigation](PHASE_32B_ZERO_DASH_INVESTIGATION.md)
 for the retained Chrome/Cairo distinction and the expanded native verification gate.
+The subsequent [endpoint continuation](PHASE_32B_NATIVE_ENDPOINT_INVESTIGATION.md)
+distinguishes terminal-only zero dots, positive endpoint edge ownership and
+zero-off caps. Raster/containment disagreements require live painted evidence;
+they cannot be accepted merely by changing the expected candidate list.
 Paint/clearance bounds conservatively retain that continuous stroke envelope;
 they are not paint-only gap masks or final hit oracles. Revision matching compares
 pattern values, phase, cap, join, width and enablement along with existing owner,

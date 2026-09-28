@@ -16,12 +16,15 @@ passed; the separate 11/11 rerun did not explain the failure). The targeted
 correction shares effective dash settings, adds endpoint cap geometry and stale
 layout guards, and separates controlled diagnostic timeout testing from real
 filesystem scheduling. The native policy now requires 29 scenarios in the same
-16 groups and 605 artifacts, preserving all earlier coverage, including six
+16 groups and 856 artifacts, preserving all earlier coverage, including six
 responsive downloads and their 91 artifacts. Fresh matching parent verification
 and independent review must accept the new tree before 32B is complete.
 32C/32D remain deferred. See the final section of the implementation report for
 executed checks and the frozen-tree handoff; historical browser evidence does
 not cover these new fixes.
+The [native endpoint continuation](PHASE_32B_NATIVE_ENDPOINT_INVESTIGATION.md)
+records the subsequent isolated-dot passes, remaining endpoint defects and
+live-paint gates, retaining all prior 705 artifacts and extending both matrices.
 
 Implement the following stages in the user's requested order. Each stage must
 remain usable and pass its own acceptance checks before the next stage begins.

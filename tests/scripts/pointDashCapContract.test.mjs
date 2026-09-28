@@ -11,9 +11,9 @@ import { dashCapEvidence } from './dashCapEvidenceFixture.mjs'
 test('synthetic dash-cap policy contract preserves paint hits, gaps, exterior controls, transformations, live edits and engine audits', () => {
   const evidence = dashCapEvidence()
   assertDashCapEvidence(evidence)
-  assert.equal(evidence.cases.length, 18)
-  assert.equal(evidence.cases.filter((entry) => entry.observation.engineAudit).length, 10)
-  assert.equal(dashCapArtifacts().length, 223)
+  assert.equal(evidence.cases.length, 22)
+  assert.equal(evidence.cases.filter((entry) => entry.observation.engineAudit).length, 14)
+  assert.equal(dashCapArtifacts().length, 301)
 })
 for (const [name, damage] of [
   ['missing circle', (e) => { e.cases = e.cases.filter((c) => c.key !== 'circle-square-wide') }],
@@ -155,10 +155,114 @@ test('failed App dash matrix retains every case and still runs supplemental mech
     assert.deepEqual(mechanismAttempts, dashCapMechanismCases.map(({ key }) => key))
     assert.equal(saved, 0); assert.deepEqual(sizes.at(-1), viewport)
     const evidence = JSON.parse(await readFile(join(artifactDir, 'point-paint-dash-caps.json'), 'utf8'))
-    assert.equal(evidence.result, 'failed'); assert.equal(evidence.cases.length, 18); assert.ok(evidence.cases.every((entry) => entry.result === 'failed'))
+    assert.equal(evidence.result, 'failed'); assert.equal(evidence.cases.length, 22); assert.ok(evidence.cases.every((entry) => entry.result === 'failed'))
     assert.equal(evidence.error.message, original.message); assert.equal(evidence.cases[0].error.stack, original.stack)
     assert.throws(() => assertDashCapEvidence(evidence))
     const mechanism = JSON.parse(await readFile(join(artifactDir, 'point-paint-dash-cap-mechanism.json'), 'utf8'))
-    assert.equal(mechanism.result, 'failed'); assert.equal(mechanism.cases.length, 19)
+    assert.equal(mechanism.result, 'failed'); assert.equal(mechanism.cases.length, dashCapMechanismCases.length)
   } finally { await rm(artifactDir, { recursive: true, force: true }) }
+})
+
+test('synthetic endpoint policy retains disproven terminal positives as negatives and adds independently painted App witnesses at both scales', () => {
+  const evidence = dashCapEvidence()
+  for (const scale of dashCapScales) {
+    const terminal = evidence.cases.find((entry) => entry.key === 'square-terminal-zero' && entry.scale === scale)
+    assert.deepEqual(terminal.specification.exact, [{ x: 21, y: -21 }, { x: 22, y: -22 }, { x: -22, y: -22 }, { x: 22, y: -18 }])
+    for (const index of [0, 1, 3]) {
+      const probe = terminal.probes.find((probe) => probe.kind === `exact-${index}`)
+      assert.equal(probe.alpha, 0); assert.equal(probe.nativeStrokeContains, false)
+      assert.ok(probe.rasterDistance > 6.14 && probe.solidDistance > 6.14)
+      assert.ok(probe.actions.every((action) => action.candidates.join() === 'control'))
+    }
+    const positive = evidence.cases.find((entry) => entry.key === 'square-positive-corner' && entry.scale === scale)
+    assert.deepEqual(positive.specification.exterior, { x: -22, y: -30 })
+    assert.deepEqual(positive.specification.exact, [{ x: 20, y: 20 }, { x: 16, y: -22 }, { x: 22, y: -22 }])
+    for (const entry of [positive, ...evidence.cases.filter((entry) => entry.scale === scale && entry.specification.livePaint)]) {
+      for (const probe of entry.probes.filter((probe) => probe.kind.startsWith('exact-'))) {
+        assert.equal(probe.alpha, 255); assert.ok(probe.solidDistance > 6.14)
+        assert.ok(probe.actions.every((action) => action.candidates.includes('p')))
+      }
+    }
+  }
+  assertDashCapEvidence(evidence)
+})
+
+for (const [name, key, damage] of [
+  ['terminal phantom candidate at (21,-21)', 'square-terminal-zero', (entry) => { entry.probes.find((probe) => probe.kind === 'exact-0').actions[0].candidates.push('p') }],
+  ['terminal negative inside continuous stroke', 'square-terminal-zero', (entry) => { entry.probes.find((probe) => probe.kind === 'exact-0').solidDistance = 5.9 }],
+  ['terminal opaque negative', 'square-terminal-zero', (entry) => { entry.probes.find((probe) => probe.kind === 'exact-1').alpha = 255 }],
+  ['removed terminal painted positive', 'square-terminal-zero', (entry) => { entry.probes = entry.probes.filter((probe) => probe.kind !== 'exact-2') }],
+  ['terminal first-failure candidate', 'square-terminal-zero', (entry) => { entry.probes.find((probe) => probe.kind === 'exact-3').actions[0].candidates.push('p') }],
+  ['positive corner missing ordinary candidate', 'square-positive-corner', (entry) => { entry.probes.find((probe) => probe.kind === 'exact-1').actions[0].candidates = ['control'] }],
+  ['positive corner missing cycling candidate', 'square-positive-corner', (entry) => { entry.probes.find((probe) => probe.kind === 'exact-2').actions[1].candidates = ['control'] }],
+  ['positive corner distant negative', 'square-positive-corner', (entry) => { entry.observation.engineAudit.samples.find((sample) => sample.local.x === -22 && sample.local.y === -30).paintDistance = 80 }],
+  ['zero-off omitted independently contained positive', 'square-zero-off', (entry) => { entry.probes.find((probe) => probe.kind === 'exact-0').actions[0].candidates = ['control'] }],
+  ['before-corner omitted live-painted positive', 'square-positive-before-corner', (entry) => { entry.probes.find((probe) => probe.kind === 'exact-1').actions[0].candidates = ['control'] }],
+]) test(`synthetic endpoint policy rejects ${name}`, () => {
+  const evidence = dashCapEvidence(); damage(evidence.cases.find((entry) => entry.key === key)); assert.throws(() => assertDashCapEvidence(evidence))
+})
+
+const liveEntry = (evidence) => evidence.cases.find((entry) => entry.key === 'square-positive-before-corner')
+const liveSample = (entry, x = 16, y = -22) => entry.observation.livePaint.captures[1].samples.find((sample) => sample.local.x === x && sample.local.y === y)
+test('synthetic oracle policy retains contradictory core/native observations and requires actual-App paint plus candidate/click checks', () => {
+  const evidence = dashCapEvidence(), entry = liveEntry(evidence)
+  const sample = entry.observation.engineAudit.samples.find((sample) => sample.local.x === 16 && sample.local.y === -22)
+  assert.equal(sample.paintCore, true); assert.equal(sample.paintAlpha, 255); assert.equal(sample.nativeStrokeContains, false)
+  assert.deepEqual(liveSample(entry).rgba, [0, 0, 0, 255]); assert.deepEqual(sample.candidates, ['p'])
+  assert.ok(entry.observation.livePaint.disagreements.some(({ x, y }) => x === 16 && y === -22))
+  assertDashCapEvidence(evidence)
+})
+for (const [name, damage] of [
+  ['missing native App paint', (entry) => { delete entry.observation.livePaint }],
+  ['dropped responsive capture', (entry) => { entry.observation.livePaint.captures.shift() }],
+  ['unfinished native capture', (entry) => { entry.observation.livePaint.captures[1].status = 'captured' }],
+  ['drifting native transform', (entry) => { entry.observation.livePaint.captures[1].afterCtm.e += 1 }],
+  ['changed source', (entry) => { entry.observation.livePaint.captures[1].source = '<polygon />' }],
+  ['missing live grid cell', (entry) => { entry.observation.livePaint.captures[1].samples.pop() }],
+  ['wrong native transform', (entry) => { entry.observation.livePaint.captures[1].ctm.a = 15 }],
+  ['misprojected native pixel', (entry) => { liveSample(entry).pixel.x++ }],
+  ['live background disproves cloned paint', (entry) => { liveSample(entry).rgba = [245, 245, 245, 255] }],
+  ['live paint disproves genuine exterior', (entry) => { liveSample(entry, -22, -30).rgba = [0, 0, 0, 255] }],
+  ['dropped contradiction', (entry) => { entry.observation.livePaint.disagreements = [] }],
+  ['retained selection decoration', (entry) => { entry.observation.livePaint.captures[1].overlays = 1 }],
+  ['mutated model', (entry) => { entry.observation.livePaint.modelUnchanged = false }],
+  ['unrestored framing', (entry) => { entry.observation.livePaint.restored = false }],
+  ['missing screenshot identity', (entry) => { delete entry.observation.livePaint.captures[1].sha256 }],
+  ['invalid screenshot byte length', (entry) => { entry.observation.livePaint.captures[1].bytes = 0 }],
+  ['new native exclusion outside retained region', (entry) => {
+    const sample = entry.observation.engineAudit.samples.find((sample) => sample.local.x === -22 && sample.local.y === -22)
+    sample.nativeStrokeContains = false
+    entry.observation.livePaint.disagreements.unshift(sample.local)
+  }],
+]) test(`synthetic live App oracle rejects ${name}`, () => {
+  const evidence = dashCapEvidence(); damage(liveEntry(evidence)); assert.throws(() => assertDashCapEvidence(evidence))
+})
+
+
+test('synthetic triangle phase edit retains both independent negative controls and native ordinary/Alt actions at both scales', () => {
+  const evidence = dashCapEvidence()
+  for (const entry of evidence.cases.filter((entry) => entry.key === 'triangle-square-wide')) {
+    const edit = entry.edits.find((edit) => edit.field === 'dashPhase')
+    assert.deepEqual(edit.negativeProbes.map(({ local }) => local), [{ x: -6, y: -34 }, { x: 0, y: -32 }])
+    assert.ok(edit.negativeProbes.every((probe) => probe.rasterDistance > 6.14 && probe.solidDistanceLowerBound > 6.14))
+    assert.ok(edit.probe.actions.every((action) => action.candidates.includes('p')), 'Original painted positive remains')
+  }
+  assertDashCapEvidence(evidence)
+})
+for (const [name, damage] of [
+  ['missing negative', (edit) => { edit.negativeProbes.pop() }],
+  ['phantom ordinary candidate', (edit) => { edit.negativeProbes[0].actions[0].candidates.push('p') }],
+  ['phantom Alt candidate', (edit) => { edit.negativeProbes[1].actions[1].candidates.push('p') }],
+  ['painted negative', (edit) => { edit.negativeProbes[0].alpha = 255 }],
+  ['paint within tolerance', (edit) => { edit.negativeProbes[0].rasterDistance = 5.9 }],
+  ['native-contained negative', (edit) => { edit.negativeProbes[0].nativeStrokeContains = true }],
+  ['invalid continuous-stroke bound', (edit) => { edit.negativeProbes[0].solidDistanceLowerBound = 20 }],
+  ['changed support vertices', (edit) => { edit.observation.solidSupport.vertices[0].y = -20 }],
+  ['unsupported solid join', (edit) => { edit.observation.solidSupport.join = 'miter' }],
+  ['missing clear', (edit) => { edit.negativeProbes[0].selectionCleared = false }],
+  ['untrusted pointer', (edit) => { edit.negativeProbes[0].actions[0].trusted = false }],
+  ['incorrect transform', (edit) => { edit.negativeProbes[0].transform.ctm.e += 1 }],
+]) test(`synthetic triangle phase negative rejects ${name}`, () => {
+  const evidence = dashCapEvidence(), edit = evidence.cases[0].edits.find((edit) => edit.field === 'dashPhase')
+  damage(edit); assert.throws(() => assertDashCapEvidence(evidence))
 })

@@ -1,0 +1,55 @@
+{
+  "scope": "Independent PNG decoding of historical native triangle; current geometry exploratory",
+  "samples": [
+    {
+      "local": {
+        "x": -6,
+        "y": -34
+      },
+      "alpha": 0,
+      "paintDistance": 10.201581525675321,
+      "solidDistance": 18.61369718107001,
+      "capDistance": 4.360265204732526
+    },
+    {
+      "local": {
+        "x": 0,
+        "y": -32
+      },
+      "alpha": 0,
+      "paintDistance": 11.308269236492382,
+      "solidDistance": 16.54558441227157,
+      "capDistance": 5.303731384092313
+    },
+    {
+      "local": {
+        "x": -4,
+        "y": -34
+      },
+      "alpha": 0,
+      "paintDistance": 11.042973586176869,
+      "solidDistance": 18.54558441227157,
+      "capDistance": 5.035782191661191
+    },
+    {
+      "local": {
+        "x": -6,
+        "y": -32
+      },
+      "alpha": 0,
+      "paintDistance": 8.348488822834945,
+      "solidDistance": 16.62189475058386,
+      "capDistance": 2.3938289467406237
+    },
+    {
+      "local": {
+        "x": 6,
+        "y": -32
+      },
+      "alpha": 0,
+      "paintDistance": 10.803735609732405,
+      "solidDistance": 16.621894750583863,
+      "capDistance": 8.303731384092313
+    }
+  ]
+}

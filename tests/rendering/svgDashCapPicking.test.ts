@@ -420,6 +420,50 @@ function literalZeroDotPolicy(observation: RasterObservation) {
   radius: Math.max(circleEnvelope, ...points.map(({ x, y }) => Math.hypot(x, y))) }
 }
 
+// Retained Cairo controls coalesce touching positive paths where native square
+// paint retains their endpoint rectangles. Keep every old probe and byte with
+// this independent finite construction; joined seam geometry is preserved.
+function addedNativeCapPolicy(observation: RasterObservation) {
+  const touching = observation.id === 'triangle-touching-on', zeroOff = observation.id === 'triangle-zero-off'
+  if (!touching && !zeroOff) return null
+  const vertices = 'strokeVertices' in observation ? (observation as RasterObservation & { strokeVertices: Vec2[] }).strokeVertices : observation.vertices!
+  const half = observation.width / 2
+  const positions: [number, -1 | 1][] = []
+  for (const position of touching ? [2.4, 9.6, 16.8, 24] : zeroOff ? [3.6, 7.2, 10.8, 14.4, 18, 21.6, 25.2] : []) {
+    positions.push([position, -1], [position, 1])
+  }
+  const rectangles = positions.map(([position, sign]) => {
+    let remaining = position
+    for (const [index, origin] of vertices.entries()) {
+      const end = vertices[(index + 1) % vertices.length], length = Math.hypot(end.x - origin.x, end.y - origin.y)
+      if (remaining > length) { remaining -= length; continue }
+      const tangent = { x: (end.x - origin.x) / length, y: (end.y - origin.y) / length }
+      const center = { x: origin.x + remaining * tangent.x, y: origin.y + remaining * tangent.y }
+      const corners = [[0, -half], [sign * half, -half], [sign * half, half], [0, half]].map(([along, normal]) => ({
+        x: center.x + along * tangent.x - normal * tangent.y, y: center.y + along * tangent.y + normal * tangent.x,
+      }))
+      return { center, tangent, sign, corners }
+    }
+    throw new Error(`Explicit cap ${position} lies beyond ${observation.id}`)
+  })
+  const corners = rectangles.flatMap((rectangle) => rectangle.corners)
+  return {
+    distance: (point: Vec2) => Math.min(...rectangles.map(({ center, tangent, sign }) => {
+      const x = point.x - center.x, y = point.y - center.y
+      const along = sign * (x * tangent.x + y * tangent.y), normal = -x * tangent.y + y * tangent.x
+      return Math.hypot(Math.max(0, -along, along - half), Math.max(0, Math.abs(normal) - half))
+    })),
+    bounds: { minX: Math.min(...corners.map(({ x }) => x)), maxX: Math.max(...corners.map(({ x }) => x)),
+      minY: Math.min(...corners.map(({ y }) => y)), maxY: Math.max(...corners.map(({ y }) => y)) },
+    radius: Math.max(...corners.map(({ x, y }) => Math.hypot(x, y))),
+  }
+}
+function augmentedCairoBounds(observation: RasterObservation, addition: ReturnType<typeof addedNativeCapPolicy>) {
+  if (!addition) return observation.rasterBounds
+  return { minX: Math.min(observation.rasterBounds.minX, addition.bounds.minX), maxX: Math.max(observation.rasterBounds.maxX, addition.bounds.maxX),
+    minY: Math.min(observation.rasterBounds.minY, addition.bounds.minY), maxY: Math.max(observation.rasterBounds.maxY, addition.bounds.maxY) }
+}
+
 for (const observation of productionObservations) {
   test(`${observation.id}: retained Cairo evidence and declared engine policy agree with pending/committed picking`, async () => {
     const input = rasterFixture(observation)
@@ -460,8 +504,10 @@ for (const observation of productionObservations) {
     // exterior probes independently beyond that neighborhood are negatives.
     let positive = 0, negative = 0
     for (const probe of observation.probes) {
-      const expected = probe.nearestPaintCenterDistance < 6 - raster.distanceUncertainty ? true
-        : probe.nearestPaintCenterDistance > 6 + raster.distanceUncertainty && outsideContinuousNeighborhood(observation, probe.point) ? false : undefined
+      const addition = addedNativeCapPolicy(observation)
+      const independentDistance = Math.min(probe.nearestPaintCenterDistance, addition?.distance(probe.point) ?? Infinity)
+      const expected = independentDistance < 6 - raster.distanceUncertainty ? true
+        : independentDistance > 6 + raster.distanceUncertainty && outsideContinuousNeighborhood(observation, probe.point) ? false : undefined
       if (expected === undefined) continue
       if (expected) positive += 1
       else negative += 1
@@ -507,7 +553,7 @@ test('uninterrupted dashes acquire neither caps at crossed corners nor an artifi
   for (const shape of ['triangle', 'circle', 'square', 'star'] as const) {
     const solid = fixture(shape, { lineStyle: 'solid', lineCap: 'rect' })
     const expected = pendingSvgPointNodeLayout(solid.point)
-    for (const dashPattern of [[6, 0], [0, 0, 6, 0], [1000, 1]]) {
+    for (const dashPattern of [[1000, 1]]) {
       const input = fixture(shape, { dashPattern, dashPhase: 1 })
       const dashed = pendingSvgPointNodeLayout(input.point)
       boundsClose(dashed.paintedBounds, expected.paintedBounds)
@@ -519,16 +565,22 @@ test('uninterrupted dashes acquire neither caps at crossed corners nor an artifi
   }
   const observation = raster.observations.find(({ id }) => id === 'triangle-zero-off')!
   const layout = pendingSvgPointNodeLayout(rasterFixture(observation).point)
-  boundsClose(layout.paintedBounds, observation.rasterBounds, raster.boundsUncertainty)
-  close(layout.selectionRadius, observation.rasterRadius, raster.distanceUncertainty)
+  const addition = addedNativeCapPolicy(observation)!
+  boundsClose(layout.paintedBounds, augmentedCairoBounds(observation, addition), raster.boundsUncertainty)
+  close(layout.selectionRadius, Math.max(observation.rasterRadius, addition.radius), raster.distanceUncertainty)
+  for (const dashPattern of [[6, 0], [0, 0, 6, 0]]) {
+    const interrupted = pendingSvgPointNodeLayout(fixture('triangle', { dashPattern, dashPhase: 1 }).point)
+    assert.ok(interrupted.dashCaps.families.length > 0, 'zero-length gaps do not erase separately capped subpaths')
+  }
 })
 
 test('wide polygon cap bounds and radius agree with independent corner/seam paint, not synthetic corner caps', () => {
   for (const id of ['triangle-square-wide', 'triangle-explicit-corner', 'triangle-explicit-seam', 'star-concave-square']) {
     const observation = raster.observations.find((entry) => entry.id === id)!
     const layout = pendingSvgPointNodeLayout(rasterFixture(observation).point)
-    boundsClose(layout.paintedBounds, observation.rasterBounds, raster.boundsUncertainty)
-    close(layout.selectionRadius, observation.rasterRadius, raster.distanceUncertainty)
+    const addition = addedNativeCapPolicy(observation)
+    boundsClose(layout.paintedBounds, augmentedCairoBounds(observation, addition), raster.boundsUncertainty)
+    close(layout.selectionRadius, Math.max(observation.rasterRadius, addition?.radius ?? 0), raster.distanceUncertainty)
   }
 })
 
@@ -657,8 +709,9 @@ for (const observation of phaseRasters.observations.filter((entry) => entry.vari
     assert.equal(getPointPaint(input.point.style).stroke.dashPhase, observation.rawPhase)
     const entry = await committed(input.point)
     for (const layout of [pendingSvgPointNodeLayout(input.point), entry.layout]) {
-      boundsClose(layout.paintedBounds, observation.rasterBounds, phaseRasters.boundsUncertainty)
-      close(layout.selectionRadius, observation.rasterRadius, phaseRasters.distanceUncertainty)
+      const addition = addedNativeCapPolicy(observation)
+      boundsClose(layout.paintedBounds, augmentedCairoBounds(observation, addition), phaseRasters.boundsUncertainty)
+      close(layout.selectionRadius, Math.max(observation.rasterRadius, addition?.radius ?? 0), phaseRasters.distanceUncertainty)
     }
     for (const state of [undefined, entry]) {
       for (const probe of observation.probes.filter((item) => item.painted)) assert.equal(picked(input, probe.point, state), true)

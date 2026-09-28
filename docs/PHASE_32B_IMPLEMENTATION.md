@@ -2946,3 +2946,23 @@ incomplete, with no final checkout comparison; it is not a passing check.
 Fresh verification and independent review remain required. Final identity,
 results and any child startup limitation are recorded outside the checkout at
 `/private/tmp/stz-phase32b-zero-dash-followup/`.
+
+## Native endpoint continuation (2026-09-28)
+
+The later parent `epviae` passed tests/build/diff/label-assets and completed both
+dash matrices. Exact-zero and internal-zero App cases now pass at both scales.
+Free-labels still failed: terminal-zero produced 45 false candidates per scale,
+and positive-corner omitted 76 painted/near-paint candidates per scale. Four
+supplemental failures include zero-off and positive-before-corner. The terminal
+stack preserves the first error; it does not mean later cases were unexecuted.
+
+The [endpoint investigation](PHASE_32B_NATIVE_ENDPOINT_INVESTIGATION.md) records
+the targeted geometry changes, corrected positive/negative witnesses, complete
+historical grids, and explicit raster/containment disagreements. New visible
+paint diagnostics and actual-App witnesses are required to adjudicate the
+disputed seam cells. Earlier Cairo observations above retain their original
+engine scope; their terminal positives do not override Chrome's demonstrated
+negatives. Original evidence bytes, visibility progress and all earlier
+acceptance requirements remain preserved. Final matching verification and
+fresh independent review remain required, with results recorded externally at
+`/private/tmp/stz-phase32b-endpoint-followup/`.

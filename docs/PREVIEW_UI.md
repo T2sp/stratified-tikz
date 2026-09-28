@@ -1683,8 +1683,10 @@ semicircles. Isolated zero-on subpaths use full upright squares or disks,
 including at corners. A dash crossing a corner does not acquire a cap there.
 Raw coordinates and zero pattern entries are preserved. The
 [native zero-dash investigation](PHASE_32B_ZERO_DASH_INVESTIGATION.md) distinguishes
-the retained Chrome reproduction from Cairo observations and records the pending
-native checks for diagonal dots, terminal seams and positive endpoints.
+the retained Chrome reproduction from Cairo observations. The subsequent
+[endpoint continuation](PHASE_32B_NATIVE_ENDPOINT_INVESTIGATION.md) records native
+diagonal/internal-zero successes, corrected terminal negatives and positive
+endpoints, and the remaining live-paint checks for seam contradictions.
 Committed layouts compare copied pattern contents and all effective geometry
 settings in addition to source, owner, shape, size and font generation.
 SVG emits a signed phase remainder modulo the effective pattern, avoiding native

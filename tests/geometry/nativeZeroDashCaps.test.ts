@@ -174,7 +174,8 @@ test('isolated diagonal zero-on cap has upright extent; round/butt and positive-
   assert.equal(createDashCaps(contour, 6, [0, 100], -5, 'butt').families.length, 0)
   const positive = createDashCaps(contour, 6, [1e-9, 100], -5, 'square')
   assert.ok(positive.families.every((family) => !family.isolatedDot), 'positive on lengths must not be normalized to zero')
-  assert.equal(createDashCaps(contour, 6, [5, 0], 0, 'square').families.length, 0)
+  assert.ok(createDashCaps(contour, 6, [5, 0], 0, 'square').families.length > 0,
+    'zero-length gaps preserve independently capped positive subpaths')
 })
 
 test('bounded dot families agree with finite independent line and circle constructions', () => {
@@ -199,4 +200,241 @@ test('bounded dot families agree with finite independent line and circle constru
       close(caps.radius, Math.max(...centers.map(({ x, y }) => cap === 'round' ? Math.hypot(x, y) + 3 : Math.hypot(Math.abs(x) + 3, Math.abs(y) + 3))))
     }
   }
+})
+
+// These are byte-identical failed parent artifacts, not a corrected browser
+// run. Keeping complete grids exposes the old defects and the two distinct
+// raster/containment disagreements while the native harness obtains live paint.
+type EndpointSample = [number, number, number, number, number, number, boolean, boolean, boolean,
+  'hit' | 'miss' | 'uncertain', number, number | null, boolean]
+type EndpointObservation = {
+  key: string; result: 'failed'; columns: string[]; error: unknown
+  specification: { points: string; width: number; pattern: number[]; phase: number; cap: 'square'; join: 'bevel' }
+  native: { vertices: Vec2[]; pathLength: number; browser: { version: string } }
+  raster: { resolution: number; uncertainty: number }
+  paint: { bounds: { minX: number; minY: number; maxX: number; maxY: number }; radius: number }
+  samples: EndpointSample[]; mismatches: unknown[]
+}
+const endpointDirectory = new URL('../fixtures/dash-cap-native-endpoints/', import.meta.url)
+const endpointKeys = ['zero-terminal-seam', 'zero-off-continuous', 'positive-exact-corner', 'positive-before-corner'] as const
+const endpointObservations = endpointKeys.map((key) => JSON.parse(readFileSync(new URL(
+  `point-paint-dash-cap-mechanism-${key}.json`, endpointDirectory), 'utf8')) as EndpointObservation)
+
+test('retained native endpoint failures authenticate every source, raster, control and complete grid', () => {
+  const manifest = JSON.parse(readFileSync(new URL('manifest.json', endpointDirectory), 'utf8')) as {
+    provenance: string; source: string; files: Record<string, string>
+  }
+  assert.match(manifest.provenance, /Historical failure, not corrected native acceptance/)
+  assert.equal(Object.keys(manifest.files).length, 29)
+  for (const [file, hash] of Object.entries(manifest.files)) {
+    assert.equal(createHash('sha256').update(readFileSync(new URL(file, endpointDirectory))).digest('hex'), hash)
+  }
+  for (const [index, observation] of endpointObservations.entries()) {
+    assert.equal(observation.key, endpointKeys[index])
+    assert.equal(observation.result, 'failed'); assert.ok(observation.error)
+    assert.equal(observation.native.browser.version, '154.0.8037.57')
+    assert.deepEqual(observation.native.vertices, square)
+    assert.equal(observation.native.pathLength, 40)
+    assert.equal(observation.raster.resolution, 16); assert.equal(observation.raster.uncertainty, .14)
+    assert.equal(observation.samples.length, 1089)
+    assert.equal(observation.mismatches.length, [45, 208, 76, 39][index])
+    observation.samples.forEach(([x, y], cell) => assert.deepEqual([x, y], [-32 + cell % 33 * 2, -32 + Math.floor(cell / 33) * 2]))
+    const disagreement = observation.samples.filter((cell) => cell[8] && !cell[7])
+    assert.equal(disagreement.length, [0, 24, 0, 30][index])
+    assert.ok(disagreement.every((cell) => cell[2] === 255 && cell[4] === 0), 'retain opaque raster and native exclusion together')
+  }
+})
+
+type LiteralBox = readonly [number, number, number, number]
+function literalBoxDistance({ x, y }: Vec2, [minX, minY, maxX, maxY]: LiteralBox): number {
+  return Math.hypot(Math.max(0, minX - x, x - maxX), Math.max(0, minY - y, y - maxY))
+}
+// The intentional continuous stroke plus original interior is the literal
+// bevel octagon. Its distance is independent of the production stroke helper.
+const bevelOctagon = [[-23, -5], [-5, -23], [5, -23], [23, -5], [23, 5], [5, 23], [-5, 23], [-23, 5]]
+function literalBevelDistance(point: Vec2): number {
+  let inside = true, distance = Infinity
+  for (const [index, [x, y]] of bevelOctagon.entries()) {
+    const [endX, endY] = bevelOctagon[(index + 1) % bevelOctagon.length], dx = endX - x, dy = endY - y
+    if (dx * (point.y - y) - dy * (point.x - x) < 0) inside = false
+    const at = Math.max(0, Math.min(1, ((point.x - x) * dx + (point.y - y) * dy) / (dx * dx + dy * dy)))
+    distance = Math.min(distance, Math.hypot(point.x - x - at * dx, point.y - y - at * dy))
+  }
+  return inside ? 0 : distance
+}
+function literalEndpointDistance(key: string, point: Vec2): number {
+  // These Cartesian rectangles are specified directly. No production helper,
+  // cap schedule, path parsing or family output supplies expected endpoints.
+  const boxes: LiteralBox[] = key === 'zero-terminal-seam'
+    ? [[-23, -23, 13, 13], [-18, -13, 18, 23]] // only dots at (-5,-5) and (0,5)
+    : key === 'positive-before-corner'
+      ? [[-22.75, -23, -4.75, 13], [-23, -13.25, 13, 4.75],
+        [4.75, -13, 22.75, 23], [-13, -4.75, 23, 13.25]]
+      : key === 'zero-off-continuous' ? [[-23, -23, 13, 13], [-23, -13, 23, 23]]
+        : [[-23, -23, 23, 23]] // exact positive endpoint rectangles cover this square
+  return Math.min(literalBevelDistance(point), ...boxes.map((box) => literalBoxDistance(point, box)))
+}
+
+for (const observation of endpointObservations) test(`${observation.key}: historical diagnostic retains all cells and quantifies unresolved native paint gaps`, () => {
+  for (const vertices of [square, rawVertices]) {
+    const caps = createDashCaps({ kind: 'polygon', radius: 0, vertices }, 36,
+      observation.specification.pattern, observation.specification.phase, 'square')
+    const expectedBounds = observation.key === 'zero-terminal-seam'
+      ? { minX: -23, minY: -23, maxX: 18, maxY: 23 } : { minX: -23, minY: -23, maxX: 23, maxY: 23 }
+    for (const key of ['minX', 'minY', 'maxX', 'maxY'] as const) close(caps.bounds![key], expectedBounds[key])
+    close(caps.radius, observation.key === 'positive-before-corner' ? Math.hypot(23, 22.75) : Math.hypot(23, 23))
+    let unresolvedHits = 0, unresolvedCores = 0
+    for (const [x, y, , , paintDistance, solidDistance, , nativeContains, paintCore, expected] of observation.samples) {
+      const point = { x, y }, analytic = literalEndpointDistance(observation.key, point)
+      const actual = Math.min(distanceToDashCaps(point, caps), literalBevelDistance(point))
+      close(actual, analytic)
+      const disagreement = Math.abs(actual - Math.min(paintDistance, solidDistance)) > .14
+      if (disagreement) assert.ok(['zero-off-continuous', 'positive-before-corner'].includes(observation.key),
+        'only the explicitly unresolved seam mechanisms may disagree with retained raster')
+      if (paintCore && actual > .14) {
+        unresolvedCores++
+        assert.equal(nativeContains, false, 'preserve the contradictory containment observation')
+      }
+      if (expected !== 'uncertain' && (actual <= 6) !== (expected === 'hit')) {
+        unresolvedHits++
+        assert.equal(expected, 'hit', 'no new false candidates are accepted')
+      }
+    }
+    assert.equal(unresolvedHits, observation.key === 'zero-off-continuous' ? 24 : observation.key === 'positive-before-corner' ? 39 : 0)
+    assert.equal(unresolvedCores, observation.key === 'zero-off-continuous' ? 24 : observation.key === 'positive-before-corner' ? 30 : 0)
+    // This diagnostic describes the limitation. The native acceptance harness
+    // still requires zero mismatches and these two cases therefore remain open.
+  }
+})
+
+test('terminal witnesses are demonstrated negatives while positive endpoints and zero-off corners remain reachable', async () => {
+  const witnesses = [
+    { key: 'zero-terminal-seam', pattern: [0, 15], phase: 5, hit: [{ x: -22, y: -22 }],
+      miss: [{ x: 22, y: -18 }, { x: 21, y: -21 }, { x: 22, y: -22 }] },
+    { key: 'positive-exact-corner', pattern: [10, 10], phase: 0, hit: [{ x: 20, y: 20 }, { x: 16, y: -22 }, { x: 22, y: -22 }],
+      miss: [{ x: -22, y: -30 }] },
+    { key: 'zero-off-continuous', pattern: [10, 0], phase: 0, hit: [{ x: -22, y: -22 }], miss: [{ x: -22, y: -30 }] },
+    { key: 'positive-before-corner', pattern: [10, 10], phase: .25, hit: [{ x: -22, y: -22 }], miss: [{ x: -22, y: -30 }] },
+  ]
+  const { diagram, point } = fixture()
+  const measurement = { identity: 'native-endpoint-regression', measure: () => ({ width: 0, ascent: 0, descent: 0 }), lineMetrics: () => ({ ascent: 0, descent: 0 }) }
+  const runtime = createSvgLabelRuntime({ measurement, service: createLabelService({ measurement }) })
+  try {
+    for (const witness of witnesses) {
+      const paint = getPointPaint(point.style)
+      paint.stroke.dashPattern = witness.pattern.map((value) => value / 1.2); paint.stroke.dashPhase = witness.phase / 1.2
+      const captured = captureSvgLabelExport({ runtime, source: '', pointStyle: point.style, position: { x: 450, y: 350 },
+        color: '#000000', opacity: 1, fontSize: 12, anchor: 'center', settings: svgLabelLayoutSettings(12), ownerIdentity: svgPointNodeOwner(11, 'p') })
+      const [state] = await settleSvgExportLabels([captured])
+      const layout = svgPointNodeLayout(point.style, state)
+      assert.deepEqual(layout.dashCaps, pendingSvgPointNodeLayout(point).dashCaps)
+      const entry = { source: '', ownerIdentity: svgPointNodeOwner(11, 'p'), fontGeneration: 0, shape: point.style.shape,
+        size: point.style.size, requestIdentity: state.requestIdentity, layout }
+      for (const committed of [false, true]) for (const scale of [.5, 1.5]) {
+        for (const [expected, points] of [[true, witness.hit], [false, witness.miss]] as const) for (const local of points) {
+          const screen = { x: (450 + local.x) * scale, y: (350 + local.y) * scale }
+          const candidates = collectSvgPreviewSelectionCandidates({ diagram, camera: diagram.camera, viewportHeight: 700,
+            point: { x: screen.x / scale, y: screen.y / scale }, showCoordinateAnchors: false,
+            ...(committed ? { pointCommits: new Map([['p', entry]]), pointDocumentRevision: 11, pointFontGeneration: 0 } : {}) })
+          assert.equal(candidates.some(({ id }) => id === 'p'), expected, `${witness.key}: ${JSON.stringify(local)}`)
+          assert.equal(literalEndpointDistance(witness.key, local) <= 6, expected)
+        }
+      }
+      const selected = renderToStaticMarkup(createElement(SvgPointNodeView, { capture: captured, state, selected: true }))
+      close(Number(/<circle r="([^"]+)"/.exec(selected)?.[1]), layout.selectionRadius + 6)
+      paint.stroke.dashPattern = [3, 4]; paint.stroke.dashPhase = 7
+      const exported = renderSettledSvgLabelDocument(captured, state)
+      assert.ok(exported.includes(`stroke-dasharray="${witness.pattern.join(' ')}"`))
+      assert.ok(exported.includes(`points="${rawPoints}"`))
+    }
+  } finally { runtime.dispose() }
+})
+
+for (const displacement of [-1e-9, 0, 1e-9]) test(`terminal-only zero seam remains half-open at displacement ${displacement}`, () => {
+  const phase = 5 + displacement
+  const centers = displacement < 0
+    ? [{ x: -5, y: -5 - displacement }, { x: -displacement, y: 5 }]
+    : displacement > 0
+      ? [{ x: -5 + displacement, y: -5 }, { x: -displacement, y: 5 }, { x: 5, y: -5 + displacement }]
+      : [{ x: -5, y: -5 }, { x: 0, y: 5 }]
+  const caps = createDashCaps({ kind: 'polygon', radius: 0, vertices: square }, 36, [0, 15], phase, 'square')
+  for (const [x, y] of endpointObservations[0].samples) {
+    const expected = Math.min(...centers.map((center) => Math.hypot(Math.max(0, Math.abs(x - center.x) - 18), Math.max(0, Math.abs(y - center.y) - 18))))
+    close(distanceToDashCaps({ x, y }, caps), expected)
+  }
+})
+
+test('positive exact starts use outgoing tangents for both square windings and preserve near-endpoint intervals', () => {
+  for (const vertices of [square, [...square].reverse()]) {
+    const caps = createDashCaps({ kind: 'polygon', radius: 0, vertices }, 36, [10, 10], 0, 'square')
+    // Two independently specified length-ten sides are painted. Their square
+    // cap rectangles, together with the continuous stroke, cover [-23,23]^2.
+    for (const local of [{ x: -22, y: -22 }, { x: 22, y: -22 }, { x: 22, y: 22 }, { x: -22, y: 22 }]) close(distanceToDashCaps(local, caps), 0)
+    for (const displacement of [-1e-9, 1e-9]) {
+      const shifted = createDashCaps({ kind: 'polygon', radius: 0, vertices }, 36, [10, 10], displacement, 'square')
+      assert.ok(shifted.families.every(({ isolatedDot }) => !isolatedDot))
+      assert.ok(shifted.families.some(({ first, last }) => first !== 0 && first < 1e-8 || last > 10 - 1e-8 && last < 10),
+        'near endpoints retain their actual short side, not an epsilon-snapped corner')
+    }
+  }
+})
+
+test('retained native triangle style edit rules out either generic extra seam cap and preserves exterior picking', async () => {
+  const decoded = JSON.parse(readFileSync(new URL('independent-triangle-cap-counterexample.json', endpointDirectory), 'utf8')) as {
+    scope: string; samples: { local: Vec2; alpha: number; paintDistance: number; solidDistance: number; capDistance: number }[]
+  }
+  assert.match(decoded.scope, /Independent PNG decoding of historical native triangle/)
+  const { diagram, point } = fixture()
+  point.style.shape = 'triangle'; point.style.size = 3
+  Object.assign(getPointPaint(point.style).stroke, { dashPattern: [10, 2], dashPhase: 7 })
+  const measurement = { identity: 'native-triangle-preservation', measure: () => ({ width: 0, ascent: 0, descent: 0 }), lineMetrics: () => ({ ascent: 0, descent: 0 }) }
+  const runtime = createSvgLabelRuntime({ measurement, service: createLabelService({ measurement }) })
+  try {
+    const captured = captureSvgLabelExport({ runtime, source: '', pointStyle: point.style, position: { x: 450, y: 350 },
+      color: '#000000', opacity: 1, fontSize: 12, anchor: 'center', settings: svgLabelLayoutSettings(12), ownerIdentity: svgPointNodeOwner(12, 'p') })
+    const [state] = await settleSvgExportLabels([captured])
+    const layout = svgPointNodeLayout(point.style, state)
+    const entry = { source: '', ownerIdentity: svgPointNodeOwner(12, 'p'), fontGeneration: 0, shape: point.style.shape,
+      size: point.style.size, requestIdentity: state.requestIdentity, layout }
+    for (const scale of [.5, 1.5]) {
+      const stem = `point-paint-dash-caps-triangle-square-wide-scale-${scale}`
+      const native = JSON.parse(readFileSync(new URL(`${stem}.json`, endpointDirectory), 'utf8')) as {
+        result: string; scale: number; edits: { field: string; sameNode: boolean; modelChanged: boolean;
+          observation: { xml: string; selectionRadius: number; rasterRadius: number; declaredBounds: number[]; phase: number; pattern: string } }[]
+      }
+      assert.equal(native.result, 'passed'); assert.equal(native.scale, scale)
+      const edit = native.edits.find(({ field }) => field === 'dashPhase')!
+      assert.equal(edit.sameNode, true); assert.equal(edit.modelChanged, true)
+      assert.equal(edit.observation.xml, readFileSync(new URL(`${stem}-edit-dashPhase.input.svg`, endpointDirectory), 'utf8'))
+      assert.equal(edit.observation.pattern, '12px, 2.4px'); assert.equal(edit.observation.phase, 8.4)
+      close(edit.observation.rasterRadius, 28.399940856012357)
+      close(edit.observation.selectionRadius, 28.426450393138133)
+      for (const current of [pendingSvgPointNodeLayout(point), layout]) {
+        close(current.selectionRadius, edit.observation.selectionRadius)
+        const actualBounds = [current.paintedBounds.minX, current.paintedBounds.minY, current.paintedBounds.maxX, current.paintedBounds.maxY]
+        actualBounds.forEach((value, index) => close(value, edit.observation.declaredBounds[index]))
+        // Either added seam orientation has a literal corner of radius
+        // 30.4021, more than two units beyond independently retained paint.
+        assert.ok(Math.hypot(6.5884572681199, -29.6796260926630) > current.selectionRadius + 1.9)
+        for (const sample of decoded.samples) {
+          assert.equal(sample.alpha, 0)
+          assert.ok(sample.paintDistance > 6.14)
+          // The decoder's solidDistance is a retained production diagnostic.
+          // Independently, every centerline point has y >= -5.091168824543141;
+          // a width-36 bevel stroke cannot extend below that minus 18.
+          const continuousDistanceLowerBound = -5.091168824543141 - 18 - sample.local.y
+          assert.ok(continuousDistanceLowerBound > 6.14)
+          assert.ok(sample.solidDistance >= continuousDistanceLowerBound)
+          assert.ok(distanceToDashCaps(sample.local, current.dashCaps) > 6)
+        }
+      }
+      for (const committed of [false, true]) for (const { local } of decoded.samples) {
+        const screen = { x: (450 + local.x) * scale, y: (350 + local.y) * scale }
+        const candidates = collectSvgPreviewSelectionCandidates({ diagram, camera: diagram.camera, viewportHeight: 700,
+          point: { x: screen.x / scale, y: screen.y / scale }, showCoordinateAnchors: false,
+          ...(committed ? { pointCommits: new Map([['p', entry]]), pointDocumentRevision: 12, pointFontGeneration: 0 } : {}) })
+        assert.equal(candidates.some(({ id }) => id === 'p'), false)
+      }
+    }
+  } finally { runtime.dispose() }
 })

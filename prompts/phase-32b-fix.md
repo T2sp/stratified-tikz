@@ -1,318 +1,264 @@
-# Phase 32B Targeted Fix Prompt: Resolve remaining native dash endpoint mismatches
+# Phase 32B Targeted Fix Prompt: Correct the paint oracle and bound acceptance
 
-## Environment and scope
+## Scope and proposed completion boundary
 
 Work on `phase/32b-color-opacity-outline`. Read `AGENTS.md`, the paired 32B
-implement/review prompts, current implementation report and
-`docs/PHASE_32B_ZERO_DASH_INVESTIGATION.md`. Preserve the 17 existing changed
-files and all completed zero-dot, solid-join, effective-style and diagnostic
-work. At this prompt update there are no untracked files; the earlier 150 dash
-and four visibility files are tracked. Do not reset or restart existing work.
+implement/review prompts, the current implementation report, and
+`docs/PHASE_32B_NATIVE_ENDPOINT_INVESTIGATION.md`.
 
-Starting HEAD is `0cf597f1a71b249e73374b354d69409ba4c51979`. The latest handoff
-and parent verification match this pre-prompt tracked/untracked/binary identity:
+The user has requested consideration of less demanding verification because
+32B has repeatedly expanded without reaching completion. Recommend a finite
+core acceptance profile: preserve normal editing, data, imports and outputs;
+separate exhaustive dash-seam/rendering-engine conformance from those gates.
+Do not continue adding mandatory matrices merely because another engine edge
+case can be constructed.
+
+**This is a proposed scope amendment, not an adopted waiver.** The current
+prompt update changes no implementation or verification policy. Unless the
+user subsequently accepts the proposal, retain the current strict gate and
+report its failures honestly. Prepare an itemized required/advisory inventory
+and a concrete scope decision; independently justified oracle corrections and
+bounded investigation can proceed without assuming approval to waive defects.
+Do not automatically call the current checkout complete.
+
+Preserve the 20 already modified tracked files and 31 untracked files (the
+native endpoint investigation and 30 fixture/manifest files). Starting HEAD is
+`beae63a78adb1e65608f6cce7b71da66e3cf5033`. The latest handoff and parent run match
+this pre-prompt tracked/untracked/binary fingerprint:
 
 ```text
-b4a31d7b7a4a0b99937396a987a9c833f7d973fbdcb61e531ab142934fc3995c
+2054380c655ef083aa18be381508ece020cef5484b80b004d0b214b144aef9d7
 ```
 
-Recompute final identity after corrections; this is not verification of later
-edits. Use Node >=22.12.0 with the supported installation first in PATH:
+Recompute identity after changes. Do not reset existing work. Keep strict
+TypeScript, existing dependencies and completed 31F/32A behavior. Keep 32C/32D
+deferred. Use Node >=22.12.0 with `/opt/homebrew/bin` first in PATH.
 
-```bash
-export PATH=/opt/homebrew/bin:$PATH
-```
-
-Resolve the retained terminal-seam false candidates, positive-endpoint and
-zero-off omissions, and disproven positive/negative witnesses using the complete
-native evidence. Investigate the specific raster/containment disagreements
-before changing their oracle contract. Preserve successful isolated zero-dot
-corrections and native visibility progress. Keep strict TypeScript, existing
-dependencies and 32A/32B contracts; keep 32C/32D deferred.
-
-## Latest evidence and acceptance status
+## Latest evidence: actual native progress, still a failed strict run
 
 Read and preserve:
 
 ```text
-/private/tmp/stz-phase32b-zero-dash-followup/HANDOFF.md
-/private/tmp/stz-phase32b-zero-dash-followup/independent-review.md
-/private/tmp/stz-phase32b-zero-dash-followup/independent-positive-corner.json
-/private/tmp/stz-phase32b-zero-dash-followup/evidence/INSPECTION.md
-/var/folders/vk/7kf940pd4bx8f6cg3rzlmtc80000gn/T/stz-phase-verifier-qwpJ7Z/response.json
-/var/folders/vk/7kf940pd4bx8f6cg3rzlmtc80000gn/T/stz-phase32b-before-review-epviae/verification.json
-/var/folders/vk/7kf940pd4bx8f6cg3rzlmtc80000gn/T/stz-phase32b-before-review-epviae/05-check-free-labels/command.log
-/var/folders/vk/7kf940pd4bx8f6cg3rzlmtc80000gn/T/stz-phase32b-before-review-epviae/05-check-free-labels/artifacts/free-labels-evidence.json
+/private/tmp/stz-phase32b-endpoint-followup/HANDOFF.md
+/private/tmp/stz-phase32b-endpoint-followup/independent-review.md
+/var/folders/vk/7kf940pd4bx8f6cg3rzlmtc80000gn/T/stz-phase-verifier-iQIRUd/response.json
+/var/folders/vk/7kf940pd4bx8f6cg3rzlmtc80000gn/T/stz-phase32b-before-review-pF6DA7/verification.json
+/var/folders/vk/7kf940pd4bx8f6cg3rzlmtc80000gn/T/stz-phase32b-before-review-pF6DA7/05-check-free-labels/command.log
+/var/folders/vk/7kf940pd4bx8f6cg3rzlmtc80000gn/T/stz-phase32b-before-review-pF6DA7/05-check-free-labels/artifacts/free-labels-evidence.json
 ```
 
-The zero-dash followup implemented full isolated square/disk dots, corrected the
-zero-on exterior witness, preserved original evidence and expanded native
-coverage. Its child verification passed 4,286 tests/build/diff and strict checks;
-both browser attempts stopped at localhost `EPERM`. Independent review returned
-`needs_changes` for the positive-corner contract/geometry conflict and missing
-native acceptance. That review predates the new parent observations.
+The followup corrected terminal-only zero dots, outgoing orientation at positive
+dash starts and zero-off interval scheduling. Its final 4,366 tests, build,
+diff and strict checks passed. Child browser startup was blocked by `EPERM`,
+and Chrome UI access was denied. Its independent `needs_changes` review predates
+the following real parent browser observations; do not describe the parent run
+as another startup failure.
 
-The subsequent parent `epviae` run reached Chrome **154.0.8037.57** on Node
-**v26.9.0**, with matching before/after checkout fingerprints:
+The matching `pF6DA7` parent run used Node v26.9.0 and Chrome 154.0.8037.57:
 
-| Required command | Parent result |
+| Command | Result |
 | --- | --- |
-| `npm test` | 4,286 passed, zero failed/skipped/cancelled |
+| `npm test` | 4,366 passed |
 | `npm run build` | Passed |
 | `git diff --check` | Passed |
 | `npm run check:label-assets` | Passed |
 | `npm run check:free-labels` | Failed during `point-paint-dash-caps` |
 
-The cumulative report has 14/16 completed groups, no page errors, an incomplete
-paint/import group and an unexecuted final `settled-SVG-export-standalone` group.
-The harness retained **all 18 App entries (14 passed, four failed)** and
-**all 19 supplemental mechanism entries (15 passed, four failed)**. It preserves
-the first error while continuing the matrix; the terminal stack is not an
-inventory of all remaining defects. Do not describe later entries as unexecuted
-or count the overall dash scenario as passed.
+The report has 14/16 completed groups, no page errors, an incomplete paint/import
+group and an unexecuted final `settled-SVG-export-standalone` group. All **22 App
+entries were attempted: 18 passed, four failed**. All **21 supplemental mechanism
+entries were attempted: 18 passed, three failed**. Preserve the complete matrices;
+the terminal stack is not the full failure inventory.
 
-The previously failing `square-exact-zero` now passes at both `.5` and `1.5`
-scales, with zero grid mismatches and actual ordinary/Alt actions. Its layout
-radius is `32.526911934581186` against raster radius `32.482717760757026`.
-Both internal-zero App variants also pass at both scales. Literal raw/exact,
-reverse-winding, diagonal zero-dot and near-zero-corner/seam controls passed.
-Preserve these new successes without claiming complete native acceptance.
-
-## 1. First failure: terminal-seam false candidates
-
-Use the actual command log and serialized evidence, not the pasted diff's
-ambiguous formatting. The first failure is **`square-terminal-zero`, scale
-`0.5`**, the eleventh App entry, at the `audit-outside` ordinary pointer action:
+The first failure is `square-zero-off`, scale `.5`, at the `audit-cap` ordinary
+click, local `(22,-22)`, in `pointerProbe` / `checkPointDashCaps.mjs:237`:
 
 ```text
-actual candidates:   ['control', 'p']
-expected candidates: ['control']
+actual candidates:   ['control']
+expected candidates: ['control', 'p']
 ```
 
-Read `point-paint-dash-caps.json` and the following artifact stems under the
-`epviae` artifacts root, for both scales:
+Both responsive scales (`.5`, `1.5`) fail for `square-zero-off` and
+`square-positive-before-corner`. The latter's failed paint witness is
+`(22.90625,-22.90625)`. Supplemental failures are `zero-off-continuous`,
+`positive-before-corner`, and **`positive-full-closed-control`**. The third is
+new relative to the child summary and must not be omitted.
 
-```text
-point-paint-dash-caps-square-terminal-zero-scale-0.5
-point-paint-dash-caps-square-terminal-zero-scale-1.5
-```
+The earlier terminal, exact-positive, isolated-zero, internal-zero, circle,
+star and triangle entries now pass. Preserve that progress. Current strict
+policy requires 16 groups, 29 point scenarios and 856 artifacts, including
+14 complete square audits and 21 supplemental mechanisms. These are the
+current policy facts, not a target that must keep growing.
 
-Inspect each `.json`, `.input.svg`, `.raster.png`, `.screen.png`,
-`-solid.input.svg`, `-solid.raster.png`, `-engine-audit.json` and retained pointer
-screenshots. Keep failure metadata and actual action records intact.
+## 1. Correct the editor interaction oracle using connected live paint
 
-This case uses empty source, square size `5.892556509887896`, disabled fill,
-width `30pt` (36 local units), explicit pattern `[0,15/1.2]`, phase `5/1.2`,
-square caps and bevel joins. Emitted native pattern is `0 15`, offset `5`,
-miter limit 10. At local **`(22,-18)`**:
+Inspect `point-paint-dash-caps.json`, `point-paint-dash-cap-mechanism.json`,
+per-case source/raster/solid controls, engine audits, connected live screenshots,
+responsive and magnified App screenshots, and actual ordinary/Alt action records
+under the latest parent artifacts root.
 
-- Raster alpha is 0 and live native stroke containment is false.
-- Paint distance is `6.447049955212074`; continuous solid-stroke distance is
-  `8.485396462452417`. Both exceed the six-unit tolerance plus `.14` uncertainty.
-- A trusted ordinary click records `['control','p']` although only `control`
-  should be a candidate. Its selected `control` does not hide the extra `p`.
+The two square families disagree across observation paths:
 
-Each scale's full 1,089-cell audit contains **45 false-hit candidates** and no
-missed hits. Radius/bounds enclosure passes, but rectangular layout bounds
-extend to maxX 23 while the retained paint reaches only maxX 18. Do not solve
-this with another radius-only change or treat a passing enclosure as exact
-stroke geometry.
+- Cloned SVG rasterization marks disputed seam points as opaque paint.
+- Actual connected App screenshots show background at the disputed points,
+  at both responsive scales and magnification 16; live containment excludes them.
+- The 24 zero-off and 30 before-corner opaque-clone/core contradictions are
+  background in retained magnified live paint. Connected literal SVG screenshots
+  at scales 1 and 16 corroborate this distinction.
 
-The current terminal `exact` witnesses `(21,-21)` and `(22,-22)` are also
-incorrectly required to be painted positives. They have alpha 0/native exclusion
-and paint distances about `8.0313107974` and `9.0313040656`; production still
-includes `p`. Retain these as explicit demonstrated negative regressions after
-checking both paint and continuous-stroke distances. Keep independently painted
-terminal-case positives, such as the retained `(-22,-22)`, with native clicks.
-Do not silently remove the disconfirming witnesses.
+A read-only offline recalibration against retained scale-16 live PNG paint,
+using the unchanged six-unit tolerance, `.14` uncertainty and continuous-stroke
+control, found **zero definite grid mismatches** for `zero-off-continuous` and
+`positive-before-corner`. This is evidence for an inappropriate interaction
+oracle, not a fresh passing native run or proof of every workflow. Reproduce
+and retain the independent pixel-distance calculation before changing assertions.
+Do not describe the original 24/39 clone-based grid discrepancies as established
+unclickable visible App paint.
 
-## 2. Positive corners: invalid exterior and separate missing candidates
+For editor interaction, use independently observed connected live paint in the
+same DOM/state as the action. Bind PNG/source hashes, dimensions, computed style,
+CTM, viewport/scale and positive/background calibration. Preserve the six-unit
+picking tolerance, separate selection decoration allowance, contour interiors
+and intentional continuous-stroke selection through dash gaps. A background
+pixel can still be a required hit within those regions; background alone does
+not establish a negative witness.
 
-Inspect both `point-paint-dash-caps-square-positive-corner-scale-*` entries and
-all associated source/raster/grid/pointer records. This case has the same raw
-square/width/cap/join but explicit local pattern `[10,10]`, phase zero.
+Keep clone-raster, live containment, live pixels and production geometry as
+separate observations. Neither `isPointInStroke` nor production distance helpers
+alone may define expected interaction. Retain independent positive and exterior
+controls and trusted ordinary/Alt events with complete candidates; an overlapping
+control must not mask a missing or extra `p`. Correct the disproven expectations
+with explained replacements, not forced selection or larger tolerances.
 
-At `(20,20)`, the contract says `outside`, but native alpha is 255 and stroke
-containment is true. The trusted click correctly includes and selects `p`.
-Fresh native evidence now resolves that witness conflict: retain `(20,20)` as
-a painted positive and replace its erroneous exterior role with an independently
-verified nearby miss beyond both paint and intentional continuous-stroke
-regions. The retained `(-22,-30)` has alpha 0/native exclusion, paint distance
-`7.0313194441` and solid distance `16.9706202929`; verify it in the corrected
-case at both scales. Keep the positive and genuine negative, not just a renamed
-or deleted assertion.
+Keep clone/render-surface disagreement visible as a diagnostic. Actual downloaded
+SVG paint and reopening still require their own checks; a corrected App oracle
+does not automatically certify export appearance or excuse export data loss.
 
-Changing that witness alone is insufficient. Each scale's complete grid records
-**76 expected-hit omissions** and no false hits. For example, `(16,-22)` and
-`(22,-22)` are fully painted/native-contained but absent from production
-candidates. Correct the positive endpoint geometry as well as the test witness.
-Retain actual ordinary/Alt evidence that these points become reachable, with an
-overlapping control unable to mask missing `p` candidates.
+## 2. Bound the remaining real closed-path discrepancy
 
-## 3. Resolve all supplemental mechanisms and oracle disagreements
+The supplemental `positive-full-closed-control` uses literal triangle vertices
+`0,0 24,0 12,16`, width 12, square caps, bevel joins, pattern `[100,100]`, phase 1.
+This long positive interval covers the closed path. Offline live-paint evaluation
+still finds **24 definite omissions**. At `(0,-14)`, live paint is approximately
+5.7732 local units away but production distance is 8, outside the six-unit
+picking tolerance. This is a real discrepancy against visible paint, even
+though the queried pixel itself is background.
 
-Read the full `point-paint-dash-cap-mechanism.json` and every per-case `.json`,
-input SVG, raster and solid control, especially these four failed stems:
+That exact arbitrary triangle is not an existing point-shape contour. Its impact
+on supported regular point shapes has not been demonstrated. Perform one bounded
+transfer check on supported point shapes with the same uninterrupted closed-dash
+mechanism, including a genuine exterior control. Determine whether the discrepancy
+is reachable through current editing/export workflows. Report the result; do not
+claim ordinary workflows unaffected without evidence or launch another general
+sweep of arbitrary polygons and engines.
 
-```text
-point-paint-dash-cap-mechanism-zero-terminal-seam
-point-paint-dash-cap-mechanism-zero-off-continuous
-point-paint-dash-cap-mechanism-positive-exact-corner
-point-paint-dash-cap-mechanism-positive-before-corner
-```
+Recommended disposition if the core profile is accepted: retain this exact
+supplemental discrepancy as a named followup limitation when no current supported
+workflow defect is demonstrated. Record trigger, impact, evidence and the precise
+scope of deferral. Do not label it fixed, silently drop its row, or claim a
+workaround without checking it. A demonstrated normal-workflow miss still needs
+a narrow fix or a further explicit scope decision; the proposal is not a blanket
+waiver of picking failures.
 
-All use independently specified literal square vertices, width 36, square caps
-and bevel joins. Retained grid discrepancies are:
+Do not restore the rejected generic initial/terminal seam cap. It falsely
+expanded the retained triangle dash-phase radius from about 28.42645 to 30.4021
+(native raster about 28.39994), creating phantom hits at `(-6,-34)` and `(0,-32)`.
+Preserve both negative controls and the corroborated terminal/positive fixes.
 
-| Mechanism | Pattern / phase, local units | Discrepancy against independent paint/continuous-stroke oracle |
-| --- | --- | --- |
-| `zero-terminal-seam` | `[0,15]` / `5` | 45 false hits; first reported assertion is zero-on paint distance at `(16,-32)` |
-| `zero-off-continuous` | `[10,0]` / `0` | 208 missed hits |
-| `positive-exact-corner` | `[10,10]` / `0` | 76 missed hits |
-| `positive-before-corner` | `[10,10]` / `.25` | 39 missed hits |
+## 3. Proposed finite core acceptance profile
 
-The supplemental rows compare geometry distances to independent SVG observations;
-they are not App pointer events. Use them alongside, not instead of, actual
-candidate/click evidence. The `zero-off-continuous` name/current early-return
-comment does not prove native caps disappear for zero-length gaps. At
-`(-22,-22)`, this case has both opaque paint and native containment, but geometry
-distance about `11.3137` and no hit. Preserve that independently corroborated
-miss while investigating zero-off scheduling/coalescence.
+Prepare the following amendment for consideration. Keep all five verification
+commands and all cumulative Phase 31F/32A groups plus the 32B paint/import group.
+Keep the 29 scenario identities, with the dash scenario's required observations
+specified explicitly rather than equating success with every supplemental grid.
 
-There is also a specific oracle disagreement. `zero-off-continuous` has 24
-opaque raster-core cells with native `isPointInStroke` false;
-`positive-before-corner` has 30. At `(16,-22)` in the latter, raster alpha is
-255 with distance zero, but native containment is false and geometry distance
-about `7.0711`. The current core-implies-native-containment contract would fail
-there even after repairing candidate omissions. `positive-exact-corner` and
-both App positive-corner audits do not have that core/containment disagreement.
+| Remains mandatory | Proposed separate diagnostic / followup |
+| --- | --- |
+| Native text/fill/stroke color and opacity, disabled paint, dimming, border width/style, explicitly colored math | Exhaustive cross-rendering-path pixel equivalence at every dash seam |
+| Legacy/new documents and presets, cloning, clipboard, bulk edit, Undo/Redo, raw text and exact serialization | Additional arbitrary-polygon/engine research beyond supported 32B workflows |
+| Bounded imported-style resolution, runtime uncertainty, untouched external semantics, explicit local overrides, both TikZ modes and independent PGF references | Precisely named supplemental full-closed-path limitation, subject to the supported-shape transfer check above |
+| Normal selection, drag, overlap cycling, 2D/3D/work planes, responsive layout, independently corroborated solid-join and dash-cap regressions | Clone/live disagreement records for the two square families after correcting the live interaction oracle |
+| Immutable pending/settled downloads, preserved source/style, actual standalone reopening, final settled-SVG group | Extra dense grids and duplicate render-surface captures beyond an itemized representative core inventory |
 
-Investigate cloned SVG rasterization versus live SVG containment, exact source,
-computed settings, parsed path, coordinate transforms/resolution and actual live
-rendered paint. Preserve both contradictory observations. Distinguish an oracle
-or engine limitation from a production geometry error using independent live
-paint and native action evidence. Do not silently discard containment or raster
-checks, redefine opaque cores, or assume source-level Skia/Cairo behavior proves
-this Chrome result. If an oracle assertion itself is disproven, document the
-mechanism and replace it with independently justified checks/negative controls
-that retain detection strength; keep the disagreement visible in evidence.
+Do not reduce test totals or artifact counts as an end in themselves. For each
+existing dash case/artifact, state whether it remains required, becomes advisory,
+or is superseded by a justified live-oracle observation, and why. Preserve
+historical bytes and useful regression tests. Freeze this finite inventory once
+accepted; expand it only for a concrete new core regression, not hypothetical
+completeness. Existing data safety, import/export fidelity and supported native
+interaction gates are not candidates for relaxation.
 
-## 4. Targeted correction and regression requirements
+If adopted, implement the profile consistently across the runner, scenario
+contracts, artifact ownership, registered policy tests, documentation and review
+criteria. Do not merely catch the exception, remove a count, or make expected
+candidates follow actual results. `runPointDashCapChecks` currently blocks the
+paint group, which prevents the final settled-SVG group from running. Ensure
+advisory diagnostics cannot starve required work: run them separately or after
+core groups, with independent status and bounded ownership.
 
-Inspect `src/geometry/dashCaps.ts`, `polygonStroke.ts`, point layout/view/stroke/
-paint/hit testing, `scripts/checkPointDashCaps.mjs`, `pointDashCapContract.mjs`,
-`checkPointDashCapMechanism.mjs`, `pointDashCapMechanismContract.mjs`, their
-registered tests and synthetic fixtures. Trace positive endpoint orientation,
-terminal-only seam inclusion, zero-off coalescence and exact/near-corner ownership.
-Use the retained native controls to determine which rules need correction.
+Preserve raw `failed`, `not_run` and `blocked` outcomes. Record acceptance
+disposition separately, binding the named profile and exact known limitations
+to the checkout and report. Report an accepted outcome as **core acceptance
+passed with named limitations**, not complete dash conformity. Unexpected core
+failures, missing/stale/malformed core evidence, page errors and unexecuted
+required groups must still fail. Add negative policy tests against unrelated
+failures being swallowed as a known limitation. Review must assess the same
+explicitly accepted scope; unchanged strict review criteria cannot be silently
+reinterpreted. Until adoption, the existing strict result remains failed.
 
-Preserve full source precision and saved patterns. The prior raw zero-square
-edge lengths are `10,10,10.000000000000002,10.000000000000002`, with cumulative
-endpoints exactly `10,20,30,40`; the repaired defect was full-dot extent, not a
-proven rounding error. Do not perturb coordinates/patterns or apply a broad
-comparison epsilon to evade the new reproductions. Keep supported short intervals,
-large/wrapped phases and bounded arithmetic families without iteration proportional
-to dash count, pattern clamping or normalization that removes valid zero entries.
+## Preserve completed behavior; avoid another expanding investigation
 
-Correct shared cap geometry so bounds, radius, pending/committed selection and
-immutable exports remain consistent. Keep six local units of picking tolerance,
-the separate six-unit selection decoration allowance and `.14` raster uncertainty.
-Retain original contour interiors and continuous-stroke selection through gaps.
-Do not replace precise geometry with a bounding box, inflate tolerances, or force
-selection to make candidate assertions pass. Preserve butt/round/solid controls,
-solid bevel/miter exterior misses and genuine outward-tip/dashed-cap hits.
+Keep full isolated square/disk dots, outgoing positive-start tangents, exclusion
+of terminal-only zero dots, separately capped zero-off intervals, raw source/
+pattern/phase precision, bounded arithmetic, effective-style matching, solid
+joins and the existing 256-edge circle contour. Preserve terminal negatives
+`(21,-21)`, `(22,-22)`, `(22,-18)` and painted `(-22,-22)`; preserve positive-corner
+`(20,20)`, `(16,-22)`, `(22,-22)` and exterior `(-22,-30)` in their own cases.
+Do not perturb patterns/coordinates, clamp valid zero entries, inflate tolerances
+or replace geometry with bounding boxes to obtain green checks.
 
-Register regressions for each demonstrated mechanism and every witness/oracle
-correction. Cover exact and near endpoints, seam sides, zero-on versus zero-off,
-positive dash intervals, relevant winding/diagonal controls, both responsive
-scales and live style changes. Include new actual-App pointer witnesses for
-supplemental defects where needed. Preserve raw SVG/model/effective settings,
-parsed geometry, path length, browser identity, transforms and raster calibration.
-Use independent observations and analytic constructions, not production helpers
-as their own oracle. Keep original failed files byte-identical and write corrected
-results separately. Update synthetic fixtures/policy consistently and label them
-as synthetic, never native acceptance.
+Keep native visibility diagnostics, trusted-input/restoration assertions, App
+continuity, monitor-drain fix, owned cleanup and primary-error retention. Keep
+independent paint/import/PGF work, lifecycle races, exact JSON/CRLF, immutable
+exports and all earlier completed behavior. Retain the runner's 60-second fixture
+deadline and fresh-process policy loading. No retry-until-green, global deadline/
+concurrency change, unrelated cleanup, new dependency or 32C/32D work.
 
-Retain all matrix entries and every complete grid. Keep per-entry status,
-continuation after individual failure, bounded failure captures and primary-error
-retention; continue through both matrices before reporting the first failure.
-A failed/incomplete matrix must not produce a passed scenario. Require at least
-**18 App entries, ten complete 1,089-cell square audits and 19 supplemental
-mechanism entries with their complete grids**. Preserve trusted ordinary/Alt
-clicks, cleared selection, overlay exclusion, actual transforms and candidate
-inspection as well as final selection. Add coverage rather than replacing
-failed cases with easier ones.
+Preserve original `epviae` evidence and all failed attempts byte-identically.
+Older exploratory generic-cap passes, unfinished `vaZYVU`, `YAt03b`, child EPERM
+and the unproven `UThawr` timeout cause remain distinct from current evidence.
+Later progress does not retrospectively prove an old failure mechanism.
 
-The current cumulative minimum is **16 groups, 29 point scenarios and 705
-required artifacts**: original 386 + original 219 dash artifacts + four zero-dot
-witness screenshots + 96 mechanism artifacts. Preserve these and extend required
-coverage for added witnesses. Update policy/negative controls explicitly without
-reducing coverage or accepting stale/malformed/missing evidence. Keep fresh-process
-policy loading, file-backed fixture memory behavior, runner deadlines and failed
-artifact retention. No retry-until-green, global concurrency change or deadline
-inflation.
+## Verification, review and stopping condition
 
-## Preserve completed work and verification history
+Document the live-versus-clone conclusion, the bounded transfer check and the
+proposed/adopted profile with its itemized inventory and limitations. Do not
+spend another cycle repairing an assertion whose independent live premise is
+already disproven. Do not require zero differences across every raster engine
+as an implicit prerequisite for finishing independent point paint.
 
-Keep the isolated full square/disk dot correction, zero-on positive witnesses
-`(-22,-22)`/`(20,20)` and genuine negative `(-22,-30)`, effective style defaults/
-pattern precedence, content-based layout matching, phase handling, existing
-256-edge square-cap circle contour and solid-join fixes. Preserve the successfully
-observed diagonal and internal-zero controls. Original Cairo fixtures, source
-inspection and analytic tests keep their distinct scope; new native evidence
-does not retroactively change their bytes or establish a universal engine rule.
-
-Keep native visibility diagnostics, trusted input/change witnesses, deliberately
-different pre-reload UI settings, both 2D/3D and inline/standalone restoration,
-full payload/history/selection/revision assertions and immutable downloads.
-Preserve the corrected monitor-drain race, bounded actual-App snapshots,
-late-rejection ownership and owned-resource cleanup. Historical `UThawr`'s
-visibility timeout cause remains unproven; subsequent passes are progress, not
-proof of that old mechanism. Do not reopen control/CSS behavior without evidence.
-
-Preserve importer uncertainty/local overrides and independent PGF evidence;
-independent paint/opacity/dimming; legacy normalization, clipboard/cloning/history;
-raw JSON/CRLF, 2D/3D/work-plane semantics, free/inline labels and whole-node exports.
-Keep five geometry fault controls, seven App → SVG → App transitions, three
-continuity controls/13 artifacts, directory scenario/11 artifacts and six
-responsive downloads/91 artifacts. Keep lifecycle instrumentation/deterministic
-timeout tests, the runner's 60-second fixture deadline and original failure/rerun
-history. No unrelated cleanup, new dependencies or 32C/32D work.
-
-The followup handoff is authoritative for its frozen identity. The older
-`/private/tmp/stz-phase32b-zero-dash-handoff/` is a different checkout and its
-unfinished `vaZYVU` report is not a pass. Earlier `YAt03b` and child `EPERM`
-records remain separate; the new parent run demonstrates real native progress
-and failures rather than a current startup blockage.
-
-## Final verification and independent review
-
-Document the actual mechanism, geometry/witness/oracle corrections, retained
-failures and remaining uncertainty. Run focused registered regressions,
-applicable strict production/fixture/test TypeScript, changed-script syntax,
-targeted lint and diff checks. Separate documented baseline lint debt and the
-existing bundle warning from new failures; do not report excluded guarded
-cleanup findings as a completely clean repository-wide lint run.
-Run `npm test` and `npm run build` sequentially because they share asset preparation.
-
-Finalize code/tests/tracked docs, then record final identity/report paths in an
-external handoff. In the authorized browser-capable parent, run:
+Run registered focused regressions and applicable strict TypeScript, script
+syntax, targeted lint and diff checks. Report baseline lint debt and existing
+bundle warnings separately. Run `npm test` and `npm run build` sequentially.
+Finalize files, then record final identity and evidence paths externally. In the
+authorized browser-capable parent, run:
 
 ```bash
 PATH=/opt/homebrew/bin:$PATH node scripts/automation/run-phase.mjs 32B verify
 ```
 
-Require all five commands on the same final tracked/untracked/binary identity,
-both complete native reports, all required matrices/scenarios/artifacts, no page
-errors and no incomplete/unexecuted groups. Include the final settled SVG group
-that `epviae` did not reach. Partial matrix passes and child startup restrictions
-do not satisfy acceptance. If execution is blocked, preserve the exact limitation
-and hand off for authorized parent execution without bypassing approval or
-changing permissions.
+Require fresh matching evidence for all five commands and every required group
+under the selected policy, including the previously unexecuted final settled
+SVG group. Child restrictions remain recorded failures, not substitutes for
+parent acceptance; do not bypass permissions. A profile change cannot reuse
+an earlier failed run as a new pass. Any subsequent checkout edit requires
+matching verification again.
 
-Any checkout edit after verification requires matching verification again.
-Obtain fresh independent read-only review against `prompts/phase-32b-review.md`,
-including all four supplemental failures, both App failure families, corrected
-witnesses/oracles and preserved completed behavior. `32B verify` does not itself
-perform review. Do not commit or push while required verification/review is
-unsuccessful. 32B remains incomplete until all gates pass; 32C/32D remain deferred.
+Obtain fresh independent read-only review against the paired review prompt and
+any explicitly adopted scope amendment. The finite closing condition is: core
+requirements pass on the final identity, all named limitations have an accepted
+disposition, and independent review agrees with that same scope. If the proposal
+has not been adopted, report the strict blockers and the concrete scope decision
+still needed; do not claim acceptance or automatically launch another expansion.
+No commit or push without successful required verification/review. 32B currently
+remains incomplete; 32C/32D remain deferred.

@@ -11,10 +11,10 @@ test('synthetic mechanism policy keeps literal/raw/near/seam/winding/diagonal an
   const evidence = syntheticMechanismEvidence()
   assertDashCapMechanismEvidence(evidence)
   assert.match(evidence.fixture, /synthetic.*not native/u)
-  assert.equal(dashCapMechanismCases.length, 19)
-  assert.equal(evidence.cases.reduce((sum, entry) => sum + entry.samples.length, 0), 19 * 1089)
-  assert.equal(dashCapMechanismArtifacts().length, 96)
-  assert.equal(new Set(dashCapMechanismArtifacts()).size, 96)
+  assert.equal(dashCapMechanismCases.length, 21)
+  assert.equal(evidence.cases.reduce((sum, entry) => sum + entry.samples.length, 0), 21 * 1089)
+  assert.equal(dashCapMechanismArtifacts().length, 169)
+  assert.equal(new Set(dashCapMechanismArtifacts()).size, 169)
   assert.notEqual(evidence.cases[0].source.rawPoints, evidence.cases[1].source.rawPoints)
   assert.deepEqual(evidence.cases[0].probes.map((r) => [r[0], r[1], r[2], r[7]]), [[-22, -22, 255, true], [20, 20, 255, true], [-22, -30, 0, false]])
 })
@@ -54,6 +54,24 @@ for (const [name, damage] of [
   ['bounds deficit', (e) => { first(e).geometry.bounds.minX = -20 }],
   ['dropped explicit witnesses', (e) => { first(e).probes.pop() }],
   ['painted negative witness', (e) => { first(e).probes[2][7] = true }],
+  ['removed live capture', (e) => { first(e).livePaint.captures.pop() }],
+  ['missing live grid cell', (e) => { first(e).livePaint.captures[1].samples.pop() }],
+  ['changed live source', (e) => { first(e).livePaint.captures[0].sourceUnchanged = false }],
+  ['changed live source hash', (e) => { first(e).livePaint.sourceSha256 = 'invalid' }],
+  ['changed live PNG hash', (e) => { first(e).livePaint.captures[1].sha256 = 'invalid' }],
+  ['uncalibrated live screen', (e) => { first(e).livePaint.captures[1].ctm.a = 15 }],
+  ['moved live screen after screenshot', (e) => { first(e).livePaint.captures[1].afterCtm.e++ }],
+  ['wrong live pixel resolution', (e) => { first(e).livePaint.captures[1].width = 128 }],
+  ['changed live effective pattern', (e) => { first(e).livePaint.captures[1].stroke.pattern = [10, 10] }],
+  ['silently changed live containment', (e) => { first(e).livePaint.captures[0].samples[0][7] = true }],
+  ['unexplained live containment change', (e) => { const c = first(e).livePaint.captures[1]; c.samples[0][7] = true; c.containmentResolutionChanges.samples = [{ x: -32, y: -32, before: false, after: true }] }],
+  ['changed live parse', (e) => { first(e).livePaint.captures[1].vertices[0].x++ }],
+  ['unpainted live core', (e) => { const entry = first(e), i = entry.samples.findIndex((r) => r[8]); entry.livePaint.captures[1].samples[i][2] = 255 }],
+  ['filled live exterior', (e) => { const entry = first(e), i = entry.samples.findIndex((r) => r[9] === 'miss'); entry.livePaint.captures[1].samples[i][2] = 0 }],
+  ['suppressed containment disagreement', (e) => { e.cases.find((c) => c.key === 'zero-off-continuous').livePaint.rasterCoreContainmentDisagreements = [] }],
+  ['unconfirmed low resolution contradiction', (e) => { const entry = e.cases.find((c) => c.key === 'positive-before-corner'), i = entry.samples.findIndex((r) => r[8] && !r[7]); entry.livePaint.captures[0].samples[i][2] = 255 }],
+  ['unconfirmed high resolution contradiction', (e) => { const entry = e.cases.find((c) => c.key === 'zero-off-continuous'), i = entry.samples.findIndex((r) => r[8] && !r[7]); entry.livePaint.captures[1].samples[i][6] = false }],
+  ['repainted terminal negative regression', (e) => { const entry = e.cases.find((c) => c.key === 'zero-terminal-seam'); entry.probes[1][2] = 255 }],
   ['aborted aggregate', (e) => { e.result = 'failed' }],
 ]) test(`synthetic mechanism policy rejects ${name}`, () => {
   const evidence = syntheticMechanismEvidence()
@@ -85,13 +103,13 @@ test('native command loads the actual pure TypeScript geometry without requiring
 test('mechanism runner retains the first native failure, executes every bounded case, and never passes an aborted matrix', async () => {
   const artifactDir = await mkdtemp(join(tmpdir(), 'stz-mechanism-failure-'))
   const original = new Error('original native observation failure'), attempted = []
-  const page = { context: () => ({ browser: () => ({ version: () => 'synthetic-failure-boundary' }) }),
-    evaluate: async (_callback, { spec }) => { attempted.push(spec.key); throw attempted.length === 1 ? original : new Error(`later ${spec.key}`) } }
+  const page = { viewportSize: () => ({ width: 1500, height: 1150 }), setViewportSize: async () => {}, context: () => ({ browser: () => ({ version: () => 'synthetic-failure-boundary' }) }),
+    evaluate: async (_callback, input) => { if (!input) return; const { spec } = input; attempted.push(spec.key); throw attempted.length === 1 ? original : new Error(`later ${spec.key}`) } }
   try {
     await assert.rejects(runPointDashCapMechanismChecks({ page, artifactDir }), (error) => error === original)
     assert.deepEqual(attempted, dashCapMechanismCases.map(({ key }) => key))
     const aggregate = JSON.parse(await readFile(join(artifactDir, 'point-paint-dash-cap-mechanism.json'), 'utf8'))
-    assert.equal(aggregate.result, 'failed'); assert.equal(aggregate.cases.length, 19)
+    assert.equal(aggregate.result, 'failed'); assert.equal(aggregate.cases.length, 21)
     assert.ok(aggregate.cases.every((entry) => entry.result === 'failed'))
     assert.equal(aggregate.cases[0].error.message, original.message)
     assert.throws(() => assertDashCapMechanismEvidence(aggregate))
@@ -99,5 +117,55 @@ test('mechanism runner retains the first native failure, executes every bounded 
       const entry = JSON.parse(await readFile(join(artifactDir, `point-paint-dash-cap-mechanism-${key}.json`), 'utf8'))
       assert.equal(entry.result, 'failed'); assert.ok(entry.error.stack.includes(entry.error.message))
     }
+  } finally { await rm(artifactDir, { recursive: true, force: true }) }
+})
+
+test('synthetic live corroboration preserves both observed contradictions without weakening independent controls', () => {
+  const evidence = syntheticMechanismEvidence()
+  for (const [key, count] of [['zero-off-continuous', 24], ['positive-before-corner', 30]]) {
+    const entry = evidence.cases.find((c) => c.key === key)
+    assert.equal(entry.livePaint.rasterCoreContainmentDisagreements.length, count)
+    const row = entry.samples.find((r) => r[0] === 16 && r[1] === -22)
+    assert.equal(row[2], 255); assert.equal(row[7], false); assert.equal(row[8], true); assert.equal(row[12], true)
+    for (const capture of entry.livePaint.captures) assert.deepEqual(capture.samples.find((r) => r[0] === 16 && r[1] === -22).slice(2), [0, 0, 0, 255, true, false])
+  }
+  assertDashCapMechanismEvidence(evidence)
+  for (const key of ['exact-zero', 'positive-exact-corner', 'solid-bevel-control']) assert.deepEqual(evidence.cases.find((c) => c.key === key).livePaint.rasterCoreContainmentDisagreements, [])
+})
+
+test('synthetic live screenshot failure retains every complete native grid and both contradictory observations before continuing the matrix', async () => {
+  const artifactDir = await mkdtemp(join(tmpdir(), 'stz-mechanism-live-failure-'))
+  const synthetic = syntheticMechanismEvidence(), attempted = [], screenshots = []
+  const original = new Error('first live compositor screenshot failure')
+  let current
+  const page = {
+    viewportSize: () => ({ width: 1500, height: 1150 }), setViewportSize: async () => {},
+    context: () => ({ browser: () => ({ version: () => 'synthetic-live-failure-boundary' }) }),
+    evaluate: async (_callback, input) => {
+      if (!input) return
+      if (input.spec) {
+        current = synthetic.cases.find((entry) => entry.key === input.spec.key); attempted.push(current.key)
+        return { native: structuredClone(current.native), raster: structuredClone(current.raster), paint: structuredClone(current.paint),
+          samples: current.samples.map((r) => r.slice(0, 10)), probes: current.probes.map((r) => r.slice(0, 10)),
+          polygonMarkup: '<polygon></polygon>', xml: '<svg></svg>', png: 'AA==', solidXml: '<svg></svg>', solidPng: 'AA==' }
+      }
+      return { scale: input.scale, side: 128 * input.scale, xml: '<svg></svg>' }
+    },
+    screenshot: async () => { screenshots.push(current.key); throw screenshots.length === 1 ? original : new Error(`later compositor ${current.key}`) },
+  }
+  try {
+    await assert.rejects(runPointDashCapMechanismChecks({ page, artifactDir }), (error) => error === original)
+    assert.deepEqual(attempted, dashCapMechanismCases.map(({ key }) => key)); assert.deepEqual(screenshots, attempted)
+    const aggregate = JSON.parse(await readFile(join(artifactDir, 'point-paint-dash-cap-mechanism.json'), 'utf8'))
+    assert.equal(aggregate.result, 'failed'); assert.equal(aggregate.cases.length, 21)
+    for (const entry of aggregate.cases) { assert.equal(entry.result, 'failed'); assert.equal(entry.samples.length, 1089); assert.equal(entry.samples[0].length, 13) }
+    for (const [key, count] of [['zero-off-continuous', 24], ['positive-before-corner', 30]]) {
+      const entry = aggregate.cases.find((item) => item.key === key)
+      assert.equal(entry.samples.filter((r) => r[8] && !r[7]).length, count)
+      assert.equal(entry.livePaint.rasterCoreContainmentDisagreements.length, count)
+      assert.deepEqual(entry.livePaint.captures, [])
+    }
+    assert.equal(aggregate.cases[0].error.message, original.message)
+    assert.throws(() => assertDashCapMechanismEvidence(aggregate))
   } finally { await rm(artifactDir, { recursive: true, force: true }) }
 })

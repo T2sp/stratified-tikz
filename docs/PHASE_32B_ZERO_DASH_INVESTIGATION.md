@@ -5,6 +5,14 @@ It addresses the retained Chrome `YAt03b` failure. Phase 32B is still incomplete
 until fresh native verification and independent review succeed on one final
 checkout. Phase 32C/32D remain deferred.
 
+The subsequent parent `epviae` did execute both full matrices: isolated-dot and
+internal-zero controls passed, while terminal-zero and positive-corner App
+entries and four supplemental mechanisms failed. The
+[native endpoint continuation](PHASE_32B_NATIVE_ENDPOINT_INVESTIGATION.md)
+supersedes the unresolved native questions below for those observed cases and
+records remaining live-paint uncertainty. This document retains the preceding
+follow-up's evidence boundary and conclusions; it is not final acceptance.
+
 The current continuation starts from clean `0cf597f1a71b249e73374b354d69409ba4c51979`.
 That commit tracked the original evidence and this investigation's draft tests
 and native mechanism harness; production geometry and cumulative registration

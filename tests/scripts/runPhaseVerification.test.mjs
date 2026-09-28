@@ -22,9 +22,9 @@ import {
 } from '../../scripts/automation/phase-verification.mjs'
 
 import { dashCapScenario, dashCapArtifacts } from '../../scripts/pointDashCapContract.mjs'
-import { dashCapEvidence } from './dashCapEvidenceFixture.mjs'
+import { dashCapEvidence, syntheticDashCapLivePng } from './dashCapEvidenceFixture.mjs'
 import { dashCapMechanismStem, dashCapMechanismArtifacts } from '../../scripts/pointDashCapMechanismContract.mjs'
-import { syntheticMechanismEvidence } from './pointDashCapMechanismFixture.mjs'
+import { syntheticMechanismEvidence, syntheticMechanismLiveSvg, syntheticMechanismLivePng } from './pointDashCapMechanismFixture.mjs'
 
 import { polygonJoinScenario, polygonJoinCases, polygonJoinScales, polygonJoinArtifacts, assertPolygonJoinEvidence } from '../../scripts/pointPolygonJoinContract.mjs'
 
@@ -98,7 +98,9 @@ if (command.startsWith('run check:')) {
       for (const entry of pointEvidence.evidence || []) for (const artifact of entry.artifacts) {
         const content = process.env.STZ_TEST_POINT_CORRUPT === 'yes' ? 'broken' : artifact.endsWith('.svg')
           ? typeof artifactValues[artifact] === 'string' ? artifactValues[artifact] : artifact.endsWith('.input.svg') ? '<svg xmlns="http://www.w3.org/2000/svg"><polygon points="0,0 1,0 0,1" fill="none" stroke="black"></polygon></svg>' : '<svg><g><circle r="20"/><g><title>fixture</title><g><g><text x="0" y="0">fixture</text></g></g></g></g></svg>'
-          : artifact.endsWith('.png') ? Buffer.from([137,80,78,71,13,10,26,10,0,0,0,0,0,0,0,0,0,0,0,1,0,0,0,1]) : JSON.stringify(artifactValues[artifact] || {})
+          : artifact.endsWith('.png') ? artifactValues[artifact]?.syntheticPngBase64
+            ? Buffer.from(artifactValues[artifact].syntheticPngBase64, 'base64')
+            : Buffer.from([137,80,78,71,13,10,26,10,0,0,0,0,0,0,0,0,0,0,0,1,0,0,0,1]) : JSON.stringify(artifactValues[artifact] || {})
         fs.writeFileSync(path.join(artifacts, artifact), content)
       }
     }
@@ -803,12 +805,16 @@ function completePointEvidence(fixture) {
     [`${dashCapMechanismStem}.json`]: mechanism,
     ...Object.fromEntries(mechanism.cases.flatMap((entry) => {
       const stem = `${dashCapMechanismStem}-${entry.key}`
-      return [[`${stem}.json`, entry], ...['input.svg', 'solid.input.svg'].map((suffix) =>
+      return [[`${stem}.json`, entry], [`${stem}.live.svg`, syntheticMechanismLiveSvg(entry)],
+        ...entry.livePaint.captures.map((capture) => [capture.file, { syntheticPngBase64: syntheticMechanismLivePng(capture.scale).toString('base64') }]),
+        ...['input.svg', 'solid.input.svg'].map((suffix) =>
         [`${stem}.${suffix}`, `<svg xmlns="http://www.w3.org/2000/svg"><polygon points="${entry.source.rawPoints}" fill="none" stroke="#000000" stroke-width="${entry.specification.width}" stroke-dasharray="${suffix === 'solid.input.svg' ? 'none' : entry.specification.pattern?.join(' ') ?? 'none'}" stroke-dashoffset="${suffix === 'solid.input.svg' ? 0 : entry.specification.phase}" stroke-linecap="${entry.specification.cap}" stroke-linejoin="${entry.specification.join}" stroke-miterlimit="${entry.specification.miterLimit}"></polygon></svg>`])]
     })),
     ...Object.fromEntries(dashCapEvidence().cases.filter((entry) => entry.specification.audit).flatMap((entry) => {
       const stem = `${dashCapScenario}-${entry.key}-scale-${entry.scale}`
-      return [[`${stem}-engine-audit.json`, entry.observation.engineAudit], ...['.input.svg', '-solid.input.svg'].map((suffix) =>
+      return [[`${stem}-engine-audit.json`, entry.observation.engineAudit],
+        ...(entry.observation.livePaint?.captures ?? []).map((capture) => [capture.screenshot, { syntheticPngBase64: syntheticDashCapLivePng }]),
+        ...['.input.svg', '-solid.input.svg'].map((suffix) =>
         [`${stem}${suffix}`, `<svg xmlns="http://www.w3.org/2000/svg"><polygon points="${entry.observation.engineAudit.rawPoints}" fill="none" stroke="black"></polygon></svg>`])]
     })),
   })
@@ -1350,6 +1356,44 @@ for (const fault of ['missing-matrix', 'unpassed-case', 'omitted-grid-cell', 'mi
     if (fault === 'rounded-source-file') artifacts[`${dashCapMechanismStem}-${entry.key}.input.svg`] = '<svg xmlns="http://www.w3.org/2000/svg"><polygon points="5,-5 -5,-5 -5,5 5,5"></polygon></svg>'
     if (fault === 'changed-pattern-file') artifacts[`${dashCapMechanismStem}-${entry.key}.input.svg`] = artifacts[`${dashCapMechanismStem}-${entry.key}.input.svg`].replace('stroke-dasharray="0 10"', 'stroke-dasharray="none"')
     if (fault === 'zero-cap-distance-mismatch') entry.samples.find((sample) => sample[9] === 'hit')[11] += 1
+    fixture.env.STZ_TEST_POINT_ARTIFACT_VALUES = JSON.stringify(artifacts)
+    assert.equal(failedVerification(t, fixture, '32B').report.status, 'failed')
+  })
+}
+
+test('32B synthetic complete endpoint evidence includes new App witnesses and independently bound live captures', (t) => {
+  const fixture = checkoutFixture(t); completePointEvidence(fixture)
+  const report = verify(t, fixture, '32B')
+  assert.equal(report.status, 'passed')
+  assert.equal(Object.values(pointNodeScenarios).flat().flatMap(pointNodeScenarioArtifacts).length,
+    386 + dashCapArtifacts().length + dashCapMechanismArtifacts().length)
+})
+
+for (const fault of ['missing-zero-off-App', 'missing-App-live', 'stale-App-live-PNG', 'missing-mechanism-live', 'stale-mechanism-live-PNG', 'stale-live-SVG']) {
+  test(`32B synthetic endpoint policy rejects ${fault}`, (t) => {
+    const fixture = checkoutFixture(t); completePointEvidence(fixture)
+    const artifacts = JSON.parse(fixture.env.STZ_TEST_POINT_ARTIFACT_VALUES)
+    const app = artifacts[`${dashCapScenario}.json`]
+    const appEntry = app.cases.find((entry) => entry.key === 'square-zero-off')
+    const mechanism = artifacts[`${dashCapMechanismStem}.json`]
+    const mechanismEntry = mechanism.cases.find((entry) => entry.key === 'zero-off-continuous')
+    if (fault === 'missing-zero-off-App') app.cases = app.cases.filter((entry) => entry !== appEntry)
+    if (fault === 'missing-App-live') delete appEntry.observation.livePaint
+    if (fault === 'stale-App-live-PNG') {
+      const file = appEntry.observation.livePaint.captures[0].screenshot
+      const bytes = Buffer.from(artifacts[file].syntheticPngBase64, 'base64'); bytes[24] ^= 1
+      artifacts[file].syntheticPngBase64 = bytes.toString('base64')
+    }
+    if (fault === 'missing-mechanism-live') delete mechanismEntry.livePaint
+    if (fault === 'stale-mechanism-live-PNG') {
+      const file = mechanismEntry.livePaint.captures[0].file
+      const bytes = Buffer.from(artifacts[file].syntheticPngBase64, 'base64'); bytes[24] ^= 1
+      artifacts[file].syntheticPngBase64 = bytes.toString('base64')
+    }
+    if (fault === 'stale-live-SVG') {
+      const file = mechanismEntry.livePaint.sourceFile
+      artifacts[file] = artifacts[file].replace('stroke-width="36"', 'stroke-width="35"')
+    }
     fixture.env.STZ_TEST_POINT_ARTIFACT_VALUES = JSON.stringify(artifacts)
     assert.equal(failedVerification(t, fixture, '32B').report.status, 'failed')
   })

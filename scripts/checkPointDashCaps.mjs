@@ -1,9 +1,10 @@
 import assert from 'node:assert/strict'
+import { createHash } from 'node:crypto'
 import { writeFile } from 'node:fs/promises'
 import { resolve } from 'node:path'
 import { runPointDashCapMechanismChecks } from './checkPointDashCapMechanism.mjs'
 import { boundedPointDiagnostic } from './pointCheckDiagnostics.mjs'
-import { dashCapScenario, dashCapCases, dashCapScales, dashCapEditFields, assertDashCapEvidence, assertDashCapObservation, assertDashCapEntry } from './pointDashCapContract.mjs'
+import { dashCapScenario, dashCapCases, dashCapScales, dashCapEditFields, triangleDashPhaseNegatives, dashCapProbeIsMiss, assertDashCapEvidence, assertDashCapObservation, assertDashCapEntry } from './pointDashCapContract.mjs'
 const paint = (spec) => ({ text: { color: '#000000', opacity: 1 }, fill: { enabled: false, color: '#000000', opacity: 1 },
   stroke: { enabled: true, color: '#000000', opacity: 1, width: spec.widthPt, lineStyle: spec.lineStyle,
     ...(spec.pattern ? { dashPattern: spec.pattern } : {}), dashPhase: spec.phase, lineCap: 'rect', lineJoin: 'bevel' } })
@@ -37,7 +38,7 @@ async function observe(page, spec) {
       if (alpha(x - 1, y) < 128 || alpha(x + 1, y) < 128 || alpha(x, y - 1) < 128 || alpha(x, y + 1) < 128) boundary.push(p)
     }
     const distance = (p) => at(p) >= 128 ? 0 : Math.sqrt(boundary.reduce((best, q) => Math.min(best, (p.x - q.x) ** 2 + (p.y - q.y) ** 2), Infinity))
-    let engineAudit, solidXml, solidRasterPng
+    let engineAudit, solidXml, solidRasterPng, solidDistanceAt
     if (spec.audit) {
       const solid = clean.cloneNode(true); solid.setAttribute('stroke-dasharray', 'none'); solid.setAttribute('stroke-dashoffset', '0')
       solidXml = `<svg xmlns="http://www.w3.org/2000/svg" width="${side}" height="${side}" viewBox="-${half} -${half} ${2 * half} ${2 * half}">${solid.outerHTML}</svg>`
@@ -55,6 +56,7 @@ async function observe(page, spec) {
         }
       }
       const solidDistance = (p) => solidAt(p) >= 128 ? 0 : Math.sqrt(solidBoundary.reduce((best, q) => Math.min(best, (p.x - q.x) ** 2 + (p.y - q.y) ** 2), Infinity))
+      solidDistanceAt = solidDistance
       const samples = []
       for (let y = -32; y <= 32; y += 2) for (let x = -32; x <= 32; x += 2) {
         const local = { x, y }, pixelX = Math.floor((x + half) * resolution), pixelY = Math.floor((y + half) * resolution)
@@ -82,7 +84,8 @@ async function observe(page, spec) {
       solidRasterPng = solidCanvas.toDataURL('image/png').split(',')[1]
     }
     const probes = [{ kind: 'paint', local: core }, { kind: 'outside', local: spec.exterior }, { kind: 'interior', local: { x: 0, y: 0 } },
-      ...(spec.exact ?? []).map((local, i) => ({ kind: `exact-${i}`, local }))]
+      ...(spec.exact ?? []).map((local, i) => ({ kind: `exact-${i}`, local })),
+      ...(spec.phaseNegatives ?? []).map((local, i) => ({ kind: `phase-outside-${i}`, local }))]
     if (engineAudit) {
       const cap = engineAudit.samples.filter((sample) => sample.paintCore && sample.solidDistance > .3 && !sample.insideContour)
         .sort((a, b) => Number(a.candidates.includes('p')) - Number(b.candidates.includes('p')) || b.solidDistance - a.solidDistance)[0]
@@ -98,17 +101,99 @@ async function observe(page, spec) {
       if (!gaps.length) throw new Error('Sparse circle has no independent raster gap')
       probes.push({ kind: 'gap', local: gaps[0].p })
     }
+    // A bevel join and each continuous segment stay within the vertex support
+    // bounds expanded by half the width. This independently proves a lower
+    // distance bound without invoking production geometry or synthesizing paint.
+    const solidSupport = spec.phaseNegatives ? { method: 'independent continuous-bevel support bound', vertices: [...contour.points].map(({ x, y }) => ({ x, y })),
+      strokeWidth: parseFloat(css.strokeWidth), join: css.strokeLinejoin, halfWidth: parseFloat(css.strokeWidth) / 2, minVertexY: Math.min(...[...contour.points].map(({ y }) => y)) } : undefined
+    if (solidSupport) solidSupport.minY = solidSupport.minVertexY - solidSupport.halfWidth
     const matrix = contour.getScreenCTM(), declaredBounds = point.getAttribute('data-point-painted-bounds').split(' ').map(Number)
-    return { engineAudit, solidXml, solidRasterPng, xml, rasterPng: canvas.toDataURL('image/png').split(',')[1], resolution, radius, rasterRadius, rasterBounds, declaredBounds,
+    return { solidSupport, engineAudit, solidXml, solidRasterPng, xml, rasterPng: canvas.toDataURL('image/png').split(',')[1], resolution, radius, rasterRadius, rasterBounds, declaredBounds,
       contourKind: contour.localName, vertexCount: contour.localName === 'polygon' ? contour.points.length : 0,
       selectionRadius: Number(point.querySelector('[data-svg-export-exclude]').getAttribute('r')) - 6,
       boundsEnclosePaint: ['minX', 'minY', 'maxX', 'maxY'].every((key, i) => i < 2 ? declaredBounds[i] <= rasterBounds[key] + .14 : declaredBounds[i] >= rasterBounds[key] - .14),
       boundaryPixelCount: boundary.length, ctm: Object.fromEntries(['a', 'b', 'c', 'd', 'e', 'f'].map((key) => [key, matrix[key]])),
       strokeWidth: parseFloat(css.strokeWidth), cap: css.strokeLinecap, join: css.strokeLinejoin, pattern: css.strokeDasharray, phase: parseFloat(css.strokeDashoffset), fill: css.fill, miterLimit: Number(css.strokeMiterlimit),
       source: point.querySelector('[data-label-state]').getAttribute('data-label-source'), bodyStatus: point.querySelector('[data-label-state]').getAttribute('data-label-state'),
-      probes: probes.map((probe) => ({ ...probe, alpha: at(probe.local), rasterDistance: distance(probe.local), nativeStrokeContains: contour.isPointInStroke(new DOMPoint(probe.local.x, probe.local.y)) })) }
+      probes: probes.map((probe) => ({ ...probe, alpha: at(probe.local), rasterDistance: distance(probe.local), ...(solidDistanceAt ? { solidDistance: solidDistanceAt(probe.local) } : {}), ...(solidSupport ? { solidDistanceLowerBound: Math.max(0, solidSupport.minY - probe.local.y) } : {}), nativeStrokeContains: contour.isPointInStroke(new DOMPoint(probe.local.x, probe.local.y)) })) }
   }, { spec, browserVersion })
 }
+// This observes the actual App DOM paint. PNG decoding does not reconstruct SVG,
+// and the zoom changes only the root framing while retaining the same contour.
+async function observeLivePaint(page, artifactDir, stem, observation, persist) {
+  await boundedPointDiagnostic(() => page.evaluate(() => window.stzLabels.select(null)), 'App live paint clear selection', 5000)
+  const saved = await boundedPointDiagnostic(() => page.evaluate(() => {
+    const root = document.querySelector('svg.svg-diagram'), state = window.stzLabels.state()
+    return { style: root.getAttribute('style'), viewBox: root.getAttribute('viewBox'), json: state.json, history: state.history }
+  }), 'App live paint original framing', 5000)
+  const captures = []
+  const live = { captures, restored: false, modelUnchanged: false,
+    disagreements: observation.engineAudit.samples.filter((sample) => sample.paintCore && !sample.nativeStrokeContains).map(({ local }) => local) }
+  observation.livePaint = live
+  await persist()
+  let primary
+  try {
+    for (const zoom of [false, true]) {
+      if (zoom) await boundedPointDiagnostic(() => page.evaluate(() => {
+        const root = document.querySelector('svg.svg-diagram')
+        root.setAttribute('viewBox', '416 316 68 68')
+        Object.assign(root.style, { width: '1088px', height: '1088px', position: 'fixed', left: '0', top: '0', zIndex: '2147483647', transform: '' })
+      }), 'App live paint magnified framing', 5000)
+      const before = await boundedPointDiagnostic(() => page.evaluate(() => {
+        const contour = document.querySelector('[data-point-id="p"] [data-point-contour]'), css = getComputedStyle(contour), matrix = contour.getScreenCTM()
+        const state = window.stzLabels.state()
+        return { rawPoints: contour.getAttribute('points'), vertices: [...contour.points].map(({ x, y }) => ({ x, y })), pathLength: contour.getTotalLength(),
+          ctm: Object.fromEntries(['a', 'b', 'c', 'd', 'e', 'f'].map((key) => [key, matrix[key]])), selection: state.selection,
+          stroke: { width: parseFloat(css.strokeWidth), pattern: css.strokeDasharray, phase: parseFloat(css.strokeDashoffset), cap: css.strokeLinecap, join: css.strokeLinejoin, fill: css.fill, miterLimit: Number(css.strokeMiterlimit), color: css.stroke, opacity: Number(css.strokeOpacity) },
+          source: contour.outerHTML, overlays: contour.parentElement.querySelectorAll('[data-svg-export-exclude]').length }
+      }), 'App live paint source before screenshot', 5000)
+      const screenshot = `${stem}-${zoom ? 'live-zoom' : 'live'}.screen.png`
+      const capture = { ...before, screenshot, zoom, method: 'actual App screenshot PNG; no SVG reconstruction', status: 'observed' }
+      captures.push(capture); await persist()
+      const png = await page.screenshot({ path: resolve(artifactDir, screenshot), timeout: 5000, scale: 'css' })
+      Object.assign(capture, { status: 'captured', bytes: png.length, sha256: createHash('sha256').update(png).digest('hex') }); await persist()
+      const pixels = await boundedPointDiagnostic(() => page.evaluate(async ({ png, samples, ctm }) => {
+        const image = new Image(); image.src = `data:image/png;base64,${png}`
+        let timer
+        try { await Promise.race([image.decode(), new Promise((_, reject) => { timer = setTimeout(() => reject(new Error('App live PNG decode exceeded 5000ms')), 5000) })]) }
+        finally { clearTimeout(timer) }
+        const canvas = document.createElement('canvas'); canvas.width = image.naturalWidth; canvas.height = image.naturalHeight
+        const context = canvas.getContext('2d', { willReadFrequently: true }); context.drawImage(image, 0, 0)
+        const bytes = context.getImageData(0, 0, canvas.width, canvas.height).data
+        return { width: canvas.width, height: canvas.height, samples: samples.map(({ local }) => {
+          const screen = { x: ctm.a * local.x + ctm.c * local.y + ctm.e, y: ctm.b * local.x + ctm.d * local.y + ctm.f }
+          const pixel = { x: Math.floor(screen.x), y: Math.floor(screen.y) }
+          if (pixel.x < 0 || pixel.y < 0 || pixel.x >= canvas.width || pixel.y >= canvas.height) throw new Error('App live sample is outside screenshot')
+          const offset = (pixel.y * canvas.width + pixel.x) * 4
+          return { local, screen, pixel, rgba: [...bytes.slice(offset, offset + 4)] }
+        }) }
+      }, { png: png.toString('base64'), samples: observation.engineAudit.samples.map(({ local }) => ({ local })), ctm: before.ctm }), 'App live PNG inspection', 6000)
+      const after = await boundedPointDiagnostic(() => page.evaluate(() => {
+        const contour = document.querySelector('[data-point-id="p"] [data-point-contour]'), matrix = contour.getScreenCTM()
+        return { source: contour.outerHTML, ctm: Object.fromEntries(['a', 'b', 'c', 'd', 'e', 'f'].map((key) => [key, matrix[key]])) }
+      }), 'App live paint source after screenshot', 5000)
+      Object.assign(capture, { status: 'inspected', sourceUnchanged: before.source === after.source, afterCtm: after.ctm, ...pixels }); await persist()
+    }
+  } catch (error) {
+    primary = error; live.error = { message: error.message }
+    try { await boundedPointDiagnostic(persist, 'App live paint failure evidence') } catch (diagnosticError) { console.error('App live paint failure evidence:', diagnosticError) }
+    throw error
+  } finally {
+    try {
+      const restored = await boundedPointDiagnostic(() => page.evaluate((saved) => {
+        const root = document.querySelector('svg.svg-diagram')
+        for (const [key, value] of [['style', saved.style], ['viewBox', saved.viewBox]]) value === null ? root.removeAttribute(key) : root.setAttribute(key, value)
+        const state = window.stzLabels.state(), matrix = document.querySelector('[data-point-id="p"] [data-point-contour]').getScreenCTM()
+        return { style: root.getAttribute('style'), viewBox: root.getAttribute('viewBox'), json: state.json, history: state.history, ctm: Object.fromEntries(['a', 'b', 'c', 'd', 'e', 'f'].map((key) => [key, matrix[key]])) }
+      }, saved), 'App live paint framing restoration')
+      Object.assign(live, { restored: saved.style === restored.style && saved.viewBox === restored.viewBox, modelUnchanged: saved.json === restored.json && saved.history === restored.history, restoredCtm: restored.ctm })
+      await boundedPointDiagnostic(persist, 'App live paint restoration evidence')
+    } catch (error) { if (!primary) primary = error; else console.error('App live framing cleanup:', error) }
+  }
+  if (primary) throw primary
+  return live
+}
+
 export async function runPointDashCapChecks({ page, artifactDir, begin, saved, diagnose }) {
   begin(dashCapScenario)
   const originalViewport = page.viewportSize(), cases = []
@@ -126,7 +211,7 @@ export async function runPointDashCapChecks({ page, artifactDir, begin, saved, d
       delete observation.solidRasterPng
     }
   }
-  async function pointerProbe(probe, screenshot, persist) {
+  async function pointerProbe(probe, screenshot, persist, spec) {
     await page.evaluate((local) => { window.stzLabels.select(null); window.stzLabels.mutatePoint('control', { position: { x: local.x / 100, y: -local.y / 100, z: 0 } }) }, probe.local)
     await settle()
     const transform = await page.evaluate((local) => {
@@ -149,7 +234,7 @@ export async function runPointDashCapChecks({ page, artifactDir, begin, saved, d
         try { await page.mouse.click(transform.screen.x, transform.screen.y) } finally { if (alt) await page.keyboard.up('Alt') }
         const action = await page.evaluate(() => ({ ...window.stzDashClicks.read().at(-1), selection: window.stzLabels.state().selection, feedback: document.querySelector('.svg-selection-cycle-feedback text')?.textContent ?? null }))
         action.screen = transform.screen; probe.actions.push(action); await persist()
-        assert.deepEqual([...action.candidates].sort(), ['outside', 'audit-outside'].includes(probe.kind) ? ['control'] : ['control', 'p'])
+        assert.deepEqual([...action.candidates].sort(), dashCapProbeIsMiss(spec, probe.kind) ? ['control'] : ['control', 'p'])
       }
       const after = await state(); assert.equal(before.json, after.json); assert.equal(before.history, after.history)
       probe.screenshot = screenshot; await page.screenshot({ path: resolve(artifactDir, probe.screenshot), timeout: 5000 }); await persist()
@@ -197,19 +282,27 @@ export async function runPointDashCapChecks({ page, artifactDir, begin, saved, d
               window.stzLabels.mutatePoint('p', { style: { paint: pointPaint } })
               return node === document.querySelector('[data-point-id="p"] [data-point-contour]')
             }, strokes[i + 1]); await settle()
-            const observation = await observe(page, spec); await rasterFiles(`${stem}-edit-${field}`, observation)
+            const observation = await observe(page, field === 'dashPhase' ? { ...spec, phaseNegatives: triangleDashPhaseNegatives } : spec); await rasterFiles(`${stem}-edit-${field}`, observation)
             const edit = { field, sameNode, modelChanged: before.json !== (await state()).json, observation,
               probe: { ...observation.probes.find((probe) => probe.kind === 'paint'), actions: [] } }
             entry.edits.push(edit); await persist(); assertDashCapObservation(observation)
-            await pointerProbe(edit.probe, `${stem}-edit-${field}.screen.png`, persist)
+            await pointerProbe(edit.probe, `${stem}-edit-${field}.screen.png`, persist, spec)
+            if (field === 'dashPhase') {
+              edit.negativeProbes = []
+              for (const [index, original] of observation.probes.filter(({ kind }) => kind.startsWith('phase-outside-')).entries()) {
+                const probe = { ...original, actions: [] }; edit.negativeProbes.push(probe); await persist()
+                await pointerProbe(probe, `${stem}-edit-dashPhase-outside-${index}.screen.png`, persist, spec)
+              }
+            }
           }
         }
         entry.observation = await observe(page, spec); await rasterFiles(stem, entry.observation); await persist()
+        if (spec.livePaint) { entry.observation.livePaint = await observeLivePaint(page, artifactDir, stem, entry.observation, persist); await persist() }
         await page.screenshot({ path: resolve(artifactDir, `${stem}.screen.png`), timeout: 5000 })
         assertDashCapObservation(entry.observation)
         for (const original of entry.observation.probes) {
           const probe = { ...original, actions: [] }; entry.probes.push(probe)
-          await pointerProbe(probe, `${stem}-${probe.kind}.png`, persist)
+          await pointerProbe(probe, `${stem}-${probe.kind}.png`, persist, spec)
         }
         assertDashCapEntry({ ...entry, result: 'passed' }, spec, scale)
         entry.result = 'passed'; await persist()

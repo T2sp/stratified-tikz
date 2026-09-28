@@ -28,7 +28,8 @@ function endpoints(pattern: readonly number[], phase: number) {
 for (const pattern of [[5, 10, 1e20, 1e19], [5, 10, 1e308, 1e308]]) {
   test(`huge period ${pattern[2]} preserves small endpoints, bounds and cap distances`, () => {
     // Along this 40-unit closed square, only on [0,5] and on [15,40] occur.
-    // They join through the closepath seam; the only caps are at lengths 5/15.
+    // The initial/final positive pieces join at the seam; retained native
+    // triangle paint rules out adding an artificial cap there.
     const caps = createDashCaps(contour, 36, pattern, 0, 'square')
     const actual = endpoints(pattern, 0)
     assert.equal(actual.length, 2)
@@ -51,14 +52,14 @@ for (const pattern of [[5, 10, 1e20, 1e19], [5, 10, 1e308, 1e308]]) {
     close(shifted[0].x, 4.875); close(shifted[0].y, 0)
     close(shifted[1].x, 10); close(shifted[1].y, 4.875)
     // Negative phase introduces a five-unit initial gap: caps at 5,10,20,40.
-    // Exact positive endpoints both use the incoming tangent, as independently
-    // observed by the ordinary-size corner fixtures below.
+    // Positive starts use their outgoing tangent; ends use their incoming tangent.
+    // The earlier incoming-start assertion came from distinct Cairo evidence.
     const negative = endpoints(pattern, -5)
     assert.equal(negative.length, 4)
     const expected = [
       { x: 5, y: 0, sign: -1, tangent: { x: 1, y: 0 } },
       { x: 10, y: 0, sign: 1, tangent: { x: 1, y: 0 } },
-      { x: 10, y: 10, sign: -1, tangent: { x: 0, y: 1 } },
+      { x: 10, y: 10, sign: -1, tangent: { x: -1, y: 0 } },
       { x: 0, y: 0, sign: 1, tangent: { x: 0, y: -1 } },
     ]
     negative.forEach((actual, index) => {
@@ -92,8 +93,8 @@ test('extreme scheduling retains caps for tiny positive on and gap entries', () 
     assert.ok(caps.bounds && Object.values(caps.bounds).every(Number.isFinite))
     assert.ok(Number.isFinite(distanceToDashCaps({ x: -25, y: -25 }, caps)))
   }
-  assert.equal(createDashCaps(contour, 36, [Number.MIN_VALUE, 0], 0, 'square').families.length, 0,
-    'all-zero off entries retain the continuous-stroke policy')
+  assert.ok(createDashCaps(contour, 36, [Number.MIN_VALUE, 0], 0, 'square').families.length > 0,
+    'subnormal zero-off schedules retain bounded cap families')
 })
 
 
@@ -212,11 +213,62 @@ function fullDotDistance(point: { x: number; y: number }, centers: readonly { x:
     : Math.max(0, Math.hypot(point.x - center.x, point.y - center.y) - half)))
 }
 
-function assertCairoExteriorWithDotDelta(point: { x: number; y: number }, actual: number,
-  centers: readonly { x: number; y: number }[], observation: Pick<CornerObservation, 'width' | 'lineCap'>) {
-  const delta = fullDotDistance(point, centers, observation.width, observation.lineCap)
-  assert.equal(actual <= 6, delta <= 6,
-    `${JSON.stringify(point)}: retained Cairo exterior; full-dot analytic distance ${delta}`)
+type LiteralCap = { center: { x: number; y: number }; outward: { x: number; y: number } }
+
+// Literal finite constructions for the authenticated Cairo squares. The native
+// corrections intentionally differ from some Cairo observations; none of those
+// bytes or observations is relabeled. Every old probe receives an independent
+// analytic expectation, including removed terminal dots and positive starts.
+function literalSquarePolicy(observation: CornerObservation) {
+  const h = observation.width / 2
+  const caps: LiteralCap[] = []
+  let dots: { x: number; y: number }[] = []
+  const cap = (x: number, y: number, dx: number, dy: number) => caps.push({ center: { x, y }, outward: { x: dx, y: dy } })
+  if (observation.dashPattern[0] === 0 && observation.dashPattern[1] === 10) dots = observation.vertices
+  else if (observation.dashPattern[0] === 0 && observation.dashPattern[1] === 15) {
+    const [, v1, v2, v3] = observation.vertices
+    dots = [v1, { x: (v2.x + v3.x) / 2, y: (v2.y + v3.y) / 2 }]
+  } else if (observation.dashPattern[0] === 10 && observation.dashPattern[1] === 10) {
+    if (observation.dashPhase === 0) {
+      cap(0, 0, -1, 0); cap(10, 0, 1, 0); cap(10, 10, 1, 0); cap(0, 10, -1, 0)
+    } else if (observation.dashPhase === .25) {
+      cap(9.75, 0, 1, 0); cap(10, 9.75, 0, -1); cap(.25, 10, -1, 0); cap(0, .25, 0, 1)
+    } else {
+      assert.equal(observation.dashPhase, -.25)
+      cap(.25, 0, -1, 0); cap(10, .25, 0, 1); cap(9.75, 10, 1, 0); cap(0, 9.75, 0, -1)
+    }
+  } else if (observation.id.startsWith('p0-')) {
+    cap(10, 5, 0, -1); cap(5, 10, -1, 0)
+  } else if (observation.id.startsWith('p1-')) {
+    cap(0, 0, -1, 0); cap(5, 0, 1, 0); cap(10, 5, 0, -1); cap(0, 10, -1, 0)
+  } else if (observation.id.startsWith('p5-') && observation.dashPhase === 0) {
+    dots = [{ x: 0, y: 10 }]
+    cap(5, 0, -1, 0); cap(10, 5, 0, 1); cap(0, 5, 0, 1); cap(0, 0, 1, 0)
+  } else if (observation.id.startsWith('p5-') && observation.dashPhase === 20) {
+    dots = [{ x: 10, y: 0 }]
+    cap(10, 5, 0, -1); cap(5, 10, -1, 0)
+  } else throw new Error(`Missing literal cap construction: ${observation.id}`)
+  return (point: { x: number; y: number }) => Math.min(fullDotDistance(point, dots, observation.width, observation.lineCap),
+    ...caps.map(({ center, outward }) => {
+      const x = point.x - center.x, y = point.y - center.y
+      const along = x * outward.x + y * outward.y, across = -x * outward.y + y * outward.x
+      if (observation.lineCap === 'square') return Math.hypot(Math.max(0, -along, along - h), Math.max(0, Math.abs(across) - h))
+      return along >= 0 ? Math.max(0, Math.hypot(along, across) - h) : Math.hypot(along, Math.max(0, Math.abs(across) - h))
+    }))
+}
+
+function checkHistoricalSquarePolicy(observation: CornerObservation) {
+  for (const [file, hash] of [[observation.svgFile, observation.svgSha256], [observation.pngFile, observation.pngSha256]]) {
+    assert.equal(createHash('sha256').update(readFileSync(new URL(file, cornerDirectory))).digest('hex'), hash)
+  }
+  const caps = createDashCaps({ kind: 'polygon', radius: 0, vertices: observation.vertices }, observation.width,
+    observation.dashPattern, observation.dashPhase, observation.lineCap)
+  const analytic = literalSquarePolicy(observation)
+  // Keep every historical probe, even when Cairo paints a terminal-only dot
+  // excluded by the retained native source or omits an outgoing start cap.
+  for (const probe of observation.probes) close(distanceToDashCaps(probe.point, caps), analytic(probe.point))
+  assert.ok(observation.probes.some(({ point }) => analytic(point) === 0))
+  assert.ok(observation.probes.some(({ point }) => analytic(point) > 6), 'genuine exterior negatives remain required')
 }
 
 test('independent corner fixture inventory retains both cap types, thin/wide paint, actual point and positive-on controls', () => {
@@ -234,51 +286,8 @@ test('independent corner fixture inventory retains both cap types, thin/wide pai
 })
 
 for (const observation of cornerRaster.observations) {
-  test(`${observation.id}: authenticated Cairo controls and explicit full-dot geometry delta`, () => {
-    for (const [file, hash] of [[observation.svgFile, observation.svgSha256], [observation.pngFile, observation.pngSha256]]) {
-      assert.equal(createHash('sha256').update(readFileSync(new URL(file, cornerDirectory))).digest('hex'), hash)
-    }
-    const solid = createPolygonStrokeRegion(observation.vertices, observation.width, observation.lineJoin)
-    const caps = createDashCaps({ kind: 'polygon', radius: 0, vertices: observation.vertices }, observation.width,
-      observation.dashPattern, observation.dashPhase, observation.lineCap)
-    const distance = (point: { x: number; y: number }) => Math.min(distanceToPolygonStroke(point, solid), distanceToDashCaps(point, caps))
-    const positives = observation.probes.filter(({ painted, alpha }) => painted && alpha >= 128)
-    assert.ok(positives.length > 0)
-    for (const probe of positives) assert.ok(distance(probe.point) <= cornerRaster.distanceUncertainty,
-      `${JSON.stringify(probe.point)} is independently painted`)
-    const xs = observation.vertices.map(({ x }) => x), ys = observation.vertices.map(({ y }) => y)
-    const contourBox = { minX: Math.min(...xs), maxX: Math.max(...xs), minY: Math.min(...ys), maxY: Math.max(...ys) }
-    const negatives = observation.probes.filter((probe) => {
-      if (probe.painted || probe.nearestPaintCenterDistance <= 6 + cornerRaster.distanceUncertainty) return false
-      const { x, y } = probe.point
-      // These selected corner probes are retained independent failure controls.
-      if (x === 25 && y === 25) return true
-      if (observation.coordinateSpace === 'production-local' && x === 20 && y === 20) return true
-      // Else require a conservative independent bound beyond the entire
-      // continuous half-width neighborhood, so a dash gap is never a miss oracle.
-      return Math.hypot(Math.max(0, contourBox.minX - x, x - contourBox.maxX),
-        Math.max(0, contourBox.minY - y, y - contourBox.maxY)) > observation.width / 2 + 6 + cornerRaster.distanceUncertainty
-    })
-    assert.ok(negatives.length > 0)
-    const dotCenters = observation.dashPattern[0] === 0 ? observation.vertices : []
-    for (const probe of negatives) assertCairoExteriorWithDotDelta(probe.point, distance(probe.point), dotCenters, observation)
-    assert.ok(negatives.some((probe) => fullDotDistance(probe.point, dotCenters, observation.width, observation.lineCap) > 6),
-      'Retain genuine exterior controls beyond the new full dots')
-    const target = observation.probes.find(({ point }) => point.x === 25 && point.y === 25)!
-    if (target.painted) close(distance(target.point), 0)
-    else if (target.nearestPaintCenterDistance > 6 + cornerRaster.distanceUncertainty) {
-      assert.equal(target.alpha, 0)
-      assertCairoExteriorWithDotDelta(target.point, distance(target.point), dotCenters, observation)
-    } else if (target.nearestPaintCenterDistance < 6 - cornerRaster.distanceUncertainty) {
-      assert.ok(distance(target.point) <= 6, 'actual paint within six units remains selectable')
-    }
-    const bounds = { minX: Math.min(solid.bounds!.minX, caps.bounds!.minX), minY: Math.min(solid.bounds!.minY, caps.bounds!.minY),
-      maxX: Math.max(solid.bounds!.maxX, caps.bounds!.maxX), maxY: Math.max(solid.bounds!.maxY, caps.bounds!.maxY) }
-    assert.ok(bounds.minX <= observation.rasterBounds.minX + cornerRaster.boundsUncertainty)
-    assert.ok(bounds.minY <= observation.rasterBounds.minY + cornerRaster.boundsUncertainty)
-    assert.ok(bounds.maxX >= observation.rasterBounds.maxX - cornerRaster.boundsUncertainty)
-    assert.ok(bounds.maxY >= observation.rasterBounds.maxY - cornerRaster.boundsUncertainty)
-    assert.ok(Math.max(caps.radius, solid.radius) >= observation.rasterRadius - cornerRaster.distanceUncertainty)
+  test(`${observation.id}: authenticated Cairo probes retain separate literal endpoint expectations`, () => {
+    checkHistoricalSquarePolicy(observation)
   })
 }
 
@@ -294,75 +303,35 @@ test('independent terminal-only dot fixture inventory retains both cap types and
 })
 
 for (const observation of terminalRaster.observations) {
-  test(`${observation.id}: terminal policy retains Cairo evidence and explicit interior full-dot delta`, () => {
-    if (observation.coordinateSpace === 'cartesian') assert.deepEqual(observation.vertices, contour.vertices)
-    assert.deepEqual(observation.dashPattern, [0, 15])
-    assert.equal(observation.dashPhase, 5)
-    assert.equal(observation.lineJoin, 'bevel')
-    for (const [file, hash] of [[observation.svgFile, observation.svgSha256], [observation.pngFile, observation.pngSha256]]) {
-      assert.equal(createHash('sha256').update(readFileSync(new URL(file, cornerDirectory))).digest('hex'), hash)
+  test(`${observation.id}: retain all Cairo terminal-dot probes without synthesizing a native terminal subpath`, () => {
+    assert.deepEqual(observation.dashPattern, [0, 15]); assert.equal(observation.dashPhase, 5)
+    checkHistoricalSquarePolicy(observation)
+    const caps = createDashCaps({ kind: 'polygon', radius: 0, vertices: observation.vertices }, observation.width,
+      observation.dashPattern, observation.dashPhase, observation.lineCap)
+    assert.equal(caps.families.length, 4, 'two interior dots, each retaining its two bounded endpoint families')
+    for (const family of caps.families) {
+      assert.equal(family.kind, 'line')
+      if (family.kind !== 'line') throw new Error('Expected polygon cap')
+      const center = { x: family.origin.x + family.first * family.tangent.x, y: family.origin.y + family.first * family.tangent.y }
+      assert.ok(Math.hypot(center.x - observation.vertices[0].x, center.y - observation.vertices[0].y) > 1,
+        'no terminal-only family at the initial vertex')
     }
-    const solid = createPolygonStrokeRegion(observation.vertices, observation.width, observation.lineJoin)
-    const caps = createDashCaps({ kind: 'polygon', radius: 0, vertices: observation.vertices }, observation.width, observation.dashPattern, observation.dashPhase, observation.lineCap)
-    // Perimeter 40 plus phase 5 reaches the next zero-on entry (45); the
-    // initial parameter is in the gap. The terminal dot uses both halves of
-    // the incoming final edge's cap, even without an initial dot to join it.
-    const lastVertex = observation.vertices.at(-1)!, firstVertex = observation.vertices[0]
-    const finalEdgeLength = Math.hypot(firstVertex.x - lastVertex.x, firstVertex.y - lastVertex.y)
-    const terminal = caps.families.filter((family) => family.kind === 'line'
-      && family.origin.x === lastVertex.x && family.origin.y === lastVertex.y
-      && Math.abs(family.first - finalEdgeLength) < 1e-10 && Math.abs(family.last - finalEdgeLength) < 1e-10)
-    assert.equal(terminal.length, 2)
-    assert.deepEqual(terminal.map(({ sign }) => sign).sort(), [-1, 1])
-    for (const family of terminal) if (family.kind === 'line') {
-      close(family.tangent.x, (firstVertex.x - lastVertex.x) / finalEdgeLength)
-      close(family.tangent.y, (firstVertex.y - lastVertex.y) / finalEdgeLength)
-    }
-    const distance = (point: { x: number; y: number }) => Math.min(distanceToPolygonStroke(point, solid), distanceToDashCaps(point, caps))
-    const positives = observation.probes.filter(({ alpha, painted }) => painted && alpha >= 128)
-    assert.ok(positives.length > 0)
-    for (const probe of positives) assert.ok(distance(probe.point) <= terminalRaster.distanceUncertainty,
-      `${JSON.stringify(probe.point)} is independently painted`)
-    // Use an independent conservative distance from the original square for
-    // exterior controls, preserving continuous stroke-neighborhood gap selection.
-    const xs = observation.vertices.map(({ x }) => x), ys = observation.vertices.map(({ y }) => y)
-    const contourBox = { minX: Math.min(...xs), maxX: Math.max(...xs), minY: Math.min(...ys), maxY: Math.max(...ys) }
-    const negatives = observation.probes.filter(({ point, painted, nearestPaintCenterDistance }) => !painted
-      && nearestPaintCenterDistance > 6 + terminalRaster.distanceUncertainty
-      && Math.hypot(Math.max(0, contourBox.minX - point.x, point.x - contourBox.maxX),
-        Math.max(0, contourBox.minY - point.y, point.y - contourBox.maxY))
-        > observation.width / 2 + 6 + terminalRaster.distanceUncertainty)
-    assert.ok(negatives.length > 0)
-    // Scalar positions 10 and 25 are interior zero-on intervals; position 40
-    // is the retained terminal policy, separately questioned by native checks.
-    const [v0, v1, v2, v3] = observation.vertices
-    const dotCenters = [v0, v1, { x: (v2.x + v3.x) / 2, y: (v2.y + v3.y) / 2 }]
-    for (const probe of negatives) assertCairoExteriorWithDotDelta(probe.point, distance(probe.point), dotCenters, observation)
-    assert.ok(negatives.some((probe) => fullDotDistance(probe.point, dotCenters, observation.width, observation.lineCap) > 6),
-      'Retain genuine exterior controls beyond the new full dots')
-    const bounds = { minX: Math.min(solid.bounds!.minX, caps.bounds!.minX), minY: Math.min(solid.bounds!.minY, caps.bounds!.minY),
-      maxX: Math.max(solid.bounds!.maxX, caps.bounds!.maxX), maxY: Math.max(solid.bounds!.maxY, caps.bounds!.maxY) }
-    assert.ok(bounds.minX <= observation.rasterBounds.minX + terminalRaster.boundsUncertainty)
-    assert.ok(bounds.minY <= observation.rasterBounds.minY + terminalRaster.boundsUncertainty)
-    assert.ok(bounds.maxX >= observation.rasterBounds.maxX - terminalRaster.boundsUncertainty)
-    assert.ok(bounds.maxY >= observation.rasterBounds.maxY - terminalRaster.boundsUncertainty)
-    assert.ok(Math.max(caps.radius, solid.radius) >= observation.rasterRadius - terminalRaster.distanceUncertainty)
   })
 }
 
-test('reported terminal square-cap paint is inside interaction geometry before adding the six-unit allowance', () => {
+test('retained Cairo terminal square paint is a documented engine difference, not a native positive', () => {
   const observation = terminalRaster.observations.find(({ id }) => id === 'cartesian-terminal-dot-36-square')!
   const probe = observation.probes.find(({ point }) => point.x === -17.96875 && point.y === -17.96875)!
   assert.ok(probe.painted && probe.alpha >= 128)
   const caps = createDashCaps(contour, 36, [0, 15], 5, 'square')
-  close(distanceToDashCaps(probe.point, caps), 0)
-  // The independent reviewer measured a former 9.96875-unit distance here.
-  // A tolerance increase or continuous bevel expansion cannot hide omission.
+  close(distanceToDashCaps(probe.point, caps), 9.96875)
+  // Retained epviae native evidence independently excludes the terminal dot.
+  // Neither the six-unit allowance nor the continuous bevel is enlarged.
   assert.ok(distanceToPolygonStroke(probe.point, createPolygonStrokeRegion(contour.vertices, 36, 'bevel')) > 6)
 })
 
 
-test('actual square point includes terminal-only dot paint in App candidates without altering the local allowance', () => {
+test('actual square point rejects both disproven terminal witnesses while retaining Cairo bytes', () => {
   const diagram = createEmptyDiagram({ ambientDimension: 2 })
   diagram.camera = { mode: '2d', scale: 1, origin: { x: 240, y: 180 } }
   const point = createPointStratum({ ambientDimension: 2, id: 'terminal-dot-square', text: '', position: { x: 0, y: 0, z: 0 } })
@@ -386,8 +355,8 @@ test('actual square point includes terminal-only dot paint in App candidates wit
   for (const local of [{ x: 21, y: -21 }, { x: 22, y: -22 }]) {
     const probe = reference.probes.find(({ point }) => point.x === local.x && point.y === local.y)!
     assert.equal(probe.alpha, 255)
-    close(distanceToDashCaps(local, layout.dashCaps), 0)
-    assert.equal(picked(local), true)
+    close(distanceToDashCaps(local, layout.dashCaps), local.x - 13)
+    assert.equal(picked(local), false)
   }
   assert.equal(picked({ x: 0, y: 0 }), true)
   assert.equal(picked({ x: 45, y: -45 }), false)
@@ -434,42 +403,10 @@ test('independent generalized-seam inventory preserves eight reviewer pairs and 
 })
 
 for (const observation of seamRaster.observations) {
-  test(`${observation.id}: generalized seam retains Cairo probes with explicit isolated-dot delta`, () => {
+  test(`${observation.id}: all retained generalized-seam probes receive independent literal endpoint checks`, () => {
     assert.deepEqual(observation.vertices, contour.vertices)
-    assert.equal(observation.width, 36)
-    assert.equal(observation.lineJoin, 'bevel')
-    for (const [file, hash] of [[observation.svgFile, observation.svgSha256], [observation.pngFile, observation.pngSha256]]) {
-      assert.equal(createHash('sha256').update(readFileSync(new URL(file, cornerDirectory))).digest('hex'), hash)
-    }
-    const solid = createPolygonStrokeRegion(observation.vertices, observation.width, observation.lineJoin)
-    const caps = createDashCaps(contour, observation.width, observation.dashPattern, observation.dashPhase, observation.lineCap)
-    const distance = (point: { x: number; y: number }) => Math.min(distanceToPolygonStroke(point, solid), distanceToDashCaps(point, caps))
-    const positives = observation.probes.filter(({ painted, alpha }) => painted && alpha >= 128)
-    assert.ok(positives.some(({ continuousStrokeDistance }) => continuousStrokeDistance > seamRaster.distanceUncertainty))
-    for (const probe of positives) assert.ok(distance(probe.point) <= seamRaster.distanceUncertainty,
-      `${JSON.stringify(probe.point)} is independently painted (${probe.reason})`)
-    // The literal octagon distance comes from the independent generator, not
-    // either production geometry helper. Requiring both distances preserves
-    // intentional continuous-stroke selection through native dash gaps.
-    const negatives = observation.probes.filter(({ painted, nearestPaintCenterDistance, continuousStrokeDistance }) => !painted
-      && nearestPaintCenterDistance > 6 + seamRaster.distanceUncertainty
-      && continuousStrokeDistance > 6 + seamRaster.distanceUncertainty)
-    assert.ok(negatives.length > 0)
-    // The p5 pattern's isolated interior dots occur at scalar 30 (phase 0)
-    // or 10 (phase 20). Positive intervals and the seam policy are unchanged.
-    const dotCenters = observation.id.startsWith('p5-')
-      ? [contour.vertices[observation.dashPhase === 0 ? 3 : 1]] : []
-    for (const probe of negatives) assertCairoExteriorWithDotDelta(probe.point, distance(probe.point), dotCenters, observation)
-    assert.ok(negatives.some((probe) => fullDotDistance(probe.point, dotCenters, observation.width, observation.lineCap) > 6),
-      'Retain genuine exterior controls beyond the new full dots')
+    checkHistoricalSquarePolicy(observation)
     const corner = observation.probes.find(({ point }) => point.x === -28 && point.y === -28)!
     close(corner.continuousStrokeDistance, 38 / Math.SQRT2)
-    const bounds = { minX: Math.min(solid.bounds!.minX, caps.bounds!.minX), minY: Math.min(solid.bounds!.minY, caps.bounds!.minY),
-      maxX: Math.max(solid.bounds!.maxX, caps.bounds!.maxX), maxY: Math.max(solid.bounds!.maxY, caps.bounds!.maxY) }
-    assert.ok(bounds.minX <= observation.rasterBounds.minX + seamRaster.boundsUncertainty)
-    assert.ok(bounds.minY <= observation.rasterBounds.minY + seamRaster.boundsUncertainty)
-    assert.ok(bounds.maxX >= observation.rasterBounds.maxX - seamRaster.boundsUncertainty)
-    assert.ok(bounds.maxY >= observation.rasterBounds.maxY - seamRaster.boundsUncertainty)
-    assert.ok(Math.max(solid.radius, caps.radius) >= observation.rasterRadius - seamRaster.distanceUncertainty)
   })
 }

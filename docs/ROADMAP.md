@@ -1783,6 +1783,11 @@ The cumulative acceptance gate retains 16 groups, 29 scenarios and all 605 prior
 artifacts. The zero-length follow-up adds explicit painted witnesses and a
 supplemental native mechanism matrix, bringing the minimum to 705 artifacts;
 accepted pre-fix evidence cannot verify these later changes.
+The [native endpoint continuation](PHASE_32B_NATIVE_ENDPOINT_INVESTIGATION.md)
+retains those artifacts and extends the minimum to 856: 22 App entries with
+14 complete square audits and 21 supplemental entries, including independent
+live-paint checks for the retained raster/containment contradictions. The
+subphase remains incomplete pending matching parent verification and review.
 
 | Subphase | Responsibility |
 | --- | --- |
