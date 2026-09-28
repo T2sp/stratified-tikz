@@ -265,3 +265,198 @@ test('DOM observer distinguishes node replacement, records frame/lifecycle progr
   assert.equal(cleared, true)
   assert.equal(observer.snapshot().frames.stopped, true)
 })
+
+function nativeControlDocument(nativeControls = true) {
+  const eventTarget = () => {
+    const listeners = new Map()
+    return { listeners, addEventListener(name, callback) { listeners.set(name, callback) },
+      removeEventListener(name, callback) { assert.equal(listeners.get(name), callback); listeners.delete(name) } }
+  }
+  const element = (tag, attributes = {}) => ({ localName: tag, id: '', isConnected: true, parentElement: null,
+    type: '', labels: [], value: '', checked: false, disabled: false, textContent: '',
+    getAttribute: (name) => attributes[name] ?? null, getBoundingClientRect: rectangle,
+    getAnimations: () => [], matches(selector) { assert.equal(selector, ':disabled'); return this.disabled },
+    scrollLeft: 0, scrollTop: 17, scrollWidth: 300, scrollHeight: 1200, clientWidth: 300, clientHeight: 200 })
+  const source = element('article', { class: 'source-panel' })
+  const makeControl = (name, type = 'checkbox') => {
+    const label = element('label'), input = element(type === 'select-one' ? 'select' : 'input', type === 'number' ? { 'aria-label': name } : {})
+    label.textContent = name; label.parentElement = source
+    input.type = type; input.labels = [label]; input.parentElement = label
+    return input
+  }
+  const visibility = makeControl('Enable approximate 3D visibility'), sort = makeControl('Auto depth-sort surfaces'),
+    axes = makeControl('Show xyz axes in TikZ output'), mode = makeControl('TikZ export mode: standalone inlineMath', 'select-one')
+  visibility.checked = true; sort.checked = false; axes.checked = true; mode.value = 'standalone'
+  const controls = [visibility, sort, axes, mode, ...['theta', 'phi', 'zoom', 'pan x', 'pan y'].map((name) => makeControl(`${name} value`, 'number'))]
+  let stateCalls = 0, frame, cancelled = 0, cleared = 0, revision = 5
+  const api = { state: () => { stateCalls++; return { labelDocumentRevision: revision,
+    json: JSON.stringify({ diagram: { ambientDimension: 3, strata: [{ id: 'point' }], labels: [] } }),
+    history: JSON.stringify({ past: [{}], present: {}, future: [{}, {}] }), selection: { kind: 'stratum', id: 'app-point' },
+    uiSettings: JSON.stringify({ exportMode: mode.value, visibility: { enabled: visibility.checked, surfaceDepthSort: sort.checked } }) } } }
+  const window = { ...eventTarget(), __stzOwnedAppDocument: { generation: 'owned', api }, stzAppLabels: api,
+    innerWidth: 1600, innerHeight: 1200, devicePixelRatio: 1, scrollX: 0, scrollY: 19 }
+  const document = { ...eventTarget(), readyState: 'complete', visibilityState: 'visible', hasFocus: () => true,
+    documentElement: { clientWidth: 1600, clientHeight: 1200 }, activeElement: sort,
+    querySelector: (selector) => selector === '.source-panel' ? source : null,
+    querySelectorAll: (selector) => selector === 'input[type="checkbox"], select, input[type="number"]' ? controls : [],
+    elementsFromPoint: () => [visibility, visibility.parentElement, source] }
+  const location = { href: 'http://localhost/app' }
+  const globals = { window, document, location, performance, Date, WeakMap,
+    getComputedStyle: () => ({ overflowY: 'auto', scrollBehavior: 'auto', pointerEvents: 'auto' }),
+    requestAnimationFrame(callback) { frame = callback; return 1 }, cancelAnimationFrame() { cancelled++ },
+    setTimeout: () => 2, clearTimeout() { cleared++ }, argument: { limits: appGeometryLimits, nativeControls } }
+  runInNewContext(`(${installAppGeometryObserver.toString()})(argument)`, globals)
+  return { window, document, controls, visibility, sort, mode, location, api, source, element,
+    observer: window.__stzAppGeometryDiagnostics, frame: (at) => frame(at),
+    get stateCalls() { return stateCalls }, get cancelled() { return cancelled }, get cleared() { return cleared },
+    advanceRevision() { revision++ } }
+}
+
+test('native-control state, exact associated labels, layout and hit evidence are opt-in and read-only', () => {
+  const inactive = nativeControlDocument(false)
+  assert.equal(inactive.observer.snapshot().nativeControls, undefined)
+  assert.equal(inactive.stateCalls, 0)
+  assert.equal(inactive.document.listeners.has('change'), false)
+  inactive.observer.stop()
+  const fixture = nativeControlDocument()
+  const evidence = fixture.observer.snapshot().nativeControls
+  assert.equal(fixture.stateCalls, 1)
+  assert.equal(evidence.state.labelDocumentRevision, 5)
+  assert.equal(evidence.state.model.ambientDimension, 3)
+  assert.equal(evidence.state.model.strataCount, 1)
+  assert.equal(evidence.state.model.freeLabelCount, 0)
+  assert.equal(evidence.state.history.pastCount, 1)
+  assert.equal(evidence.state.history.futureCount, 2)
+  assert.equal(evidence.state.selection.kind, 'stratum')
+  assert.equal(evidence.state.selection.id, 'app-point')
+  assert.equal(JSON.parse(evidence.state.uiSettings.text).visibility.enabled, true)
+  const visibility = evidence.controls[0]
+  assert.equal(visibility.matchCount, 1)
+  assert.equal(visibility.matches[0].checked, true)
+  assert.equal(visibility.matches[0].enabled, true)
+  assert.equal(visibility.matches[0].connected, true)
+  assert.equal(visibility.matches[0].labels[0], 'Enable approximate 3D visibility')
+  assert.equal(visibility.matches[0].associatedLabels[0].tag, 'label')
+  assert.equal(visibility.matches[0].hitTest.targets[0].id, visibility.matches[0].id)
+  assert.equal(evidence.ancestors[0].scroll.top, 17)
+  assert.equal(evidence.ancestors[0].layout.overflowY, 'auto')
+  assert.equal(evidence.activeFocus.id, evidence.controls[1].matches[0].id)
+  assert.equal(evidence.controls[3].matches[0].value, 'standalone')
+  assert.equal(evidence.controls[4].name, 'theta value')
+  fixture.observer.stop()
+})
+
+test('native-control state call is guarded against missing/replaced API, document generation and URL', () => {
+  for (const change of [
+    (fixture) => { fixture.window.stzAppLabels = undefined },
+    (fixture) => { fixture.window.stzAppLabels = { state() { assert.fail('replacement state must not be called') } } },
+    (fixture) => { fixture.window.__stzOwnedAppDocument.generation = 'replacement' },
+    (fixture) => { fixture.location.href = 'http://localhost/another-app' },
+  ]) {
+    const fixture = nativeControlDocument()
+    change(fixture)
+    const evidence = fixture.observer.snapshot().nativeControls
+    assert.equal(evidence.state.status, 'unavailable')
+    assert.match(evidence.state.reason, /continuity lost/)
+    assert.equal(fixture.stateCalls, 0)
+    assert.equal(evidence.controls[0].matchCount, 1, 'DOM evidence survives API continuity loss')
+    fixture.observer.stop()
+  }
+})
+
+test('native-control frames and trusted events retain bounded movement/state observations and release listeners', () => {
+  const fixture = nativeControlDocument()
+  let parent = fixture.source
+  for (let i = 0; i < appGeometryLimits.ancestors; i++) { parent.parentElement = fixture.element('div'); parent = parent.parentElement }
+  const first = fixture.observer.snapshot().nativeControls.controls[0].matches[0].id
+  for (let i = 0; i < 100; i++) {
+    fixture.visibility.getBoundingClientRect = () => ({ ...rectangle(), x: i, left: i })
+    fixture.window.scrollY = i
+    fixture.frame(i * 100)
+    fixture.visibility.checked = i % 2 === 0
+    fixture.document.listeners.get('input')({ target: fixture.visibility, isTrusted: true })
+    fixture.document.listeners.get('change')({ target: fixture.visibility, isTrusted: true })
+  }
+  fixture.advanceRevision()
+  const evidence = fixture.observer.snapshot().nativeControls
+  assert.equal(fixture.stateCalls, 2, 'rAF and event listeners never invoke state')
+  assert.equal(evidence.frames.samples.length, appGeometryLimits.controlFrames)
+  assert.equal(evidence.frames.dropped, 100 - appGeometryLimits.controlFrames)
+  assert.equal(evidence.frames.samples.at(-1).controls[0].matches[0].rect.x, 99)
+  assert.equal(evidence.frames.samples.at(-1).controls[0].matches[0].id, first)
+  assert.equal(evidence.frames.samples.at(-1).scroll.y, 99)
+  assert.equal(evidence.frames.samples.at(-1).delta, 100)
+  assert.equal(evidence.events.samples.length, appGeometryLimits.controlEvents)
+  assert.equal(evidence.events.dropped, 200 - appGeometryLimits.controlEvents)
+  assert.equal(evidence.events.samples.at(-1).event, 'change')
+  assert.equal(evidence.events.samples.at(-1).trusted, true)
+  assert.equal(evidence.events.samples.at(-1).checked, false)
+  assert.equal(evidence.state.labelDocumentRevision, 6)
+  assert.equal(evidence.ancestors.length, appGeometryLimits.ancestors)
+  assert.equal(evidence.controls.length, 9)
+  assert.equal(evidence.controls[0].matches[0].ancestorsTruncated, true)
+  assert.ok(evidence.controls[1].matches[0].ancestors.length > 0, 'Shared scroll ancestors survive exhausted deduplicated-node budget')
+  assert.ok(JSON.stringify(fixture.observer.snapshot()).length < appGeometryLimits.recordBytes)
+  fixture.observer.stop()
+  assert.equal(fixture.document.listeners.size, 0)
+  assert.equal(fixture.window.listeners.size, 0)
+  assert.equal(fixture.cancelled, 1)
+  assert.ok(fixture.cleared > 0)
+})
+
+test('native-control scans/matches and serialized state clipping explicitly report evidence limits', () => {
+  const fixture = nativeControlDocument()
+  for (let i = 0; i < appGeometryLimits.controlScan + 20; i++) fixture.controls.push(fixture.visibility)
+  fixture.api.state = () => ({ uiSettings: 'x'.repeat(5000), json: 'x'.repeat(appGeometryLimits.stateParse + 1),
+    history: 'x'.repeat(appGeometryLimits.stateParse + 1), selection: 'x'.repeat(900), labelDocumentRevision: 5 })
+  const evidence = fixture.observer.snapshot().nativeControls
+  assert.equal(evidence.scan.truncated, true)
+  assert.equal(evidence.scan.scanned, appGeometryLimits.controlScan)
+  assert.ok(evidence.controls[0].matchCount > appGeometryLimits.controlMatches)
+  assert.equal(evidence.controls[0].matches.length, appGeometryLimits.controlMatches)
+  assert.equal(evidence.state.status, 'available')
+  assert.equal(evidence.state.uiSettings.length, 5000)
+  assert.equal(evidence.state.uiSettings.text.length, 4000)
+  assert.equal(evidence.state.uiSettings.truncated, true)
+  assert.equal(evidence.state.model.summaryOmitted, true)
+  assert.equal(evidence.state.history.summaryOmitted, true)
+  fixture.api.state = () => ({ selection: null })
+  assert.equal(fixture.observer.snapshot().nativeControls.state.selection, null)
+  fixture.api.state = () => ({ selection: { kind: 'multi', elements: Array.from({ length: 12 }, () => ({ kind: 'label', id: 'x'.repeat(1000) })) } })
+  const selection = fixture.observer.snapshot().nativeControls.state.selection
+  assert.equal(selection.kind, 'multi')
+  assert.equal(selection.count, 12)
+  assert.equal(selection.elements.length, 8)
+  assert.equal(selection.elements[0].id.length, 300)
+  assert.equal(selection.truncated, true)
+  fixture.observer.stop()
+})
+
+test('native-control opt-in reaches browser install and a timed-out failure capture retains the original call log', async (context) => {
+  const artifactDir = await directory(context)
+  const primary = new Error('locator.uncheck: Timeout 30000ms exceeded.\nCall log:\n  scrolling into view if needed')
+  primary.log = ['locator resolved to <input type="checkbox"/>', 'scrolling into view if needed']
+  let unavailable = false, rejectLate, installed
+  const page = new Page((callback, argument) => {
+    if (callback.name === 'installAppGeometryObserver') { installed = argument; return {} }
+    if (unavailable && callback.name === 'readAppGeometryObserver') return new Promise((_resolve, reject) => { rejectLate = reject })
+    return snapshot()
+  })
+  const diagnostics = createAppGeometryDiagnostics({ page, artifactDir, timeoutMs: 10, nativeControls: true })
+  await diagnostics.install()
+  assert.equal(installed.nativeControls, true)
+  await assert.rejects(diagnostics.around('3d:standalone:visibility-off', async () => {
+    unavailable = true; throw primary
+  }, { ambientDimension: 3, mode: 'standalone' }), (error) => error === primary)
+  await diagnostics.failure(primary)
+  await diagnostics.dispose()
+  const index = JSON.parse(await readFile(join(artifactDir, 'app-geometry-index.json'), 'utf8'))
+  assert.equal(index.failure.error.message, primary.message)
+  assert.equal(index.failure.error.stack, primary.stack)
+  assert.deepEqual(index.failure.error.log, primary.log)
+  assert.equal(index.failure.error.logTruncated, false)
+  assert.equal(index.index.at(-1).status, 'unavailable')
+  assert.equal(page.listenerCount('pageerror'), 0)
+  rejectLate(new Error('late native-control capture transport error'))
+  await new Promise((done) => setImmediate(done))
+})

@@ -2911,3 +2911,16 @@ authorized parent runner, with no permission change or relaxed assertion.
 Baseline lint debt and the existing bundle-size warning remain separate from
 new failures. 32B remains incomplete until all five commands and independent
 review pass on the same final identity. No commit/push or 32C/32D work is done.
+
+## Native visibility control timeout investigation (2026-09-28)
+
+The latest parent `UThawr` reached Chrome and failed the native point App's
+visibility `uncheck()` during scrolling, after completing the inline 3D reload
+and downloading the standalone document. Its cause remains unproven. The
+[targeted investigation](PHASE_32B_NATIVE_VISIBILITY_INVESTIGATION.md) separates
+that failure from earlier startup/stability/lifecycle failures and documents
+bounded actual-page observations, explicit pre-reload settings assertions and
+the focused reproduction entry point. Production geometry/layout and native
+actions are unchanged. Current checkbox and dash-cap acceptance remain pending;
+final exact identity, executed results and review live in the external visibility
+handoff so verification does not modify the checkout.

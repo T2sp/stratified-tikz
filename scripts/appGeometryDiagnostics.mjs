@@ -4,14 +4,20 @@ import { resolve } from 'node:path'
 import { boundedPointDiagnostic } from './pointCheckDiagnostics.mjs'
 
 export const appGeometryLimits = Object.freeze({ samples: 1024, events: 128, ancestors: 12,
-  animations: 16, monitorSamples: 8, recordBytes: 64_000, string: 4000 })
+  animations: 16, monitorSamples: 8, recordBytes: 64_000, string: 4000,
+  controlFrames: 24, controlEvents: 32, controlScan: 512, controlMatches: 2, hitTargets: 4, stateParse: 256_000 })
 const observerKey = '__stzAppGeometryDiagnostics'
 const clipped = (value, limit = 4000) => String(value ?? '').slice(0, limit)
-const errorDetails = (error) => ({ message: clipped(error?.message ?? error), stack: clipped(error?.stack, 12_000) })
+const errorDetails = (error) => ({ message: clipped(error?.message ?? error), stack: clipped(error?.stack, 12_000),
+  ...(Array.isArray(error?.log) ? { log: error.log.slice(0, 64).map((line) => clipped(line, 500)),
+    logTruncated: error.log.length > 64 || error.log.some((line) => String(line).length > 500) } :
+    error?.log !== undefined ? { log: clipped(error.log), logTruncated: String(error.log).length > 4000 } : {}),
+  messageTruncated: String(error?.message ?? error).length > 4000, stackTruncated: String(error?.stack ?? '').length > 12_000 })
 
-/** This observer reads the actual DOM, never the fixture state/geometry API.
+/** DOM observation is always available. Optional native-control evidence reads
+ * state only from the original owned document/API; it never calls geometry APIs.
  * Node identities are document-local, so replacement and movement differ. */
-export function installAppGeometryObserver({ key = '__stzAppGeometryDiagnostics', limits }) {
+export function installAppGeometryObserver({ key = '__stzAppGeometryDiagnostics', limits, nativeControls = false }) {
   if (window[key]) throw new Error('App geometry observer is already installed; do not reacquire a replaced document')
   const nodes = new WeakMap(), events = [], listeners = []
   let nodeIndex = 0, frames = 0, lastFrame = null, raf = null, stopped = false, droppedEvents = 0, lease
@@ -36,7 +42,26 @@ export function installAppGeometryObserver({ key = '__stzAppGeometryDiagnostics'
   }
   for (const event of ['visibilitychange', 'freeze', 'resume']) listen(document, event)
   for (const event of ['pagehide', 'pageshow']) listen(window, event)
-  const tick = (at) => { frames++; lastFrame = at; if (!stopped) raf = requestAnimationFrame(tick) }
+  const controlFrames = [], controlEvents = []
+  let droppedControlFrames = 0, droppedControlEvents = 0, lastControlFrame = null
+  const tick = (at) => {
+    const delta = lastFrame === null ? null : at - lastFrame
+    frames++; lastFrame = at
+    if (nativeControls && (lastControlFrame === null || at - lastControlFrame >= 100)) {
+      lastControlFrame = at
+      // Sampling never calls state(). This is a finite ring, not a readiness
+      // wait, and timestamps distinguish observed frame gaps from wall time.
+      try {
+        controlFrames.push({ wall: Date.now(), monotonic: performance.now(), frame: at, delta,
+          scroll: { x: window.scrollX, y: window.scrollY }, controls: findControls().groups.slice(0, 3)
+            .map(({ name, matches }) => ({ name, matches: matches.slice(0, limits.controlMatches)
+              .map((element) => ({ id: identity(element), connected: element.isConnected,
+                checked: element.checked, rect: compactRect(element.getBoundingClientRect()) })) })) })
+        if (controlFrames.length > limits.controlFrames) { controlFrames.shift(); droppedControlFrames++ }
+      } catch (error) { add(`control-frame-unavailable: ${text(error?.message ?? error)}`) }
+    }
+    if (!stopped) raf = requestAnimationFrame(tick)
+  }
   const stop = () => {
     if (stopped) return
     stopped = true; cancelAnimationFrame(raf); clearTimeout(lease)
@@ -48,20 +73,128 @@ export function installAppGeometryObserver({ key = '__stzAppGeometryDiagnostics'
   const renew = () => { clearTimeout(lease); if (!stopped) lease = setTimeout(stop, 120_000) }
   const rect = (value) => ({ x: value.x, y: value.y, width: value.width, height: value.height,
     top: value.top, right: value.right, bottom: value.bottom, left: value.left })
+  const compactRect = (value) => ({ x: value.x, y: value.y, width: value.width, height: value.height })
   const matrix = (value) => value ? { a: value.a, b: value.b, c: value.c, d: value.d, e: value.e, f: value.f } : null
+  const identity = (element) => {
+    if (!nodes.has(element)) nodes.set(element, ++nodeIndex)
+    return nodes.get(element)
+  }
   const node = (element) => {
     if (!element) return null
-    if (!nodes.has(element)) nodes.set(element, ++nodeIndex)
+    identity(element)
     const style = getComputedStyle(element)
     const layout = Object.fromEntries(['display', 'visibility', 'position', 'width', 'height', 'minWidth', 'minHeight',
       'maxWidth', 'maxHeight', 'overflow', 'overflowX', 'overflowY', 'scrollBehavior', 'transform', 'transformOrigin',
       'transitionProperty', 'transitionDuration', 'transitionDelay', 'animationName', 'animationDuration',
-      'animationPlayState', 'contain', 'contentVisibility'].map((name) => [name, text(style[name])]))
+      'animationPlayState', 'contain', 'contentVisibility', 'pointerEvents', 'zIndex', 'opacity'].map((name) => [name, text(style[name])]))
     return { id: nodes.get(element), tag: element.localName, domId: text(element.id), class: text(element.getAttribute('class')),
       connected: element.isConnected, rect: rect(element.getBoundingClientRect()),
       screenCTM: typeof element.getScreenCTM === 'function' ? matrix(element.getScreenCTM()) : null,
       scroll: { left: element.scrollLeft, top: element.scrollTop, width: element.scrollWidth, height: element.scrollHeight,
         clientWidth: element.clientWidth, clientHeight: element.clientHeight }, layout }
+  }
+  const controlNames = ['Enable approximate 3D visibility', 'Auto depth-sort surfaces', 'Show xyz axes in TikZ output',
+    'TikZ export mode:', 'theta value', 'phi value', 'zoom value', 'pan x value', 'pan y value']
+  const normalizeLabel = (value) => String(value ?? '').slice(0, limits.string).replace(/\s+/g, ' ').trim()
+  const controlLabels = (element) => [element.getAttribute('aria-label'),
+    ...Array.from(element.labels ?? []).slice(0, 4).map((label) => label.textContent)]
+    .filter((value) => value !== null && value !== undefined).map(normalizeLabel)
+  const matchesName = (labels, name) => labels.some((label) => name === 'TikZ export mode:' ? label.startsWith(name) : label === name)
+  const findControls = () => {
+    const candidates = document.querySelectorAll('input[type="checkbox"], select, input[type="number"]')
+    const groups = controlNames.map((name) => ({ name, count: 0, matches: [] }))
+    for (let i = 0; i < Math.min(candidates.length, limits.controlScan); i++) {
+      const element = candidates[i], labels = controlLabels(element)
+      for (const group of groups) if (matchesName(labels, group.name)) {
+        group.count++
+        if (group.matches.length < limits.controlMatches) group.matches.push(element)
+      }
+    }
+    return { groups, scanned: Math.min(candidates.length, limits.controlScan), totalCandidates: candidates.length,
+      truncated: candidates.length > limits.controlScan }
+  }
+  const stateEvidence = () => {
+    try { assertOwnership() } catch (error) { return { status: 'unavailable', reason: text(error.message) } }
+    try {
+      const state = expected.api.state()
+      // Strings are summarized/clipped with their original lengths explicit.
+      // Large documents/history are never parsed by this diagnostic observer.
+      const serialized = (value, max = 800) => ({ type: typeof value, length: typeof value === 'string' ? value.length : null,
+        text: String(value ?? '').slice(0, max), truncated: typeof value === 'string' && value.length > max })
+      const selection = (value) => {
+        if (value === null || value === undefined) return null
+        if (typeof value !== 'object') return serialized(value)
+        const single = (item) => ({ kind: text(item?.kind).slice(0, 100), id: text(item?.id).slice(0, 300) })
+        return { ...single(value), ...(Array.isArray(value.elements) ? { count: value.elements.length,
+          elements: value.elements.slice(0, 8).map(single), truncated: value.elements.length > 8 } : {}) }
+      }
+      const parse = (value) => typeof value === 'string' && value.length <= limits.stateParse ? JSON.parse(value) : null
+      const documentValue = parse(state.json), history = parse(state.history), diagram = documentValue?.diagram
+      return { status: 'available', labelDocumentRevision: state.labelDocumentRevision,
+        uiSettings: serialized(state.uiSettings, 4000), selection: selection(state.selection),
+        model: { ...serialized(state.json), ambientDimension: diagram?.ambientDimension ?? null,
+          strataCount: Array.isArray(diagram?.strata) ? diagram.strata.length : null,
+          freeLabelCount: Array.isArray(diagram?.labels) ? diagram.labels.length : null,
+          summaryOmitted: diagram === undefined || diagram === null },
+        history: { ...serialized(state.history, 400), pastCount: history?.past?.length ?? null,
+          futureCount: history?.future?.length ?? null, summaryOmitted: history === null } }
+    } catch (error) { return { status: 'unavailable', reason: text(error?.message ?? error) } }
+  }
+  const nativeSnapshot = () => {
+    const found = findControls(), ancestorNodes = new Map()
+    // Keep the native extension inside the existing record budget even when
+    // the fixture has both SVG ancestors and expanded camera controls.
+    const controlNode = (element) => {
+      const value = node(element)
+      return { id: value.id, tag: value.tag, domId: value.domId, class: value.class.slice(0, 200),
+        connected: value.connected, rect: value.rect, scroll: value.scroll,
+        layout: Object.fromEntries(['display', 'visibility', 'position', 'overflowX', 'overflowY', 'scrollBehavior',
+          'transform', 'transitionProperty', 'transitionDuration', 'animationName', 'animationDuration', 'contain',
+          'contentVisibility', 'pointerEvents', 'zIndex', 'opacity'].map((name) => [name, value.layout[name].slice(0, 200)])) }
+    }
+    const brief = (element) => element ? { id: identity(element), tag: text(element.localName), domId: text(element.id),
+      class: text(element.getAttribute('class')).slice(0, 200), role: text(element.getAttribute('role')).slice(0, 100),
+      connected: element.isConnected, rect: compactRect(element.getBoundingClientRect()) } : null
+    const controls = found.groups.map(({ name, count, matches }) => ({ name, matchCount: count,
+      matches: matches.map((element) => {
+        const ancestors = []; let parent = element.parentElement, depth = 0, omittedAncestors = 0
+        while (parent && depth++ < limits.ancestors) {
+          const id = identity(parent)
+          if (!ancestorNodes.has(id) && ancestorNodes.size < limits.ancestors) ancestorNodes.set(id, controlNode(parent))
+          if (ancestorNodes.has(id)) ancestors.push(id)
+          else omittedAncestors++
+          parent = parent.parentElement
+        }
+        const bounds = element.getBoundingClientRect(), x = bounds.x + bounds.width / 2, y = bounds.y + bounds.height / 2
+        const inViewport = x >= 0 && y >= 0 && x < window.innerWidth && y < window.innerHeight
+        const hits = inViewport && typeof document.elementsFromPoint === 'function' ? document.elementsFromPoint(x, y) : []
+        return { ...controlNode(element), labels: controlLabels(element).map((label) => label.slice(0, 300)),
+          type: text(element.type), value: text(element.value).slice(0, 300), checked: element.type === 'checkbox' ? element.checked : null,
+          enabled: !element.matches(':disabled'), ancestors, ancestorsTruncated: !!parent || omittedAncestors > 0,
+          associatedLabels: Array.from(element.labels ?? []).slice(0, 2).map(brief),
+          hitTest: { x, y, inViewport, targets: hits.slice(0, limits.hitTargets).map(brief), truncated: hits.length > limits.hitTargets } }
+      }) }))
+    return { state: stateEvidence(), controls, scan: { scanned: found.scanned, totalCandidates: found.totalCandidates, truncated: found.truncated },
+      ancestors: [...ancestorNodes.values()], activeFocus: brief(document.activeElement),
+      nearby: ['.source-panel', '.copy-controls', '.tikz-export-help', '.camera-panel'].map((selector) => ({ selector, node: brief(document.querySelector(selector)) })),
+      frames: { samples: controlFrames.slice(), dropped: droppedControlFrames, intervalMs: 100 },
+      events: { samples: controlEvents.slice(), dropped: droppedControlEvents } }
+  }
+  if (nativeControls) {
+    for (const event of ['input', 'change']) {
+      const callback = (eventValue) => {
+        const element = eventValue.target
+        if (!element || typeof element.getAttribute !== 'function') return
+        const labels = controlLabels(element), names = controlNames.filter((name) => matchesName(labels, name))
+        if (!names.length) return
+        controlEvents.push({ event, trusted: eventValue.isTrusted, wall: Date.now(), monotonic: performance.now(),
+          names, nodeId: identity(element), connected: element.isConnected,
+          checked: element.type === 'checkbox' ? element.checked : null, value: text(element.value).slice(0, 300) })
+        if (controlEvents.length > limits.controlEvents) { controlEvents.shift(); droppedControlEvents++ }
+      }
+      document.addEventListener(event, callback, true)
+      listeners.push(() => document.removeEventListener(event, callback, true))
+    }
   }
   const snapshot = () => {
     renew()
@@ -105,7 +238,7 @@ export function installAppGeometryObserver({ key = '__stzAppGeometryDiagnostics'
         expanded: document.querySelector('.camera-summary-toggle')?.getAttribute('aria-expanded') ?? null,
         fields: Array.from(document.querySelectorAll('input[aria-label^="pan "]')).slice(0, 3)
           .map((input) => ({ name: text(input.getAttribute('aria-label')), value: text(input.value), rect: rect(input.getBoundingClientRect()) })) },
-      animations }
+      animations, ...(nativeControls ? { nativeControls: nativeSnapshot() } : {}) }
   }
   Object.defineProperty(window, key, { value: { snapshot, stop, assertOwnership }, configurable: false })
   add('observer-installed'); raf = requestAnimationFrame(tick); renew()
@@ -243,7 +376,7 @@ function boundedDetails(value, depth = 0, budget = { bytes: 16_000 }) {
 
 /** Evidence only: diagnostic failure never turns a primary operation failure
  * into a screenshot/read/close error, nor counts as geometry acceptance. */
-export function createAppGeometryDiagnostics({ page, artifactDir, timeoutMs = 2000, prefix = 'app-geometry' }) {
+export function createAppGeometryDiagnostics({ page, artifactDir, timeoutMs = 2000, prefix = 'app-geometry', nativeControls = false }) {
   if (!Number.isFinite(timeoutMs) || timeoutMs <= 0 || timeoutMs > 10_000) throw new Error('App diagnostic timeout must be in (0, 10000]')
   if (!/^[a-z0-9-]+$/i.test(prefix)) throw new Error('Invalid App diagnostic artifact prefix')
   const events = [], index = [], listeners = [], diagnosticErrors = []
@@ -333,7 +466,7 @@ export function createAppGeometryDiagnostics({ page, artifactDir, timeoutMs = 20
   return {
     capture, around,
     async install() {
-      const installed = await evaluate(installAppGeometryObserver, { key: observerKey, limits: appGeometryLimits })
+      const installed = await evaluate(installAppGeometryObserver, { key: observerKey, limits: appGeometryLimits, nativeControls })
       note('observer-installed', installed); await persist(); return installed
     },
     async failure(error, details = {}) {
