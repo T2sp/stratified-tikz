@@ -1,12 +1,13 @@
 # Phase 32B: Independent point paint and imported styles
 
-Latest continuation: [connected live paint and proposed bounded acceptance](PHASE_32B_LIVE_PAINT_ACCEPTANCE.md).
-The `pF6DA7` parent reached Chrome, passed tests/build/diff/label-assets, and
-failed free-labels after attempting all 22 App and 21 supplemental dash entries.
-Two square interaction expectations used an inappropriate clone-paint oracle;
-the literal full-closed triangle retains a real discrepancy. The proposed
-`stz-32b-core-v1` scope is not adopted. Strict acceptance remains failed; fresh
-matching parent verification and independent review are still required.
+Latest continuation: [connected capture isolation](PHASE_32B_LIVE_PAINT_ACCEPTANCE.md#targeted-capture-isolation-continuation).
+The `gHadrw` parent reached Chrome, passed tests/build/diff/label-assets, and
+failed free-labels with 18/22 App and 20/21 supplemental entries passed.
+Four App captures stopped at root-level tooltip contamination; the literal
+full-closed triangle retains a separate real discrepancy. This continuation
+isolates capture presentation and retains failure metadata. The proposed
+`stz-32b-core-v1` scope is not adopted. Bounded native transfer, fresh complete
+matching parent verification and independent review remain required.
 
 Status: 32B remains incomplete until matching final verification and independent
 review succeed. The `AsZusl` parent passed all five commands, 16 cumulative
@@ -2974,3 +2975,18 @@ negatives. Original evidence bytes, visibility progress and all earlier
 acceptance requirements remain preserved. Final matching verification and
 fresh independent review remain required, with results recorded externally at
 `/private/tmp/stz-phase32b-endpoint-followup/`.
+
+
+## Connected capture isolation follow-up (2026-09-28)
+
+The real `gHadrw` parent reached Chrome: 18/22 App and 20/21 supplemental
+entries passed. Four responsive App screenshots were correctly rejected for
+root-level tooltip contamination before magnified captures or corrected pointer
+probes; the full-closed triangle discrepancy remains separate. The
+[capture isolation continuation](PHASE_32B_LIVE_PAINT_ACCEPTANCE.md#targeted-capture-isolation-continuation)
+records the harness-only visibility isolation, early PNG metadata, boundary
+diagnostics and owned restoration. Existing region/matrix/artifact boundaries,
+production geometry and strict acceptance remain unchanged. The finite core
+profile is still not adopted; bounded native transfer, matching complete parent
+evidence and review remain required. Final results and identity are external at
+`/private/tmp/stz-phase32b-capture-followup/`; no commit/push or 32C/32D work.

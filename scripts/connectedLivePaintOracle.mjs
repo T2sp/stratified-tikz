@@ -1,5 +1,26 @@
 import assert from 'node:assert/strict'
+import { createHash } from 'node:crypto'
 import { inflateSync } from 'node:zlib'
+
+const defaultRegion = { minX: -34, minY: -34, maxX: 34, maxY: 34 }
+const screenRegionFor = (ctm, region) => ({ minX: region.minX * ctm.a + ctm.e, minY: region.minY * ctm.d + ctm.f,
+  maxX: region.maxX * ctm.a + ctm.e, maxY: region.maxY * ctm.d + ctm.f })
+
+// Save this record with the original PNG before inspecting its pixels. Reading
+// the IHDR does not depend on whether the paint mask/calibration is acceptable.
+export function connectedPaintCaptureMetadata(png, { source, ctm, region = defaultRegion, captureState }) {
+  assert.ok(png.length >= 33 && png.subarray(0, 8).equals(Buffer.from([137, 80, 78, 71, 13, 10, 26, 10])) && png.toString('ascii', 12, 16) === 'IHDR', 'PNG capture header')
+  assert.equal(typeof source, 'string', 'Retained connected capture source')
+  return { bytes: png.length, sha256: createHash('sha256').update(png).digest('hex'), width: png.readUInt32BE(16), height: png.readUInt32BE(20),
+    sourceSha256: createHash('sha256').update(source).digest('hex'), ctm: { ...ctm }, region: { ...region }, screenRegion: screenRegionFor(ctm, region), captureState: structuredClone(captureState) }
+}
+
+function assertCapture(condition, message, diagnostic) {
+  if (condition) return
+  const error = new assert.AssertionError({ message: `${message}: ${JSON.stringify(diagnostic)}` })
+  error.captureDiagnostic = diagnostic
+  throw error
+}
 
 // Chrome screenshots are non-interlaced 8-bit RGB/RGBA PNGs. Decode their
 // retained bytes directly; neither SVG reconstruction nor production geometry
@@ -46,12 +67,22 @@ export function inspectConnectedLivePaintPng(png, options) {
   return inspectConnectedLivePaintRgba({ ...decodeConnectedPaintPng(png), ...options })
 }
 
-export function inspectConnectedLivePaintRgba({ width, height, rgba, ctm, samples, region = { minX: -34, minY: -34, maxX: 34, maxY: 34 } }) {
-  assert.ok(Object.values(ctm).every(Number.isFinite) && ctm.a > 0 && ctm.d === ctm.a && ctm.b === 0 && ctm.c === 0, 'Measured uniform live CTM')
+export function inspectConnectedLivePaintRgba({ width, height, rgba, ctm, samples, region = defaultRegion, captureState }) {
+  const context = { dimensions: { width, height }, ctm, region, captureState }
+  assertCapture(Object.values(ctm).every(Number.isFinite) && ctm.a > 0 && ctm.d === ctm.a && ctm.b === 0 && ctm.c === 0, 'Measured uniform live CTM', context)
+  assertCapture(Object.values(region).every(Number.isFinite) && region.minX < region.maxX && region.minY < region.maxY, 'Finite nonempty live capture region', context)
   assert.equal(rgba.length, width * height * 4)
   const scale = ctm.a, threshold = 127
-  const rect = { minX: Math.max(0, Math.floor(region.minX * scale + ctm.e)), minY: Math.max(0, Math.floor(region.minY * scale + ctm.f)),
-    maxX: Math.min(width - 1, Math.ceil(region.maxX * scale + ctm.e)), maxY: Math.min(height - 1, Math.ceil(region.maxY * scale + ctm.f)) }
+  const screenRegion = screenRegionFor(ctm, region)
+  Object.assign(context, { screenRegion })
+  // The continuous region may end exactly at the screenshot edge, where the
+  // last existing pixel is width/height - 1. A region beyond it is clipped and
+  // cannot establish complete paint, even when its remaining pixels are white.
+  assertCapture(screenRegion.minX >= 0 && screenRegion.minY >= 0 && screenRegion.maxX <= width && screenRegion.maxY <= height,
+    'Requested live paint region is not clipped', context)
+  const rect = { minX: Math.floor(screenRegion.minX), minY: Math.floor(screenRegion.minY),
+    maxX: Math.min(width - 1, Math.ceil(screenRegion.maxX)), maxY: Math.min(height - 1, Math.ceil(screenRegion.maxY)) }
+  Object.assign(context, { pixelRegion: rect })
   const at = (x, y) => [...rgba.subarray((y * width + x) * 4, (y * width + x) * 4 + 4)]
   const black = (x, y) => {
     const offset = (y * width + x) * 4
@@ -59,6 +90,7 @@ export function inspectConnectedLivePaintRgba({ width, height, rgba, ctm, sample
       && rgba[offset + 3] === 255 && rgba[offset] <= threshold && rgba[offset + 1] <= threshold && rgba[offset + 2] <= threshold
   }
   const core = (x, y) => {
+    if (x < 1 || y < 1 || x >= width - 1 || y >= height - 1) return false
     for (let dy = -1; dy <= 1; dy++) for (let dx = -1; dx <= 1; dx++) {
       const offset = ((y + dy) * width + x + dx) * 4
       if (rgba[offset] !== 0 || rgba[offset + 1] !== 0 || rgba[offset + 2] !== 0 || rgba[offset + 3] !== 255) return false
@@ -69,7 +101,9 @@ export function inspectConnectedLivePaintRgba({ width, height, rgba, ctm, sample
   let paintedPixelCount = 0, positiveControl = null, paintRadius = 0
   for (let y = rect.minY; y <= rect.maxY; y++) for (let x = rect.minX; x <= rect.maxX; x++) {
     if (!black(x, y)) continue
-    assert.ok(x > rect.minX && x < rect.maxX && y > rect.minY && y < rect.maxY, 'Live paint mask has an exterior margin')
+    if (x === rect.minX || x === rect.maxX || y === rect.minY || y === rect.maxY) assertCapture(false, 'Live paint mask has an exterior margin',
+      { ...context, pixel: { x, y }, rgba: at(x, y), boundary: [x === rect.minX ? 'left' : null, x === rect.maxX ? 'right' : null,
+        y === rect.minY ? 'top' : null, y === rect.maxY ? 'bottom' : null].filter(Boolean) })
     paintedPixelCount++
     const local = { x: (x + .5 - ctm.e) / scale, y: (y + .5 - ctm.f) / scale }
     paintRadius = Math.max(paintRadius, Math.hypot(local.x, local.y))
@@ -78,15 +112,15 @@ export function inspectConnectedLivePaintRgba({ width, height, rgba, ctm, sample
     if (!positiveControl && core(x, y)) positiveControl = { local, pixel: { x, y }, rgba: at(x, y) }
     if (!black(x - 1, y) || !black(x + 1, y) || !black(x, y - 1) || !black(x, y + 1)) boundary.push(local)
   }
-  assert.ok(!paintedPixelCount || boundary.length && positiveControl, 'Independent opaque positive calibration')
+  assertCapture(!paintedPixelCount || boundary.length && positiveControl, 'Independent opaque positive calibration', { ...context, paintedPixelCount, boundaryPixelCount: boundary.length })
   const backgroundControl = { pixel: { x: rect.minX, y: rect.minY }, rgba: at(rect.minX, rect.minY) }
-  assert.ok(backgroundControl.rgba.slice(0, 3).every((n) => n >= 230) && backgroundControl.rgba[3] === 255, 'Independent background calibration')
+  assertCapture(backgroundControl.rgba.slice(0, 3).every((n) => n >= 230) && backgroundControl.rgba[3] === 255, 'Independent background calibration', { ...context, ...backgroundControl })
   return { width, height, method: 'connected screenshot black-pixel boundary distance', region, calibration: { threshold, pixelCenters: true, positiveControl, backgroundControl },
     boundaryPixelCount: boundary.length, paintedPixelCount, paintBounds: paintedPixelCount ? bounds : null, paintRadius,
     samples: samples.map((sample) => {
       const local = sample.local ?? sample
       const screen = { x: scale * local.x + ctm.e, y: scale * local.y + ctm.f }, pixel = { x: Math.floor(screen.x), y: Math.floor(screen.y) }
-      assert.ok(pixel.x >= rect.minX && pixel.x <= rect.maxX && pixel.y >= rect.minY && pixel.y <= rect.maxY, 'Live probe inside measured region')
+      assertCapture(pixel.x >= rect.minX && pixel.x <= rect.maxX && pixel.y >= rect.minY && pixel.y <= rect.maxY, 'Live probe inside measured region', { ...context, local, screen, pixel })
       const paintDistance = black(pixel.x, pixel.y) ? 0 : boundary.length ? Math.sqrt(boundary.reduce((best, q) => Math.min(best, (local.x - q.x) ** 2 + (local.y - q.y) ** 2), Infinity)) : null
       return { local, screen, pixel, rgba: at(pixel.x, pixel.y), paintDistance, paintCore: core(pixel.x, pixel.y) }
     }) }

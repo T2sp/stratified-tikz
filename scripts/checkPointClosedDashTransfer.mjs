@@ -11,7 +11,8 @@ import { createHash } from 'node:crypto'
 import { createServer } from 'vite'
 import { captureBrowserCheckoutSnapshot } from './browserCheckoutSnapshot.mjs'
 import { boundedPointDiagnostic } from './pointCheckDiagnostics.mjs'
-import { inspectConnectedLivePaintPng } from './connectedLivePaintOracle.mjs'
+import { connectedPaintCaptureMetadata, inspectConnectedLivePaintPng } from './connectedLivePaintOracle.mjs'
+import { withConnectedLivePaintIsolation } from './connectedLivePaintIsolation.mjs'
 
 export const closedDashTransferCases = ['triangle', 'square', 'star', 'circle'].map((shape) => ({
   shape, size: 5.892556509887896, widthPt: 10, patternPt: [100 / 1.2, 100 / 1.2], phasePt: 1 / 1.2,
@@ -19,7 +20,7 @@ export const closedDashTransferCases = ['triangle', 'square', 'star', 'circle'].
 }))
 const region = { minX: -48, minY: -48, maxX: 48, maxY: 48 }
 const sha = (bytes) => createHash('sha256').update(bytes).digest('hex')
-const details = (error) => ({ message: error instanceof Error ? error.message : String(error), stack: error instanceof Error ? error.stack : undefined })
+const details = (error) => ({ message: error instanceof Error ? error.message : String(error), stack: error instanceof Error ? error.stack : undefined, captureDiagnostic: error?.captureDiagnostic })
 
 export async function runClosedDashTransfer({ page, artifactDir }) {
   const evidence = { result: 'observed', scope: 'Bounded supported-point transfer investigation; not cumulative native acceptance or an adopted limitation',
@@ -33,15 +34,18 @@ export async function runClosedDashTransfer({ page, artifactDir }) {
     const entry = { shape: spec.shape, specification: spec, result: 'observed' }, stem = `closed-dash-transfer-${spec.shape}`
     evidence.cases.push(entry); await persist()
     try {
-      await page.evaluate((spec) => {
+      entry.framing = await page.evaluate((spec) => {
         window.stzLabels.mount({ labels: [], points: [{ id: 'p', text: '', style: { shape: spec.shape, size: spec.size, paint: {
           text: { color: '#000000', opacity: 1 }, fill: { enabled: false, color: '#000000', opacity: 1 },
           stroke: { enabled: true, color: '#000000', opacity: 1, width: spec.widthPt, lineStyle: 'solid', dashPattern: spec.patternPt, dashPhase: spec.phasePt, lineCap: 'rect', lineJoin: 'bevel' },
         } } }] })
         window.stzLabels.setProps({ showGeometryHandles: false }); window.stzLabels.select(null)
         const svg = document.querySelector('svg.svg-diagram')
+        const state = window.stzLabels.state()
+        const saved = { style: svg.getAttribute('style'), viewBox: svg.getAttribute('viewBox'), json: state.json, history: state.history }
         svg.setAttribute('viewBox', '402 302 96 96')
         Object.assign(svg.style, { width: '1536px', height: '1536px', position: 'fixed', left: '0', top: '0', background: '#fff', zIndex: '2147483647' })
+        return saved
       }, spec)
       await page.waitForFunction(() => !document.querySelector('[data-label-state="pending"]'), undefined, { timeout: 30000 })
       const samples = [...grid, { local: spec.exterior }]
@@ -62,18 +66,35 @@ export async function runClosedDashTransfer({ page, artifactDir }) {
         return { method: 'owned temporary CSS hides export-excluded decoration only', count: document.querySelectorAll('svg.svg-diagram [data-svg-export-exclude]').length }
       })
       const clip = { x: 0, y: 0, width: 1536, height: 1536 }
-      const png = await page.screenshot({ clip, scale: 'css', animations: 'disabled', timeout: 5000 })
-      await save(`${stem}.live.png`, png)
-      entry.live = { file: `${stem}.live.png`, sha256: sha(png), clip, pixels: inspectConnectedLivePaintPng(png, { ctm: before.ctm, samples, region }) }
-      const priorDash = await page.evaluate(() => {
-        const contour = document.querySelector('[data-point-id="p"] [data-point-contour]'), value = contour.getAttribute('stroke-dasharray')
-        contour.setAttribute('stroke-dasharray', 'none'); return value
-      })
+      const capture = async (kind) => {
+        const file = `${stem}.${kind === 'live' ? 'live' : 'continuous'}.png`
+        const captureState = { kind: 'supported full-closed transfer', shape: spec.shape, paint: kind }
+        const captureSource = await boundedPointDiagnostic(() => page.evaluate(() => {
+          const contour = document.querySelector('[data-point-id="p"] [data-point-contour]'), m = contour.getScreenCTM()
+          return { source: contour.outerHTML, ctm: Object.fromEntries(['a', 'b', 'c', 'd', 'e', 'f'].map((key) => [key, m[key]])), viewport: { width: innerWidth, height: innerHeight } }
+        }), 'transfer capture source and transform')
+        const { source, ctm } = captureSource
+        const record = { file, clip, ...captureSource, sourceSha256: sha(source), region, captureState, status: 'observed' }
+        entry[kind] = record; await persist()
+        assert.deepEqual(ctm, before.ctm, 'Capture retains the measured connected contour transform')
+        await withConnectedLivePaintIsolation({ page, owner: 'stz-closed-dash-capture-isolation', record, persist, region }, async () => {
+          const png = await page.screenshot({ clip, scale: 'css', animations: 'disabled', timeout: 5000 })
+          await save(file, png)
+          Object.assign(record, connectedPaintCaptureMetadata(png, { source, ctm, region, captureState }), { status: 'captured' }); await persist()
+          record.pixels = inspectConnectedLivePaintPng(png, { ctm, samples, region, captureState })
+          record.status = 'inspected'; await persist()
+        })
+      }
+      await capture('live')
+      let continuousFailure
       try {
-        const solidPng = await page.screenshot({ clip, scale: 'css', animations: 'disabled', timeout: 5000 })
-        await save(`${stem}.continuous.png`, solidPng)
-        entry.continuous = { file: `${stem}.continuous.png`, sha256: sha(solidPng), pixels: inspectConnectedLivePaintPng(solidPng, { ctm: before.ctm, samples, region }) }
-      } finally { await page.evaluate((pattern) => document.querySelector('[data-point-id="p"] [data-point-contour]').setAttribute('stroke-dasharray', pattern), priorDash) }
+        await boundedPointDiagnostic(() => page.evaluate(() => document.querySelector('[data-point-id="p"] [data-point-contour]').setAttribute('stroke-dasharray', 'none')), 'transfer continuous control installation')
+        await capture('continuous')
+      } catch (error) { continuousFailure = error }
+      try {
+        await boundedPointDiagnostic(() => page.evaluate((pattern) => document.querySelector('[data-point-id="p"] [data-point-contour]').setAttribute('stroke-dasharray', pattern), before.sourcePattern), 'transfer continuous source restoration')
+      } catch (error) { entry.continuousRestorationError = details(error); continuousFailure ??= error }
+      if (continuousFailure) throw continuousFailure
       entry.after = await page.evaluate(() => {
         const contour = document.querySelector('[data-point-id="p"] [data-point-contour]'), m = contour.getScreenCTM(), state = window.stzLabels.state()
         return { source: contour.outerHTML, json: state.json, history: state.history, ctm: Object.fromEntries(['a', 'b', 'c', 'd', 'e', 'f'].map((key) => [key, m[key]])) }
@@ -102,11 +123,16 @@ export async function runClosedDashTransfer({ page, artifactDir }) {
         await page.evaluate(() => { window.stzLabels.select(null); window.stzTransferClicks = window.stzLabels.observeEmptyPointSelectionClicks() })
         try {
           for (const alt of [false, true]) {
+            const freshCtm = await page.evaluate(() => {
+              const m = document.querySelector('[data-point-id="p"] [data-point-contour]').getScreenCTM()
+              return Object.fromEntries(['a', 'b', 'c', 'd', 'e', 'f'].map((key) => [key, m[key]]))
+            })
+            assert.deepEqual(freshCtm, actionCtm, 'Fresh action transform retains restored ordinary framing')
             if (alt) await page.keyboard.down('Alt')
-            try { await page.mouse.click(actionCtm.a * sample.local.x + actionCtm.e, actionCtm.d * sample.local.y + actionCtm.f) }
+            try { await page.mouse.click(freshCtm.a * sample.local.x + freshCtm.e, freshCtm.d * sample.local.y + freshCtm.f) }
             finally { if (alt) await page.keyboard.up('Alt') }
             const action = await page.evaluate(() => window.stzTransferClicks.read().at(-1))
-            entry.actions.push({ local: sample.local, expected: sample.expected, ...action })
+            entry.actions.push({ local: sample.local, expected: sample.expected, ctm: freshCtm, ...action })
             try {
               assert.equal(action.trusted, true); assert.equal(action.overlayExcluded, true)
               // Canvas inversion can introduce sub-ulp arithmetic roundoff.
@@ -140,7 +166,23 @@ export async function runClosedDashTransfer({ page, artifactDir }) {
       assert.deepEqual(entry.mismatches, [], 'Supported full-closed-dash interaction discrepancy')
       entry.result = 'passed'
     } catch (error) { primary ??= error; entry.result = 'failed'; entry.error = details(error) }
-    try { await page.evaluate(() => document.querySelector('[data-closed-dash-transfer-isolation]')?.remove()) } catch (error) { primary ??= error; entry.cleanupError = details(error); entry.result = 'failed' }
+    for (const [name, cleanup] of [
+      ['decoration', () => page.evaluate(() => document.querySelector('[data-closed-dash-transfer-isolation]')?.remove())],
+      ['framing', async () => {
+        if (!entry.framing) return
+        entry.restoration = await page.evaluate((saved) => {
+          const svg = document.querySelector('svg.svg-diagram')
+          for (const [key, value] of [['style', saved.style], ['viewBox', saved.viewBox]]) value === null ? svg.removeAttribute(key) : svg.setAttribute(key, value)
+          const state = window.stzLabels.state(), contour = document.querySelector('[data-point-id="p"] [data-point-contour]')
+          return { style: svg.getAttribute('style'), viewBox: svg.getAttribute('viewBox'), json: state.json, history: state.history, source: contour.outerHTML }
+        }, entry.framing)
+        entry.framingRestored = entry.restoration.style === entry.framing.style && entry.restoration.viewBox === entry.framing.viewBox
+        entry.modelUnchanged = entry.restoration.json === entry.framing.json && entry.restoration.history === entry.framing.history
+        assert.equal(entry.framingRestored, true); assert.equal(entry.modelUnchanged, true)
+        if (entry.before) assert.equal(entry.restoration.source, entry.before.source)
+      }],
+    ]) try { await boundedPointDiagnostic(cleanup, `transfer ${name} cleanup`, 5000) }
+    catch (error) { primary ??= error; (entry.cleanupErrors ??= []).push({ name, ...details(error) }); entry.result = 'failed' }
     await save(`${stem}.json`, entry); await persist()
   }
   evidence.result = primary ? 'failed' : 'passed'; await persist()
@@ -177,7 +219,14 @@ export async function main({ artifactDir = process.env.STZ_CLOSED_DASH_TRANSFER_
   }
   finally {
     for (const cleanup of [() => page?.close(), () => browser?.close(), () => server?.close()]) try { await boundedPointDiagnostic(cleanup, 'transfer owned cleanup', 5000) } catch (error) { if (!primary) { primary = error; report.result = 'failed'; report.error = details(error) } else (report.secondary ??= []).push(details(error)) }
-    report.afterCheckout = captureBrowserCheckoutSnapshot().checkout; await save()
+    report.afterCheckout = captureBrowserCheckoutSnapshot().checkout
+    report.checkoutUnchanged = report.checkout?.fingerprint === report.afterCheckout.fingerprint
+    if (!report.checkoutUnchanged) {
+      const error = new Error('Bounded transfer checkout identity changed during observation')
+      if (!primary) { primary = error; report.error = details(error) } else (report.secondary ??= []).push(details(error))
+      report.result = 'failed'
+    }
+    await save()
   }
   if (primary) throw primary
   return report

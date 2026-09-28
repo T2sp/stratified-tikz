@@ -1,7 +1,7 @@
 import { createHash } from 'node:crypto'
 import { deflateSync } from 'node:zlib'
-import { inspectConnectedLivePaintPng } from '../../scripts/connectedLivePaintOracle.mjs'
-import { dashCapScenario, dashCapCases, dashCapScales, dashCapProbeKinds, dashCapEditFields, triangleDashPhaseNegatives, dashCapProbeIsMiss, dashCapAuditGrid, rawDashCapSquarePoints } from '../../scripts/pointDashCapContract.mjs'
+import { connectedPaintCaptureMetadata, inspectConnectedLivePaintPng } from '../../scripts/connectedLivePaintOracle.mjs'
+import { dashCapScenario, dashCapCases, dashCapScales, dashCapProbeKinds, dashCapEditFields, triangleDashPhaseNegatives, dashCapProbeIsMiss, dashCapProbeIsProximityHit, dashCapAuditGrid, rawDashCapSquarePoints } from '../../scripts/pointDashCapContract.mjs'
 
 // Synthetic policy data only: these analytic regions exercise evidence validation,
 // not the browser's dash geometry or the production geometry helper.
@@ -103,9 +103,11 @@ export function dashCapEvidence() {
           const candidates = sample.expected === 'miss' ? ['control'] : ['control', 'p']
           probe.actions = [false, true, true, true].map((alt, i) => ({ alt, trusted: true, overlayExcluded: true, candidates: [...candidates],
             screen: { x: scale * probe.local.x + observation.ctm.e, y: scale * probe.local.y + observation.ctm.f }, point: { x: 450 + probe.local.x, y: 350 + probe.local.y },
-            selection: { id: alt ? candidates[i % candidates.length] : sample.expected === 'miss' ? 'control' : 'p' } }))
+            selection: { id: alt ? candidates[i % candidates.length] : sample.expected === 'miss' || dashCapProbeIsProximityHit(specification, probe.kind) ? 'control' : 'p' } }))
           const reference = observation.livePaint.captures[0], pixelDistances = syntheticPixels(reference, [probe], specification.key)
-          probe.liveCapture = { ...reference, screenshot: probe.screenshot, ...pixelDistances, pixelDistances }
+          probe.liveCapture = { ...reference, screenshot: probe.screenshot, ...pixelDistances, pixelDistances,
+            captureState: { kind: 'App preaction paint', case: specification.key, probe: probe.kind, local: { ...probe.local } },
+            isolation: structuredClone(reference.isolation), isolationAfter: structuredClone(reference.isolationAfter), isolationRestoration: structuredClone(reference.isolationRestoration) }
         }
       }
       return entry
@@ -155,7 +157,8 @@ function syntheticLivePaint(spec, scale, observation) {
       viewport: { width: 1500, height: 1150 },
       stroke: { width: 36, pattern: observation.pattern, phase: spec.phase * 1.2, cap: 'square', join: 'bevel', fill: 'none', miterLimit: 10, color: 'rgb(0, 0, 0)', opacity: 1 } }
     const png = syntheticDashCapLivePng(capture, spec.key), pixelDistances = syntheticPixels(capture, audit.samples, spec.key)
-    return { ...capture, bytes: png.length, sha256: createHash('sha256').update(png).digest('hex'), ...pixelDistances, pixelDistances, method: 'actual App screenshot PNG; no SVG reconstruction' }
+    const metadata = connectedPaintCaptureMetadata(png, { ...capture, captureState: { kind: 'App live paint', stem: `${dashCapScenario}-${spec.key}-scale-${scale}`, zoom } })
+    return { ...capture, ...metadata, ...syntheticIsolationEvidence(capture, metadata.region), ...pixelDistances, pixelDistances, method: 'actual App screenshot PNG; no SVG reconstruction' }
   })
   const samples = audit.samples.map((sample, index) => {
     const pixel = captures[1].samples[index], minimum = Math.min(pixel.paintDistance, sample.solidDistance)
@@ -169,6 +172,26 @@ function syntheticLivePaint(spec, scale, observation) {
     disagreements: audit.samples.filter((sample) => sample.paintCore && !sample.nativeStrokeContains).map(({ local }) => local),
     interaction: { method: 'connected live paint plus continuous stroke and contour interior', tolerance: 6, uncertainty: .14, selectionDecorationAllowance: 0,
       screenshot: captures[1].screenshot, sha256: captures[1].sha256, samples, mismatches: [] } }
+}
+
+function syntheticIsolationEvidence(capture, region) {
+  const owner = 'stz-dash-live-capture-isolation'
+  const visible = { visibility: 'visible', display: 'inline', pointerEvents: 'auto' }
+  const hidden = { visibility: 'hidden', display: 'inline', pointerEvents: 'auto' }
+  const geometricBounds = { minX: -5, minY: -5, maxX: 5, maxY: 5 }, width = capture.stroke.width, expansion = width * Math.SQRT2 / 2
+  const isolation = { owner, method: 'owned CSS: connected intended contour and calibrated white root only', valid: true,
+    connected: true, contourIdentityPreserved: true, sourceUnchanged: true, paintUnchanged: true, pointerEventsUnchanged: true, ctmUnchanged: true,
+    source: capture.source, ctm: { ...capture.ctm }, background: 'rgb(255, 255, 255)', root: { ...visible }, contour: { ...visible },
+    rootDecorationVisibility: [{ tag: 'polygon', contour: true, intendedPaint: true, ...visible },
+      { tag: 'g', class: 'svg-selection-cycle-feedback', contour: false, intendedPaint: false, ...hidden }], visibilityLeaks: [],
+    feedback: [{ tag: 'g', class: 'svg-selection-cycle-feedback', ...hidden }],
+    paintSupport: { method: 'native geometric bbox plus square-cap Euclidean support; independent of dash placement and production geometry',
+      geometricBounds, width, cap: capture.stroke.cap, join: capture.stroke.join, expansion,
+      bounds: { minX: -5 - expansion, minY: -5 - expansion, maxX: 5 + expansion, maxY: 5 + expansion }, region: { ...region }, supported: true, enclosed: true } }
+  return { isolation, isolationAfter: structuredClone(isolation),
+    isolationRestoration: { owner, restored: true, removedOwnedStyle: true, remainingOwner: false, connected: true, contourIdentityPreserved: true,
+      sourceUnchanged: true, paintUnchanged: true, backgroundRestored: true, ctmUnchanged: true, rootPresentationRestored: true, rootStyleUnchanged: true,
+      changedVisibility: [], rootStyle: '', ctm: { ...capture.ctm } } }
 }
 
 function syntheticTriangleSolidSupport() {

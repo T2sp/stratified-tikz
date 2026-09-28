@@ -3,7 +3,8 @@ import { createHash } from 'node:crypto'
 import { writeFile } from 'node:fs/promises'
 import { resolve } from 'node:path'
 import { runPointDashCapMechanismChecks } from './checkPointDashCapMechanism.mjs'
-import { inspectConnectedLivePaintPng } from './connectedLivePaintOracle.mjs'
+import { connectedPaintCaptureMetadata, inspectConnectedLivePaintPng } from './connectedLivePaintOracle.mjs'
+import { withConnectedLivePaintIsolation } from './connectedLivePaintIsolation.mjs'
 import { boundedPointDiagnostic } from './pointCheckDiagnostics.mjs'
 import { dashCapScenario, dashCapCases, dashCapScales, dashCapEditFields, triangleDashPhaseNegatives, dashCapProbeIsMiss, assertDashCapEvidence, assertDashCapObservation, assertDashCapEntry } from './pointDashCapContract.mjs'
 const paint = (spec) => ({ text: { color: '#000000', opacity: 1 }, fill: { enabled: false, color: '#000000', opacity: 1 },
@@ -121,7 +122,7 @@ async function observe(page, spec) {
 }
 // This observes the actual App DOM paint. PNG decoding does not reconstruct SVG,
 // and the zoom changes only the root framing while retaining the same contour.
-async function observeLivePaint(page, artifactDir, stem, observation, persist) {
+export async function observeLivePaint(page, artifactDir, stem, observation, persist) {
   await boundedPointDiagnostic(() => page.evaluate(() => window.stzLabels.select(null)), 'App live paint clear selection', 5000)
   const saved = await boundedPointDiagnostic(() => page.evaluate(() => {
     const root = document.querySelector('svg.svg-diagram'), state = window.stzLabels.state()
@@ -140,28 +141,33 @@ async function observeLivePaint(page, artifactDir, stem, observation, persist) {
         root.setAttribute('viewBox', '416 316 68 68')
         Object.assign(root.style, { width: '1088px', height: '1088px', position: 'fixed', left: '0', top: '0', zIndex: '2147483647', transform: '' })
       }), 'App live paint magnified framing', 5000)
-      const before = await boundedPointDiagnostic(() => page.evaluate(() => {
-        const contour = document.querySelector('[data-point-id="p"] [data-point-contour]'), css = getComputedStyle(contour), matrix = contour.getScreenCTM()
-        const state = window.stzLabels.state()
-        return { rawPoints: contour.getAttribute('points'), vertices: [...contour.points].map(({ x, y }) => ({ x, y })), pathLength: contour.getTotalLength(),
-          ctm: Object.fromEntries(['a', 'b', 'c', 'd', 'e', 'f'].map((key) => [key, matrix[key]])), selection: state.selection,
-          stroke: { width: parseFloat(css.strokeWidth), pattern: css.strokeDasharray, phase: parseFloat(css.strokeDashoffset), cap: css.strokeLinecap, join: css.strokeLinejoin, fill: css.fill, miterLimit: Number(css.strokeMiterlimit), color: css.stroke, opacity: Number(css.strokeOpacity) },
-          viewport: { width: innerWidth, height: innerHeight }, source: contour.outerHTML, overlays: contour.parentElement.querySelectorAll('[data-svg-export-exclude]').length }
-      }), 'App live paint source before screenshot', 5000)
       const screenshot = `${stem}-${zoom ? 'live-zoom' : 'live'}.screen.png`
-      const capture = { ...before, screenshot, zoom, method: 'actual App screenshot PNG; no SVG reconstruction', status: 'observed' }
+      const captureState = { kind: 'App live paint', stem, zoom }
+      const capture = { screenshot, zoom, captureState, method: 'actual App screenshot PNG; no SVG reconstruction', status: 'observed' }
       captures.push(capture); await persist()
-      const png = await page.screenshot({ path: resolve(artifactDir, screenshot), timeout: 5000, scale: 'css' })
-      Object.assign(capture, { status: 'captured', bytes: png.length, sha256: createHash('sha256').update(png).digest('hex') }); await persist()
-      const pixels = inspectConnectedLivePaintPng(png, { ctm: before.ctm, samples: observation.engineAudit.samples })
-      const after = await boundedPointDiagnostic(() => page.evaluate(() => {
-        const contour = document.querySelector('[data-point-id="p"] [data-point-contour]'), matrix = contour.getScreenCTM()
-        return { source: contour.outerHTML, ctm: Object.fromEntries(['a', 'b', 'c', 'd', 'e', 'f'].map((key) => [key, matrix[key]])) }
-      }), 'App live paint source after screenshot', 5000)
-      Object.assign(capture, { sourceSha256: createHash('sha256').update(before.source).digest('hex'), status: 'inspected', sourceUnchanged: before.source === after.source, afterCtm: after.ctm, ...pixels, pixelDistances: pixels, method: 'actual App screenshot PNG; no SVG reconstruction' }); await persist()
+      await withConnectedLivePaintIsolation({ page, owner: 'stz-dash-live-capture-isolation', record: capture, persist }, async () => {
+        const before = await boundedPointDiagnostic(() => page.evaluate(() => {
+          const contour = document.querySelector('[data-point-id="p"] [data-point-contour]'), css = getComputedStyle(contour), matrix = contour.getScreenCTM()
+          const state = window.stzLabels.state()
+          return { rawPoints: contour.getAttribute('points'), vertices: [...contour.points].map(({ x, y }) => ({ x, y })), pathLength: contour.getTotalLength(),
+            ctm: Object.fromEntries(['a', 'b', 'c', 'd', 'e', 'f'].map((key) => [key, matrix[key]])), selection: state.selection,
+            stroke: { width: parseFloat(css.strokeWidth), pattern: css.strokeDasharray, phase: parseFloat(css.strokeDashoffset), cap: css.strokeLinecap, join: css.strokeLinejoin, fill: css.fill, miterLimit: Number(css.strokeMiterlimit), color: css.stroke, opacity: Number(css.strokeOpacity) },
+            viewport: { width: innerWidth, height: innerHeight }, source: contour.outerHTML, overlays: contour.parentElement.querySelectorAll('[data-svg-export-exclude]').length }
+        }), 'App live paint source before screenshot', 5000)
+        Object.assign(capture, before, { sourceSha256: createHash('sha256').update(before.source).digest('hex') }); await persist()
+        const png = await page.screenshot({ path: resolve(artifactDir, screenshot), timeout: 5000, scale: 'css' })
+        Object.assign(capture, connectedPaintCaptureMetadata(png, { ...before, captureState }), { status: 'captured' }); await persist()
+        const after = await boundedPointDiagnostic(() => page.evaluate(() => {
+          const contour = document.querySelector('[data-point-id="p"] [data-point-contour]'), matrix = contour.getScreenCTM()
+          return { source: contour.outerHTML, ctm: Object.fromEntries(['a', 'b', 'c', 'd', 'e', 'f'].map((key) => [key, matrix[key]])) }
+        }), 'App live paint source after screenshot', 5000)
+        Object.assign(capture, { sourceUnchanged: before.source === after.source, afterCtm: after.ctm }); await persist()
+        const pixels = inspectConnectedLivePaintPng(png, { ctm: before.ctm, samples: observation.engineAudit.samples, captureState })
+        Object.assign(capture, { ...pixels, pixelDistances: pixels, status: 'inspected', method: 'actual App screenshot PNG; no SVG reconstruction' }); await persist()
+      })
     }
   } catch (error) {
-    primary = error; live.error = { message: error.message }
+    primary = error; live.error = { message: error.message, captureDiagnostic: error.captureDiagnostic }
     try { await boundedPointDiagnostic(persist, 'App live paint failure evidence') } catch (diagnosticError) { console.error('App live paint failure evidence:', diagnosticError) }
     throw error
   } finally {
@@ -241,18 +247,22 @@ export async function runPointDashCapChecks({ page, artifactDir, begin, saved, d
     await page.mouse.click(transform.clear.x, transform.clear.y); assert.equal((await state()).selection, null); probe.selectionCleared = true
     const before = await state()
     if (spec.livePaint) {
-      const source = await page.evaluate(() => {
-        const contour = document.querySelector('[data-point-id="p"] [data-point-contour]'), css = getComputedStyle(contour)
-        return { source: contour.outerHTML, viewport: { width: innerWidth, height: innerHeight }, selection: window.stzLabels.state().selection,
-          stroke: { width: parseFloat(css.strokeWidth), pattern: css.strokeDasharray, phase: parseFloat(css.strokeDashoffset), cap: css.strokeLinecap, join: css.strokeLinejoin, fill: css.fill, miterLimit: Number(css.strokeMiterlimit), color: css.stroke, opacity: Number(css.strokeOpacity) } }
+      const captureState = { kind: 'App preaction paint', case: spec.key, probe: probe.kind, local: probe.local }
+      const capture = { screenshot, ctm: transform.ctm, captureState, status: 'observed' }
+      probe.liveCapture = capture; probe.screenshot = screenshot; await persist()
+      await withConnectedLivePaintIsolation({ page, owner: 'stz-dash-live-capture-isolation', record: capture, persist }, async () => {
+        const source = await page.evaluate(() => {
+          const contour = document.querySelector('[data-point-id="p"] [data-point-contour]'), css = getComputedStyle(contour)
+          return { source: contour.outerHTML, viewport: { width: innerWidth, height: innerHeight }, selection: window.stzLabels.state().selection,
+            stroke: { width: parseFloat(css.strokeWidth), pattern: css.strokeDasharray, phase: parseFloat(css.strokeDashoffset), cap: css.strokeLinecap, join: css.strokeLinejoin, fill: css.fill, miterLimit: Number(css.strokeMiterlimit), color: css.stroke, opacity: Number(css.strokeOpacity) } }
+        })
+        Object.assign(capture, source, { sourceSha256: createHash('sha256').update(source.source).digest('hex') }); await persist()
+        const png = await page.screenshot({ path: resolve(artifactDir, screenshot), timeout: 5000, scale: 'css' })
+        Object.assign(capture, connectedPaintCaptureMetadata(png, { ...source, ctm: transform.ctm, captureState }), { status: 'captured' }); await persist()
+        const pixelDistances = inspectConnectedLivePaintPng(png, { ctm: transform.ctm, samples: [{ local: probe.local }], captureState })
+        Object.assign(capture, { ...pixelDistances, pixelDistances, status: 'inspected' })
+        await persist()
       })
-      const png = await page.screenshot({ path: resolve(artifactDir, screenshot), timeout: 5000, scale: 'css' })
-      const pixelDistances = inspectConnectedLivePaintPng(png, { ctm: transform.ctm, samples: [{ local: probe.local }] })
-      probe.liveCapture = { ...source, sourceSha256: createHash('sha256').update(source.source).digest('hex'), screenshot,
-        ctm: transform.ctm, sha256: createHash('sha256').update(png).digest('hex'), bytes: png.length,
-        ...pixelDistances, pixelDistances }
-      probe.screenshot = screenshot
-      await persist()
     }
     await page.evaluate(() => { window.stzDashClicks = window.stzLabels.observeEmptyPointSelectionClicks() })
     let primary

@@ -5,6 +5,52 @@ acceptance policy remains strict. Correcting a disproven interaction oracle
 does not waive a production defect or certify exported paint. 32B remains
 incomplete; 32C/32D remain deferred.
 
+## Targeted capture isolation continuation
+
+The next checkout starts at `f8213c4d3d76059b903b6e946269aa18f6b46845`.
+That commit records all seventeen prior tracked changes and all four prior
+untracked files byte-identically, plus the updated fix prompt. The earlier
+`8953e01`/`08d33056...` handoff and its failed observations remain historical.
+Preservation authentication and this continuation's final identity/results are
+recorded externally in `/private/tmp/stz-phase32b-capture-followup/`.
+
+The matching native parent `gHadrw` passed 4,388 tests, build, diff and label
+assets. Its free-labels check completed fourteen groups with no page errors:
+eighteen of twenty-two App entries and twenty of twenty-one supplemental
+mechanisms passed. The four App failures were the first responsive capture of
+zero-off and before-corner at both scales, before magnification or corrected
+pointer probes. The dark root-level selection-cycle tooltip crossed the right
+mask boundary; selection was cleared but that component feedback remained.
+The mask rejection was correct. This is separate from the retained twenty-four
+full-closed triangle omissions. The final settled-SVG group was unexecuted.
+
+The capture now temporarily reveals only the original connected contour over
+a white root background. It inspects computed visibility of every root
+descendant, including feedback outside the point group, and verifies source,
+effective paint, CTM and pointer-event properties before and after capture.
+Owned styles are restored before native pointer actions. The original
+interaction decoration isolation, overlapping control, cleared selection,
+trusted ordinary/Alt actions and six-unit picking remain intact. No product
+tooltip or geometry is changed. Independent geometric bounds expanded by the
+maximum square-cap reach establish that complete paint fits the existing
+region; the pixel margin and positive/background calibrations remain required.
+
+Both responsive and magnified screenshots, and their existing preaction
+screenshots, retain PNG bytes/hash/dimensions, source hash, CTM, region and
+capture state before pixel inspection. Rejections identify boundary sides,
+pixel and RGBA. Cleanup preserves the first failure and records isolation and
+framing restoration. Registered tests retain the four actual contaminated
+regions as rejected evidence and exercise clean/failed ownership restoration.
+The same capture isolation and early metadata retention apply to the separate
+four-shape transfer; this does not claim it previously exhibited contamination.
+Its temporary framing and continuous-source changes receive bounded restoration.
+
+The 856-path inventory is unchanged. No extra native matrix, profile adoption,
+diagnostic waiver or production dash correction follows from this fix. Native
+results on the final identity, the bounded transfer, complete strict acceptance
+including settled SVG, and independent review remain required. Any child
+localhost restriction is a pending parent check, never a native pass.
+
 ## Preserved checkout and evidence
 
 This continuation actually starts on clean
