@@ -1385,6 +1385,10 @@ painted bounds and picking, separate from body and shape bounds.
 Dash endpoint geometry shares the emitted effective stroke settings. Interaction
 unions the original contour, continuous stroke neighborhood and actual oriented
 caps, retaining selection through dash gaps and the six-local-unit allowance.
+Isolated zero-on subpaths use full square/disk cap geometry, separately from
+oriented positive-length endpoint caps. Raw dash patterns and coordinates remain
+unchanged. See the [native zero-dash investigation](PHASE_32B_ZERO_DASH_INVESTIGATION.md)
+for the retained Chrome/Cairo distinction and the expanded native verification gate.
 Paint/clearance bounds conservatively retain that continuous stroke envelope;
 they are not paint-only gap masks or final hit oracles. Revision matching compares
 pattern values, phase, cap, join, width and enablement along with existing owner,

@@ -1678,8 +1678,13 @@ Dashed borders add the real endpoint caps to this region. Named patterns,
 explicit-pattern precedence, phase, caps, joins and the TeX-point conversion
 come from the same effective settings used to emit SVG. Dash gaps and original
 contour interiors remain selectable; there is still exactly a six-local-unit
-exterior allowance. Square caps use oriented rectangles, round polygon caps use
-outward semicircles, and a dash crossing a corner does not acquire a cap there.
+exterior allowance. Positive-length endpoints use oriented rectangles or outward
+semicircles. Isolated zero-on subpaths use full upright squares or disks,
+including at corners. A dash crossing a corner does not acquire a cap there.
+Raw coordinates and zero pattern entries are preserved. The
+[native zero-dash investigation](PHASE_32B_ZERO_DASH_INVESTIGATION.md) distinguishes
+the retained Chrome reproduction from Cairo observations and records the pending
+native checks for diagonal dots, terminal seams and positive endpoints.
 Committed layouts compare copied pattern contents and all effective geometry
 settings in addition to source, owner, shape, size and font generation.
 SVG emits a signed phase remainder modulo the effective pattern, avoiding native

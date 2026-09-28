@@ -1,8 +1,9 @@
 import assert from 'node:assert/strict'
 import { writeFile } from 'node:fs/promises'
 import { resolve } from 'node:path'
+import { runPointDashCapMechanismChecks } from './checkPointDashCapMechanism.mjs'
 import { boundedPointDiagnostic } from './pointCheckDiagnostics.mjs'
-import { dashCapScenario, dashCapCases, dashCapScales, dashCapEditFields, assertDashCapEvidence, assertDashCapObservation } from './pointDashCapContract.mjs'
+import { dashCapScenario, dashCapCases, dashCapScales, dashCapEditFields, assertDashCapEvidence, assertDashCapObservation, assertDashCapEntry } from './pointDashCapContract.mjs'
 const paint = (spec) => ({ text: { color: '#000000', opacity: 1 }, fill: { enabled: false, color: '#000000', opacity: 1 },
   stroke: { enabled: true, color: '#000000', opacity: 1, width: spec.widthPt, lineStyle: spec.lineStyle,
     ...(spec.pattern ? { dashPattern: spec.pattern } : {}), dashPhase: spec.phase, lineCap: 'rect', lineJoin: 'bevel' } })
@@ -10,7 +11,8 @@ const paint = (spec) => ({ text: { color: '#000000', opacity: 1 }, fill: { enabl
 // Native SVG image rasterization is independent from production stroke geometry.
 async function observe(page, spec) {
   await page.evaluate(() => window.stzLabels.select({ kind: 'stratum', id: 'p' }))
-  return page.evaluate(async (spec) => {
+  const browserVersion = page.context().browser()?.version() ?? 'unavailable'
+  return page.evaluate(async ({ spec, browserVersion }) => {
     const contour = document.querySelector('[data-point-id="p"] [data-point-contour]'), point = contour.parentElement
     const css = getComputedStyle(contour), resolution = 16, half = 90, side = 2 * half * resolution
     const clean = contour.cloneNode(true)
@@ -70,7 +72,9 @@ async function observe(page, spec) {
       const mismatches = samples.filter((sample) => sample.expected !== 'uncertain' && (sample.candidates.includes('p') !== (sample.expected === 'hit') || sample.candidates.some((id) => id !== 'p')))
         .map(({ local, expected, candidates }) => ({ local, expected, candidates }))
       const originalVertices = [...contour.points].map(({ x, y }) => ({ x, y }))
-      engineAudit = { grid: { min: -32, max: 32, step: 2, size: 33, samples: 1089, uncertainty: .14 },
+      engineAudit = { model: before.points.find(({ id }) => id === 'p'), rawPoints: contour.getAttribute('points'), pathLength: contour.getTotalLength(),
+        browser: { version: browserVersion, userAgent: navigator.userAgent },
+        raster: { resolution, half, side, uncertainty: .14, alphaThreshold: 128 }, grid: { min: -32, max: 32, step: 2, size: 33, samples: 1089, uncertainty: .14 },
         modelUnchanged: before.json === after.json && before.history === after.history, originalVertices,
         solidControl: { fill: solid.getAttribute('fill'), pattern: solid.getAttribute('stroke-dasharray'), strokeWidth: Number(solid.getAttribute('stroke-width')), join: solid.getAttribute('stroke-linejoin'), vertices: [...solid.points].map(({ x, y }) => ({ x, y })) },
         counts: { hits: samples.filter(({ expected }) => expected === 'hit').length, misses: samples.filter(({ expected }) => expected === 'miss').length, uncertain: samples.filter(({ expected }) => expected === 'uncertain').length },
@@ -103,7 +107,7 @@ async function observe(page, spec) {
       strokeWidth: parseFloat(css.strokeWidth), cap: css.strokeLinecap, join: css.strokeLinejoin, pattern: css.strokeDasharray, phase: parseFloat(css.strokeDashoffset), fill: css.fill, miterLimit: Number(css.strokeMiterlimit),
       source: point.querySelector('[data-label-state]').getAttribute('data-label-source'), bodyStatus: point.querySelector('[data-label-state]').getAttribute('data-label-state'),
       probes: probes.map((probe) => ({ ...probe, alpha: at(probe.local), rasterDistance: distance(probe.local), nativeStrokeContains: contour.isPointInStroke(new DOMPoint(probe.local.x, probe.local.y)) })) }
-  }, spec)
+  }, { spec, browserVersion })
 }
 export async function runPointDashCapChecks({ page, artifactDir, begin, saved, diagnose }) {
   begin(dashCapScenario)
@@ -167,45 +171,59 @@ export async function runPointDashCapChecks({ page, artifactDir, begin, saved, d
     await page.setViewportSize({ width: 1500, height: 1150 })
     for (const spec of dashCapCases) for (const scale of dashCapScales) {
       const finalPaint = paint(spec), stem = `${dashCapScenario}-${spec.key}-scale-${scale}`
-      await page.evaluate(({ spec, scale, finalPaint }) => {
-        const controlPaint = structuredClone(finalPaint); controlPaint.fill.enabled = true; controlPaint.fill.color = '#bbbbbb'; controlPaint.stroke.enabled = false
-        window.stzLabels.mount({ labels: [], points: [{ id: 'control', text: '', layer: -1, position: { x: 3, y: 3, z: 0 }, style: { size: 12, shape: 'circle', paint: controlPaint } },
-          { id: 'p', text: '', layer: 1, style: { size: spec.size, shape: spec.shape, paint: finalPaint } }] })
-        window.stzLabels.setProps({ showGeometryHandles: false })
-        const svg = document.querySelector('svg.svg-diagram'); svg.style.width = `${900 * scale}px`; svg.style.height = `${700 * scale}px`; svg.style.transform = ''
-      }, { spec, scale, finalPaint })
-      await settle()
-      const entry = { key: spec.key, scale, specification: spec, edits: [], probes: [], modelUnchanged: true }; cases.push(entry)
+      const entry = { key: spec.key, scale, specification: spec, result: 'observed', edits: [], probes: [], modelUnchanged: true }; cases.push(entry)
       const persist = async () => { await writeFile(resolve(artifactDir, `${stem}.json`), JSON.stringify(entry, null, 2) + '\n'); await diagnose({ boundary: 'dash-cap-observation', entry: { ...entry, observation: entry.observation && { ...entry.observation, engineAudit: entry.observation.engineAudit && { ...entry.observation.engineAudit, samples: undefined } } } }) }
-      if (spec.key === 'triangle-square-wide') {
-        const strokes = [
-          { ...finalPaint.stroke, lineStyle: 'solid', lineCap: 'butt' },
-          { ...finalPaint.stroke, lineCap: 'butt' }, finalPaint.stroke,
-          { ...finalPaint.stroke, dashPattern: [10, 2] }, { ...finalPaint.stroke, dashPattern: [10, 2], dashPhase: 7 }, finalPaint.stroke,
-        ]
-        await page.evaluate((stroke) => window.stzLabels.mutatePoint('p', { style: { paint: { text: { color: '#000000', opacity: 1 }, fill: { enabled: false, color: '#000000', opacity: 1 }, stroke } } }), strokes[0]); await settle()
-        for (const [i, field] of dashCapEditFields.entries()) {
-          const before = await state()
-          const sameNode = await page.evaluate((stroke) => {
-            const node = document.querySelector('[data-point-id="p"] [data-point-contour]')
-            const pointPaint = { text: { color: '#000000', opacity: 1 }, fill: { enabled: false, color: '#000000', opacity: 1 }, stroke }
-            window.stzLabels.mutatePoint('p', { style: { paint: pointPaint } })
-            return node === document.querySelector('[data-point-id="p"] [data-point-contour]')
-          }, strokes[i + 1]); await settle()
-          const observation = await observe(page, spec); await rasterFiles(`${stem}-edit-${field}`, observation)
-          const edit = { field, sameNode, modelChanged: before.json !== (await state()).json, observation,
-            probe: { ...observation.probes.find((probe) => probe.kind === 'paint'), actions: [] } }
-          entry.edits.push(edit); await persist(); assertDashCapObservation(observation)
-          await pointerProbe(edit.probe, `${stem}-edit-${field}.screen.png`, persist)
+      try {
+        await page.evaluate(({ spec, scale, finalPaint }) => {
+          const controlPaint = structuredClone(finalPaint); controlPaint.fill.enabled = true; controlPaint.fill.color = '#bbbbbb'; controlPaint.stroke.enabled = false
+          window.stzLabels.mount({ labels: [], points: [{ id: 'control', text: '', layer: -1, position: { x: 3, y: 3, z: 0 }, style: { size: 12, shape: 'circle', paint: controlPaint } },
+            { id: 'p', text: '', layer: 1, style: { size: spec.size, shape: spec.shape, paint: finalPaint } }] })
+          window.stzLabels.setProps({ showGeometryHandles: false })
+          const svg = document.querySelector('svg.svg-diagram'); svg.style.width = `${900 * scale}px`; svg.style.height = `${700 * scale}px`; svg.style.transform = ''
+        }, { spec, scale, finalPaint })
+        await settle()
+        if (spec.key === 'triangle-square-wide') {
+          const strokes = [
+            { ...finalPaint.stroke, lineStyle: 'solid', lineCap: 'butt' },
+            { ...finalPaint.stroke, lineCap: 'butt' }, finalPaint.stroke,
+            { ...finalPaint.stroke, dashPattern: [10, 2] }, { ...finalPaint.stroke, dashPattern: [10, 2], dashPhase: 7 }, finalPaint.stroke,
+          ]
+          await page.evaluate((stroke) => window.stzLabels.mutatePoint('p', { style: { paint: { text: { color: '#000000', opacity: 1 }, fill: { enabled: false, color: '#000000', opacity: 1 }, stroke } } }), strokes[0]); await settle()
+          for (const [i, field] of dashCapEditFields.entries()) {
+            const before = await state()
+            const sameNode = await page.evaluate((stroke) => {
+              const node = document.querySelector('[data-point-id="p"] [data-point-contour]')
+              const pointPaint = { text: { color: '#000000', opacity: 1 }, fill: { enabled: false, color: '#000000', opacity: 1 }, stroke }
+              window.stzLabels.mutatePoint('p', { style: { paint: pointPaint } })
+              return node === document.querySelector('[data-point-id="p"] [data-point-contour]')
+            }, strokes[i + 1]); await settle()
+            const observation = await observe(page, spec); await rasterFiles(`${stem}-edit-${field}`, observation)
+            const edit = { field, sameNode, modelChanged: before.json !== (await state()).json, observation,
+              probe: { ...observation.probes.find((probe) => probe.kind === 'paint'), actions: [] } }
+            entry.edits.push(edit); await persist(); assertDashCapObservation(observation)
+            await pointerProbe(edit.probe, `${stem}-edit-${field}.screen.png`, persist)
+          }
         }
+        entry.observation = await observe(page, spec); await rasterFiles(stem, entry.observation); await persist()
+        await page.screenshot({ path: resolve(artifactDir, `${stem}.screen.png`), timeout: 5000 })
+        assertDashCapObservation(entry.observation)
+        for (const original of entry.observation.probes) {
+          const probe = { ...original, actions: [] }; entry.probes.push(probe)
+          await pointerProbe(probe, `${stem}-${probe.kind}.png`, persist)
+        }
+        assertDashCapEntry({ ...entry, result: 'passed' }, spec, scale)
+        entry.result = 'passed'; await persist()
+      } catch (error) {
+        primary ??= error; entry.result = 'failed'; entry.error = { message: error.message, stack: error.stack }
+        try { await boundedPointDiagnostic(persist, 'dash-cap case failure evidence') }
+        catch (diagnosticError) { console.error('Dash-cap case failure diagnostics:', diagnosticError) }
       }
-      entry.observation = await observe(page, spec); await rasterFiles(stem, entry.observation); await persist()
-      await page.screenshot({ path: resolve(artifactDir, `${stem}.screen.png`), timeout: 5000 })
-      assertDashCapObservation(entry.observation)
-      for (const original of entry.observation.probes) {
-        const probe = { ...original, actions: [] }; entry.probes.push(probe)
-        await pointerProbe(probe, `${stem}-${probe.kind}.png`, persist)
-      }
+    }
+    try { await runPointDashCapMechanismChecks({ page, artifactDir }) } catch (error) { primary ??= error }
+    if (primary) {
+      try { await boundedPointDiagnostic(() => writeFile(resolve(artifactDir, `${dashCapScenario}.json`), JSON.stringify({ scenario: dashCapScenario, group: 'point-node-paint-import-persistence', result: 'failed', cases, error: { message: primary.message, stack: primary.stack } }, null, 2) + '\n'), 'dash-cap matrix failure evidence') }
+      catch (diagnosticError) { console.error('Dash-cap matrix failure diagnostics:', diagnosticError) }
+      throw primary
     }
     assertDashCapEvidence({ scenario: dashCapScenario, group: 'point-node-paint-import-persistence', result: 'passed', cases }); await saved({ cases })
   } catch (error) {

@@ -17,6 +17,7 @@ import { homedir, tmpdir } from "node:os";
 import { join, resolve } from "node:path";
 import { observePostExternalPointPaint, assertPostExternalPointPaint, observeLiteralPointPaint, assertPointPaint, assertExplicitPointPaint } from "../pointPaintOracle.mjs";
 
+import { dashCapMechanismStem, dashCapMechanismArtifacts, assertDashCapMechanismEvidence } from "../pointDashCapMechanismContract.mjs";
 import { dashCapScenario, dashCapArtifacts, assertDashCapEvidence } from "../pointDashCapContract.mjs";
 
 import { polygonJoinScenario, polygonJoinArtifacts, assertPolygonJoinEvidence } from "../pointPolygonJoinContract.mjs";
@@ -69,7 +70,7 @@ export const pointNodeScenarios = {
   ],
 };
 export function pointNodeScenarioArtifacts(name) {
-  if (name === dashCapScenario) return dashCapArtifacts();
+  if (name === dashCapScenario) return [...dashCapArtifacts(), ...dashCapMechanismArtifacts()];
   if (name === polygonJoinScenario) return polygonJoinArtifacts();
   if (name === "point-paint-app-continuity") {
     return [`${name}.json`, "point-paint-app-lifecycle.json", "point-paint-app-transitions.json", "point-paint-app-controls.json",
@@ -221,8 +222,31 @@ function validateTargetedPaintEvidence(artifactDir, name, group) {
     const evidence = evidenceObject(artifactDir, `${name}.json`);
     assertDashCapEvidence(evidence);
     for (const entry of evidence.cases) if (entry.specification.audit) {
-      assert.deepEqual(evidenceObject(artifactDir, `${name}-${entry.key}-scale-${entry.scale}-engine-audit.json`),
+      const stem = `${name}-${entry.key}-scale-${entry.scale}`;
+      assert.deepEqual(evidenceObject(artifactDir, `${stem}-engine-audit.json`),
         entry.observation.engineAudit, "Retained independent audit artifact matches the recorded native case");
+      for (const suffix of [".input.svg", "-solid.input.svg"]) {
+        const source = readFileSync(join(artifactDir, `${stem}${suffix}`), "utf8");
+        assert.ok(source.includes(`points="${entry.observation.engineAudit.rawPoints}"`), "Retained App SVG preserves emitted precision");
+      }
+    }
+    const mechanism = evidenceObject(artifactDir, `${dashCapMechanismStem}.json`);
+    assertDashCapMechanismEvidence(mechanism);
+    for (const entry of mechanism.cases) {
+      const stem = `${dashCapMechanismStem}-${entry.key}`;
+      assert.deepEqual(evidenceObject(artifactDir, `${stem}.json`), entry,
+        "Retained mechanism entry matches the complete matrix");
+      for (const suffix of ["input.svg", "solid.input.svg"]) {
+        const source = readFileSync(join(artifactDir, `${stem}.${suffix}`), "utf8");
+        assert.ok(source.includes(`points="${entry.source.rawPoints}"`), "Retained literal SVG preserves source precision");
+        const spec = entry.specification;
+        for (const [attribute, value] of Object.entries({ fill: "none", stroke: "#000000", "stroke-width": spec.width,
+          "stroke-dasharray": suffix === "solid.input.svg" ? "none" : spec.pattern?.join(" ") ?? "none",
+          "stroke-dashoffset": suffix === "solid.input.svg" ? 0 : spec.phase, "stroke-linecap": spec.cap,
+          "stroke-linejoin": spec.join, "stroke-miterlimit": spec.miterLimit })) {
+          assert.ok(source.includes(`${attribute}="${value}"`), `Retained literal SVG preserves ${attribute}`);
+        }
+      }
     }
     return;
   }
@@ -708,7 +732,7 @@ function validateBrowserEvidence(name, artifactDir, phase, checkout) {
             if (!value || typeof value !== "object") throw new Error(`Invalid point-node JSON: ${artifact}`);
           } else if (artifact.endsWith(".svg")) {
             const svg = bytes.toString();
-            if ((artifact.startsWith(`${polygonJoinScenario}-`) || artifact.startsWith(`${dashCapScenario}-`)) && artifact.endsWith(".input.svg")) {
+            if ((artifact.startsWith(`${polygonJoinScenario}-`) || artifact.startsWith(`${dashCapScenario}-`) || artifact.startsWith(`${dashCapMechanismStem}-`)) && artifact.endsWith(".input.svg")) {
               if (!/^<svg\s[^>]*><(polygon|circle)\s[^>]*><\/\1><\/svg>$/u.test(svg)
                 || /(?:href|onload|script|data-)=/u.test(svg)) throw new Error(`Invalid polygon stroke SVG input: ${artifact}`);
             } else if (!hasWholePointSvg(svg)) {

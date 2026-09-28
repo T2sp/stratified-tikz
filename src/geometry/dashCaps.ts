@@ -2,7 +2,7 @@ import type { Vec2 } from '../model/types.ts'
 
 type Bounds = { minX: number; minY: number; maxX: number; maxY: number }
 type Repetitions = { first: number; last: number; step: number }
-type CapFamily = Repetitions & { sign: -1 | 1 } & (
+type CapFamily = Repetitions & { sign: -1 | 1; isolatedDot: boolean } & (
   { kind: 'line'; origin: Vec2; tangent: Vec2 }
   | { kind: 'circle'; radius: number })
 export type DashCaps = {
@@ -133,14 +133,16 @@ export function createDashCaps(contour: Contour, width: number, pattern: readonl
     const range = exactRepetitions(position, exactPeriod!, binaryUnits(min), binaryUnits(max), includeMin, includeMax)
     return range ? { first: localNumber(range.first), last: localNumber(range.last), step: period } : null
   }
-  const add = (position: number | bigint, sign: -1 | 1, singleton = false, dot = false) => {
+  const add = (position: number | bigint, sign: -1 | 1, singleton = false, dot = false,
+    isolatedDot = dot && !singleton) => {
     if (contour.kind === 'circle') {
       const range = singleton ? { first: Number(position), last: Number(position), step: period }
         : rangeAt(position, 0, length, false, false)
-      if (range) result.families.push({ ...range, sign, kind: 'circle', radius: contour.radius })
+      if (range) result.families.push({ ...range, sign, isolatedDot, kind: 'circle', radius: contour.radius })
     } else for (const edge of edges) {
-      // At an exact vertex positive dashes use the incoming tangent at both
-      // ends. Zero-length dots instead leave their end on the outgoing edge.
+      // Endpoint ownership locates the center; it does not give an isolated
+      // zero-length subpath a direction. Native zero-on paint is a full dot,
+      // not an incoming half-cap plus an outgoing half-cap at the vertex.
       // A dash merely crossing the vertex does not acquire another cap.
       // Explicit seam endpoints below instead use their initial/final edge.
       const outgoing = singleton && !dot ? sign < 0 : dot && sign > 0
@@ -160,7 +162,7 @@ export function createDashCaps(contour: Contour, width: number, pattern: readonl
             outgoing && edge.start !== 0, !outgoing && edge.end !== length)
         range = absolute ? { first: absolute.first - edge.start, last: absolute.last - edge.start, step: period } : null
       }
-      if (range) result.families.push({ ...range, sign, kind: 'line', origin: edge.origin, tangent: edge.tangent })
+      if (range) result.families.push({ ...range, sign, isolatedDot, kind: 'line', origin: edge.origin, tangent: edge.tangent })
     }
   }
   let start = 0
@@ -203,21 +205,21 @@ export function createDashCaps(contour: Contour, width: number, pattern: readonl
   }
   // Join the first and last painted intervals at the closepath seam, including
   // a zero-length terminal interval or a positive dash starting exactly there.
-  // Only their outer endpoints retain caps. An isolated boundary dot has both
-  // caps on that boundary's edge, rather than acquiring the other edge tangent.
+  // Only their outer endpoints retain oriented caps. If the boundary subpath
+  // is an isolated dot, neither half may inherit an adjacent edge direction.
   const firstPainted = rightAtStart || dotAtStart
   const lastPainted = leftAtEnd || startsAtEnd || dotAtEnd
   if (firstPainted && lastPainted) {
-    if (!leftAtEnd) add(length, -1, true)
-    if (!rightAtStart) add(0, 1, true, true)
+    if (!leftAtEnd) add(length, -1, true, false, dotAtEnd && !rightAtStart)
+    if (!rightAtStart) add(0, 1, true, true, !leftAtEnd)
   } else {
     if (firstPainted) {
-      add(0, -1, true)
-      if (!rightAtStart) add(0, 1, true, true)
+      add(0, -1, true, false, !rightAtStart)
+      if (!rightAtStart) add(0, 1, true, true, true)
     }
     if (lastPainted) {
-      add(length, 1, true)
-      if (!leftAtEnd) add(length, -1, true)
+      add(length, 1, true, false, dotAtEnd && !leftAtEnd)
+      if (!leftAtEnd) add(length, -1, true, false, dotAtEnd)
     }
   }
   measure(result)
@@ -251,6 +253,17 @@ function measure(result: DashCaps) {
       const { origin, tangent: t } = family
       for (const at of [family.first, family.last]) {
         const x = origin.x + at * t.x, y = origin.y + at * t.y
+        if (family.isolatedDot) {
+          if (result.cap === 'round') {
+            include(result, x - h, y); include(result, x + h, y)
+            include(result, x, y - h); include(result, x, y + h)
+            result.radius = Math.max(result.radius, Math.hypot(x, y) + h)
+          } else {
+            include(result, x - h, y - h); include(result, x + h, y + h)
+            include(result, x - h, y + h); include(result, x + h, y - h)
+          }
+          continue
+        }
         if (result.cap === 'round') {
           include(result, x - h * t.y, y + h * t.x)
           include(result, x + h * t.y, y - h * t.x)
@@ -268,6 +281,15 @@ function measure(result: DashCaps) {
         }
       }
     } else {
+      if (family.isolatedDot && result.cap === 'square') {
+        for (const dx of [-h, h]) for (const dy of [-h, h]) {
+          for (const at of circleCandidates(family, [0, Math.PI / 2, Math.PI, 3 * Math.PI / 2, Math.atan2(dy, dx)])) {
+            include(result, family.radius * Math.cos(at / family.radius) + dx,
+              family.radius * Math.sin(at / family.radius) + dy)
+          }
+        }
+        continue
+      }
       const radial = result.cap === 'round' ? [family.radius] : [family.radius - h, family.radius + h]
       const tangential = result.cap === 'round' ? [0] : [0, family.sign * h]
       for (const r of radial) for (const t of tangential) {
@@ -297,6 +319,25 @@ export function distanceToDashCaps(point: Vec2, caps: DashCaps): number {
     if (family.kind === 'line') {
       const x = point.x - family.origin.x, y = point.y - family.origin.y, t = family.tangent
       const along = x * t.x + y * t.y, normal = -x * t.y + y * t.x
+      if (family.isolatedDot) {
+        if (caps.cap === 'round') {
+          for (const at of nearest(family, along)) best = Math.min(best, Math.max(0, Math.hypot(along - at, normal) - h))
+        } else {
+          // Distance to a translating upright square is piecewise quadratic.
+          // Its stationary points are projections onto its edges/corners;
+          // feature changes occur at x/y = +/-h. Check adjacent repetitions
+          // at those finite events, never enumerate the dash repetitions.
+          const targets = [along]
+          for (const dx of [-h, 0, h]) for (const dy of [-h, 0, h]) targets.push((x - dx) * t.x + (y - dy) * t.y)
+          if (t.x !== 0) for (const dx of [-h, 0, h]) targets.push((x - dx) / t.x)
+          if (t.y !== 0) for (const dy of [-h, 0, h]) targets.push((y - dy) / t.y)
+          for (const target of targets) for (const at of nearest(family, target)) {
+            best = Math.min(best, Math.hypot(Math.max(0, Math.abs(x - at * t.x) - h),
+              Math.max(0, Math.abs(y - at * t.y) - h)))
+          }
+        }
+        continue
+      }
       for (const at of nearest(family, along - (caps.cap === 'square' ? family.sign * h / 2 : 0))) {
         const outward = family.sign * (along - at)
         best = Math.min(best, caps.cap === 'round' ? outward >= 0
@@ -306,6 +347,23 @@ export function distanceToDashCaps(point: Vec2, caps: DashCaps): number {
       }
     } else {
       const rho = Math.hypot(point.x, point.y), alpha = Math.atan2(point.y, point.x), r = family.radius
+      if (family.isolatedDot && caps.cap === 'square') {
+        const angles = [0, Math.PI / 2, Math.PI, 3 * Math.PI / 2]
+        for (const dx of [-h, 0, h]) for (const dy of [-h, 0, h]) angles.push(Math.atan2(point.y - dy, point.x - dx))
+        for (const offset of [-h, h]) {
+          if (Math.abs((point.x - offset) / r) <= 1) {
+            const a = Math.acos((point.x - offset) / r); angles.push(a, -a)
+          }
+          if (Math.abs((point.y - offset) / r) <= 1) {
+            const a = Math.asin((point.y - offset) / r); angles.push(a, Math.PI - a)
+          }
+        }
+        for (const at of circleCandidates(family, angles)) {
+          best = Math.min(best, Math.hypot(Math.max(0, Math.abs(point.x - r * Math.cos(at / r)) - h),
+            Math.max(0, Math.abs(point.y - r * Math.sin(at / r)) - h)))
+        }
+        continue
+      }
       const angles = [alpha, alpha + Math.PI / 2, alpha + Math.PI, alpha - Math.PI / 2]
       if (caps.cap === 'square') {
         // Stationary corner/edge distances and all changes of nearest feature.

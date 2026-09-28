@@ -64,6 +64,19 @@ test('retain original failed Chrome source/raster/audit bytes and do not turn ab
 test('raw source, exact parsed vertices and winding retain every native grid cell and exact six-unit tolerance', () => {
   const audit = original.observation.engineAudit
   assert.deepEqual(audit.originalVertices, square)
+  const edgeLengths = (vertices: readonly Vec2[]) => vertices.map((point, index) => {
+    const end = vertices[(index + 1) % vertices.length]
+    return Math.hypot(end.x - point.x, end.y - point.y)
+  })
+  const rawLengths = edgeLengths(rawVertices), nativeLengths = edgeLengths(audit.originalVertices)
+  assert.deepEqual(rawLengths, [10, 10, 10.000000000000002, 10.000000000000002])
+  assert.deepEqual(nativeLengths, [10, 10, 10, 10])
+  // The tiny source differences do not move the scalar corner schedule in
+  // this reproduction. They must not be "fixed" by rounding the emitted SVG.
+  for (const lengths of [rawLengths, nativeLengths]) {
+    let total = 0
+    assert.deepEqual(lengths.map((length) => (total += length)), [10, 20, 30, 40])
+  }
   assert.equal(audit.samples.length, 1089)
   for (const vertices of [rawVertices, square, [...rawVertices].reverse(), [...square].reverse()]) {
     const caps = createDashCaps({ kind: 'polygon', radius: 0, vertices }, 36, [0, 10], 0, 'square')

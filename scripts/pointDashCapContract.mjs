@@ -1,4 +1,5 @@
 import assert from 'node:assert/strict'
+export const rawDashCapSquarePoints = '5.000000000000001,-5 -5,-5.000000000000001 -5.000000000000002,5 5,5.000000000000002'
 export const dashCapScenario = 'point-paint-dash-caps'
 export const dashCapScales = [.5, 1.5]
 export const dashCapCases = [
@@ -6,7 +7,7 @@ export const dashCapCases = [
   { key: 'circle-square-wide', shape: 'circle', size: 3, widthPt: 60, lineStyle: 'dashed', phase: 0, exterior: { x: 9, y: -62 }, exact: [{ x: 9, y: -50 }] },
   { key: 'circle-square-gap', shape: 'circle', size: 30, widthPt: 1, lineStyle: 'solid', pattern: [2, 8], phase: 4, exterior: { x: 0, y: -36 }, gap: true },
   { key: 'star-concave-square', shape: 'star', size: 35, widthPt: 30, lineStyle: 'dashed', phase: 2, exterior: { x: 0, y: -80 } },
-  { key: 'square-exact-zero', shape: 'square', size: 5.892556509887896, widthPt: 30, lineStyle: 'solid', pattern: [0, 10 / 1.2], phase: 0, exterior: { x: 20, y: 20 }, audit: true },
+  { key: 'square-exact-zero', shape: 'square', size: 5.892556509887896, widthPt: 30, lineStyle: 'solid', pattern: [0, 10 / 1.2], phase: 0, exterior: { x: -22, y: -30 }, exact: [{ x: -22, y: -22 }, { x: 20, y: 20 }], audit: true },
   { key: 'square-terminal-zero', shape: 'square', size: 5.892556509887896, widthPt: 30, lineStyle: 'solid', pattern: [0, 15 / 1.2], phase: 5 / 1.2, exterior: { x: -32, y: 32 }, exact: [{ x: 21, y: -21 }, { x: 22, y: -22 }], audit: true },
   { key: 'square-positive-corner', shape: 'square', size: 5.892556509887896, widthPt: 30, lineStyle: 'solid', pattern: [10 / 1.2, 10 / 1.2], phase: 0, exterior: { x: 20, y: 20 }, audit: true },
   { key: 'square-later-zero-phase-10', shape: 'square', size: 5.892556509887896, widthPt: 30, lineStyle: 'solid', pattern: [5 / 1.2, 5 / 1.2, 0, 15 / 1.2], phase: 10 / 1.2, exterior: { x: -32, y: 32 }, audit: true },
@@ -42,69 +43,74 @@ export function assertDashCapEvidence(evidence) {
   for (const spec of dashCapCases) for (const scale of dashCapScales) {
     const entries = evidence.cases.filter((entry) => entry.key === spec.key && entry.scale === scale)
     assert.equal(entries.length, 1); const entry = entries[0]
-    assert.deepEqual(entry.specification, spec); assert.equal(entry.modelUnchanged, true)
-    const observation = entry.observation; assertDashCapObservation(observation)
-    assert.equal(observation.strokeWidth, spec.widthPt * 1.2); assert.equal(observation.cap, 'square'); assert.equal(observation.join, 'bevel')
-    assert.equal(observation.fill, 'none'); assert.equal(observation.miterLimit, 10)
-    assert.equal(observation.contourKind, 'polygon')
-    assert.equal(observation.vertexCount, spec.shape === 'circle' ? 256 : spec.shape === 'star' ? 10 : spec.shape === 'square' ? 4 : 3)
-    if (spec.shape === 'circle') assert.ok(Math.abs(observation.radius - spec.size * .6 * Math.SQRT2) < 1e-8)
-    const expectedPattern = (spec.pattern ?? [3, 3]).map((part) => part * 1.2)
-    const actualPattern = observation.pattern.split(/[,\s]+/u).filter(Boolean).map(parseFloat)
-    assert.equal(actualPattern.length, expectedPattern.length)
-    actualPattern.forEach((part, index) => assert.ok(Math.abs(part - expectedPattern[index]) < 1e-8))
-    assert.ok(Math.abs(observation.phase - spec.phase * 1.2) < 1e-8)
-    assert.ok(Object.values(observation.ctm).every(Number.isFinite)); assert.ok(Math.abs(observation.ctm.a - scale) < 1e-8)
-    if (spec.key === 'triangle-square-wide') {
-      assert.ok(Math.abs(observation.rasterBounds.minY + 29.6875) < .14)
-      assert.ok(Math.abs(observation.rasterRadius - 30.3804328989) < .14)
-      assert.ok(Math.abs(observation.declaredBounds[1] - observation.rasterBounds.minY) < .14)
-      assert.deepEqual(entry.edits.map(({ field }) => field), dashCapEditFields)
-      for (const edit of entry.edits) {
-        assert.equal(edit.sameNode, true); assert.equal(edit.modelChanged, true); assertDashCapObservation(edit.observation)
-        const probe = edit.probe, matrix = probe?.transform?.ctm
-        assert.ok(probe && matrix && Object.values(matrix).every(Number.isFinite))
-        assert.equal(probe.alpha, 255); assert.equal(probe.nativeStrokeContains, true); assert.equal(probe.selectionCleared, true)
-        assert.equal(probe.screenshot, `${dashCapScenario}-${spec.key}-scale-${scale}-edit-${edit.field}.screen.png`)
-        assert.deepEqual(probe.actions.map((action) => action.alt), [false, true, true, true])
-        for (const action of probe.actions) {
-          assert.equal(action.trusted, true); assert.equal(action.overlayExcluded, true)
-          assert.deepEqual([...action.candidates].sort(), ['control', 'p'])
-          if (!action.alt) assert.equal(action.selection?.id, 'p')
-          assert.ok(Math.abs(action.screen.x - (matrix.a * probe.local.x + matrix.c * probe.local.y + matrix.e)) < .01)
-          assert.ok(Math.abs(action.screen.y - (matrix.b * probe.local.x + matrix.d * probe.local.y + matrix.f)) < .01)
-          assert.ok(Math.abs(action.point.x - 450 - probe.local.x) < .01 && Math.abs(action.point.y - 350 - probe.local.y) < .01)
-        }
-        assert.deepEqual([...new Set(probe.actions.filter((action) => action.alt).map((action) => action.selection?.id))].sort(), ['control', 'p'])
-      }
-      assert.equal(entry.edits[0].observation.cap, 'butt'); assert.equal(entry.edits[1].observation.cap, 'square')
-      assert.notDeepEqual(entry.edits[0].observation.declaredBounds, entry.edits[1].observation.declaredBounds)
-      assert.notEqual(entry.edits[1].observation.pattern, entry.edits[2].observation.pattern)
-      assert.notEqual(entry.edits[2].observation.phase, entry.edits[3].observation.phase)
-    }
-    if (spec.audit) assertDashCapEngineAudit(entry, spec, scale)
-    if (spec.key === 'circle-square-wide') assert.ok(observation.rasterRadius > 51 && observation.selectionRadius > 51)
-    for (const kind of dashCapProbeKinds(spec)) {
-      const probe = entry.probes.find((p) => p.kind === kind); assert.ok(probe)
-      assert.equal(probe.screenshot, `${dashCapScenario}-${spec.key}-scale-${scale}-${kind}.png`)
-      if (kind === 'paint' || kind === 'audit-cap' || kind.startsWith('exact')) { assert.equal(probe.alpha, 255); assert.equal(probe.nativeStrokeContains, true) }
-      if (kind.startsWith('exact')) assert.deepEqual(probe.local, spec.exact[Number(kind.slice(6))])
-      if (kind === 'outside') { assert.deepEqual(probe.local, spec.exterior); assert.equal(probe.alpha, 0); assert.ok(probe.rasterDistance > 6.2) }
-      if (kind === 'gap') { assert.equal(probe.alpha, 0); assert.equal(probe.nativeStrokeContains, false); assert.ok(Math.abs(Math.hypot(probe.local.x, probe.local.y) - observation.radius) < 1e-8) }
-      assert.equal(probe.selectionCleared, true)
+    assertDashCapEntry(entry, spec, scale)
+  }
+}
+
+export function assertDashCapEntry(entry, spec, scale) {
+  assert.deepEqual(entry.specification, spec); assert.equal(entry.modelUnchanged, true); assert.equal(entry.result, 'passed')
+  assert.deepEqual(entry.probes.map(({ kind }) => kind).sort(), dashCapProbeKinds(spec).sort())
+  const observation = entry.observation; assertDashCapObservation(observation)
+  assert.equal(observation.strokeWidth, spec.widthPt * 1.2); assert.equal(observation.cap, 'square'); assert.equal(observation.join, 'bevel')
+  assert.equal(observation.fill, 'none'); assert.equal(observation.miterLimit, 10)
+  assert.equal(observation.contourKind, 'polygon')
+  assert.equal(observation.vertexCount, spec.shape === 'circle' ? 256 : spec.shape === 'star' ? 10 : spec.shape === 'square' ? 4 : 3)
+  if (spec.shape === 'circle') assert.ok(Math.abs(observation.radius - spec.size * .6 * Math.SQRT2) < 1e-8)
+  const expectedPattern = (spec.pattern ?? [3, 3]).map((part) => part * 1.2)
+  const actualPattern = observation.pattern.split(/[,\s]+/u).filter(Boolean).map(parseFloat)
+  assert.equal(actualPattern.length, expectedPattern.length)
+  actualPattern.forEach((part, index) => assert.ok(Math.abs(part - expectedPattern[index]) < 1e-8))
+  assert.ok(Math.abs(observation.phase - spec.phase * 1.2) < 1e-8)
+  assert.ok(Object.values(observation.ctm).every(Number.isFinite)); assert.ok(Math.abs(observation.ctm.a - scale) < 1e-8)
+  if (spec.key === 'triangle-square-wide') {
+    assert.ok(Math.abs(observation.rasterBounds.minY + 29.6875) < .14)
+    assert.ok(Math.abs(observation.rasterRadius - 30.3804328989) < .14)
+    assert.ok(Math.abs(observation.declaredBounds[1] - observation.rasterBounds.minY) < .14)
+    assert.deepEqual(entry.edits.map(({ field }) => field), dashCapEditFields)
+    for (const edit of entry.edits) {
+      assert.equal(edit.sameNode, true); assert.equal(edit.modelChanged, true); assertDashCapObservation(edit.observation)
+      const probe = edit.probe, matrix = probe?.transform?.ctm
+      assert.ok(probe && matrix && Object.values(matrix).every(Number.isFinite))
+      assert.equal(probe.alpha, 255); assert.equal(probe.nativeStrokeContains, true); assert.equal(probe.selectionCleared, true)
+      assert.equal(probe.screenshot, `${dashCapScenario}-${spec.key}-scale-${scale}-edit-${edit.field}.screen.png`)
       assert.deepEqual(probe.actions.map((action) => action.alt), [false, true, true, true])
-      const expected = ['outside', 'audit-outside'].includes(kind) ? ['control'] : ['control', 'p'], matrix = probe.transform.ctm
-      assert.ok(Object.values(matrix).every(Number.isFinite)); assert.ok(Math.abs(matrix.a - scale) < 1e-8 && Math.abs(matrix.d - scale) < 1e-8)
       for (const action of probe.actions) {
         assert.equal(action.trusted, true); assert.equal(action.overlayExcluded, true)
-        assert.deepEqual([...action.candidates].sort(), expected)
+        assert.deepEqual([...action.candidates].sort(), ['control', 'p'])
+        if (!action.alt) assert.equal(action.selection?.id, 'p')
         assert.ok(Math.abs(action.screen.x - (matrix.a * probe.local.x + matrix.c * probe.local.y + matrix.e)) < .01)
         assert.ok(Math.abs(action.screen.y - (matrix.b * probe.local.x + matrix.d * probe.local.y + matrix.f)) < .01)
         assert.ok(Math.abs(action.point.x - 450 - probe.local.x) < .01 && Math.abs(action.point.y - 350 - probe.local.y) < .01)
-        if (!action.alt && (kind === 'paint' || kind === 'audit-cap' || kind.startsWith('exact') || ['outside', 'audit-outside'].includes(kind))) assert.equal(action.selection?.id, ['outside', 'audit-outside'].includes(kind) ? 'control' : 'p')
       }
-      assert.deepEqual([...new Set(probe.actions.filter((a) => a.alt).map((a) => a.selection?.id))].sort(), expected)
+      assert.deepEqual([...new Set(probe.actions.filter((action) => action.alt).map((action) => action.selection?.id))].sort(), ['control', 'p'])
     }
+    assert.equal(entry.edits[0].observation.cap, 'butt'); assert.equal(entry.edits[1].observation.cap, 'square')
+    assert.notDeepEqual(entry.edits[0].observation.declaredBounds, entry.edits[1].observation.declaredBounds)
+    assert.notEqual(entry.edits[1].observation.pattern, entry.edits[2].observation.pattern)
+    assert.notEqual(entry.edits[2].observation.phase, entry.edits[3].observation.phase)
+  }
+  if (spec.audit) assertDashCapEngineAudit(entry, spec, scale)
+  if (spec.key === 'circle-square-wide') assert.ok(observation.rasterRadius > 51 && observation.selectionRadius > 51)
+  for (const kind of dashCapProbeKinds(spec)) {
+    const probe = entry.probes.find((p) => p.kind === kind); assert.ok(probe)
+    assert.equal(probe.screenshot, `${dashCapScenario}-${spec.key}-scale-${scale}-${kind}.png`)
+    if (kind === 'paint' || kind === 'audit-cap' || kind.startsWith('exact')) { assert.equal(probe.alpha, 255); assert.equal(probe.nativeStrokeContains, true) }
+    if (kind.startsWith('exact')) assert.deepEqual(probe.local, spec.exact[Number(kind.slice(6))])
+    if (kind === 'outside') { assert.deepEqual(probe.local, spec.exterior); assert.equal(probe.alpha, 0); assert.equal(probe.nativeStrokeContains, false); assert.ok(probe.rasterDistance > 6.2) }
+    if (kind === 'gap') { assert.equal(probe.alpha, 0); assert.equal(probe.nativeStrokeContains, false); assert.ok(Math.abs(Math.hypot(probe.local.x, probe.local.y) - observation.radius) < 1e-8) }
+    assert.equal(probe.selectionCleared, true)
+    assert.deepEqual(probe.actions.map((action) => action.alt), [false, true, true, true])
+    const expected = ['outside', 'audit-outside'].includes(kind) ? ['control'] : ['control', 'p'], matrix = probe.transform.ctm
+    assert.ok(Object.values(matrix).every(Number.isFinite)); assert.ok(Math.abs(matrix.a - scale) < 1e-8 && Math.abs(matrix.d - scale) < 1e-8)
+    for (const action of probe.actions) {
+      assert.equal(action.trusted, true); assert.equal(action.overlayExcluded, true)
+      assert.deepEqual([...action.candidates].sort(), expected)
+      assert.ok(Math.abs(action.screen.x - (matrix.a * probe.local.x + matrix.c * probe.local.y + matrix.e)) < .01)
+      assert.ok(Math.abs(action.screen.y - (matrix.b * probe.local.x + matrix.d * probe.local.y + matrix.f)) < .01)
+      assert.ok(Math.abs(action.point.x - 450 - probe.local.x) < .01 && Math.abs(action.point.y - 350 - probe.local.y) < .01)
+      if (!action.alt && (kind === 'paint' || kind === 'audit-cap' || kind.startsWith('exact') || ['outside', 'audit-outside'].includes(kind))) assert.equal(action.selection?.id, ['outside', 'audit-outside'].includes(kind) ? 'control' : 'p')
+    }
+    assert.deepEqual([...new Set(probe.actions.filter((a) => a.alt).map((a) => a.selection?.id))].sort(), expected)
   }
 }
 
@@ -115,6 +121,15 @@ export function assertDashCapEngineAudit(entry, spec, scale) {
   assert.ok(audit, 'Required independent native engine audit')
   assert.deepEqual(audit.grid, dashCapAuditGrid)
   assert.equal(audit.modelUnchanged, true)
+  assert.equal(audit.model.id, 'p'); assert.equal(audit.model.geometricKind, 'point'); assert.equal(audit.model.codim, 2); assert.equal(audit.model.text, '')
+  assert.equal(audit.model.style.shape, spec.shape); assert.equal(audit.model.style.size, spec.size)
+  assert.deepEqual(audit.model.style.paint, { text: { color: '#000000', opacity: 1 }, fill: { enabled: false, color: '#000000', opacity: 1 },
+    stroke: { enabled: true, color: '#000000', opacity: 1, width: spec.widthPt, lineStyle: spec.lineStyle, dashPattern: spec.pattern, dashPhase: spec.phase, lineCap: 'rect', lineJoin: 'bevel' } })
+  assert.equal(audit.rawPoints, rawDashCapSquarePoints)
+  assert.ok(Math.abs(audit.pathLength - 40) < 1e-8)
+  assert.deepEqual(audit.raster, { resolution: 16, half: 90, side: 2880, uncertainty: .14, alphaThreshold: 128 })
+  assert.equal(typeof audit.browser.version, 'string'); assert.ok(audit.browser.version.length > 0); assert.notEqual(audit.browser.version, 'unavailable')
+  assert.equal(typeof audit.browser.userAgent, 'string'); assert.ok(audit.browser.userAgent.length > 0)
   assert.equal(audit.samples.length, dashCapAuditGrid.samples)
   assert.equal(audit.solidControl.fill, 'none'); assert.equal(audit.solidControl.pattern, 'none')
   assert.equal(audit.solidControl.strokeWidth, 36); assert.equal(audit.solidControl.join, 'bevel')
@@ -144,6 +159,18 @@ export function assertDashCapEngineAudit(entry, spec, scale) {
   }
   assert.ok(hits > 100 && misses > 50 && uncertain < 200)
   assert.deepEqual(audit.counts, { hits, misses, uncertain })
+  if (spec.key === 'square-exact-zero') {
+    for (const local of spec.exact) {
+      const sample = audit.samples.find((sample) => sample.local.x === local.x && sample.local.y === local.y)
+      assert.ok(sample); assert.equal(sample.paintCore, true); assert.equal(sample.paintAlpha, 255); assert.equal(sample.nativeStrokeContains, true)
+      assert.equal(sample.insideContour, false); assert.ok(sample.solidDistance > 6.14); assert.deepEqual(sample.candidates, ['p'])
+    }
+    const sample = audit.samples.find((sample) => sample.local.x === spec.exterior.x && sample.local.y === spec.exterior.y)
+    assert.ok(sample); assert.equal(sample.paintAlpha, 0); assert.equal(sample.nativeStrokeContains, false); assert.equal(sample.insideContour, false)
+    assert.ok(sample.paintDistance > 6.2 && sample.paintDistance < 8 && sample.solidDistance > 6.14); assert.deepEqual(sample.candidates, [])
+    const probe = entry.probes.find((probe) => probe.kind === 'outside')
+    assert.ok(probe); assert.equal(probe.rasterDistance, sample.paintDistance)
+  }
   for (const kind of ['audit-cap', 'audit-outside']) {
     const probe = entry.probes.find((probe) => probe.kind === kind)
     assert.ok(probe, 'Required actual native audit pointer witness')

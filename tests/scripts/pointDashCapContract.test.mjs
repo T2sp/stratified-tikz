@@ -1,5 +1,11 @@
 import assert from 'node:assert/strict'
 import test from 'node:test'
+import { mkdtemp, readFile, rm } from 'node:fs/promises'
+import { tmpdir } from 'node:os'
+import { join } from 'node:path'
+import { runPointDashCapChecks } from '../../scripts/checkPointDashCaps.mjs'
+import { dashCapCases, dashCapScales } from '../../scripts/pointDashCapContract.mjs'
+import { dashCapMechanismCases } from '../../scripts/pointDashCapMechanismContract.mjs'
 import { dashCapArtifacts, assertDashCapEvidence } from '../../scripts/pointDashCapContract.mjs'
 import { dashCapEvidence } from './dashCapEvidenceFixture.mjs'
 test('synthetic dash-cap policy contract preserves paint hits, gaps, exterior controls, transformations, live edits and engine audits', () => {
@@ -7,7 +13,7 @@ test('synthetic dash-cap policy contract preserves paint hits, gaps, exterior co
   assertDashCapEvidence(evidence)
   assert.equal(evidence.cases.length, 18)
   assert.equal(evidence.cases.filter((entry) => entry.observation.engineAudit).length, 10)
-  assert.equal(dashCapArtifacts().length, 219)
+  assert.equal(dashCapArtifacts().length, 223)
 })
 for (const [name, damage] of [
   ['missing circle', (e) => { e.cases = e.cases.filter((c) => c.key !== 'circle-square-wide') }],
@@ -35,7 +41,9 @@ for (const [name, damage] of [
   ['stale phase paint', (e) => { e.cases[0].edits[3].observation.phase = e.cases[0].edits[2].observation.phase }],
 ]) test(`dash-cap evidence rejects ${name}`, () => { const evidence = dashCapEvidence(); damage(evidence); assert.throws(() => assertDashCapEvidence(evidence)) })
 
-const auditEntry = (evidence) => evidence.cases.find((entry) => entry.specification.audit)
+// The mixed-pattern synthetic region retains explicit gap controls; exact-zero
+// has a separate full-square synthetic region matching the corrected witness roles.
+const auditEntry = (evidence) => evidence.cases.find((entry) => entry.key === 'square-later-zero-phase-10')
 const audit = (evidence) => auditEntry(evidence).observation.engineAudit
 const auditProbe = (evidence, kind = 'audit-cap') => auditEntry(evidence).probes.find((probe) => probe.kind === kind)
 const auditSample = (evidence, predicate) => {
@@ -106,4 +114,51 @@ for (const [name, damage] of [
   const evidence = dashCapEvidence()
   damage(evidence)
   assert.throws(() => assertDashCapEvidence(evidence))
+})
+
+const zeroEntry = (evidence) => evidence.cases.find((entry) => entry.key === 'square-exact-zero')
+test('synthetic policy keeps disproven exterior as painted positive and a nearby independently exterior replacement at both scales', () => {
+  const evidence = dashCapEvidence()
+  assert.match(evidence.fixture, /synthetic.*not native/u)
+  for (const entry of evidence.cases.filter((entry) => entry.key === 'square-exact-zero')) {
+    assert.deepEqual(entry.specification.exterior, { x: -22, y: -30 })
+    assert.deepEqual(entry.specification.exact, [{ x: -22, y: -22 }, { x: 20, y: 20 }])
+    assertDashCapEvidence(evidence)
+  }
+})
+for (const [name, damage] of [
+  ['unpassed matrix entry', (entry) => { entry.result = 'observed' }],
+  ['erased model zero entry', (entry) => { entry.observation.engineAudit.model.style.paint.stroke.dashPattern.shift() }],
+  ['rounded emitted points', (entry) => { entry.observation.engineAudit.rawPoints = '5,-5 -5,-5 -5,5 5,5' }],
+  ['unavailable native engine', (entry) => { entry.observation.engineAudit.browser.version = 'unavailable' }],
+  ['missing fully painted regression', (entry) => { entry.probes = entry.probes.filter((probe) => probe.kind !== 'exact-1') }],
+  ['painted exterior containment', (entry) => { entry.probes.find((probe) => probe.kind === 'outside').nativeStrokeContains = true }],
+  ['distant replacement negative', (entry) => { entry.observation.engineAudit.samples.find((sample) => sample.local.x === -22 && sample.local.y === -30).paintDistance = 80 }],
+]) test(`synthetic corrected witness rejects ${name}`, () => {
+  const evidence = dashCapEvidence(); damage(zeroEntry(evidence)); assert.throws(() => assertDashCapEvidence(evidence))
+})
+
+test('failed App dash matrix retains every case and still runs supplemental mechanism without converting failures to successful scenarios', async () => {
+  const artifactDir = await mkdtemp(join(tmpdir(), 'stz-dash-matrix-failure-'))
+  const original = new Error('original App matrix failure'), appAttempts = [], mechanismAttempts = [], viewport = { width: 900, height: 700 }, sizes = []
+  let saved = 0
+  const page = { viewportSize: () => viewport, setViewportSize: async (size) => { sizes.push(size) },
+    context: () => ({ browser: () => ({ version: () => 'synthetic-failure-boundary' }) }),
+    evaluate: async (_callback, input) => {
+      if (!input) return
+      if (input.finalPaint) { appAttempts.push([input.spec.key, input.scale]); throw appAttempts.length === 1 ? original : new Error('later App failure') }
+      mechanismAttempts.push(input.spec.key); throw new Error('supplemental native observation failure')
+    } }
+  try {
+    await assert.rejects(runPointDashCapChecks({ page, artifactDir, begin() {}, saved: async () => { saved++ }, diagnose: async () => {} }), (error) => error === original)
+    assert.deepEqual(appAttempts, dashCapCases.flatMap(({ key }) => dashCapScales.map((scale) => [key, scale])))
+    assert.deepEqual(mechanismAttempts, dashCapMechanismCases.map(({ key }) => key))
+    assert.equal(saved, 0); assert.deepEqual(sizes.at(-1), viewport)
+    const evidence = JSON.parse(await readFile(join(artifactDir, 'point-paint-dash-caps.json'), 'utf8'))
+    assert.equal(evidence.result, 'failed'); assert.equal(evidence.cases.length, 18); assert.ok(evidence.cases.every((entry) => entry.result === 'failed'))
+    assert.equal(evidence.error.message, original.message); assert.equal(evidence.cases[0].error.stack, original.stack)
+    assert.throws(() => assertDashCapEvidence(evidence))
+    const mechanism = JSON.parse(await readFile(join(artifactDir, 'point-paint-dash-cap-mechanism.json'), 'utf8'))
+    assert.equal(mechanism.result, 'failed'); assert.equal(mechanism.cases.length, 19)
+  } finally { await rm(artifactDir, { recursive: true, force: true }) }
 })

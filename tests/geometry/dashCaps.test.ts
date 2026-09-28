@@ -134,16 +134,17 @@ test('exact corner ownership preserves a subnormal positive gap beside huge inte
 
 
 for (const cap of ['square', 'round'] as const) {
-  test(`zero-on ${cap} corner dots preserve independent exterior negatives and six-unit allowance`, () => {
+  test(`zero-on ${cap} full corner dots preserve nearby exterior negatives and six-unit allowance`, () => {
     const caps = createDashCaps(contour, 36, [0, 10], 0, cap)
     const solid = createPolygonStrokeRegion(contour.vertices, 36, 'bevel')
-    const point = { x: 25, y: 25 }
+    const point = { x: 25, y: 35 }
     const interactionDistance = Math.min(distanceToDashCaps(point, caps), distanceToPolygonStroke(point, solid))
-    // Independent librsvg observations: alpha=0, nearest paint distance
-    // 7.0313 (square) / 8.5047 (round). Both are outside the six-unit policy.
-    close(distanceToPolygonStroke(point, solid), 6 * Math.SQRT2)
+    // Four width-36 full dots have centers at the four literal vertices.
+    // (25,25), called exterior by Cairo's split corner caps, is within the
+    // full-dot region/allowance; (25,35) is seven units beyond square paint.
     assert.ok(interactionDistance > 6)
-    assert.ok(Math.abs(interactionDistance - (cap === 'square' ? 7.0313 : 8.5047)) < .125)
+    close(distanceToDashCaps(point, caps), cap === 'square' ? 7 : Math.hypot(15, 25) - 18)
+    assert.ok(distanceToDashCaps({ x: 25, y: 25 }, caps) < 6)
     assert.equal(distanceToDashCaps({ x: 5, y: 5 }, caps), 0,
       'inside cap paint remains available; exterior rejection does not disable dots')
   })
@@ -156,7 +157,7 @@ test('positive-on dash endpoints just after corners preserve ordinary cap direct
   close(distanceToDashCaps({ x: 25, y: 25 }, caps), 0)
 })
 
-test('actual square point with zero-on corner dots rejects exterior App candidates without changing width or tolerance', () => {
+test('actual square point includes full zero-on corner paint and rejects nearby exterior App candidates', () => {
   const diagram = createEmptyDiagram({ ambientDimension: 2 })
   diagram.camera = { mode: '2d', scale: 1, origin: { x: 240, y: 180 } }
   const point = createPointStratum({ ambientDimension: 2, id: 'zero-corner-square', text: '', position: { x: 0, y: 0, z: 0 } })
@@ -179,8 +180,9 @@ test('actual square point with zero-on corner dots rejects exterior App candidat
     camera: diagram.camera, viewportHeight: 360, point: { x: center.x + local.x, y: center.y + local.y },
     showCoordinateAnchors: false }).some((candidate) => candidate.id === point.id)
   assert.equal(picked({ x: 0, y: 0 }), true, 'hollow original contour interior remains selectable')
-  assert.equal(picked({ x: 20, y: 20 }), false)
-  assert.equal(picked({ x: 25, y: 25 }), false)
+  assert.equal(picked({ x: 20, y: 20 }), true, 'retained Chrome paint disproves the former Cairo exterior classification')
+  assert.equal(picked({ x: 25, y: 25 }), true, 'within six units of the full square corner')
+  assert.equal(picked({ x: -22, y: -30 }), false, 'seven units beyond full square paint')
   for (const probe of reference.probes.filter((probe) => probe.painted)) assert.equal(picked(probe.point), true)
 })
 
@@ -198,6 +200,25 @@ const cornerRaster = JSON.parse(readFileSync(new URL('corner-observations.json',
   observations: CornerObservation[]
 }
 
+// Literal zero-dot centers for these finite square fixtures. This independent
+// analytic delta retains every Cairo observation, while avoiding treating
+// Cairo's split incoming/outgoing caps as a Chrome oracle. Native acceptance
+// of the other zero patterns remains required by the browser mechanism matrix.
+function fullDotDistance(point: { x: number; y: number }, centers: readonly { x: number; y: number }[],
+  width: number, cap: 'square' | 'round'): number {
+  const half = width / 2
+  return Math.min(...centers.map((center) => cap === 'square'
+    ? Math.hypot(Math.max(0, Math.abs(point.x - center.x) - half), Math.max(0, Math.abs(point.y - center.y) - half))
+    : Math.max(0, Math.hypot(point.x - center.x, point.y - center.y) - half)))
+}
+
+function assertCairoExteriorWithDotDelta(point: { x: number; y: number }, actual: number,
+  centers: readonly { x: number; y: number }[], observation: Pick<CornerObservation, 'width' | 'lineCap'>) {
+  const delta = fullDotDistance(point, centers, observation.width, observation.lineCap)
+  assert.equal(actual <= 6, delta <= 6,
+    `${JSON.stringify(point)}: retained Cairo exterior; full-dot analytic distance ${delta}`)
+}
+
 test('independent corner fixture inventory retains both cap types, thin/wide paint, actual point and positive-on controls', () => {
   assert.match(cornerRaster.provenance, /Independent librsvg/)
   assert.equal(cornerRaster.scale, 16)
@@ -213,7 +234,7 @@ test('independent corner fixture inventory retains both cap types, thin/wide pai
 })
 
 for (const observation of cornerRaster.observations) {
-  test(`${observation.id}: authenticated native paint positives and meaningful exterior negatives match interaction`, () => {
+  test(`${observation.id}: authenticated Cairo controls and explicit full-dot geometry delta`, () => {
     for (const [file, hash] of [[observation.svgFile, observation.svgSha256], [observation.pngFile, observation.pngSha256]]) {
       assert.equal(createHash('sha256').update(readFileSync(new URL(file, cornerDirectory))).digest('hex'), hash)
     }
@@ -239,12 +260,15 @@ for (const observation of cornerRaster.observations) {
         Math.max(0, contourBox.minY - y, y - contourBox.maxY)) > observation.width / 2 + 6 + cornerRaster.distanceUncertainty
     })
     assert.ok(negatives.length > 0)
-    for (const probe of negatives) assert.ok(distance(probe.point) > 6,
-      `${JSON.stringify(probe.point)} is independently outside paint and the intended continuous interaction region`)
+    const dotCenters = observation.dashPattern[0] === 0 ? observation.vertices : []
+    for (const probe of negatives) assertCairoExteriorWithDotDelta(probe.point, distance(probe.point), dotCenters, observation)
+    assert.ok(negatives.some((probe) => fullDotDistance(probe.point, dotCenters, observation.width, observation.lineCap) > 6),
+      'Retain genuine exterior controls beyond the new full dots')
     const target = observation.probes.find(({ point }) => point.x === 25 && point.y === 25)!
     if (target.painted) close(distance(target.point), 0)
     else if (target.nearestPaintCenterDistance > 6 + cornerRaster.distanceUncertainty) {
-      assert.equal(target.alpha, 0); assert.ok(distance(target.point) > 6)
+      assert.equal(target.alpha, 0)
+      assertCairoExteriorWithDotDelta(target.point, distance(target.point), dotCenters, observation)
     } else if (target.nearestPaintCenterDistance < 6 - cornerRaster.distanceUncertainty) {
       assert.ok(distance(target.point) <= 6, 'actual paint within six units remains selectable')
     }
@@ -270,7 +294,7 @@ test('independent terminal-only dot fixture inventory retains both cap types and
 })
 
 for (const observation of terminalRaster.observations) {
-  test(`${observation.id}: terminal-only closed-path dot preserves authenticated native paint and exterior controls`, () => {
+  test(`${observation.id}: terminal policy retains Cairo evidence and explicit interior full-dot delta`, () => {
     if (observation.coordinateSpace === 'cartesian') assert.deepEqual(observation.vertices, contour.vertices)
     assert.deepEqual(observation.dashPattern, [0, 15])
     assert.equal(observation.dashPhase, 5)
@@ -309,7 +333,13 @@ for (const observation of terminalRaster.observations) {
         Math.max(0, contourBox.minY - point.y, point.y - contourBox.maxY))
         > observation.width / 2 + 6 + terminalRaster.distanceUncertainty)
     assert.ok(negatives.length > 0)
-    for (const probe of negatives) assert.ok(distance(probe.point) > 6, `${JSON.stringify(probe.point)} is an exterior miss`)
+    // Scalar positions 10 and 25 are interior zero-on intervals; position 40
+    // is the retained terminal policy, separately questioned by native checks.
+    const [v0, v1, v2, v3] = observation.vertices
+    const dotCenters = [v0, v1, { x: (v2.x + v3.x) / 2, y: (v2.y + v3.y) / 2 }]
+    for (const probe of negatives) assertCairoExteriorWithDotDelta(probe.point, distance(probe.point), dotCenters, observation)
+    assert.ok(negatives.some((probe) => fullDotDistance(probe.point, dotCenters, observation.width, observation.lineCap) > 6),
+      'Retain genuine exterior controls beyond the new full dots')
     const bounds = { minX: Math.min(solid.bounds!.minX, caps.bounds!.minX), minY: Math.min(solid.bounds!.minY, caps.bounds!.minY),
       maxX: Math.max(solid.bounds!.maxX, caps.bounds!.maxX), maxY: Math.max(solid.bounds!.maxY, caps.bounds!.maxY) }
     assert.ok(bounds.minX <= observation.rasterBounds.minX + terminalRaster.boundsUncertainty)
@@ -404,7 +434,7 @@ test('independent generalized-seam inventory preserves eight reviewer pairs and 
 })
 
 for (const observation of seamRaster.observations) {
-  test(`${observation.id}: generalized seam encloses independent cap paint and excludes independent exterior probes`, () => {
+  test(`${observation.id}: generalized seam retains Cairo probes with explicit isolated-dot delta`, () => {
     assert.deepEqual(observation.vertices, contour.vertices)
     assert.equal(observation.width, 36)
     assert.equal(observation.lineJoin, 'bevel')
@@ -425,8 +455,13 @@ for (const observation of seamRaster.observations) {
       && nearestPaintCenterDistance > 6 + seamRaster.distanceUncertainty
       && continuousStrokeDistance > 6 + seamRaster.distanceUncertainty)
     assert.ok(negatives.length > 0)
-    for (const probe of negatives) assert.ok(distance(probe.point) > 6,
-      `${JSON.stringify(probe.point)} is independently beyond paint and the continuous bevel neighborhood`)
+    // The p5 pattern's isolated interior dots occur at scalar 30 (phase 0)
+    // or 10 (phase 20). Positive intervals and the seam policy are unchanged.
+    const dotCenters = observation.id.startsWith('p5-')
+      ? [contour.vertices[observation.dashPhase === 0 ? 3 : 1]] : []
+    for (const probe of negatives) assertCairoExteriorWithDotDelta(probe.point, distance(probe.point), dotCenters, observation)
+    assert.ok(negatives.some((probe) => fullDotDistance(probe.point, dotCenters, observation.width, observation.lineCap) > 6),
+      'Retain genuine exterior controls beyond the new full dots')
     const corner = observation.probes.find(({ point }) => point.x === -28 && point.y === -28)!
     close(corner.continuousStrokeDistance, 38 / Math.SQRT2)
     const bounds = { minX: Math.min(solid.bounds!.minX, caps.bounds!.minX), minY: Math.min(solid.bounds!.minY, caps.bounds!.minY),

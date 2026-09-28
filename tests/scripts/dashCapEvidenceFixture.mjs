@@ -1,8 +1,8 @@
-import { dashCapScenario, dashCapCases, dashCapScales, dashCapProbeKinds, dashCapEditFields, dashCapAuditGrid } from '../../scripts/pointDashCapContract.mjs'
+import { dashCapScenario, dashCapCases, dashCapScales, dashCapProbeKinds, dashCapEditFields, dashCapAuditGrid, rawDashCapSquarePoints } from '../../scripts/pointDashCapContract.mjs'
 
 // Synthetic policy data only: these analytic regions exercise evidence validation,
 // not the browser's dash geometry or the production geometry helper.
-function syntheticEngineAudit() {
+function syntheticEngineAudit(specification) {
   const originalVertices = [{ x: -5, y: -5 }, { x: 5, y: -5 }, { x: 5, y: 5 }, { x: -5, y: 5 }]
   const solidBoundary = [[-5, -23], [5, -23], [23, -5], [23, 5], [5, 23], [-5, 23], [-23, 5], [-23, -5]]
   const solidDistanceAt = (x, y) => {
@@ -19,7 +19,8 @@ function syntheticEngineAudit() {
     const x = -32 + index % 33 * 2, y = -32 + Math.floor(index / 33) * 2
     // One wide square cap extends past the bevel, while the opposite contour
     // remains a deliberate gap selected using the continuous solid neighborhood.
-    const paintDistance = Math.hypot(Math.max(-23 - x, 0, x - 13), Math.max(-23 - y, 0, y - 13))
+    const extent = specification.key === 'square-exact-zero' ? 23 : 13
+    const paintDistance = Math.hypot(Math.max(-23 - x, 0, x - extent), Math.max(-23 - y, 0, y - extent))
     const solidDistance = solidDistanceAt(x, y), insideContour = Math.abs(x) <= 5 && Math.abs(y) <= 5
     const distance = Math.min(paintDistance, solidDistance)
     const expected = insideContour || distance < 5.86 ? 'hit' : distance > 6.14 ? 'miss' : 'uncertain'
@@ -27,15 +28,17 @@ function syntheticEngineAudit() {
     return { local: { x, y }, point: { x: 450 + x, y: 350 + y }, paintDistance, solidDistance,
       paintAlpha: paintDistance === 0 ? 255 : 0, solidAlpha: solidDistance === 0 ? 255 : 0,
       insideContour, expected, nativeStrokeContains: paintDistance === 0,
-      paintCore: x > -23 && x < 13 && y > -23 && y < 13, candidates: expected === 'miss' ? [] : ['p'] }
+      paintCore: x > -23 && x < extent && y > -23 && y < extent, candidates: expected === 'miss' ? [] : ['p'] }
   })
-  return { grid: { ...dashCapAuditGrid }, modelUnchanged: true, originalVertices,
+  return { model: { id: 'p', text: '', geometricKind: 'point', codim: 2, style: { shape: specification.shape, size: specification.size,
+    paint: { text: { color: '#000000', opacity: 1 }, fill: { enabled: false, color: '#000000', opacity: 1 }, stroke: { enabled: true, color: '#000000', opacity: 1, width: specification.widthPt, lineStyle: specification.lineStyle, dashPattern: [...specification.pattern], dashPhase: specification.phase, lineCap: 'rect', lineJoin: 'bevel' } } } }, rawPoints: rawDashCapSquarePoints, pathLength: 40, browser: { version: 'synthetic policy fixture', userAgent: 'synthetic policy validation; not native acceptance' },
+    raster: { resolution: 16, half: 90, side: 2880, uncertainty: .14, alphaThreshold: 128 }, grid: { ...dashCapAuditGrid }, modelUnchanged: true, originalVertices,
     solidControl: { fill: 'none', pattern: 'none', strokeWidth: 36, join: 'bevel', vertices: structuredClone(originalVertices) },
     samples, counts, mismatches: [] }
 }
 
 export function dashCapEvidence() {
-  return { scenario: dashCapScenario, group: 'point-node-paint-import-persistence', result: 'passed',
+  return { fixture: 'synthetic policy validation; not native acceptance', scenario: dashCapScenario, group: 'point-node-paint-import-persistence', result: 'passed',
     cases: dashCapCases.flatMap((specification) => dashCapScales.map((scale) => {
       const triangle = specification.key === 'triangle-square-wide', circle = specification.key === 'circle-square-wide'
       const radius = specification.size * .6 * Math.SQRT2
@@ -47,8 +50,8 @@ export function dashCapEvidence() {
         rasterBounds: triangle ? { minX: -26.375, minY: -29.6875, maxX: 27, maxY: 23.6875 } : { minX: -70, minY: -70, maxX: 70, maxY: 70 },
         ctm: { a: scale, b: 0, c: 0, d: scale, e: 10, f: 20 }, strokeWidth: specification.widthPt * 1.2,
         cap: 'square', join: 'bevel', fill: 'none', miterLimit: 10, pattern: (specification.pattern ?? [3, 3]).map((n) => `${n * 1.2}px`).join(', '), phase: specification.phase * 1.2,
-        ...(specification.audit ? { engineAudit: syntheticEngineAudit() } : {}) }
-      return { key: specification.key, scale, specification: structuredClone(specification), modelUnchanged: true, observation,
+        ...(specification.audit ? { engineAudit: syntheticEngineAudit(specification) } : {}) }
+      return { key: specification.key, scale, result: 'passed', specification: structuredClone(specification), modelUnchanged: true, observation,
         edits: triangle ? dashCapEditFields.map((field, i) => ({ field, sameNode: true, modelChanged: true,
           probe: { alpha: 255, nativeStrokeContains: true, selectionCleared: true, local: { x: 0, y: -24 },
             screenshot: `${dashCapScenario}-${specification.key}-scale-${scale}-edit-${field}.screen.png`,
@@ -61,8 +64,11 @@ export function dashCapEvidence() {
           const auditSample = kind === 'audit-cap' ? observation.engineAudit.samples.find((sample) => sample.paintCore && sample.solidDistance > .3 && !sample.insideContour)
             : kind === 'audit-outside' ? observation.engineAudit.samples.filter((sample) => sample.expected === 'miss').sort((a, b) => Math.min(a.paintDistance, a.solidDistance) - Math.min(b.paintDistance, b.solidDistance))[0] : undefined
           const local = auditSample?.local ?? (kind.startsWith('exact') ? specification.exact[Number(kind.slice(6))] : kind === 'outside' ? specification.exterior : kind === 'gap' ? { x: 0, y: radius } : { x: 0, y: 0 })
+          const corresponding = observation.engineAudit?.samples.find((sample) => sample.local.x === local.x && sample.local.y === local.y)
+          const exactZeroSample = specification.key === 'square-exact-zero' && (kind === 'outside' || kind.startsWith('exact')) ? corresponding : undefined
+          const sample = auditSample ?? exactZeroSample
           const exterior = ['outside', 'audit-outside'].includes(kind), candidates = exterior ? ['control'] : ['control', 'p']
-          return { kind, local, alpha: auditSample?.paintAlpha ?? (['outside', 'gap'].includes(kind) ? 0 : 255), nativeStrokeContains: auditSample?.nativeStrokeContains ?? !['outside', 'gap'].includes(kind), rasterDistance: auditSample?.paintDistance ?? (kind === 'outside' ? 10 : kind === 'gap' ? 4 : 0),
+          return { kind, local, alpha: sample?.paintAlpha ?? (['outside', 'gap'].includes(kind) ? 0 : 255), nativeStrokeContains: sample?.nativeStrokeContains ?? !['outside', 'gap'].includes(kind), rasterDistance: sample?.paintDistance ?? (kind === 'outside' ? 10 : kind === 'gap' ? 4 : 0),
             selectionCleared: true, screenshot: `${dashCapScenario}-${specification.key}-scale-${scale}-${kind}.png`,
             transform: { ctm: { a: scale, b: 0, c: 0, d: scale, e: 10, f: 20 } },
             actions: [false, true, true, true].map((alt, i) => ({ alt, trusted: true, overlayExcluded: true, candidates: [...candidates],

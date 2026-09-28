@@ -1779,7 +1779,9 @@ The latest 32B correction adds dashed endpoint caps to bounds, selection and
 picking, effective-style revision matching, and independent/native regressions.
 The separate lifecycle timeout investigation retains the failed reviewer run
 and uses controlled timer advancement without reducing evidence assertions.
-The cumulative acceptance gate is 16 groups, 29 scenarios and 605 artifacts;
+The cumulative acceptance gate retains 16 groups, 29 scenarios and all 605 prior
+artifacts. The zero-length follow-up adds explicit painted witnesses and a
+supplemental native mechanism matrix, bringing the minimum to 705 artifacts;
 accepted pre-fix evidence cannot verify these later changes.
 
 | Subphase | Responsibility |

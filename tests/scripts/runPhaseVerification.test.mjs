@@ -23,6 +23,8 @@ import {
 
 import { dashCapScenario, dashCapArtifacts } from '../../scripts/pointDashCapContract.mjs'
 import { dashCapEvidence } from './dashCapEvidenceFixture.mjs'
+import { dashCapMechanismStem, dashCapMechanismArtifacts } from '../../scripts/pointDashCapMechanismContract.mjs'
+import { syntheticMechanismEvidence } from './pointDashCapMechanismFixture.mjs'
 
 import { polygonJoinScenario, polygonJoinCases, polygonJoinScales, polygonJoinArtifacts, assertPolygonJoinEvidence } from '../../scripts/pointPolygonJoinContract.mjs'
 
@@ -95,7 +97,7 @@ if (command.startsWith('run check:')) {
     if (process.env.STZ_TEST_POINT_ARTIFACTS === 'yes') {
       for (const entry of pointEvidence.evidence || []) for (const artifact of entry.artifacts) {
         const content = process.env.STZ_TEST_POINT_CORRUPT === 'yes' ? 'broken' : artifact.endsWith('.svg')
-          ? artifact.endsWith('.input.svg') ? '<svg xmlns="http://www.w3.org/2000/svg"><polygon points="0,0 1,0 0,1" fill="none" stroke="black"></polygon></svg>' : '<svg><g><circle r="20"/><g><title>fixture</title><g><g><text x="0" y="0">fixture</text></g></g></g></g></svg>'
+          ? typeof artifactValues[artifact] === 'string' ? artifactValues[artifact] : artifact.endsWith('.input.svg') ? '<svg xmlns="http://www.w3.org/2000/svg"><polygon points="0,0 1,0 0,1" fill="none" stroke="black"></polygon></svg>' : '<svg><g><circle r="20"/><g><title>fixture</title><g><g><text x="0" y="0">fixture</text></g></g></g></g></svg>'
           : artifact.endsWith('.png') ? Buffer.from([137,80,78,71,13,10,26,10,0,0,0,0,0,0,0,0,0,0,0,1,0,0,0,1]) : JSON.stringify(artifactValues[artifact] || {})
         fs.writeFileSync(path.join(artifacts, artifact), content)
       }
@@ -795,10 +797,20 @@ function completePointEvidence(fixture) {
         })) }),
     },
   ])))
+  const mechanism = syntheticMechanismEvidence()
   fixture.env.STZ_TEST_POINT_ARTIFACT_VALUES = JSON.stringify({
     ...JSON.parse(fixture.env.STZ_TEST_POINT_ARTIFACT_VALUES), ...appContinuityEvidence().files,
-    ...Object.fromEntries(dashCapEvidence().cases.filter((entry) => entry.specification.audit).map((entry) =>
-      [`${dashCapScenario}-${entry.key}-scale-${entry.scale}-engine-audit.json`, entry.observation.engineAudit])),
+    [`${dashCapMechanismStem}.json`]: mechanism,
+    ...Object.fromEntries(mechanism.cases.flatMap((entry) => {
+      const stem = `${dashCapMechanismStem}-${entry.key}`
+      return [[`${stem}.json`, entry], ...['input.svg', 'solid.input.svg'].map((suffix) =>
+        [`${stem}.${suffix}`, `<svg xmlns="http://www.w3.org/2000/svg"><polygon points="${entry.source.rawPoints}" fill="none" stroke="#000000" stroke-width="${entry.specification.width}" stroke-dasharray="${suffix === 'solid.input.svg' ? 'none' : entry.specification.pattern?.join(' ') ?? 'none'}" stroke-dashoffset="${suffix === 'solid.input.svg' ? 0 : entry.specification.phase}" stroke-linecap="${entry.specification.cap}" stroke-linejoin="${entry.specification.join}" stroke-miterlimit="${entry.specification.miterLimit}"></polygon></svg>`])]
+    })),
+    ...Object.fromEntries(dashCapEvidence().cases.filter((entry) => entry.specification.audit).flatMap((entry) => {
+      const stem = `${dashCapScenario}-${entry.key}-scale-${entry.scale}`
+      return [[`${stem}-engine-audit.json`, entry.observation.engineAudit], ...['.input.svg', '-solid.input.svg'].map((suffix) =>
+        [`${stem}${suffix}`, `<svg xmlns="http://www.w3.org/2000/svg"><polygon points="${entry.observation.engineAudit.rawPoints}" fill="none" stroke="black"></polygon></svg>`])]
+    })),
   })
   return evidence
 }
@@ -1301,7 +1313,7 @@ test('32B requires independent polygon join raster and native candidate/cycling 
 
 
 test('32B retains previous 386 artifacts and requires the independent dash-cap native scenario', (t) => {
-  assert.equal(Object.values(pointNodeScenarios).flat().flatMap(pointNodeScenarioArtifacts).length, 386 + dashCapArtifacts().length)
+  assert.equal(Object.values(pointNodeScenarios).flat().flatMap(pointNodeScenarioArtifacts).length, 386 + dashCapArtifacts().length + dashCapMechanismArtifacts().length)
   const fixture = checkoutFixture(t); completePointEvidence(fixture)
   const artifacts = JSON.parse(fixture.env.STZ_TEST_POINT_ARTIFACT_VALUES)
   artifacts[`${dashCapScenario}.json`].cases[0].probes[0].actions[0].candidates = ['control']
@@ -1321,6 +1333,23 @@ for (const fault of ['missing-grid', 'hidden-phantom', 'mismatched-audit-file'])
       entry.observation.engineAudit.mismatches = []
     }
     if (fault === 'mismatched-audit-file') artifacts[`${dashCapScenario}-${entry.key}-scale-${entry.scale}-engine-audit.json`].samples.pop()
+    fixture.env.STZ_TEST_POINT_ARTIFACT_VALUES = JSON.stringify(artifacts)
+    assert.equal(failedVerification(t, fixture, '32B').report.status, 'failed')
+  })
+}
+
+for (const fault of ['missing-matrix', 'unpassed-case', 'omitted-grid-cell', 'mismatched-case-file', 'rounded-source-file', 'changed-pattern-file', 'zero-cap-distance-mismatch']) {
+  test(`32B cumulative native mechanism policy rejects ${fault}`, (t) => {
+    const fixture = checkoutFixture(t); completePointEvidence(fixture)
+    const artifacts = JSON.parse(fixture.env.STZ_TEST_POINT_ARTIFACT_VALUES)
+    const evidence = artifacts[`${dashCapMechanismStem}.json`], entry = evidence.cases[0]
+    if (fault === 'missing-matrix') delete artifacts[`${dashCapMechanismStem}.json`]
+    if (fault === 'unpassed-case') entry.result = 'observed'
+    if (fault === 'omitted-grid-cell') entry.samples.pop()
+    if (fault === 'mismatched-case-file') artifacts[`${dashCapMechanismStem}-${entry.key}.json`].samples.pop()
+    if (fault === 'rounded-source-file') artifacts[`${dashCapMechanismStem}-${entry.key}.input.svg`] = '<svg xmlns="http://www.w3.org/2000/svg"><polygon points="5,-5 -5,-5 -5,5 5,5"></polygon></svg>'
+    if (fault === 'changed-pattern-file') artifacts[`${dashCapMechanismStem}-${entry.key}.input.svg`] = artifacts[`${dashCapMechanismStem}-${entry.key}.input.svg`].replace('stroke-dasharray="0 10"', 'stroke-dasharray="none"')
+    if (fault === 'zero-cap-distance-mismatch') entry.samples.find((sample) => sample[9] === 'hit')[11] += 1
     fixture.env.STZ_TEST_POINT_ARTIFACT_VALUES = JSON.stringify(artifacts)
     assert.equal(failedVerification(t, fixture, '32B').report.status, 'failed')
   })

@@ -5,6 +5,13 @@ It addresses the retained Chrome `YAt03b` failure. Phase 32B is still incomplete
 until fresh native verification and independent review succeed on one final
 checkout. Phase 32C/32D remain deferred.
 
+The current continuation starts from clean `0cf597f1a71b249e73374b354d69409ba4c51979`.
+That commit tracked the original evidence and this investigation's draft tests
+and native mechanism harness; production geometry and cumulative registration
+still used the preceding implementation. This continuation applies those
+corrections without resetting the checkout. All 150 dash files and four
+visibility files matched the preceding handoffs at the starting boundary.
+
 ## Observed failure and numeric representation
 
 The original ninth dash entry, `square-exact-zero` at scale `.5`, used empty ready
@@ -92,16 +99,27 @@ squares. Fresh diagonal/corner/near-seam observations are therefore mandatory.
 Current upstream source also raises questions about terminal-only zero dots and
 positive starts exactly at vertices. Existing terminal and positive controls
 remain required. In particular the previously unexecuted
-`square-positive-corner` `(20,20)` exterior conflicts with even the existing
-helper's positive endpoint region; it is explicitly a pending native question,
-not a validated negative. It has not been silently moved. A failed native case
-must retain its evidence and prevent acceptance.
+`square-positive-corner` `(20,20)` exterior conflicts with the existing
+helper's positive endpoint region: cap distance is exactly zero, while the solid
+bevel distance is `8.485281374238571`. This is a deterministic contract/geometry
+disagreement, not merely missing browser execution. The present 18-entry gate
+cannot pass that case: native paint would disprove the negative, whereas native
+exclusion would expose a false candidate. No independent native observation of
+this previously unexecuted case is available in the child. Its negative control
+and positive-endpoint scheduling are therefore retained for the authorized
+parent's complete matrix; choosing which to correct remains blocked on those
+observations. They are not declared fixed by the demonstrated zero-dot repair.
+A failed native case must retain its evidence and prevent acceptance.
 
 ## Expanded gate and preserved visibility evidence
 
 The original 18 App case/scale entries keep their live edits, trusted ordinary
 and Alt clicks, cleared selections, overlay exclusion, overlap controls and ten
 complete square grids. Two new exact-zero positive probes add four screenshots.
+Each entry now records observed/passed/failed status. Failure retains the primary
+error and permits observations of the remaining entries; it never marks that
+case or the scenario successful. The supplemental matrix executes even after
+an App case fails, so later mechanism evidence is available without retrying.
 The supplemental literal-SVG mechanism matrix adds 19 cases and 96 artifacts,
 with 20,691 ordered cells, raw and parsed coordinates, native path length,
 browser identity, local CTM, model/effective settings, raster resolution and
@@ -129,7 +147,9 @@ are unchanged by this correction.
 
 Final tests, strict TypeScript, targeted lint/syntax/diff results, browser startup
 limitations, binary-aware checkout identity and independent review are recorded
-outside the checkout in `/private/tmp/stz-phase32b-zero-dash-handoff/`.
+outside the checkout in `/private/tmp/stz-phase32b-zero-dash-followup/`. The earlier
+`/private/tmp/stz-phase32b-zero-dash-handoff/` belongs to a different tree; its
+`vaZYVU` verification is incomplete and has no final identity comparison.
 Finalization precedes verification; later results are external to avoid changing
 the verified identity. Child startup restrictions are not native passes. The
 authorized parent must run `PATH=/opt/homebrew/bin:$PATH node

@@ -349,13 +349,107 @@ const correctedCircles = JSON.parse(readFileSync(new URL('corrected-circle-obser
 const productionObservations = [...raster.observations.filter((observation) => observation.shape !== 'circle' || observation.lineCap !== 'square'),
   ...correctedCircles.observations]
 
+// These three Cairo fixtures use zero-on squares along oblique edges. Cairo's
+// tangent-oriented squares and native upright zero-length squares have different
+// extents in both directions. Retain every authenticated raster probe, but use
+// this finite literal construction for the revised geometry policy. It does not
+// call the cap/polygon helpers under test; fresh native matrix acceptance is
+// still required and is not established by this analytic test.
+const zeroDotPolicyCases = new Set(['triangle-zero-on', 'triangle-zero-entry', 'circle-zero-entry-linearized'])
+function literalZeroDotPolicy(observation: RasterObservation) {
+  const vertices = 'strokeVertices' in observation ? (observation as RasterObservation & { strokeVertices: Vec2[] }).strokeVertices
+    : observation.vertices!
+  const half = observation.width / 2
+  const edges = vertices.map((start, index) => {
+    const end = vertices[(index + 1) % vertices.length]
+    const length = Math.hypot(end.x - start.x, end.y - start.y)
+    return { start, length, tangent: { x: (end.x - start.x) / length, y: (end.y - start.y) / length } }
+  })
+  const orientation = Math.sign(vertices.reduce((area, p, i) => {
+    const q = vertices[(i + 1) % vertices.length]; return area + p.x * q.y - p.y * q.x
+  }, 0))
+  // The original interior plus its solid bevel stroke is this convex polygon.
+  const continuous = vertices.flatMap((vertex, index) => [edges[(index + edges.length - 1) % edges.length], edges[index]]
+    .map(({ tangent }) => ({ x: vertex.x + orientation * tangent.y * half, y: vertex.y - orientation * tangent.x * half })))
+  const locate = (distance: number) => {
+    let remaining = distance
+    for (const edge of edges) {
+      if (remaining <= edge.length) return { center: { x: edge.start.x + remaining * edge.tangent.x,
+        y: edge.start.y + remaining * edge.tangent.y }, tangent: edge.tangent }
+      remaining -= edge.length
+    }
+    throw new Error(`Literal endpoint ${distance} exceeds contour`)
+  }
+  const dotPositions = observation.id === 'triangle-zero-on' ? [0, 3.6, 7.2, 10.8, 14.4, 18, 21.6, 25.2]
+    : observation.id === 'triangle-zero-entry' ? [1.2, 7.2, 13.2, 19.2, 25.2] : [6, 12]
+  // The mixed triangle begins inside a positive interval and ends it at 1.2.
+  // An isolated initial zero dot has no extra tangent-oriented half-cap.
+  const starts = observation.id === 'triangle-zero-entry' ? [0, 4.8, 10.8, 16.8, 22.8]
+    : observation.id === 'circle-zero-entry-linearized' ? [3.6, 9.6, 15.6] : []
+  const ends = observation.id === 'triangle-zero-entry' ? [1.2, 7.2, 13.2, 19.2, 25.2]
+    : observation.id === 'circle-zero-entry-linearized' ? [0, 6, 12] : []
+  const polygons: Vec2[][] = [continuous, ...dotPositions.map((position) => {
+    const { center } = locate(position)
+    return [{ x: center.x - half, y: center.y - half }, { x: center.x + half, y: center.y - half },
+      { x: center.x + half, y: center.y + half }, { x: center.x - half, y: center.y + half }]
+  })]
+  for (const [positions, sign] of [[starts, -1], [ends, 1]] as const) for (const position of positions) {
+    const { center, tangent } = locate(position)
+    polygons.push([[0, -half], [sign * half, -half], [sign * half, half], [0, half]].map(([along, normal]) => ({
+      x: center.x + along * tangent.x - normal * tangent.y, y: center.y + along * tangent.y + normal * tangent.x,
+    })))
+  }
+  const distance = (point: Vec2) => Math.min(...polygons.map((polygon) => {
+    let sign = 0, inside = true, nearest = Infinity
+    polygon.forEach((a, index) => {
+      const b = polygon[(index + 1) % polygon.length], dx = b.x - a.x, dy = b.y - a.y
+      const turn = Math.sign(dx * (point.y - a.y) - dy * (point.x - a.x))
+      if (turn && sign && turn !== sign) inside = false
+      if (turn) sign = turn
+      const t = Math.max(0, Math.min(1, ((point.x - a.x) * dx + (point.y - a.y) * dy) / (dx * dx + dy * dy)))
+      nearest = Math.min(nearest, Math.hypot(point.x - a.x - t * dx, point.y - a.y - t * dy))
+    })
+    return inside ? 0 : nearest
+  }))
+  const points = polygons.flat()
+  // The existing circular body envelope is retained alongside its fixed
+  // polygon stroke; this is separate from the zero-dot correction.
+  const circleEnvelope = observation.radius === undefined ? 0 : observation.radius + half
+  return { distance, bounds: { minX: Math.min(-circleEnvelope, ...points.map(({ x }) => x)), maxX: Math.max(circleEnvelope, ...points.map(({ x }) => x)),
+    minY: Math.min(-circleEnvelope, ...points.map(({ y }) => y)), maxY: Math.max(circleEnvelope, ...points.map(({ y }) => y)) },
+  radius: Math.max(circleEnvelope, ...points.map(({ x, y }) => Math.hypot(x, y))) }
+}
+
 for (const observation of productionObservations) {
-  test(`${observation.id}: independent visible paint, six-unit neighbors and exterior controls agree with pending/committed picking`, async () => {
+  test(`${observation.id}: retained Cairo evidence and declared engine policy agree with pending/committed picking`, async () => {
     const input = rasterFixture(observation)
     const entry = await committed(input.point)
     const layout = pendingSvgPointNodeLayout(input.point)
     boundsClose(layout.paintedBounds, entry.layout.paintedBounds)
     assert.deepEqual(layout.anchorClearanceBounds, layout.paintedBounds)
+    if (zeroDotPolicyCases.has(observation.id)) {
+      const policy = literalZeroDotPolicy(observation)
+      boundsClose(layout.paintedBounds, policy.bounds)
+      close(layout.selectionRadius, policy.radius)
+      let positive = 0, negative = 0, historicalDifference = 0
+      for (const probe of observation.probes) {
+        // No Cairo probe is dropped or relabeled as native evidence. Every
+        // old point now receives a separately derived policy expectation.
+        const expected = policy.distance(probe.point) <= 6
+        if (expected) positive++; else negative++
+        const cairo = probe.nearestPaintCenterDistance < 6 - raster.distanceUncertainty ? true
+          : probe.nearestPaintCenterDistance > 6 + raster.distanceUncertainty && outsideContinuousNeighborhood(observation, probe.point) ? false : undefined
+        if (cairo !== undefined && cairo !== expected) historicalDifference++
+        for (const state of [undefined, entry]) for (const scale of [.5, 2]) {
+          assert.equal(picked(input, probe.point, state, scale), expected, JSON.stringify({ id: observation.id, probe, scale, policy: 'full upright zero dots' }))
+        }
+      }
+      assert.ok(positive > 0 && negative > 0)
+      assert.ok(historicalDifference > 0 || Object.keys(policy.bounds).some((key) =>
+        Math.abs(policy.bounds[key as keyof Bounds] - observation.rasterBounds[key as keyof Bounds]) > raster.boundsUncertainty),
+      'The engine separation must correspond to a demonstrated oriented/upright geometry difference')
+      return
+    }
     const uncertainty = raster.boundsUncertainty
     assert.ok(layout.paintedBounds.minX <= observation.rasterBounds.minX + uncertainty)
     assert.ok(layout.paintedBounds.minY <= observation.rasterBounds.minY + uncertainty)

@@ -2924,3 +2924,25 @@ the focused reproduction entry point. Production geometry/layout and native
 actions are unchanged. Current checkbox and dash-cap acceptance remain pending;
 final exact identity, executed results and review live in the external visibility
 handoff so verification does not modify the checkout.
+
+## Native zero-length dash follow-up (2026-09-28)
+
+The later parent `YAt03b` supplies both 3D visibility/reload paths, but stops at
+the ninth dash entry: native square zero-on paint exceeds the selection radius
+and 96 grid cells omit candidates. Its failed entry never reached pointer
+actions. The [zero-dash investigation](PHASE_32B_ZERO_DASH_INVESTIGATION.md)
+records exact source/arithmetic, the shared full-dot correction, the corrected
+`(20,20)` positive and nearby `(-22,-30)` negative, preserved original bytes,
+registered complete-grid regressions and the expanded native gate. Original
+Cairo conclusions above retain that engine's scope; they do not establish the
+native semantics of zero-length subpaths. The historical visibility timeout's
+cause remains unproven.
+
+This continuation began on clean `0cf597f1a71b249e73374b354d69409ba4c51979`,
+which already tracked the original evidence and draft mechanism tests/docs but
+had not applied the described geometry or registered the tests/harness. Those
+existing files are preserved. The earlier external `vaZYVU` verification remains
+incomplete, with no final checkout comparison; it is not a passing check.
+Fresh verification and independent review remain required. Final identity,
+results and any child startup limitation are recorded outside the checkout at
+`/private/tmp/stz-phase32b-zero-dash-followup/`.
