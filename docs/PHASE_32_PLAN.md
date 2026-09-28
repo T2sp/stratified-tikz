@@ -7,16 +7,18 @@ passing review. Its tracked diff and four then-untracked file hashes match the
 historical contaminated-reference failure and the earlier child-only handoff.
 See the prerequisite audit in [32B implementation](PHASE_32B_IMPLEMENTATION.md).
 
-32B's `xgI0o0` parent verification passed all five commands, 16 groups,
-20 point scenarios and accepted PGF evidence on fingerprint
-`4061512fdc4f58a9d71ec92378920a24dbe8c22406beba9c222aa232c0011742`.
-The subsequent independent review ran and found three Medium production defects:
-lost equal-valued local overrides, inconsistent cross-file resolution, and stale
-resolution after unsupported color redefinitions. The targeted fixes add persisted
-property-level intent, a shared ordered source context and unknown color bindings.
-The native policy now requires 23 scenarios in the same 16 groups, preserving all
-six responsive downloads and their 91 required artifacts. Fresh matching parent
-verification and independent review must accept the new tree before 32B is complete.
+32B's accepted `wPPGzN` parent verification passed all five commands, 16 groups,
+28 point scenarios and 386 required artifacts on fingerprint
+`121aaf324b9b9945e785e9aaf0bdc0e07a0f68895b703007e22cda5b1dba5e42`.
+The independent review subsequently found a Medium dashed square-cap bounds/
+picking defect and a distinct full-suite lifecycle-test timeout (3,986/3,987
+passed; the separate 11/11 rerun did not explain the failure). The targeted
+correction shares effective dash settings, adds endpoint cap geometry and stale
+layout guards, and separates controlled diagnostic timeout testing from real
+filesystem scheduling. The native policy now requires 29 scenarios in the same
+16 groups and 605 artifacts, preserving all earlier coverage, including six
+responsive downloads and their 91 artifacts. Fresh matching parent verification
+and independent review must accept the new tree before 32B is complete.
 32C/32D remain deferred. See the final section of the implementation report for
 executed checks and the frozen-tree handoff; historical browser evidence does
 not cover these new fixes.

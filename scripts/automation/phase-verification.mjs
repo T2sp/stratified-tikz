@@ -17,6 +17,8 @@ import { homedir, tmpdir } from "node:os";
 import { join, resolve } from "node:path";
 import { observePostExternalPointPaint, assertPostExternalPointPaint, observeLiteralPointPaint, assertPointPaint, assertExplicitPointPaint } from "../pointPaintOracle.mjs";
 
+import { dashCapScenario, dashCapArtifacts, assertDashCapEvidence } from "../pointDashCapContract.mjs";
+
 import { polygonJoinScenario, polygonJoinArtifacts, assertPolygonJoinEvidence } from "../pointPolygonJoinContract.mjs";
 
 const freeLabelGroups = [
@@ -63,10 +65,11 @@ export const pointNodeScenarios = {
     "point-paint-local-override-intent", "point-paint-cross-file-resolution",
     "point-paint-unsupported-color-bindings",
     "point-paint-unsupported-mutations", "point-paint-clear-imported-style",
-    "point-paint-mutation-directory-uncertainty", "point-paint-app-continuity", polygonJoinScenario,
+    "point-paint-mutation-directory-uncertainty", "point-paint-app-continuity", polygonJoinScenario, dashCapScenario,
   ],
 };
 export function pointNodeScenarioArtifacts(name) {
+  if (name === dashCapScenario) return dashCapArtifacts();
   if (name === polygonJoinScenario) return polygonJoinArtifacts();
   if (name === "point-paint-app-continuity") {
     return [`${name}.json`, "point-paint-app-lifecycle.json", "point-paint-app-transitions.json", "point-paint-app-controls.json",
@@ -214,6 +217,15 @@ function evidenceObject(artifactDir, name) {
 }
 
 function validateTargetedPaintEvidence(artifactDir, name, group) {
+  if (name === dashCapScenario) {
+    const evidence = evidenceObject(artifactDir, `${name}.json`);
+    assertDashCapEvidence(evidence);
+    for (const entry of evidence.cases) if (entry.specification.audit) {
+      assert.deepEqual(evidenceObject(artifactDir, `${name}-${entry.key}-scale-${entry.scale}-engine-audit.json`),
+        entry.observation.engineAudit, "Retained independent audit artifact matches the recorded native case");
+    }
+    return;
+  }
   if (name === polygonJoinScenario) {
     assertPolygonJoinEvidence(evidenceObject(artifactDir, `${name}.json`));
     return;
@@ -696,8 +708,8 @@ function validateBrowserEvidence(name, artifactDir, phase, checkout) {
             if (!value || typeof value !== "object") throw new Error(`Invalid point-node JSON: ${artifact}`);
           } else if (artifact.endsWith(".svg")) {
             const svg = bytes.toString();
-            if (artifact.startsWith(`${polygonJoinScenario}-`) && artifact.endsWith(".input.svg")) {
-              if (!/^<svg\s[^>]*><polygon\s[^>]*><\/polygon><\/svg>$/u.test(svg)
+            if ((artifact.startsWith(`${polygonJoinScenario}-`) || artifact.startsWith(`${dashCapScenario}-`)) && artifact.endsWith(".input.svg")) {
+              if (!/^<svg\s[^>]*><(polygon|circle)\s[^>]*><\/\1><\/svg>$/u.test(svg)
                 || /(?:href|onload|script|data-)=/u.test(svg)) throw new Error(`Invalid polygon stroke SVG input: ${artifact}`);
             } else if (!hasWholePointSvg(svg)) {
               throw new Error(`Invalid whole-point SVG artifact: ${artifact}`);

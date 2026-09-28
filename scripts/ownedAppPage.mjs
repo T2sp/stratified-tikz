@@ -70,10 +70,22 @@ export function assertOwnedAppState(before, after) {
 }
 
 /** Fail closed after startup. Never wait for, reload, or recreate a lost App. */
-export function createOwnedAppPage({ page, expectedUrl, artifactDir, prefix = 'point-paint-app', timeoutMs = 2000 }) {
+export function createOwnedAppPage({ page, expectedUrl, artifactDir, prefix = 'point-paint-app', timeoutMs = 2000, observeDiagnostic }) {
   const pageId = `app-${randomUUID()}`, events = [], listeners = [], transitions = []
   let sequence = 0, droppedEvents = 0, crashed = false, expected, startup, lastState, failureRecord
   const evidencePath = resolve(artifactDir, `${prefix}-lifecycle.json`)
+  const diagnostic = async (operation, name, deadlineMs = timeoutMs) => {
+    const started = performance.now()
+    let outcome = 'passed'
+    try { return await boundedPointDiagnostic(operation, name, deadlineMs) }
+    catch (error) { outcome = 'failed'; throw error }
+    finally {
+      // Optional read-only test/runner timing; never replaces an operation's
+      // result, error, or production deadline. It runs outside persisted state.
+      try { observeDiagnostic?.({ name, timeoutMs: deadlineMs, elapsedMs: performance.now() - started, outcome }) }
+      catch (error) { console.error('Owned App timing observer:', error) }
+    }
+  }
   const add = (event, details = {}) => {
     events.push({ sequence: ++sequence, at: new Date().toISOString(), event, pageId, url: clipped(page.url()), ...details })
     if (events.length > 256) { events.shift(); droppedEvents++ }
@@ -98,28 +110,28 @@ export function createOwnedAppPage({ page, expectedUrl, artifactDir, prefix = 'p
     })
   })
   add('created', { expectedUrl })
-  const persist = (extra = {}) => boundedPointDiagnostic(() => writeFile(evidencePath, JSON.stringify({
+  const persist = (phase, extra = {}) => diagnostic(() => writeFile(evidencePath, JSON.stringify({
     schema: 1, pageId, expectedUrl, expected, startup, droppedEvents, events, failure: failureRecord, ...extra,
-  }, null, 2) + '\n'), 'owned App lifecycle evidence', timeoutMs)
+  }, null, 2) + '\n'), `owned App lifecycle evidence (${phase})`)
   async function capture(boundary, includeDom = false) {
     const snapshot = { boundary, pageId, expectedUrl, closed: page.isClosed(), crashed,
-      document: await boundedPointDiagnostic(() => page.evaluate(observeOwnedAppDocument, { key: markerKey, includeDom }), 'owned App document capture', timeoutMs) }
+      document: await diagnostic(() => page.evaluate(observeOwnedAppDocument, { key: markerKey, includeDom }), `owned App document capture (${boundary})`) }
     add('document-observation', { boundary, document: { ...snapshot.document, dom: undefined } })
-    await persist()
+    await persist(`capture:${boundary}`)
     return snapshot
   }
   async function readState() {
     assert.ok(expected, 'Owned App startup must complete before model observations')
     // Check and read atomically in the same browser task: a navigation between
     // a prior document check and this call cannot pass as the old App instance.
-    return boundedPointDiagnostic(() => page.evaluate(({ key, expected }) => {
+    return diagnostic(() => page.evaluate(({ key, expected }) => {
       const marker = window[key]
       if (location.href !== expected.url || marker?.generation !== expected.generation
         || typeof window.stzAppLabels?.state !== 'function' || marker.api !== window.stzAppLabels) {
         throw new Error('Owned App continuity lost before state read')
       }
       return window.stzAppLabels.state()
-    }, { key: markerKey, expected }), 'owned App state read', timeoutMs)
+    }, { key: markerKey, expected }), 'owned App state read')
   }
   async function checkpoint(boundary) {
     const snapshot = await capture(boundary)
@@ -135,7 +147,7 @@ export function createOwnedAppPage({ page, expectedUrl, artifactDir, prefix = 'p
   }
   return {
     pageId, transitions, readState, checkpoint,
-    async install() { await page.addInitScript(installOwnedAppDocumentMarker, markerKey); await persist() },
+    async install() { await page.addInitScript(installOwnedAppDocumentMarker, markerKey); await persist('install') },
     async start() {
       await capture('startup-before-ready')
       // The only readiness wait belongs to the legitimate initial navigation.
@@ -148,7 +160,7 @@ export function createOwnedAppPage({ page, expectedUrl, artifactDir, prefix = 'p
       expected = { pageId, url: expectedUrl, generation: ready.document.generation }
       assert.equal(typeof expected.generation, 'string', 'Startup document generation is present')
       startup = await checkpoint('startup-committed')
-      await persist()
+      await persist('startup-complete')
       return startup
     },
     async withStandalone(name, operation) {
@@ -156,8 +168,8 @@ export function createOwnedAppPage({ page, expectedUrl, artifactDir, prefix = 'p
       const before = await checkpoint(`${name}:before-standalone`), standalonePages = [], releases = []
       const transition = { name, before, standalonePages, result: 'pending' }
       transitions.push(transition)
-      const saveTransitions = () => boundedPointDiagnostic(() => writeFile(resolve(artifactDir, `${prefix}-transitions.json`),
-        JSON.stringify({ schema: 1, pageId, transitions }, null, 2) + '\n'), 'owned App transition evidence', timeoutMs)
+      const saveTransitions = () => diagnostic(() => writeFile(resolve(artifactDir, `${prefix}-transitions.json`),
+        JSON.stringify({ schema: 1, pageId, transitions }, null, 2) + '\n'), `owned App transition evidence (${name}:${transition.result})`)
       await saveTransitions()
       const trackStandalone = (standalone) => {
         assert.notEqual(standalone, page, 'Standalone SVG must own a distinct page')
@@ -202,7 +214,7 @@ export function createOwnedAppPage({ page, expectedUrl, artifactDir, prefix = 'p
       const result = { schema: 1, startup, helperReturn, beforeNextLoad, transitions,
         lifecycleArtifact: `${prefix}-lifecycle.json`, transitionsArtifact: `${prefix}-transitions.json` }
       await writeFile(resolve(artifactDir, `${prefix}-transitions.json`), JSON.stringify(result, null, 2) + '\n')
-      await persist()
+      await persist('finish')
       return result
     },
     async failure(primary, details = {}) {
@@ -211,26 +223,26 @@ export function createOwnedAppPage({ page, expectedUrl, artifactDir, prefix = 'p
       const evidence = { boundary: 'owned-app-failure', pageId, expectedUrl, error: errorDetails(primary), ...details }
       const path = resolve(artifactDir, `${prefix}-failure.json`)
       failureRecord = { error: errorDetails(primary), artifact: `${prefix}-failure.json` }
-      const save = async () => {
-        try { await boundedPointDiagnostic(() => writeFile(path, JSON.stringify(evidence, null, 2) + '\n'), 'owned App primary failure evidence', timeoutMs) }
+      const save = async (phase) => {
+        try { await diagnostic(() => writeFile(path, JSON.stringify(evidence, null, 2) + '\n'), `owned App primary failure evidence (${phase})`) }
         catch (error) { console.error('Owned App failure evidence:', error) }
-        try { await persist() }
+        try { await persist(`failure:${phase}`) }
         catch (error) { console.error('Owned App lifecycle evidence:', error) }
       }
-      await save()
+      await save('primary')
       try { evidence.snapshot = await capture('failure', true) }
       catch (error) { evidence.captureError = errorDetails(error) }
-      await save()
+      await save('after-capture')
       try {
         const screenshot = `${prefix}-failure.png`
-        await boundedPointDiagnostic(() => page.screenshot({ path: resolve(artifactDir, screenshot), fullPage: false, timeout: timeoutMs }), 'owned App failure screenshot', timeoutMs + 100)
+        await diagnostic(() => page.screenshot({ path: resolve(artifactDir, screenshot), fullPage: false, timeout: timeoutMs }), 'owned App failure screenshot', timeoutMs + 100)
         evidence.screenshot = screenshot
       } catch (error) { evidence.screenshotError = errorDetails(error) }
-      await save()
+      await save('after-screenshot')
       return evidence
     },
     async dispose() {
-      try { await persist({ lastBoundary: lastState?.boundary }) }
+      try { await persist('dispose', { lastBoundary: lastState?.boundary }) }
       finally { for (const release of listeners) release() }
     },
   }

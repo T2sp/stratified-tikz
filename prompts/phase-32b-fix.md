@@ -1,259 +1,271 @@
-# Phase 32B Targeted Fix Prompt: Include dashed caps in point bounds and picking
+# Phase 32B Targeted Fix Prompt: Resolve native 3D visibility control timeout
 
 ## Environment and scope
 
-Work on `phase/32b-color-opacity-outline`. Inspect status and preserve all current
-geometry, rendering, browser/policy, documentation, package and test changes,
-including the 43 untracked solid-join helper, fixture and regression files.
-At this prompt update HEAD is `b8455dfc828471c87d75abb4a3c44121186d7756`.
-The accepted parent report and reviewed checkout match this pre-prompt identity:
+Work on `phase/32b-color-opacity-outline`. Read `AGENTS.md`, the paired 32B
+implement/review prompts, current implementation report and relevant diagnostics.
+Preserve all current tracked changes and 150 untracked files, including the
+completed dashed-cap, effective-style layout, solid-join and lifecycle work.
+At this prompt update HEAD is `87798f7deaaedf298159b719a86288078dd69191`.
+The implementation handoff and latest parent verification match this identity:
 
 ```text
-121aaf324b9b9945e785e9aaf0bdc0e07a0f68895b703007e22cda5b1dba5e42
+24397265a1a6ec1bef2636e96843225b5d4386dce36876dfc0105f6282f58d4e
 ```
 
-This describes the checkout before this prompt edit. Recompute final identity
-including tracked, untracked and binary bytes after corrections. Do not reset,
-discard or restart the existing work.
-
-Use Node >=22.12.0 with the supported installation first in PATH:
+This is the identity before this prompt edit, not a final verification claim.
+Recompute tracked/untracked/binary identity after corrections. Do not reset,
+discard or restart existing work. Use Node >=22.12.0:
 
 ```bash
 export PATH=/opt/homebrew/bin:$PATH
 ```
 
-Correct the remaining Medium defect: supported dashed square-cap borders paint
-outside the geometry used for point bounds, selection extent and picking.
-Include relevant dash/cap settings in committed-layout matching. Preserve the
-completed solid-join fixes and intentional selection through dash gaps.
-Separately investigate the retained lifecycle-test timeout below without
-weakening its assertions. Keep strict TypeScript, bounded geometry, existing
-dependencies and 32A behavior; keep 32C/32D deferred.
+Investigate and correct the latest native input timeout at the approximate 3D
+visibility checkbox, preserving the save/change/reload acceptance contract.
+Then complete matching cumulative native verification and independent review.
+The timeout's exact cause remains unproven; do not assume another geometry
+change is needed. Keep strict TypeScript, existing dependencies and completed
+32A/32B behavior. Keep 32C/32D deferred.
 
-## Accepted parent evidence and failed reviewer test
+## Evidence and current acceptance status
 
-Matching parent verification passed all five commands, including both browser
-commands:
+Read and retain these separate results:
 
 ```text
-/var/folders/vk/7kf940pd4bx8f6cg3rzlmtc80000gn/T/stz-phase32b-before-review-wPPGzN/verification.json
-/var/folders/vk/7kf940pd4bx8f6cg3rzlmtc80000gn/T/stz-phase32b-before-review-wPPGzN/05-check-free-labels/artifacts/free-labels-evidence.json
-/private/tmp/stz-32b-review-H8bkE3/checks.json
+/private/tmp/stz-phase32b-dash-handoff/HANDOFF.md
+/private/tmp/stz-phase32b-dash-handoff/independent-review.md
+/private/tmp/stz-phase32b-dash-handoff/independent-audit-index.json
+/private/tmp/stz-phase32b-dash-handoff/final-checkout.json
+/var/folders/vk/7kf940pd4bx8f6cg3rzlmtc80000gn/T/stz-phase-verifier-reehte/response.json
+/var/folders/vk/7kf940pd4bx8f6cg3rzlmtc80000gn/T/stz-phase32b-before-review-UThawr/verification.json
+/var/folders/vk/7kf940pd4bx8f6cg3rzlmtc80000gn/T/stz-phase32b-before-review-UThawr/05-check-free-labels/command.log
+/var/folders/vk/7kf940pd4bx8f6cg3rzlmtc80000gn/T/stz-phase32b-before-review-UThawr/05-check-free-labels/artifacts/free-labels-evidence.json
 ```
 
-The review accepts 16 cumulative groups, 28 point scenarios and 386 required
-artifacts with no page errors, on the unchanged tracked/untracked identity.
-Actual observations, downloads, standalone reopening and PGF evidence were
-inspected. This is accepted native evidence for the pre-fix tree.
+The dash implementation finished with **4,158/4,158 tests passed**, build/diff,
+strict TypeScript, targeted lint and script syntax passed. Its independent
+review found the production correction satisfactory within the tested scope,
+but returned `needs_changes` for missing current native acceptance. Both child
+browser attempts stopped before acceptance at localhost `listen EPERM`.
+The separate Chrome UI attempt was rejected by automatic approval:
+“Computer Use was not approved to use Google Chrome.” Preserve these facts;
+do not change permissions or bypass rejection to produce acceptance.
 
-Keep the independent reviewer results distinct:
+The subsequent parent `UThawr` run reached real Chrome **154.0.8037.57** on
+Node **v26.9.0**, with matching before/after identity:
 
-| Reviewer check | Actual result |
+| Required command | Parent result |
 | --- | --- |
-| Full `npm test` | 3,987 total: 3,986 passed, 1 failed; zero skipped/cancelled |
-| Focused lifecycle rerun | 11/11 passed; does not replace the failed full run |
-| Build / diff | Passed on Node v26.9.0; existing bundle-size warning |
-| Strict production/fixture/new-test TypeScript | Passed |
-| Latest changed-code ESLint / script syntax | Passed / all 60 scripts passed |
-| Broader focused lint | 40 baseline errors and 4 warnings, independently matched |
+| `npm test` | 4,158 passed, zero failed/skipped/cancelled |
+| `npm run build` | Passed |
+| `git diff --check` | Passed |
+| `npm run check:label-assets` | Passed |
+| `npm run check:free-labels` | Failed at `point-node-native-input` |
 
-Repository-wide lint was not run. The independent review returned
-`needs_changes`, with zero Critical, one Medium and zero Low findings and
-`ready_to_commit: false`. The production geometry finding and failed full test
-must both be addressed. Do not label native acceptance missing, or treat the
-parent pass or isolated rerun as an explanation of the reviewer timeout.
+The free-label report has 11 completed groups; five remain incomplete, including
+four unexecuted groups. `point-node-body-layout-lifecycle` is incomplete;
+`real-App-input-JSON-history-reused-ID-load`, `settled-SVG-export-standalone`,
+`point-node-settled-export` and `point-node-paint-import-persistence` were not
+executed. No page errors were recorded, but native acceptance is incomplete.
+In particular, the new dash-cap group coverage has not passed in this run.
 
-## 1. Confirmed dashed-cap geometry defect
+Do not describe this latest failure as a server-startup permission problem or
+claim all native checks passed. The historical `wPPGzN` parent acceptance
+(16 groups, 28 scenarios, 386 artifacts, pre-fix fingerprint `121aaf32…`) remains
+valid for its earlier tree, not the current implementation.
 
-Inspect and preserve:
+## 1. Locate the exact native failure and preserve its evidence
 
-```text
-/private/tmp/stz-32b-review-H8bkE3/triangle-dash-repro.json
-/private/tmp/stz-32b-review-H8bkE3/dash-repro.json
-```
-
-The exact triangle is empty, size `3`, fill disabled, with an enabled solid-color
-`30pt` border using `lineStyle: 'dashed'`, `dashPhase: 0`, `lineCap: 'rect'` and
-`lineJoin: 'bevel'`. Rendering emits width `36`, dash array approximately
-`[3.6, 3.6]`, cap `square`, join `bevel` and miter limit `10`, all in local SVG
-units. Probe coordinates are relative to the projected point center.
-
-Independent raster observations show:
-
-| Observation | Actual paint | Current layout / picking |
-| --- | --- | --- |
-| Local `(0, -24)` | Fully painted, alpha 255 | Rejected |
-| Local `(-6, -28)` | Fully painted, alpha 255 | Rejected |
-| Minimum Y | Approximately `-29.65625` | `-15.4544155877` |
-| Maximum radius | Approximately `30.3804328989` | `21.0133538218` |
-
-Selection decoration therefore under-encloses visible paint, and overlap
-cycling can omit the clicked point. Retain independent exterior negative
-controls as well as these painted positive probes.
-
-The completed solid geometry is correct for its intended input:
-`svgPointNodeLayout.ts` calls `createPolygonStrokeRegion(vertices, width, join)`
-and uses `radius + width / 2` for circles. However, `svgPointPaint.ts` also emits
-effective dash arrays, phase and caps. Square caps at dash endpoints can extend
-beyond that solid-stroke region. Both polygons and circles need the missing
-extent, not just the supplied triangle.
-
-`currentSvgPointNodeLayout()` currently matches owner/source/font/shape/size,
-width and join, but omits line style, pattern, phase and cap. Once these settings
-affect layout, accepting old committed geometry after their change is unsafe.
-
-### Required targeted correction
-
-1. Share effective stroke settings between rendering and geometry: named-style
-   defaults, explicit-pattern precedence, phase, caps and joins, with the existing
-   `TeX pt * 1.2` conversion. Use the actual emitted pattern semantics rather
-   than a second inconsistent interpretation of raw style fields.
-2. Include actual dash endpoint caps for polygons and circles. Account for
-   tangent orientation on circles, dash continuity across polygon corners,
-   closed-path seams and overlapping wide caps. Do not add a cap at a join
-   crossed by one uninterrupted dash. Keep miter-limit and solid-join behavior.
-3. Correct painted bounds, selection extent/radius, applicable clearance bounds
-   and picking together. Painted extent and interaction geometry may differ:
-   preserve the original contour interior and continuous stroke neighborhood
-   used to select through dash gaps, while including real cap extensions.
-   Do not replace that established policy with paint-only gap rejection.
-4. Preserve the existing six-local-unit tolerance. A blanket radius/box padding
-   is not an exact hit oracle and must not restore the old solid miter/bevel
-   false positives. Solid bevel `(0,-24)` must still miss, while the reported
-   dashed square-cap variant at that coordinate must hit. Preserve the fixed
-   solid miter `(0,28)` miss and genuine outward miter-tip hits.
-5. Match committed layouts against every effective style setting that can alter
-   the new geometry. Compare pattern contents, not only array/object identity,
-   and retain the current owner/source/font guards. Reject stale commits after
-   relevant edits and accept the matching refreshed layout. Keep pending,
-   committed and immutable export reconstruction consistent.
-6. Keep computation finite and bounded for supported zero-length entries,
-   positive-total patterns, short intervals, large/wrapped phases and wide
-   borders. Avoid non-advancing loops and unbounded tessellation. Preserve the
-   supported pattern/width range and explain any bounded approximation with
-   independent error checks; do not silently drop caps or valid patterns.
-
-Preserve the existing opacity/disabled-stroke, hollow-interior, layer/visibility,
-locking, candidate-order and ordinary/Alt-cycling contracts. Keep geometric
-responsive scaling and the existing local tolerance; convert screen probes
-through actual transforms. Do not switch caps/joins, shrink border widths,
-increase tolerance, change source text or force selection to hide the mismatch.
-
-### Registered geometry and native regressions
-
-Add focused registered tests covering:
-
-- The exact triangle, both painted positive probes, independent bounds/radius
-  observations and meaningful exterior negatives beyond the interaction region.
-- Square-cap circle borders extending beyond `radius + halfWidth`, with butt
-  and round caps as controls. Include thin/wide strokes and relevant polygon
-  corners/concave shapes without regressing the solid-join suite.
-- Named dashed/dotted/densely-dotted styles, explicit-pattern precedence,
-  nonzero/wrapped phases, cap endpoints near corners/seams and overlapping
-  caps. Keep valid zero-entry and other bounded-input controls.
-- Intentional dash-gap selection, original contour interiors, disabled stroke
-  and established zero-alpha behavior. Distinguish gaps from exterior misses.
-- Stale committed layouts after changes to line style, pattern contents, phase
-  or cap; correct refreshed layouts; pending/committed equivalence and immutable
-  captured output after live edits. Keep responsive coordinate mapping covered.
-
-Use independent SVG rasterization/native paint observations for polygon and
-circle bounds, cap-positive probes and exterior negatives. Retain source SVGs,
-settings, raster resolution/error limits, transforms and observations. Do not
-use the corrected helper as its own oracle or simply loosen expected bounds.
-Preserve original failed evidence and put corrected results separately.
-
-Add mandatory native ordinary-click and Alt overlap-cycling regressions. The
-visibly clicked node must be present in candidates and reachable through cycling;
-an overlapping control must not conceal its omission. Clear prior selection,
-exclude handles/overlays, use real pointer actions and retain candidate/selection
-records and screenshots. Exercise actual style edits so stale dash/cap layouts
-cannot pass unnoticed. Integrate the checks into cumulative acceptance with
-appropriate policy/negative controls, preserving the current 16 groups,
-28 scenarios and 386 artifacts while adding new required coverage.
-
-## 2. Investigate the retained lifecycle-test timeout
-
-Preserve these distinct results:
+The failing call is currently `scripts/checkPointNodesApp.mjs:203`, inside
+`runNativePointChecks`, reached through `checkPointNodes.mjs` and
+`checkFreeLabels.mjs`. Playwright reports:
 
 ```text
-/private/tmp/stz-32b-review-H8bkE3/npm-test.log
-/private/tmp/stz-32b-review-H8bkE3/owned-app-page-rerun.log
-/private/tmp/stz-32b-review-H8bkE3/checks.json
+locator.uncheck: Timeout 30000ms exceeded.
+waiting for getByLabel('Enable approximate 3D visibility', { exact: true })
+  locator resolved to <input type="checkbox"/>
+  attempting click action
+    waiting for element to be visible, enabled and stable
+    element is visible, enabled and stable
+    scrolling into view if needed
 ```
 
-The full suite failed the unchanged test
-`bounded failing capture and screenshot retain primary, own late rejections and permit cleanup`
-at `tests/scripts/ownedAppPage.test.mjs:118` with:
+The log ends during scrolling after actionability checks succeeded. It does not
+prove a click occurred, a visibility update was committed, or why scrolling
+failed to finish. This differs from the earlier free-label SVG
+`scrollIntoViewIfNeeded` failure waiting for element stability; retain both
+histories without asserting a shared cause.
 
-```text
-Timed out after 15ms during owned App lifecycle evidence
-```
+Inspect these files in the `UThawr` artifacts directory:
 
-The test passes `timeoutMs: 15` through `setup()`. That budget covers real
-lifecycle file persistence as well as diagnostic capture/disposal; intentionally
-hanging browser mocks are installed only after setup. The retained timer stack
-from `pointCheckDiagnostics.mjs` does not establish which lifecycle save phase
-timed out. Filesystem scheduling, setup and disposal are hypotheses, not a
-confirmed root cause. The focused 11/11 pass does not explain the full-run failure.
+- `point-observation-0179.json` through `point-observation-0183.json`: the 3D
+  `inlineMath` save/change/reload sequence completed, with no payload differences
+  and document revision advancing from 4 to 5.
+- `point-observation-0184.json` through `point-observation-0186.json` and
+  `point-native-3d-standalone.json`: the subsequent 3D `standalone` download
+  completed with no payload differences. Saved controls include axes on,
+  visibility on, surface depth sorting off, theta 41, phi -28, zoom 1.3 and
+  pan `(12,-9)`.
+- `point-observation-0187.json`: native failure capture from the actual App URL,
+  with a readable 3D document at revision 5 and local `errors: []`.
 
-Read the test, `scripts/ownedAppPage.mjs` and bounded diagnostic helper. Identify
-the failed operation/phase and collect actionable timing/evidence under focused
-and ordinary full-suite conditions. Keep this investigation separate from the
-dashed-cap production defect. If evidence justifies test hardening, separate
-controlled timeout checks from incidental real-I/O timing, or use a narrow
-deterministic scheduling seam. Preserve finite production bounds and the
-assertions for primary-error retention, both capture timeouts, ownership of late
-rejections, retained JSON/lifecycle evidence, close events and cleanup/isolation.
+After that standalone download, the code changes export mode to `inlineMath`,
+turns axes off, turns surface depth sorting on, then tries to turn visibility
+off. The timeout occurs at this final checkbox action, before changing theta to
+63 and before the standalone file's reload. There is no corresponding
+standalone `before-reload`/`reload` evidence. Preserve both export-mode iterations;
+the successful inline iteration cannot replace the failed standalone iteration.
 
-Do not blanket-increase deadlines, remove the timeout case, weaken artifact
-assertions, change global concurrency or retry until green. Keep successful
-reruns alongside the failure and state any unproven trigger explicitly. Require
-fresh whole-suite success on the final tree; a focused rerun alone is insufficient.
+The failure capture establishes that the state API was callable when captured,
+not uninterrupted App identity or healthy scrolling/rAF throughout the action.
+Its setup observer covers the direct-input form, which is already closed here;
+zero form/control counts are expected and do not diagnose the checkbox.
+It omits current checkbox state/geometry and `uiSettings`. The persisted
+`diagram.view` from the earlier load is not proof of current live UI settings.
+The outer `failure.png` shows the separate renderer fixture, not this native
+App page. Do not use it as checkbox or App-layout evidence.
 
-## Preserve completed work and verify the final tree
+## 2. Investigate with bounded evidence from the actual native App
 
-Keep `src/geometry/polygonStroke.ts`, its solid-join regression/independent
-fixtures, and mandatory `point-paint-polygon-joins` coverage. Preserve the
-corrected convex/concave joins, miter-limit fallback, thick overlap behavior,
-six-unit allowance and original contour selection. The dash-cap correction
-must extend this work, not reinstate the earlier rounded polygon expansion.
+Inspect `checkPointNodesApp.mjs`, `appJsonPersistence.mjs`,
+`pointNativeSetupDiagnostics.mjs`, `ownedAppPage.mjs`, existing geometry/scroll
+helpers and their tests, and the production visibility controls/layout.
+The native input page is created separately from the renderer and from later
+paint/import App workflows. Reuse appropriate existing diagnostics without
+assuming those other pages' ownership instrumentation covers this call.
 
-Keep all importer certainty, recorded local override, raw source/persistence
-and independent PGF work unchanged unless a demonstrated dependency requires
-otherwise. Preserve independent paint/opacity/dimming, cloning/clipboard/history,
-raw JSON/CRLF, 2D/3D semantics, immutable whole-node export and free/inline labels.
-Keep App ownership/geometry diagnostics and five native geometry fault controls,
-seven App → SVG → App transitions, three continuity controls and 13 artifacts,
-the directory scenario and 11 artifacts, and six responsive downloads with
-91 artifacts. Preserve fresh-process verification, the runner's 60-second
-fixture deadline, owned-process cleanup and failed-evidence retention.
+Reproduce the exact 2D/3D direct/cursor and persistence sequence, including
+both `inlineMath` and `standalone` iterations, using the normal viewport and
+real controls. Also run it in the cumulative predecessor sequence. A focused
+reproduction is investigation evidence, not a substitute for full acceptance.
+Preserve original failures and put investigative/corrected results separately.
 
-Read `AGENTS.md`, paired 32B implement/review prompts, current implementation
-report and relevant rendering/geometry documentation. Document effective dash/
-cap geometry, intended gap selection, revision matching, independent results and
-the actual lifecycle investigation. Keep changes focused on these requested
-corrections and necessary tests/documentation; defer 32C/32D.
+Add only the observations needed to distinguish the cause, before the suspect
+control changes and at failure, with explicit dimension/mode/action boundaries:
 
-Run focused registered regressions, applicable strict production/fixture/test
-TypeScript, changed-script syntax, targeted lint and `git diff --check`.
+1. Actual page/document identity, URL, closed/crashed state, lifecycle and local
+   page errors; guarded App API availability, document revision, current
+   `uiSettings`, relevant model/history state and saved download identity.
+2. Checkbox match count, associated label, checked/enabled/connected state,
+   bounding rectangle, viewport and relevant scroll-container offsets/styles.
+   Record nearby layout changes after surface-depth-sort is enabled, active
+   focus and overlays/hit target where relevant. Distinguish pre-action,
+   post-action and failure observations rather than inferring state from code.
+3. Finite timing/scroll/rAF responsiveness observations sufficient to distinguish
+   layout movement, browser/protocol stalls, App replacement and host timing
+   anomalies. Treat each as a hypothesis until supported by retained evidence.
+   Do not infer a host-sleep cause merely from an unusually long wall duration.
+4. A bounded screenshot and structural/control snapshot of this actual native
+   App before it closes. Keep fallback metadata if capture stalls. Retain the
+   original Playwright error, call log and stack even if diagnostics fail.
+
+Reuse finite diagnostic deadlines and ownership of late rejections. Cap retained
+samples/DOM/event size, remove listeners/timers, and close only owned resources.
+A secondary capture/write/cleanup error must not mask the original timeout or
+hang the suite. Do not add another unbounded readiness/geometry wait or rely on
+an unconditional fixture API call to diagnose a missing App.
+
+Make the smallest correction justified by evidence, whether in control layout,
+state transitions or native harness interaction. A targeted scroll/readiness
+correction must preserve realistic native control access and observable state
+changes. Do not force clicks, invoke DOM `click()`/dispatch synthetic events,
+mutate checkbox/model state via evaluation, preconfigure the fixture to skip
+unchecking, or suppress the failed action. Do not hide the issue with arbitrary
+sleeps, blanket deadline increases, global concurrency changes, retries until
+green, or replacing/reloading the App after continuity loss.
+
+## 3. Preserve persistence proof and register targeted regressions
+
+The save/change/reload sequence deliberately changes live controls so reload
+cannot pass because controls already equal the saved values. Preserve and make
+observable the real visibility `true -> false -> true` transition, surface
+sorting `false -> true -> false`, export mode/axes changes and camera restoration
+for both 3D iterations. Confirm differing live settings before reload, then
+compare the complete downloaded document, UI settings and selected controls.
+Keep the revision increment, selection reset, cleared redo branch, immutable
+JSON downloads, exact source and both 2D/3D direct/cursor/work-plane checks.
+
+Add registered regressions for demonstrated failure mechanisms and any new
+bounded diagnostic/interaction helper. Cover primary-error retention, capture
+failure/timeouts, late rejection ownership and cleanup where changed. Native
+regression evidence must show the actual checkbox action and downstream
+save/reload assertions; a mocked helper pass cannot prove browser behavior.
+If evidence remains insufficient to identify the trigger, say so explicitly
+and retain the gap; do not label it fixed because one isolated rerun passed.
+
+## Preserve completed geometry, lifecycle and cumulative acceptance
+
+Do not reimplement the completed dashed-cap correction. Preserve shared
+effective stroke settings, named defaults and explicit-pattern precedence,
+phase canonicalization, cap/join/miter semantics, bounded dash scheduling and
+content-based committed-layout matching. Keep pending/committed and immutable
+export geometry consistent. Preserve real cap extensions on polygons/circles,
+the documented 256-edge contour for active square-capped dashed circles,
+original interior and continuous-stroke selection through gaps, and exactly
+six local units of picking tolerance.
+
+Keep dashed triangle `(0,-24)` and `(-6,-28)` hits, solid bevel `(0,-24)` and
+solid miter `(0,28)` misses, genuine miter-tip hits, concave/overlap/corner/seam
+controls and all original solid-join fixtures. Preserve valid zero entries and
+independent positive/exterior-negative paint observations. The retained Cairo
+matrix normalized internal zero-on entries in 28 cases; this is not proof of
+Chrome behavior. Require the current native engine audits before accepting
+those cases, without dropping valid caps to match Cairo.
+
+Keep the current mandatory minimum **16 cumulative groups, 29 point scenarios
+and 605 artifacts**, including all original 386 artifacts and 219 dash-cap
+artifacts, 18 dash cases and the complete 1,089-cell audits for the required
+square-cap cases. Retain ordinary/Alt trusted pointer actions after live style
+edits, overlap candidates, transforms, independent raster controls, contour/
+continuous-neighborhood coverage and terminal/corner/internal-zero cases.
+Inspect determined cells and failures; do not shrink grids or use production
+geometry as its own paint oracle. Extend required policy only when necessary
+for new evidence, with negative controls; never reduce existing requirements.
+
+Keep `docs/PHASE_32B_LIFECYCLE_INVESTIGATION.md` and its phase-labelled bounded
+writes, deterministic timeout test, real I/O evidence, primary-error/late-
+rejection/close/cleanup assertions and unchanged production deadlines. The old
+3,986/3,987 failure, separate 11/11 rerun and later complete passes remain
+separate facts; its precise historical trigger remains unproven. Preserve the
+file-backed verification fixture transport and demonstrated memory fix; do not
+restore retained multi-megabyte closure copies or increase heap/deadline limits.
+
+Preserve importer uncertainty/local override intent and retained independent
+PGF evidence; independent paint/opacity/dimming; legacy normalization, cloning,
+clipboard/history; raw JSON/CRLF; 2D/3D semantics; free/inline labels and immutable
+whole-node exports. Keep five native geometry fault controls, seven App → SVG →
+App transitions, three continuity controls/13 artifacts, the directory scenario/
+11 artifacts and six responsive downloads/91 artifacts. Preserve fresh-process
+verification, the runner's 60-second fixture deadline, owned-process cleanup
+and failed-evidence retention. No unrelated cleanup or 32C/32D work.
+
+## Verification and independent review
+
+Document the actual mechanism, correction, retained failures and any remaining
+uncertainty. Run focused registered regressions, applicable strict production/
+fixture/test TypeScript, changed-script syntax, targeted lint and diff checks.
 Run `npm test` and `npm run build` sequentially because they share asset
-preparation. Separate baseline lint debt and the bundle warning from new failures.
+preparation. Keep demonstrated baseline lint debt and the existing bundle-size
+warning separate from new failures.
 
-The wPPGzN parent evidence verifies the pre-fix tree; it cannot verify subsequent
-changes or erase the failed reviewer run. Finalize code/tests/tracked docs before
-final verification and record identities/report paths in an external handoff:
+Finalize code/tests/tracked docs, then record final identity and report paths in
+an external handoff. In the authorized browser-capable parent, run:
 
 ```bash
 PATH=/opt/homebrew/bin:$PATH node scripts/automation/run-phase.mjs 32B verify
 ```
 
-Require all five commands and current cumulative native evidence, including new
-dash-cap checks, on the same tracked/untracked/binary identity. Preserve failures.
-Any checkout edit after verification requires matching verification again.
-Obtain independent read-only review of that verified tree against
-`prompts/phase-32b-review.md`, reassessing the cap geometry, layout matching and
-lifecycle-test result. `32B verify` itself does not perform review.
+Require all five commands on the same final tracked/untracked/binary identity.
+Inspect both browser reports, full terminal success, all mandatory scenarios/
+artifacts, no page errors and no incomplete/unexecuted groups. The current
+`UThawr` partial run and child `EPERM` results cannot satisfy this gate.
+If execution is blocked, retain that exact limitation and hand off for authorized
+parent verification; never mark an unavailable check passed or bypass approval.
 
-Do not commit or push while the finding, full verification or review remains
-unsuccessful. 32B stays incomplete until these gates pass; 32C/32D remain deferred.
+Any checkout edit after verification requires matching verification again.
+Obtain a fresh independent read-only review against `phase-32b-review.md`,
+covering the native timeout correction, persistence evidence and previously
+pending dashed-cap native acceptance. `32B verify` itself does not perform review.
+Do not commit or push while required verification/review is unsuccessful.
+32B remains incomplete until all gates pass; 32C/32D remain deferred.

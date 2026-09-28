@@ -2686,3 +2686,228 @@ pending for the authorized parent. No assertion, timeout or sandbox permission
 is relaxed. 32B is incomplete until all five commands and independent read-only
 review succeed on the same final identity; no commit or push while either gate
 is unsuccessful.
+
+## Targeted dashed-cap geometry and lifecycle correction (2026-09-27)
+
+The accepted `wPPGzN` parent verified the pre-fix identity
+`121aaf324b9b9945e785e9aaf0bdc0e07a0f68895b703007e22cda5b1dba5e42`:
+all five commands, 16 groups, 28 point scenarios and 386 required artifacts.
+That native acceptance is retained. The independent reviewer subsequently
+reported one Medium dashed-cap defect and a distinct full-suite failure:
+3,986/3,987 tests passed, zero skipped/cancelled. Its focused 11/11 lifecycle
+rerun is a separate success, not an explanation or replacement for that failure.
+The original two cap reproductions, failed test log, rerun log and `checks.json`
+remain unchanged under `/private/tmp/stz-32b-review-H8bkE3/`.
+
+The actual starting checkout was clean `87798f7deaaedf298159b719a86288078dd69191`
+on `phase/32b-color-opacity-outline`. That prompt-update commit contains the
+previous solid-join implementation, including all 43 formerly untracked helpers,
+fixtures and regressions. Those files are preserved byte-for-byte. No importer,
+local override, raw source/persistence, PGF reference, dependency, coordinate,
+body/font, free-label or inline-label implementation was changed.
+
+`svgPointStroke.ts` now resolves one effective SVG stroke: explicit patterns
+precede named defaults, named dashed uses `[3,3]`, dotted uses `[width,2]`,
+densely dotted uses `[width,1]`, and lengths/phase/width use `TeX pt * 1.2`.
+Caps map `rect` to SVG `square`; joins and miter limit 10 are shared with layout.
+The effective pattern is copied. Commit matching compares its contents and
+length, phase, cap, join, width, enablement and miter limit, retaining all prior
+owner/source/font/shape/size guards. Paint-only changes with identical effective
+geometry remain compatible; stale geometry after dash/cap edits is rejected.
+Pending, mounted and immutable captured reconstruction use this same layout.
+
+Effective phases are emitted as signed remainders modulo the emitted local
+pattern total. Independent review found that finite offsets `1e12`, `1e20` and
+`1e200` lost native SVG endpoint precision; separately retained canonical-offset
+rasters agree with geometry within the same original pixel limits. Ordinary
+in-period signed offsets stay unchanged. Phases whose `* 1.2` conversion would
+overflow are first reduced modulo a representable raw pattern. No stroke width or pattern length
+is silently clamped. As before, raw schema numbers so large that the individual
+SVG-local width/dash length itself exceeds JavaScript/SVG numeric range are not
+representable paint settings; finite-input validation alone does not promise
+arbitrary-precision rendering. This limitation is distinct from a sum of finite
+local dash entries overflowing, or a large/wrapped phase losing a small endpoint:
+the cap scheduler must retain those representable endpoint cases.
+Extreme dynamic-range scheduling tests establish bounded mathematical geometry,
+not native paint fidelity beyond an SVG engine's numeric precision. For example,
+independent librsvg emitted no paint for `[5,10,1e20,1e19]` at phase `1e20`,
+despite finite local entries; that engine limitation is not a verified supported
+paint case. Normal-sized patterns with huge phases are separately raster-verified
+after the shared phase canonicalization described above.
+
+`dashCaps.ts` represents repeated endpoint caps as clipped arithmetic
+progressions on each edge. It does not iterate through every dash. Square caps
+are outward half-width rectangles and round polygon caps are outward
+semicircles; full endpoint disks would produce false positives at wide corners.
+Intervals continue across polygon vertices, so crossing a corner does not
+create a cap. Closed seams connect painted intervals; all-zero off patterns are
+continuous, touching positive on intervals coalesce, and zero-length on entries
+retain both caps. Overlapping caps use minimum Euclidean distance to the union.
+At an exact polygon corner, positive-length dash endpoints use the incoming
+tangent. A zero-length dot instead takes its starting cap from the incoming
+tangent and ending cap from the outgoing tangent. A dot present at
+both ends connects across the closed seam; an isolated initial dot uses the
+initial outgoing tangent for both halves. Independent review exposed the
+opposite assignment as an exterior false hit on a 10-unit square with `[0,10]`
+dashes and width 36. Separate source/raster fixtures and actual production
+square probes now retain that negative alongside painted positives and ordinary
+positive-length dash endpoint controls at and immediately beside the corner.
+The first and last painted intervals connect through the closed seam even when
+one has zero length, including a positive dash beginning exactly at the final
+parameter. Only the outer endpoints retain caps. An isolated initial or terminal
+dot has both caps on its own boundary edge. This also handles a positive initial
+interval clipped by phase and a zero-length terminal interval without adding a
+false seam cap or omitting terminal paint.
+The supported positive-total patterns therefore need no iteration cutoff or
+minimum dash length. Work/storage are bounded by pattern length and contour
+edge count. Ordinary scheduling uses stable numeric first/last positions;
+extreme pattern ratios use exact binary units for scheduling only (at most
+2,104 bits for 64 finite entries). This preserves small endpoint offsets beside
+huge intervals, finite entries whose total overflows, cancellation after huge
+phases, and subnormal positive gaps at corners. Returned geometry stays numeric;
+an infinite repetition step denotes a period longer than every finite contour,
+not infinite coordinates. Solid joins continue through the unchanged
+`polygonStroke.ts`.
+
+Interaction retains original contour interiors and the continuous solid-stroke
+neighborhood, then adds actual cap geometry. Gaps remain selectable, zero alpha
+retains the prior geometry policy, and disabled borders contribute no caps.
+The allowance remains exactly six local units; a box/radius is never a final
+hit oracle. Painted/clearance bounds conservatively retain the continuous
+stroke envelope through gaps and include the cap extrema. Selection radius
+includes the same cap union. The solid bevel `(0,-24)` and solid miter `(0,28)`
+remain misses; genuine outward miter tips remain hits. The exact dashed square
+triangle now accepts `(0,-24)` and `(-6,-28)`. Its layout top is approximately
+`-29.679626` and radius `30.402105`, agreeing with independent raster top
+`-29.6875` and radius `30.380433` within recorded pixel uncertainty.
+
+Tiny circles with very wide square caps exposed an additional renderer detail:
+using ideal circular arclength/tangents alone missed actual SVG paint. The
+original native/librsvg circle observations are preserved separately; scaling
+coordinates or splitting native arcs did not consistently remove dash tangent
+interpolation error. Active square-capped dashed circles with endpoints now
+emit a fixed 256-edge inscribed contour, shared exactly with cap/solid-stroke
+geometry. This changes neither border width, cap/join setting nor the six-unit
+allowance. The centerline/fill radial error is bounded by
+`r*(1-cos(pi/256))` (about `0.0000753r`); edge tangent error is at most `pi/256`
+(about `0.012272` radians). Registered tests independently check every edge and
+compare actual emitted contour points. Original circle/body bounds and circle
+interior selection remain unchanged. Solid, uninterrupted, disabled, butt-cap
+and round-cap circles retain native circles. This bounded rendering detail is
+not a saved shape/schema change or a 32C shape feature.
+
+The [independent cap fixtures](../tests/fixtures/dash-cap-svg/README.md) retain
+19 original SVG/PNG pairs and three separate corrected circle pairs, settings,
+transforms, renderer versions, hashes and pixel observations. Generators import
+no production helper. They cover named/explicit patterns, thin/wide borders,
+phases, corners/seams, overlapping/zero entries, concave stars, circle controls
+and a sparse round-cap exterior negative. Pixels use 16 samples per local unit;
+original bounds uncertainty is 1/16 and radius/distance uncertainty 2/16.
+Corrected circle sharp-cap bounds use 2/16, independently justified by a measured
+0.0699-unit alpha-threshold corner discrepancy. These limits never enter
+production bounds or hit tolerance. Failed observations are not overwritten.
+Six additional large-phase SVG/PNG pairs retain both original failed and
+canonical-offset paint observations, including the independent review's source
+and raster byte identities. Registered checks compare corrected bounds, radius
+and painted positives, while asserting the raw saved phase stays unchanged.
+Seventeen separate corner SVG/PNG pairs cover zero-on dots, the retained actual
+square reproduction, and positive endpoints exactly at and immediately before
+or after a corner, with both cap types and thin/wide borders. Their painted
+positives and exterior distances independently constrain endpoint orientation;
+the five original reviewer source/raster pairs retain their exact bytes.
+Five terminal-dot source/raster pairs separately retain thin/wide square/round
+controls and the actual square point whose `(21,-21)` and `(22,-22)` pixels are
+opaque. Its two painted probes now enter App candidates. Failed originals remain
+separate from corrected geometry observations.
+Eight additional authenticated seam pairs cover terminal positive starts,
+phase-clipped initial intervals and leading-zero mixed patterns, with both cap
+types. Their exterior controls use a separately specified continuous bevel
+octagon; the preceding 50 source/raster pairs remain unchanged.
+
+An independent 144-case endpoint-state audit exposed a renderer distinction:
+116 cases agree after the seam correction; the remaining 28 involve internal
+zero-on entries in `[5,5,0,15]` or `[10,0,0,15]`. Thirty-six source/raster
+comparisons show Cairo renders those patterns identically to `[5,20]` and
+`[10,15]`, respectively. Cairo 1.18.4's
+[dash normalization source](https://fossies.org/linux/cairo/src/cairo-gstate.c)
+merges internal zero entries, whereas its
+[public API documentation](https://cairographics.org/manual/cairo-cairo-t.html#cairo-set-dash)
+describes caps on zero-length on segments. These are retained Cairo observations,
+also confirmed directly by the installed Cairo library's `set_dash`/`get_dash`,
+not verified Chrome behavior or a universal SVG rule. The implementation retains
+the user's valid zero entries and their cap geometry; it does not remove them to
+fit one raster engine. Mandatory browser checks include these boundary patterns
+and independent paint/continuous-neighborhood controls, so an engine mismatch
+cannot become accepted native evidence. That gate remains pending until the
+authorized parent can run the actual browser. The matrix, failed comparisons,
+normalization comparison and independent continuous-octagon oracle remain in the
+external review evidence, without replacing the original failure records.
+
+Registered regressions cover reported positives, meaningful exterior negatives,
+gap/interior selection, styles/alpha/disablement, locks/layers/order/cycling,
+responsive coordinate mapping, stale/refreshed commits, value-equal patterns,
+in-place pattern edits and immutable captured output. The mandatory native
+`point-paint-dash-caps` scenario adds eighteen responsive polygon/circle cases and
+real ordinary/Alt overlap clicks, candidate/selection records, screenshots,
+source SVGs and native rasters. Five edits on each mounted triangle also receive
+actual pointer/cycling checks before the next edit. The cumulative gate is now
+16 groups, 29 scenarios and 605 required artifacts (386 retained plus 219 new).
+Existing solid-join acceptance, five App geometry controls, seven App → SVG → App
+transitions, three continuity controls/13 artifacts, directory/11 artifacts,
+and six responsive downloads/91 artifacts remain mandatory. Fresh worker
+verification, owned-process cleanup and the runner's 60-second fixture deadline
+are unchanged.
+The original eight dash cases and their 95 artifacts remain mandatory. Ten new
+responsive square cases cover exact zero-on corners, terminal-only zero dots,
+positive corner endpoints and later-zero patterns at two phases. Each square
+audit compares a bounded 33-by-33 grid against independently rasterized dashed
+paint and continuous stroke plus the original contour interior. A read-only
+fixture candidate diagnostic records the App result for that same grid. Actual
+ordinary/Alt pointer witnesses retain mismatches rather than selecting only easy
+points. The continuous control preserves selection through gaps while exposing
+paint omissions and phantom exterior cap candidates. The expanded policy rejects
+missing audit samples, inconsistent observations and failed native witnesses.
+Runner test checkouts also copy the new dash-contract module imported by the
+fresh verification policy; the earlier failed full run from the missing copy is
+retained separately. Its module-loading failures are unrelated to the historic
+lifecycle timeout and cannot be counted as final whole-suite success.
+The expanded synthetic native audit also exposed a distinct verification-test
+memory failure: an ordinary full run reached V8's approximately 2GB heap limit
+while parsing JSON in `runPhaseVerification.test.mjs`. The lifecycle timeout
+regression passed in that run. Each fixture's non-enumerable transport getter
+retained its multi-megabyte JSON string in the same closure context as its cleanup
+hook. A controlled independent 20-fixture experiment with the retained 2.9MB
+payload held about 60.9MB with that stored-value getter and about 2.95MB with a
+file-backed getter. An 80-fixture experiment using the actual constructor and
+complete 5,493,757-byte payload grew retained heap by 451,380,568 bytes before
+and 11,880,288 after; the payload hash and all ten 1,089-sample grids matched.
+The test transport now reads its owned JSON file on demand and writes it without
+retaining a second payload string. All 1,089 samples, assertions and artifacts
+remain required; no heap limit, global concurrency, deadline or retry policy was
+changed. The OOM log and before/after measurements remain external, and a fresh
+whole-suite result on the corrected final identity is required separately.
+
+The [lifecycle investigation](PHASE_32B_LIFECYCLE_INVESTIGATION.md) is separate.
+The historic stack establishes a lifecycle persistence deadline but lacks phase
+identity. A retained setup artifact supports install persistence as a hypothesis,
+without conclusive process linkage or a proven OS scheduling trigger. New
+operation/phase timing under focused and ordinary full-suite conditions did not
+reproduce the failure; the investigative ordinary run passed 3,987/3,987 and is
+retained separately. Production bounds remain finite and unchanged. The test
+now advances a local mocked timeout clock only when the deliberately hanging
+DOM and screenshot operations enter, retaining the 15ms/115ms deadline paths,
+real filesystem evidence, primary-error retention, late rejection ownership,
+close events and cleanup/isolation assertions. This is not a blanket deadline
+increase, concurrency change, retry or assertion reduction.
+
+Final validation results, the binary-aware tracked/untracked identity, preserved
+artifact hashes, verification report path and independent read-only review are
+recorded outside the checkout in `/private/tmp/stz-phase32b-dash-handoff/`.
+Code/tests/docs are finalized before `32B verify`; later results are external to
+avoid changing the verified identity. The child's browser launch failed with
+sandbox SIGABRT/EPERM and its failure log is retained. If final browser commands
+are similarly restricted, current native acceptance remains pending for the
+authorized parent runner, with no permission change or relaxed assertion.
+Baseline lint debt and the existing bundle-size warning remain separate from
+new failures. 32B remains incomplete until all five commands and independent
+review pass on the same final identity. No commit/push or 32C/32D work is done.

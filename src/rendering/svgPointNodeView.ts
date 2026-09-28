@@ -13,10 +13,11 @@ export function SvgPointNodeView({ capture, state, selected = false, elementRef 
   if (!capture.pointStyle) throw new Error('Missing point style')
   const style = capture.pointStyle
   const layout = svgPointNodeLayout(style, state)
-  const { geometry } = layout
+  const { geometry, strokeContour } = layout
   const textPaint = getPointPaint(style).text
   const paint = { ...pointStyleToSvgPaint(style),
-    'data-point-contour': 'true' }
+    'data-point-contour': 'true',
+    ...(geometry.kind === 'circle' ? { 'data-point-circle-radius': geometry.radius } : {}) }
   return createElement('g', { ref: elementRef,
     transform: `translate(${capture.position.x} ${capture.position.y})`,
     'data-point-node': capture.ownerIdentity, 'data-point-request': state.requestIdentity,
@@ -25,8 +26,8 @@ export function SvgPointNodeView({ capture, state, selected = false, elementRef 
   }, selected ? createElement('circle', { r: layout.selectionRadius + 6, fill: 'none', stroke: '#F4B400',
     strokeOpacity: 0.85, strokeWidth: 3, vectorEffect: 'non-scaling-stroke', pointerEvents: 'none',
     'data-svg-export-exclude': 'true' }) : null,
-  geometry.kind === 'circle' ? createElement('circle', { ...paint, r: geometry.radius })
-    : createElement('polygon', { ...paint, points: geometry.vertices.map(({ x, y }) => `${x},${y}`).join(' ') }),
+  strokeContour.kind === 'circle' ? createElement('circle', { ...paint, r: geometry.radius })
+    : createElement('polygon', { ...paint, points: strokeContour.vertices.map(({ x, y }) => `${x},${y}`).join(' ') }),
   createElement(SvgTexLabelView, { capture: { ...capture, color: textPaint.color,
     opacity: style.opacity * textPaint.opacity, position: { x: 0, y: 0 } }, state }))
 }

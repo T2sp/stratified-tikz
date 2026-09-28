@@ -1674,6 +1674,27 @@ Overlapping wide strips contribute to both bounds and distance. Interior
 selection of hollow nodes is unchanged. Bounds are not a final hit oracle. The
 editor selection ring alone keeps its non-scaling outline.
 
+Dashed borders add the real endpoint caps to this region. Named patterns,
+explicit-pattern precedence, phase, caps, joins and the TeX-point conversion
+come from the same effective settings used to emit SVG. Dash gaps and original
+contour interiors remain selectable; there is still exactly a six-local-unit
+exterior allowance. Square caps use oriented rectangles, round polygon caps use
+outward semicircles, and a dash crossing a corner does not acquire a cap there.
+Committed layouts compare copied pattern contents and all effective geometry
+settings in addition to source, owner, shape, size and font generation.
+SVG emits a signed phase remainder modulo the effective pattern, avoiding native
+precision loss at huge offsets while preserving the saved raw phase.
+
+For square-capped dashed circles with actual endpoints, SVG uses a fixed
+256-edge inscribed contour shared with the cap geometry. Native curved-path
+dash interpolation gave visibly different tangent angles on tiny circles with
+wide borders. This bounded approximation avoids engine-specific picking: its
+centerline error is at most `r*(1-cos(pi/256))`, tangent error at most `pi/256`.
+It does not change width or tolerance. Solid, uninterrupted, disabled, butt-cap
+and round-cap circles retain the native circle representation. The original
+circle interior remains selectable. See the independent original/corrected
+[dash-cap observations](../tests/fixtures/dash-cap-svg/README.md).
+
 Both `\tikzstyle` and `\tikzset` imported presets resolve supported literal
 paint and bounded named-style references in order. Unsupported values/options
 appear as preview diagnostics and remain available to external TikZ export.

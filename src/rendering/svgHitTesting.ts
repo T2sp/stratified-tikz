@@ -1,6 +1,7 @@
 import { pathIntersectionDetectionForDiagram } from '../geometry/pathIntersections.ts'
 import { sampleCurvedSheetPrimitive } from '../geometry/curvedSheets.ts'
 import { distanceToPolygonStroke } from '../geometry/polygonStroke.ts'
+import { distanceToDashCaps } from '../geometry/dashCaps.ts'
 import {
   arcSegmentToCubicBezierSegments,
   pathSegmentEnd,
@@ -1180,7 +1181,8 @@ function collectPointCandidate(
         ? distanceToPolygonStroke(localPoint, layout.strokeRegion)
         : distanceToClosedPolyline(localPoint, geometry.vertices)
 
-  if (boundaryDistance > 6) {
+  if (Math.min(boundaryDistance, distanceToDashCaps(localPoint, layout.dashCaps),
+    geometry.kind === 'circle' && layout.strokeRegion ? distanceToPolygonStroke(localPoint, layout.strokeRegion) : Infinity) > 6) {
     return true
   }
 

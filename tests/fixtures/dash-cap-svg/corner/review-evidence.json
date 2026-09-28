@@ -1,0 +1,42 @@
+{
+  "provenance": "Byte-preserved independent reviewer corner evidence; original raw geometry/picking failures remain in copied observation files",
+  "observationFiles": [
+    {
+      "source": "/private/tmp/stz-review-zero-corner-observations.json",
+      "file": "review-cartesian-observations.json",
+      "sha256": "e41df5df2691e29887af7701d69006b3f17b44d694f2d179a986828bc551dda6"
+    },
+    {
+      "source": "/private/tmp/stz-review-production-zero-exact-corner.json",
+      "file": "review-production-observations.json",
+      "sha256": "56ce0b5732fd345c08b99ef11e00d5c185db1ad4df95b12ebcfb39c0036b876c"
+    }
+  ],
+  "pairs": {
+    "cartesian-zero-corner-6-square": {
+      "reviewedSource": "/private/tmp/stz-review-zero-corner-6-square",
+      "svgSha256": "8a6a419b58cde391f9cf7365fbb51e23472bd52b4292e4bf2d8e71381fb488f7",
+      "pngSha256": "07b54a3b7ca00c57b0f1ed3e9ea0ba741a7ee1c8d94a85d77af9da8e072058f9"
+    },
+    "cartesian-zero-corner-6-round": {
+      "reviewedSource": "/private/tmp/stz-review-zero-corner-6-round",
+      "svgSha256": "d366aac8e15bcf37d02d75732ce8f0b09919ee316b284e5f8f1db17cd1c5fe20",
+      "pngSha256": "e46e83efcb1e29817574e760623d0a06e8cc3bfc8b8d4ab2a710b5e6ec081895"
+    },
+    "cartesian-zero-corner-36-square": {
+      "reviewedSource": "/private/tmp/stz-review-zero-corner-36-square",
+      "svgSha256": "079b9e4218fb1b5f7d38e7b141f234b6d1b877ed8e5cce9a0290026da1e451f3",
+      "pngSha256": "a65a76eba9f9f6f6c7d9fc79c7ad47dad3b5e0c0033bac252884de4b03237801"
+    },
+    "cartesian-zero-corner-36-round": {
+      "reviewedSource": "/private/tmp/stz-review-zero-corner-36-round",
+      "svgSha256": "45435051ef9a792cabf09441637d9b5e137a1d57cb80d6618681cf1f5d2e0fba",
+      "pngSha256": "2e37a06b3959676e84aff71299e2da4fe4e70d1c16f80163e64f34b667543fbd"
+    },
+    "production-zero-exact-corner": {
+      "reviewedSource": "/private/tmp/stz-review-production-zero-exact-corner",
+      "svgSha256": "84598a7a0938afcb8d68d1184fb2cb16636535497a4e597d7d11a16e97215e08",
+      "pngSha256": "7fb10e83cb8745eff136076bc1c2c3c5c9d8d3bc888feca059a6f4e366bc2f95"
+    }
+  }
+}

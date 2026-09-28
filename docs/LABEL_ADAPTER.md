@@ -765,6 +765,17 @@ overlaps. Picking measures its six-unit allowance from that region; it preserves
 the original contour's interior selection. Pending and committed empty bodies
 use the same layout contract. No stroke geometry enters the adapter/cache key.
 
+Effective SVG dash settings also belong to this synchronous geometry boundary.
+Layouts retain an independent copy of effective pattern values and compare
+width, enablement, phase, cap and join before accepting a commit. Dash endpoint
+rectangles/semicircles extend the continuous selection neighborhood without
+rejecting gaps. Square-capped dashed circles with endpoints share a fixed
+256-edge contour between SVG and geometry; original circle/body bounds and
+all label conversion identities stay unchanged. Both contour fill and stroke
+use that bounded inscribed approximation; other circle styles retain circles.
+See the [independent cap fixtures](../tests/fixtures/dash-cap-svg/README.md) for
+original engine observations, corrected outputs and analytic approximation limits.
+
 The accepted 32B `yeWQVG` parent passed all five checks, 16 groups and 16 point
 scenarios with no page errors. Independent review then rejected namespace
 lookup and responsive border geometry, with zero Critical and two Medium

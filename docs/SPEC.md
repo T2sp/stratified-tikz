@@ -1382,6 +1382,19 @@ Contour fill and stroke have independent SVG alphas, body color inherits into
 validated math geometry, and explicit math color survives. Stroke width affects
 painted bounds and picking, separate from body and shape bounds.
 
+Dash endpoint geometry shares the emitted effective stroke settings. Interaction
+unions the original contour, continuous stroke neighborhood and actual oriented
+caps, retaining selection through dash gaps and the six-local-unit allowance.
+Paint/clearance bounds conservatively retain that continuous stroke envelope;
+they are not paint-only gap masks or final hit oracles. Revision matching compares
+pattern values, phase, cap, join, width and enablement along with existing owner,
+source, font and shape guards. Immutable export reconstructs the same contour.
+Square-capped dashed circles with endpoints use a fixed 256-edge inscribed
+contour in both SVG and geometry, with radial error bounded by
+`r*(1-cos(pi/256))` and tangent-angle error by `pi/256`. The original mathematical
+circle and body bounds remain authoritative; other circle styles are unchanged.
+This is a bounded rendering approximation, not a saved shape/schema change.
+
 The browser policy adds `point-node-paint-import-persistence` cumulatively to all
 31F and 32A groups. Completion still requires fresh terminal success, named
 scenario observations, actual standalone downloads, matching checkout identity,

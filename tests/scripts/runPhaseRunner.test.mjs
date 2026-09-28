@@ -54,7 +54,7 @@ function fixture(t, phase = '31B', options = {}) {
   // The verifier independently checks generated post-key paint. Keep its real
   // oracle and transitive helpers in the isolated checkout so both the parent
   // identity import and each fresh verification worker load the same modules.
-  for (const file of ['pointPaintOracle.mjs', 'pointCheckDiagnostics.mjs', 'pointResponsiveFraming.mjs', 'pointPolygonJoinContract.mjs']) {
+  for (const file of ['pointPaintOracle.mjs', 'pointCheckDiagnostics.mjs', 'pointResponsiveFraming.mjs', 'pointPolygonJoinContract.mjs', 'pointDashCapContract.mjs']) {
     cpSync(join(automationDir, '..', file), join(cwd, 'scripts', file))
   }
   const runner = join(localAutomationDir, 'run-phase.mjs')

@@ -336,6 +336,18 @@ function observeEmptyPointSelectionClicks() {
 
 const api = {
   mount, mutateLabel, mutateInlineNode, state, observeInlineSelectionClicks, observeEmptyPointSelectionClicks,
+  emptyPointSelectionCandidates(points: readonly { x: number; y: number }[]) {
+    if (points.length > 2048 || points.some(({ x, y }) => !Number.isFinite(x) || !Number.isFinite(y))) {
+      throw new Error('Empty point candidate audit exceeds its finite input budget')
+    }
+    const diagram = editor.editableDiagram
+    if (diagram.ambientDimension !== 2 || diagram.labels.length !== 0 || diagram.strata.some((point) =>
+      point.geometricKind !== 'point' || (point.text ?? '') !== '')) throw new Error('Candidate audit requires empty-label 2D points')
+    const camera = resolveSvgCamera(diagram, 900, 700, { ...props, viewAdjustment: props.cameraViewAdjustment })
+    const visibility = createSvgSelectionCandidateVisibility({ visibilityOptions: resolveVisibilityOptions(diagram, props.visibilityOptions) })
+    return points.map((point) => ({ point, candidates: collectSvgPreviewSelectionCandidates({ diagram, camera, viewportHeight: 700,
+      point, layerFilter: editor.layerFilter, visibility }).map((candidate) => candidate.id) }))
+  },
   mutatePoint(id: string, change: Partial<PointStratum>) {
     const diagram = { ...editor.editableDiagram, strata: editor.editableDiagram.strata.map((point) =>
       point.id === id && point.geometricKind === 'point'

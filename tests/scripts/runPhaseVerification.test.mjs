@@ -21,6 +21,9 @@ import {
   hasWholePointSvg,
 } from '../../scripts/automation/phase-verification.mjs'
 
+import { dashCapScenario, dashCapArtifacts } from '../../scripts/pointDashCapContract.mjs'
+import { dashCapEvidence } from './dashCapEvidenceFixture.mjs'
+
 import { polygonJoinScenario, polygonJoinCases, polygonJoinScales, polygonJoinArtifacts, assertPolygonJoinEvidence } from '../../scripts/pointPolygonJoinContract.mjs'
 
 const freeLabelGroups = [
@@ -87,7 +90,8 @@ if (command.startsWith('run check:')) {
     const groups = JSON.parse(process.env.STZ_TEST_FREE_LABEL_GROUPS)
     const incomplete = process.env.STZ_TEST_FREE_EVIDENCE === 'incomplete'
     const pointEvidence = JSON.parse(process.env.STZ_TEST_POINT_EVIDENCE || '{}')
-    const artifactValues = JSON.parse(process.env.STZ_TEST_POINT_ARTIFACT_VALUES || '{}')
+    const artifactValues = JSON.parse(process.env.STZ_TEST_POINT_ARTIFACT_VALUES_FILE
+      ? fs.readFileSync(process.env.STZ_TEST_POINT_ARTIFACT_VALUES_FILE, 'utf8') : process.env.STZ_TEST_POINT_ARTIFACT_VALUES || '{}')
     if (process.env.STZ_TEST_POINT_ARTIFACTS === 'yes') {
       for (const entry of pointEvidence.evidence || []) for (const artifact of entry.artifacts) {
         const content = process.env.STZ_TEST_POINT_CORRUPT === 'yes' ? 'broken' : artifact.endsWith('.svg')
@@ -127,6 +131,20 @@ function checkoutFixture(t) {
     STZ_PLAYWRIGHT_MODULE: join(root, 'external playwright', 'index.mjs'),
     STZ_BROWSER_EXECUTABLE: join(root, 'Chrome Browser'),
   }
+  // Full native raster grids exceed OS environment-string limits. Keep the
+  // test-facing mutable payload API, but transport its exact JSON through an
+  // owned external fixture file rather than truncating audit evidence. Read on
+  // demand: cleanup hooks retain this closure until the test file finishes, so
+  // caching each multi-megabyte payload here would retain every fixture's JSON.
+  const pointArtifactValuesFile = join(root, 'point-artifact-values.json')
+  Object.defineProperty(env, 'STZ_TEST_POINT_ARTIFACT_VALUES', {
+    enumerable: false,
+    get() { return env.STZ_TEST_POINT_ARTIFACT_VALUES_FILE ? readFileSync(pointArtifactValuesFile, 'utf8') : undefined },
+    set(value) {
+      writeFileSync(pointArtifactValuesFile, value)
+      env.STZ_TEST_POINT_ARTIFACT_VALUES_FILE = pointArtifactValuesFile
+    },
+  })
   const git = (...args) => {
     const result = spawnSync('git', args, { cwd, env, encoding: 'utf8' })
     assert.equal(result.status, 0, result.stderr)
@@ -183,6 +201,17 @@ function failedVerification(t, fixture, phase, options = {}) {
 function storedReport(report) {
   return JSON.parse(readFileSync(report.summaryPath, 'utf8'))
 }
+
+test('point artifact payload uses the owned file as its uncached source', (t) => {
+  const fixture = checkoutFixture(t)
+  assert.equal(fixture.env.STZ_TEST_POINT_ARTIFACT_VALUES, undefined)
+  fixture.env.STZ_TEST_POINT_ARTIFACT_VALUES = '{"samples":[1,2,3]}'
+  const file = fixture.env.STZ_TEST_POINT_ARTIFACT_VALUES_FILE
+  assert.equal(readFileSync(file, 'utf8'), '{"samples":[1,2,3]}')
+  writeFileSync(file, '{"samples":[3,2,1]}')
+  assert.equal(fixture.env.STZ_TEST_POINT_ARTIFACT_VALUES, '{"samples":[3,2,1]}')
+  assert.equal(Object.keys(fixture.env).includes('STZ_TEST_POINT_ARTIFACT_VALUES'), false)
+})
 
 test('browser gates apply to 31B and all subsequent label subphases only', () => {
   assert.deepEqual(browserChecksForPhase('31B'), ['check:label-assets'])
@@ -464,11 +493,11 @@ const targetedPaintScenarios = [
   'point-paint-responsive-circle',
   'point-paint-responsive-triangle',
   'point-paint-responsive-downloads',
-  ...importRegressionScenarios, ...correctionScenarios, ...continuityScenarios, polygonJoinScenario,
+  ...importRegressionScenarios, ...correctionScenarios, ...continuityScenarios, polygonJoinScenario, dashCapScenario,
 ]
 test('32B preserves its original groups and scenarios and requires namespace and responsive paint evidence', () => {
   assert.equal(pointGroups.length, 16)
-  assert.equal(Object.values(pointNodeScenarios).flat().length, 28)
+  assert.equal(Object.values(pointNodeScenarios).flat().length, 29)
   assert.deepEqual(pointNodeScenarios['point-node-paint-import-persistence'], [
     'point-paint-native-inspector-history', 'point-paint-imported-presets-persistence',
     'point-paint-lifecycle-dimming', 'point-paint-pending-transparent-edit',
@@ -745,7 +774,7 @@ function completePointEvidence(fixture) {
   fixture.env.STZ_TEST_POINT_EVIDENCE = JSON.stringify(evidence)
   fixture.env.STZ_TEST_POINT_ARTIFACT_VALUES = JSON.stringify(Object.fromEntries(targetedPaintScenarios.map((name) => [
     `${name}.json`, { scenario: name, group: 'point-node-paint-import-persistence', result: 'passed',
-      ...(name === polygonJoinScenario ? polygonJoinEvidence() : name === 'point-paint-app-continuity' ? appContinuityEvidence().evidence : name === 'point-paint-clear-imported-style' ? clearRegressionEvidence() : [...importRegressionScenarios, 'point-paint-unsupported-mutations', 'point-paint-mutation-directory-uncertainty'].includes(name) ? importRegressionEvidence(name) : name === 'point-paint-responsive-downloads' ? {
+      ...(name === dashCapScenario ? dashCapEvidence() : name === polygonJoinScenario ? polygonJoinEvidence() : name === 'point-paint-app-continuity' ? appContinuityEvidence().evidence : name === 'point-paint-clear-imported-style' ? clearRegressionEvidence() : [...importRegressionScenarios, 'point-paint-unsupported-mutations', 'point-paint-mutation-directory-uncertainty'].includes(name) ? importRegressionEvidence(name) : name === 'point-paint-responsive-downloads' ? {
         cases: ['transparent', 'white'].flatMap((background) => [['circle', 'solid'], ['triangle', 'solid'], ['circle', 'dashed']]
           .map(([shape, variant]) => ({ background, shape, variant,
             baseline: { fixture: { source: 'Scale' }, expectedBackground: background, saved: bodyStructure(background) },
@@ -768,6 +797,8 @@ function completePointEvidence(fixture) {
   ])))
   fixture.env.STZ_TEST_POINT_ARTIFACT_VALUES = JSON.stringify({
     ...JSON.parse(fixture.env.STZ_TEST_POINT_ARTIFACT_VALUES), ...appContinuityEvidence().files,
+    ...Object.fromEntries(dashCapEvidence().cases.filter((entry) => entry.specification.audit).map((entry) =>
+      [`${dashCapScenario}-${entry.key}-scale-${entry.scale}-engine-audit.json`, entry.observation.engineAudit])),
   })
   return evidence
 }
@@ -1267,3 +1298,30 @@ test('32B requires independent polygon join raster and native candidate/cycling 
     assert.equal(error.report.status, 'failed', name)
   }
 })
+
+
+test('32B retains previous 386 artifacts and requires the independent dash-cap native scenario', (t) => {
+  assert.equal(Object.values(pointNodeScenarios).flat().flatMap(pointNodeScenarioArtifacts).length, 386 + dashCapArtifacts().length)
+  const fixture = checkoutFixture(t); completePointEvidence(fixture)
+  const artifacts = JSON.parse(fixture.env.STZ_TEST_POINT_ARTIFACT_VALUES)
+  artifacts[`${dashCapScenario}.json`].cases[0].probes[0].actions[0].candidates = ['control']
+  fixture.env.STZ_TEST_POINT_ARTIFACT_VALUES = JSON.stringify(artifacts)
+  assert.equal(failedVerification(t, fixture, '32B').report.status, 'failed')
+})
+
+
+for (const fault of ['missing-grid', 'hidden-phantom', 'mismatched-audit-file']) {
+  test(`32B native dash engine audit rejects ${fault}`, (t) => {
+    const fixture = checkoutFixture(t); completePointEvidence(fixture)
+    const artifacts = JSON.parse(fixture.env.STZ_TEST_POINT_ARTIFACT_VALUES)
+    const entry = artifacts[`${dashCapScenario}.json`].cases.find((entry) => entry.key === 'square-later-zero-phase-10')
+    if (fault === 'missing-grid') entry.observation.engineAudit.samples.pop()
+    if (fault === 'hidden-phantom') {
+      entry.observation.engineAudit.samples.find((sample) => sample.expected === 'miss').candidates = ['p']
+      entry.observation.engineAudit.mismatches = []
+    }
+    if (fault === 'mismatched-audit-file') artifacts[`${dashCapScenario}-${entry.key}-scale-${entry.scale}-engine-audit.json`].samples.pop()
+    fixture.env.STZ_TEST_POINT_ARTIFACT_VALUES = JSON.stringify(artifacts)
+    assert.equal(failedVerification(t, fixture, '32B').report.status, 'failed')
+  })
+}

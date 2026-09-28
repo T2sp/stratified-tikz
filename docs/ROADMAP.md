@@ -1775,6 +1775,13 @@ open. 32C and 32D remain planned. See the
 [Phase 32 plan](./PHASE_32_PLAN.md) and
 [32B implementation and evidence](./PHASE_32B_IMPLEMENTATION.md).
 
+The latest 32B correction adds dashed endpoint caps to bounds, selection and
+picking, effective-style revision matching, and independent/native regressions.
+The separate lifecycle timeout investigation retains the failed reviewer run
+and uses controlled timer advancement without reducing evidence assertions.
+The cumulative acceptance gate is 16 groups, 29 scenarios and 605 artifacts;
+accepted pre-fix evidence cannot verify these later changes.
+
 | Subphase | Responsibility |
 | --- | --- |
 | 32A | Apply the shared MathJax runtime to Add point bodies; synchronize contour, picking, and whole-node settled SVG export |

@@ -1,0 +1,47 @@
+{
+  "provenance": "Read-only copies of retained independent reviewer observations; original versus canonical SVG/PNG identities checked before copying",
+  "observationFiles": [
+    {
+      "source": "/private/tmp/stz-review-production-large-phase-observations.json",
+      "file": "review-original-observations.json",
+      "sha256": "8dc310f3bbe987500cbbf3c3fe709ff79c007a22d4cdc9163f4431ce543644a4"
+    },
+    {
+      "source": "/private/tmp/stz-review-canonical-large-phase-observations.json",
+      "file": "review-corrected-observations.json",
+      "sha256": "8e1510c66ef4987ba67eabe21959e5ee5ddc74d2504c3fe17a93241a4b56b316"
+    }
+  ],
+  "pairs": {
+    "triangle-phase-1e12-original": {
+      "svgSha256": "ee5fc138032e170fc8887f5c74d0d41aee2c1f221594d1abeee7092b99ad5eeb",
+      "pngSha256": "3a441400a6ecc8277155c857bd7fadba4fea5b202e063fd3d71be117c856f0af",
+      "reviewedSource": "/private/tmp/stz-review-production-phase-1000000000000"
+    },
+    "triangle-phase-1e12-corrected": {
+      "svgSha256": "48c17ed53ee237156ff473b3a4ea07a848af76e6b5e594e77899735048b81f02",
+      "pngSha256": "116cdeff667bf8631eec528343df6ed20143dfd1eea354821cde1fbb7345b3d6",
+      "reviewedSource": "/private/tmp/stz-review-production-phase-1000000000000-canonical"
+    },
+    "triangle-phase-1e20-original": {
+      "svgSha256": "8faba021f2624bf492ab4f6d5179d88e7b200af33b98535614b896e2ca5810d7",
+      "pngSha256": "226697eacbbd4cf7bda08316918b4262f996a787ba83fc5f4749f06e66d9b2f5",
+      "reviewedSource": "/private/tmp/stz-review-production-phase-100000000000000000000"
+    },
+    "triangle-phase-1e20-corrected": {
+      "svgSha256": "bab01742354c6f906998c0e5d5a57375f0e05f89b7de71b2b2debf6169cd68cf",
+      "pngSha256": "f6ee6cdc9502e4597675c4d97c7774644aeee9c59b49ad555bcc1fb78a7622d2",
+      "reviewedSource": "/private/tmp/stz-review-production-phase-100000000000000000000-canonical"
+    },
+    "triangle-phase-1e200-original": {
+      "svgSha256": "354cb4d5460d15ea23e4c7626bc1078323f2ac7087cd61a286ecaaef37d7cd91",
+      "pngSha256": "9951acea9c296c43dbbe968068535f4cb7d30b639df5bc467bd218ce1d5dbfa8",
+      "reviewedSource": "/private/tmp/stz-review-production-phase-1e+200"
+    },
+    "triangle-phase-1e200-corrected": {
+      "svgSha256": "b3998b32762c8809b4e9417d82c08a39c12a6a7ee0e9390333e42d5797eda478",
+      "pngSha256": "4e4a5e5ee425260d961bb1f0647c6f9f57f90666a7712c3c222f19c7280b09f6",
+      "reviewedSource": "/private/tmp/stz-review-production-phase-1e+200-canonical"
+    }
+  }
+}

@@ -1,0 +1,60 @@
+{
+  "style": {
+    "kind": "pointStyle",
+    "color": "#000000",
+    "opacity": 1,
+    "shape": "square",
+    "fill": "filled",
+    "size": 5.892556509887896,
+    "paint": {
+      "text": {
+        "color": "#000000",
+        "opacity": 1
+      },
+      "fill": {
+        "enabled": false,
+        "color": "#000000",
+        "opacity": 1
+      },
+      "stroke": {
+        "enabled": true,
+        "color": "#000000",
+        "opacity": 1,
+        "width": 30,
+        "lineStyle": "solid",
+        "dashPhase": 4.166666666666667,
+        "lineCap": "rect",
+        "lineJoin": "bevel",
+        "dashPattern": [
+          0,
+          12.5
+        ]
+      }
+    }
+  },
+  "vertices": [
+    {
+      "x": 5.000000000000001,
+      "y": -5
+    },
+    {
+      "x": -5,
+      "y": -5.000000000000001
+    },
+    {
+      "x": -5.000000000000002,
+      "y": 5
+    },
+    {
+      "x": 5,
+      "y": 5.000000000000002
+    }
+  ],
+  "pattern": [
+    0,
+    15
+  ],
+  "issueCount": 0,
+  "issues": [],
+  "targeted": []
+}

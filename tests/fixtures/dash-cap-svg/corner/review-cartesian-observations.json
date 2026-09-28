@@ -1,0 +1,106 @@
+[
+  {
+    "width": 6,
+    "cap": "square",
+    "caps": {
+      "minX": -3,
+      "minY": -3,
+      "maxX": 13,
+      "maxY": 13
+    },
+    "solid": {
+      "minX": -3,
+      "minY": -3,
+      "maxX": 13,
+      "maxY": 13
+    },
+    "raster": [
+      -3,
+      -3,
+      13,
+      13
+    ],
+    "r": 16.357397504646023,
+    "count": 32256,
+    "outsidePaint": 0,
+    "maximumDistance": 0
+  },
+  {
+    "width": 6,
+    "cap": "round",
+    "caps": {
+      "minX": -3,
+      "minY": -3,
+      "maxX": 13,
+      "maxY": 13
+    },
+    "solid": {
+      "minX": -3,
+      "minY": -3,
+      "maxX": 13,
+      "maxY": 13
+    },
+    "raster": [
+      -3,
+      -3,
+      13,
+      13
+    ],
+    "r": 16.39556199478993,
+    "count": 26344,
+    "outsidePaint": 0,
+    "maximumDistance": 0
+  },
+  {
+    "width": 36,
+    "cap": "square",
+    "caps": {
+      "minX": -18,
+      "minY": -18,
+      "maxX": 28,
+      "maxY": 28
+    },
+    "solid": {
+      "minX": -18,
+      "minY": -18,
+      "maxX": 28,
+      "maxY": 28
+    },
+    "raster": [
+      -18,
+      -18,
+      28,
+      28
+    ],
+    "r": 33.24344977773817,
+    "count": 441346,
+    "outsidePaint": 0,
+    "maximumDistance": 0
+  },
+  {
+    "width": 36,
+    "cap": "round",
+    "caps": {
+      "minX": -18,
+      "minY": -18,
+      "maxX": 28,
+      "maxY": 28
+    },
+    "solid": {
+      "minX": -18,
+      "minY": -18,
+      "maxX": 28,
+      "maxY": 28
+    },
+    "raster": [
+      -18,
+      -18,
+      28,
+      28
+    ],
+    "r": 29.713245415555,
+    "count": 373580,
+    "outsidePaint": 0,
+    "maximumDistance": 0
+  }
+]

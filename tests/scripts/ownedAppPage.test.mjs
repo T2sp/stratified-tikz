@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict'
 import { EventEmitter } from 'node:events'
-import { mkdtemp, readFile, rm } from 'node:fs/promises'
+import { mkdir, mkdtemp, readFile, rm, writeFile } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import test from 'node:test'
@@ -32,10 +32,25 @@ class Page extends EventEmitter {
 }
 async function setup(t, options = {}) {
   const artifactDir = await mkdtemp(join(tmpdir(), 'stz-owned-app-test-'))
-  const page = new Page(), app = createOwnedAppPage({ page, expectedUrl: url, artifactDir, ...options })
+  const timings = []
+  const page = new Page(), app = createOwnedAppPage({ page, expectedUrl: url, artifactDir,
+    observeDiagnostic: (entry) => timings.push(entry), ...options })
+  // Install cleanup before startup so a startup/persistence failure cannot leave
+  // owned listeners or temporary files behind. Retain opt-in timing separately.
+  t.after(async () => {
+    try { await app.dispose() }
+    finally {
+      try {
+        if (process.env.STZ_LIFECYCLE_TIMING_DIR) {
+          await mkdir(process.env.STZ_LIFECYCLE_TIMING_DIR, { recursive: true })
+          await writeFile(join(process.env.STZ_LIFECYCLE_TIMING_DIR, `${app.pageId}.json`),
+            JSON.stringify({ test: t.name, artifactDir, node: process.version, timings }, null, 2) + '\n')
+        }
+      } finally { await rm(artifactDir, { recursive: true, force: true }) }
+    }
+  })
   await app.install(); const startup = await app.start()
-  t.after(async () => { await app.dispose(); await rm(artifactDir, { recursive: true, force: true }) })
-  return { app, page, startup, artifactDir }
+  return { app, page, startup, artifactDir, timings }
 }
 
 test('owned document boundary rejects wrong page, URL, API, and same-URL replacement', () => {
@@ -115,24 +130,48 @@ test('owned failure persists primary before API-independent DOM and screenshot; 
   assert.equal(evidence.scenario, 'next-scenario-before-load')
 })
 
-test('bounded failing capture and screenshot retain primary, own late rejections and permit cleanup', async (t) => {
-  const { app, page, artifactDir } = await setup(t, { timeoutMs: 15 })
-  let rejectCapture, rejectImage
-  page.evaluate = () => new Promise((_resolve, reject) => { rejectCapture = reject })
-  page.screenshot = () => new Promise((_resolve, reject) => { rejectImage = reject })
+test('bounded failing capture and screenshot retain primary, own late rejections and permit cleanup', { timeout: 10_000 }, async (t) => {
+  // Only advance the diagnostic clock after an intentionally hanging browser
+  // operation starts. Real filesystem setup/persistence/disposal still happens,
+  // with the same 15ms configured budget, but host scheduling cannot spend it.
+  // Each test owns/restores its timer mock; ordinary production timers are intact.
+  t.mock.timers.enable({ apis: ['setTimeout'] })
+  const { app, page, artifactDir, timings } = await setup(t, { timeoutMs: 15 })
+  let rejectCapture, rejectImage, captureEntered, imageEntered
+  const captureStarted = new Promise((resolve) => { captureEntered = resolve })
+  const imageStarted = new Promise((resolve) => { imageEntered = resolve })
+  page.evaluate = () => new Promise((_resolve, reject) => { rejectCapture = reject; captureEntered() })
+  page.screenshot = (options) => new Promise((_resolve, reject) => {
+    assert.equal(options.timeout, 15)
+    assert.equal(options.fullPage, false)
+    rejectImage = reject; imageEntered()
+  })
   const primary = new Error('primary action failure')
-  const evidence = await app.failure(primary)
+  const failure = app.failure(primary)
+  await captureStarted
+  t.mock.timers.tick(15)
+  await imageStarted
+  t.mock.timers.tick(115)
+  const evidence = await failure
   assert.equal(evidence.error.message, primary.message)
-  assert.match(evidence.captureError.message, /Timed out/)
-  assert.match(evidence.screenshotError.message, /Timed out/)
+  assert.match(evidence.captureError.message, /Timed out after 15ms during owned App document capture \(failure\)/)
+  assert.match(evidence.screenshotError.message, /Timed out after 115ms during owned App failure screenshot/)
+  assert.deepEqual(timings.filter((entry) => entry.outcome === 'failed').map(({ name, timeoutMs }) => ({ name, timeoutMs })), [
+    { name: 'owned App document capture (failure)', timeoutMs: 15 },
+    { name: 'owned App failure screenshot', timeoutMs: 115 },
+  ])
   await page.close(); rejectCapture(new Error('late evaluate cancellation')); rejectImage(new Error('late screenshot cancellation'))
   await new Promise((resolve) => setImmediate(resolve))
   await app.dispose()
   const retained = JSON.parse(await readFile(join(artifactDir, 'point-paint-app-failure.json'), 'utf8'))
   assert.equal(retained.error.message, primary.message)
+  assert.equal(retained.captureError.message, evidence.captureError.message)
+  assert.equal(retained.screenshotError.message, evidence.screenshotError.message)
   const lifecycle = JSON.parse(await readFile(join(artifactDir, 'point-paint-app-lifecycle.json'), 'utf8'))
   assert.equal(lifecycle.events.at(-1).event, 'close')
   assert.equal(lifecycle.failure.error.message, primary.message, 'Cleanup retains primary in lifecycle evidence')
+  assert.equal(page.eventNames().length, 0, 'Cleanup releases every owned page listener')
+  assert.ok(timings.filter((entry) => entry.name.includes('evidence')).every((entry) => entry.outcome === 'passed' && entry.timeoutMs === 15))
 })
 
 test('bounded event lifecycle retains navigation, close/crash, console, module and request failures', async (t) => {

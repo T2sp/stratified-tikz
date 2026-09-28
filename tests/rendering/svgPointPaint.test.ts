@@ -120,6 +120,7 @@ test('wide border expands painted bounds and picking without changing body or sh
   const diagram = createEmptyDiagram({ ambientDimension: 2 })
   const point = createPointStratum({ ambientDimension: 2, id: 'p', position: { x: 0, y: 0, z: 0 }, style: style() })
   point.style.paint!.stroke.width = 20
+  point.style.paint!.stroke.lineStyle = 'solid'
   diagram.strata = [point]
   const layout = pendingSvgPointNodeLayout(point)
   assert.equal(layout.paintedBounds.maxX, layout.geometry.radius + 12)
@@ -139,6 +140,7 @@ test('triangle miter tip has the independent 60-degree join extent and remains p
   const point = createPointStratum({ ambientDimension: 2, id: 'miter', position: { x: 0, y: 0, z: 0 }, style: style() })
   point.style.shape = 'triangle'
   point.style.paint!.stroke.width = 30
+  point.style.paint!.stroke.lineStyle = 'solid'
   diagram.strata = [point]
   const layout = pendingSvgPointNodeLayout(point)
   // 60-degree corner: half-width / sin(30 degrees) = full stroke width.
