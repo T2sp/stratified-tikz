@@ -1,3 +1,5 @@
+import { phase32cProfile, phase32cDeferrals, phase32cAuthorization, resolveVerificationProfile, deferredMechanismKey, mechanismNotRun, assertScopedMechanismEvidence, assertNamedStrict32BFailure } from './phase32c-profile.mjs';
+import { geometricShapeGroup, geometricShapeScenarios, geometricShapeArtifacts, assertGeometricShapeEvidence } from '../pointGeometricShapesContract.mjs';
 import {
   closeSync,
   existsSync,
@@ -70,8 +72,10 @@ export const pointNodeScenarios = {
     "point-paint-mutation-directory-uncertainty", "point-paint-app-continuity", polygonJoinScenario, dashCapScenario,
   ],
 };
-export function pointNodeScenarioArtifacts(name) {
-  if (name === dashCapScenario) return [...dashCapArtifacts(), ...dashCapMechanismArtifacts()];
+export const allPointNodeScenarios = { ...pointNodeScenarios, [geometricShapeGroup]: geometricShapeScenarios };
+export function pointNodeScenarioArtifacts(name, profile = "strict") {
+  if (geometricShapeScenarios.includes(name)) return geometricShapeArtifacts(name);
+  if (name === dashCapScenario) return [...dashCapArtifacts(), ...dashCapMechanismArtifacts().filter((file) => profile !== phase32cProfile || !file.startsWith(`${dashCapMechanismStem}-${deferredMechanismKey}.`))];
   if (name === polygonJoinScenario) return polygonJoinArtifacts();
   if (name === "point-paint-app-continuity") {
     return [`${name}.json`, "point-paint-app-lifecycle.json", "point-paint-app-transitions.json", "point-paint-app-controls.json",
@@ -128,7 +132,7 @@ export function pointNodeScenarioArtifacts(name) {
 const pointNodeGroups = [...combinedLabelGroups, ...Object.keys(pointNodeScenarios)];
 const pointNodeMathGroups = pointNodeGroups.filter((group) => group !== "point-node-paint-import-persistence");
 const phase32Groups = { "32A": pointNodeMathGroups, "32B": pointNodeGroups,
-  "32C": pointNodeGroups, "32D": pointNodeGroups };
+  "32C": [...pointNodeGroups, geometricShapeGroup], "32D": [...pointNodeGroups, geometricShapeGroup] };
 
 export function browserChecksForPhase(phase) {
   const normalized = String(phase).toUpperCase();
@@ -266,7 +270,33 @@ function validateDashLivePaintFiles(artifactDir, live) {
   }
 }
 
-function validateTargetedPaintEvidence(artifactDir, name, group) {
+function validateTargetedPaintEvidence(artifactDir, name, group, profile = "strict") {
+  if (group === geometricShapeGroup) {
+    const evidence = evidenceObject(artifactDir, `${name}.json`);
+    assertGeometricShapeEvidence(evidence, name);
+    if (name.startsWith('point-geometric-download-')) {
+      const standalone = evidenceObject(artifactDir, `${name}-standalone.json`);
+      assert.deepEqual(standalone.pageErrors, []);
+      assert.deepEqual(standalone.expected, evidence.expected); assert.deepEqual(standalone.click, evidence.click);
+      assert.equal(standalone.reopened.length, evidence.expected.length);
+      assert.ok(standalone.requests.length > 0 && standalone.requests.every((url) => url.startsWith('file:')));
+      const svg = readFileSync(join(artifactDir, `${name}.svg`), 'utf8');
+      const escape = (value) => String(value).replaceAll('&', '&amp;').replaceAll('<', '&lt;').replaceAll('>', '&gt;').replaceAll('"', '&quot;');
+      for (const [index, expected] of evidence.expected.entries()) {
+        const actual = standalone.reopened[index];
+        assert.equal(actual.source, expected.source); assert.equal(actual.shape, expected.shape);
+        assert.equal(actual.errors, 0); assert.ok(actual.glyphs > 0);
+        assert.deepEqual(actual.contour, expected.rendered.contour);
+        assert.ok(svg.includes(`<title>${escape(expected.source)}</title>`), 'Downloaded SVG preserves captured source');
+        for (const [key, value] of Object.entries(actual.contour.attributes)) assert.ok(svg.includes(`${key}="${escape(value)}"`), 'Downloaded SVG retains captured contour attributes');
+        const regions = expected.rendered.paintRegions.map(({ role: _role, ...region }) => region);
+        assert.deepEqual(actual.regions, regions, 'Standalone cylinder regions match captured paints');
+        for (const region of regions) for (const [key, value] of Object.entries(region.attributes)) assert.ok(svg.includes(`${key}="${escape(value)}"`));
+      }
+      assert.equal(svg.includes('data-stratified-tikz-export-background="white"'), evidence.background === 'white');
+    }
+    return;
+  }
   if (name === dashCapScenario) {
     const evidence = evidenceObject(artifactDir, `${name}.json`);
     assertDashCapEvidence(evidence);
@@ -284,8 +314,10 @@ function validateTargetedPaintEvidence(artifactDir, name, group) {
       }
     }
     const mechanism = evidenceObject(artifactDir, `${dashCapMechanismStem}.json`);
-    assertDashCapMechanismEvidence(mechanism);
+    if (profile === phase32cProfile) assertScopedMechanismEvidence(mechanism);
+    else assertDashCapMechanismEvidence(mechanism);
     for (const entry of mechanism.cases) {
+      if (profile === phase32cProfile && entry.key === deferredMechanismKey) continue;
       const stem = `${dashCapMechanismStem}-${entry.key}`;
       assert.deepEqual(evidenceObject(artifactDir, `${stem}.json`), entry,
         "Retained mechanism entry matches the complete matrix");
@@ -645,7 +677,7 @@ function validateDetachedPaintEvidence(artifactDir, name, group) {
         const expected = structuredClone(prior.current), actual = after.points.find((point) => point.current.id === expected.id);
         if (ids.includes(expected.id)) {
           const key = entry.before.diagram.importedTikzStyleReferences.find((ref) => ref.id === expected.importedTikzStyleReferenceId).key;
-          delete expected.stylePresetId; delete expected.importedTikzStyleReferenceId; delete expected.style.importedPaint;
+          delete expected.stylePresetId; delete expected.importedTikzStyleReferenceId; delete expected.style.importedPaint; delete expected.style.importedShape;
           assert.equal(Object.hasOwn(actual.current, "stylePresetId"), false);
           assert.equal(Object.hasOwn(actual.current, "importedTikzStyleReferenceId"), false);
           assert.equal(Object.hasOwn(actual.current.style, "importedPaint"), false);
@@ -713,14 +745,15 @@ export function hasWholePointSvg(svg) {
   if (stack.length || roots.length !== 1 || roots[0].name !== "svg") return false;
   const hasPaint = (node) => node.children.some((child) => ["text", "path", "rect", "use"].includes(child.name) || hasPaint(child));
   const wholePoint = (node) => (node.name === "g"
-    && node.children.some((child) => ["circle", "polygon"].includes(child.name))
+    && node.children.some((child) => ["circle", "polygon", "path", "ellipse", "rect"].includes(child.name))
     && node.children.some((child) => child.name === "g"
       && child.children.some((entry) => entry.name === "title") && hasPaint(child)))
     || node.children.some(wholePoint);
   return wholePoint(roots[0]);
 }
 
-function validateBrowserEvidence(name, artifactDir, phase, checkout) {
+export function validateBrowserEvidence(name, artifactDir, phase, checkout, profile = "strict") {
+  resolveVerificationProfile(profile, phase);
   if (name === "check:label-assets") {
     const evidence = evidenceObject(artifactDir, "native-retry-evidence.json");
     if (typeof evidence.browser !== "string" || evidence.browser.trim() === ""
@@ -733,6 +766,8 @@ function validateBrowserEvidence(name, artifactDir, phase, checkout) {
     return;
   }
   const evidence = evidenceObject(artifactDir, "free-labels-evidence.json");
+  if (profile === phase32cProfile) { assert.equal(evidence.profile, profile, "Scoped browser profile mismatch"); assert.deepEqual(evidence.deferredScenarios, [mechanismNotRun()]); }
+  else assert.ok(evidence.profile === undefined || evidence.profile === "strict", "Strict verification cannot accept scoped evidence");
   if (evidence.result !== "passed" || evidence.stage !== "complete"
     || typeof evidence.environment?.browserVersion !== "string"
     || evidence.environment.browserVersion.trim() === "") {
@@ -747,9 +782,9 @@ function validateBrowserEvidence(name, artifactDir, phase, checkout) {
   const completed = evidence.completed;
   if (!Array.isArray(completed)
     || new Set(completed).size !== completed.length
-    || completed.some((group) => !pointNodeGroups.includes(group))
+    || completed.some((group) => ![...pointNodeGroups, geometricShapeGroup].includes(group))
     || !requiredGroups.every((group) => completed.includes(group))
-    || ![freeLabelGroups, inlineCompleteGroups, allLabelGroups, combinedLabelGroups, pointNodeMathGroups, pointNodeGroups].some((groups) =>
+    || ![freeLabelGroups, inlineCompleteGroups, allLabelGroups, combinedLabelGroups, pointNodeMathGroups, pointNodeGroups, phase32Groups["32C"]].some((groups) =>
       groups.length === completed.length && groups.every((group) => completed.includes(group)))) {
     throw new Error(`Phase ${phase} browser evidence must complete ${requiredGroups.length} required groups; only complete supported group sets are accepted`);
   }
@@ -765,13 +800,13 @@ function validateBrowserEvidence(name, artifactDir, phase, checkout) {
         JSON.stringify(Object.entries(checkout.untrackedSha256).sort())) {
       throw new Error("Point-node browser evidence checkout mismatch");
     }
-    for (const [group, names] of Object.entries(pointNodeScenarios)) {
+    for (const [group, names] of Object.entries(allPointNodeScenarios)) {
       if (!completed.includes(group)) continue;
       for (const name of names) {
         const records = evidence.evidence?.filter((entry) => entry.name === name) ?? [];
         if (records.length !== 1 || records[0].group !== group || records[0].result !== "passed"
           || !Array.isArray(records[0].artifacts) || records[0].artifacts.length === 0
-          || !pointNodeScenarioArtifacts(name).every((file) => records[0].artifacts.includes(file))) {
+          || !pointNodeScenarioArtifacts(name, profile).every((file) => records[0].artifacts.includes(file))) {
           throw new Error(`Missing completed point-node scenario: ${name}`);
         }
         for (const artifact of records[0].artifacts) {
@@ -798,7 +833,7 @@ function validateBrowserEvidence(name, artifactDir, phase, checkout) {
             throw new Error(`Invalid point-node PNG artifact: ${artifact}`);
           }
         }
-        validateTargetedPaintEvidence(artifactDir, name, group);
+        validateTargetedPaintEvidence(artifactDir, name, group, profile);
       }
     }
   }
@@ -815,7 +850,7 @@ function commandError(message, exitCode = 1) {
   return error;
 }
 
-function runCheck(report, { name, command, args, cwd, env, browser = false }) {
+function runCheck(report, { name, command, args, cwd, env, browser = false, profile = "strict" }) {
   const checkDir = join(report.artifactDir,
     `${String(report.checks.length + 1).padStart(2, "0")}-${name.replace(/[^a-z0-9-]/gi, "-")}`);
   mkdirSync(checkDir, { recursive: true });
@@ -858,7 +893,7 @@ function runCheck(report, { name, command, args, cwd, env, browser = false }) {
     }
     if (browser) {
       try {
-        validateBrowserEvidence(name, check.artifactDir, report.phase, report.checkout);
+        validateBrowserEvidence(name, check.artifactDir, report.phase, report.checkout, profile);
       } catch (error) {
         throw commandError(`${name} evidence is incomplete or invalid: ${error.message}`);
       }
@@ -893,6 +928,7 @@ function runCheck(report, { name, command, args, cwd, env, browser = false }) {
 // The caller runs this in the parent runner, outside its child Codex sandbox.
 // An outer sandbox still applies: permission failures remain failed checks.
 export function runPhaseVerification({ phase, cwd = process.cwd(), env = process.env, stage = "verification" }) {
+  if (env.STZ_VERIFICATION_PROFILE && env.STZ_VERIFICATION_PROFILE !== "strict") throw commandError("Strict verifier does not accept a phase-specific profile; use 32C review-deferred");
   const normalized = String(phase).toUpperCase();
   const prefix = `stz-phase${normalized.toLowerCase()}-${stage}-`.replace(/[^a-z0-9-]/gi, "-");
   const artifactDir = mkdtempSync(join(tmpdir(), prefix));
@@ -953,4 +989,106 @@ export function runPhaseVerification({ phase, cwd = process.cwd(), env = process
     throw failure;
   }
   return report;
+}
+
+/** Review-only 32C disposition. A failed strict report is retained as failed and
+ * is never passed to run-phase's success/commit path. The second browser run
+ * executes every non-deferred scenario, including final SVG and all new shapes. */
+function validateNamedStrict32CDiagnostic(check, checkout) {
+  const evidence = evidenceObject(check.artifactDir, 'free-labels-evidence.json');
+  assert.equal(evidence.profile ?? 'strict', 'strict');
+  assert.equal(evidence.checkout?.revision, checkout.revision);
+  assert.equal(evidence.checkout?.trackedDiffSha256, checkout.trackedDiffSha256);
+  assert.deepEqual(evidence.checkout?.untrackedSha256, checkout.untrackedSha256);
+  const earlier = pointNodeGroups.filter((group) => group !== 'point-node-paint-import-persistence' && group !== 'settled-SVG-export-standalone');
+  assert.equal(evidence.completed.length, earlier.length);
+  assert.ok(earlier.every((group) => evidence.completed.includes(group)));
+  assert.ok(evidence.incompleteGroups.includes('settled-SVG-export-standalone') && evidence.incompleteGroups.includes('point-node-paint-import-persistence'));
+  const appDash = evidenceObject(check.artifactDir, `${dashCapScenario}.json`);
+  assertNamedStrict32BFailure(evidence, evidenceObject(check.artifactDir, `${dashCapMechanismStem}.json`), appDash);
+  assertDashCapEvidence({ ...appDash, result: 'passed' });
+}
+
+export function runPhase32CReviewVerification({ phase = '32C', cwd = process.cwd(), env = process.env, stage = 'review-only' } = {}) {
+  resolveVerificationProfile(phase32cProfile, phase);
+  const artifactDir = mkdtempSync(join(tmpdir(), `stz-phase32c-${stage}-`));
+  const report = { phase, stage, kind: 'phase32c-review-only', profile: phase32cProfile,
+    status: 'running', artifactDir, summaryPath: join(artifactDir, 'verification.json'),
+    startedAt: new Date().toISOString(), checkout: null, checkoutAfter: null, checks: [] };
+  const disposition = { phase, profile: phase32cProfile, status: 'pending', reviewOnly: true,
+    authorization: phase32cAuthorization, deferrals: phase32cDeferrals,
+    summaryPath: join(artifactDir, '32c-acceptance.json'), rawReportPath: report.summaryPath,
+    checkout: null, evidencePaths: [] };
+  const strictEnv = { ...env }; delete strictEnv.STZ_VERIFICATION_PROFILE; delete strictEnv.STZ_VERIFICATION_PHASE;
+  let failure, strictFailure;
+  saveReport(report);
+  try {
+    report.checkout = captureCheckoutIdentity({ cwd, env }); disposition.checkout = report.checkout;
+    for (const spec of [{ name: 'npm-test', command: 'npm', args: ['test'] },
+      { name: 'npm-build', command: 'npm', args: ['run', 'build'] },
+      { name: 'git-diff-check', command: 'git', args: ['diff', '--check'] }]) runCheck(report, { ...spec, cwd, env: strictEnv });
+    const browserEnv = browserEnvironment(cwd, strictEnv);
+    report.browserEnvironment = { playwrightModule: browserEnv.STZ_PLAYWRIGHT_MODULE ?? 'playwright', browserExecutable: browserEnv.STZ_BROWSER_EXECUTABLE ?? null };
+    runCheck(report, { name: 'check:label-assets', command: 'npm', args: ['run', 'check:label-assets'], cwd, env: browserEnv, browser: true });
+    try { runCheck(report, { name: 'check:free-labels', command: 'npm', args: ['run', 'check:free-labels'], cwd, env: browserEnv, browser: true }); }
+    catch (error) { strictFailure = error; }
+    // Even an unexpected diagnostic failure does not hide the independent 32C
+    // run. It remains a blocker when the disposition is evaluated below.
+    runCheck(report, { name: 'check:free-labels:32c', command: 'npm', args: ['run', 'check:free-labels:32c'],
+      cwd, env: browserEnv, browser: true, profile: phase32cProfile });
+    if (strictFailure) {
+      const check = report.checks.find(({ name }) => name === 'check:free-labels');
+      assert.equal(check.exitCode, 1, 'Only the recorded assertion exit is classifiable');
+      assert.equal(check.signal, null);
+      validateNamedStrict32CDiagnostic(check, report.checkout);
+      disposition.strictDiagnostic = 'failed-named-32b-literal-case';
+    } else disposition.strictDiagnostic = 'passed';
+    disposition.status = 'accepted';
+  } catch (error) { failure = error; disposition.status = 'failed'; disposition.error = error.message; }
+  try {
+    report.checkoutAfter = captureCheckoutIdentity({ cwd, env });
+    assert.equal(report.checkoutAfter.fingerprint, report.checkout?.fingerprint, 'Checkout changed during 32C verification');
+  } catch (error) { failure ??= error; disposition.status = 'failed'; disposition.error = error.message; }
+  report.status = failure || strictFailure ? 'failed' : 'passed';
+  report.finishedAt = new Date().toISOString();
+  if (failure || strictFailure) report.error = { message: (failure ?? strictFailure).message };
+  disposition.evidencePaths = report.checks.map(({ name, logPath, artifactDir }) => ({ name, logPath, ...(artifactDir ? { artifactDir } : {}) }));
+  disposition.finishedAt = new Date().toISOString();
+  saveReport(report); writeFileSync(disposition.summaryPath, JSON.stringify(disposition, null, 2) + '\n');
+  console.log(`Raw cumulative result: ${report.status}; ${report.summaryPath}`);
+  console.log(`32C review-only acceptance: ${disposition.status}; ${disposition.summaryPath}`);
+  if (failure) { failure.report = report; failure.disposition = disposition; failure.exitCode ??= 1; throw failure; }
+  return { report, disposition };
+}
+
+export function phase32CDispositionMatchesCheckout({ report, disposition }, options = {}) {
+  try {
+    assert.equal(report.kind, 'phase32c-review-only'); assert.equal(report.phase, '32C'); assert.equal(report.profile, phase32cProfile);
+    assert.equal(disposition.phase, '32C'); assert.equal(disposition.profile, phase32cProfile); assert.equal(disposition.status, 'accepted');
+    assert.equal(disposition.reviewOnly, true); assert.equal(disposition.authorization, phase32cAuthorization);
+    assert.deepEqual(disposition.deferrals, phase32cDeferrals); assert.deepEqual(disposition.checkout, report.checkout);
+    assert.equal(report.checkoutAfter.fingerprint, report.checkout.fingerprint);
+    assert.equal(captureCheckoutIdentity(options).fingerprint, report.checkout.fingerprint);
+    assert.equal(report.summaryPath, join(report.artifactDir, 'verification.json'));
+    assert.equal(disposition.summaryPath, join(report.artifactDir, '32c-acceptance.json'));
+    assert.equal(disposition.rawReportPath, report.summaryPath);
+    assert.deepEqual(JSON.parse(readFileSync(report.summaryPath, 'utf8')), report);
+    assert.deepEqual(JSON.parse(readFileSync(disposition.summaryPath, 'utf8')), disposition);
+    const names = ['npm-test', 'npm-build', 'git-diff-check', 'check:label-assets', 'check:free-labels', 'check:free-labels:32c'];
+    assert.deepEqual(report.checks.map(({ name }) => name), names);
+    for (const check of report.checks) {
+      assert.equal(check.signal, null); assert.ok(existsSync(check.logPath));
+      if (check.name === 'check:free-labels' && check.status === 'failed') {
+        assert.equal(report.status, 'failed'); assert.equal(disposition.strictDiagnostic, 'failed-named-32b-literal-case');
+        assert.equal(check.exitCode, 1);
+        validateNamedStrict32CDiagnostic(check, report.checkout);
+      } else {
+        assert.equal(check.status, 'passed'); assert.equal(check.exitCode, 0);
+        if (check.name === 'check:free-labels') { assert.equal(disposition.strictDiagnostic, 'passed'); assert.equal(report.status, 'passed'); }
+        if (check.artifactDir) validateBrowserEvidence(check.name, check.artifactDir, '32C', report.checkout,
+          check.name === 'check:free-labels:32c' ? phase32cProfile : 'strict');
+      }
+    }
+    return true;
+  } catch { return false; }
 }

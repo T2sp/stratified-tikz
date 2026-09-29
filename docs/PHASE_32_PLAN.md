@@ -19,7 +19,8 @@ filesystem scheduling. The native policy now requires 29 scenarios in the same
 16 groups and 856 artifacts, preserving all earlier coverage, including six
 responsive downloads and their 91 artifacts. Fresh matching parent verification
 and independent review must accept the new tree before 32B is complete.
-32C/32D remain deferred. See the final section of the implementation report for
+At that historical handoff 32C/32D remained deferred. The later explicit
+[32C fix amendment](../prompts/phase-32c-fix.md) authorizes 32C now; 32D stays deferred. See the final section of the implementation report for
 executed checks and the frozen-tree handoff; historical browser evidence does
 not cover these new fixes.
 The [native endpoint continuation](PHASE_32B_NATIVE_ENDPOINT_INVESTIGATION.md)
@@ -31,7 +32,12 @@ paint. Its finite core inventory remains a proposal, not a policy change;
 strict verification and the bounded full-closed transfer decision remain open.
 
 Implement the following stages in the user's requested order. Each stage must
-remain usable and pass its own acceptance checks before the next stage begins.
+remain usable and pass its own acceptance checks, subject to the explicit 32C
+exception: carry the named [32B residual issues](../prompts/phase-32b-fix.md)
+forward without another repair cycle. The raw strict 32B result remains failed.
+32C uses a separate narrow acceptance disposition, with all new shapes and
+non-deferred earlier behavior still required. See [32C implementation and
+verification](PHASE_32C_IMPLEMENTATION.md).
 
 | Stage | Deliverable |
 | --- | --- |

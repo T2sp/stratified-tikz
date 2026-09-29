@@ -1771,7 +1771,10 @@ report/log paths, inspected artifacts and remaining gates.
 Status: 32A is accepted by the complete `gtRban` parent report and independent
 review. 32B independent paint, migration, ordered import and cumulative harness
 are implemented; fresh parent acceptance and independent review remain
-open. 32C and 32D remain planned. See the
+open. The user authorized 32C implementation with the exact
+[32B residual issues](../prompts/phase-32b-fix.md) deferred; 32D remains planned.
+All eleven shapes and parameters now have implementation paths; fresh native
+acceptance and independent review remain required. See the
 [Phase 32 plan](./PHASE_32_PLAN.md) and
 [32B implementation and evidence](./PHASE_32B_IMPLEMENTATION.md).
 

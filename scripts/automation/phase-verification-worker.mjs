@@ -12,6 +12,9 @@ try {
   let response;
   if (operation === "browser-checks") {
     response = { browserChecks: verifier.browserChecksForPhase(phase) };
+  } else if (operation === "verify-32c-deferred") {
+    response = verifier.runPhase32CReviewVerification({ phase, stage, ...options });
+    if (!verifier.phase32CDispositionMatchesCheckout(response, options)) throw new Error("32C disposition does not match complete current evidence");
   } else if (operation === "verify") {
     const report = verifier.runPhaseVerification({ phase, stage, ...options });
     if (!verifier.verificationMatchesCheckout(report, options)) {

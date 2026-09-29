@@ -1,0 +1,115 @@
+\documentclass{article}
+\usepackage{tikz}
+\usetikzlibrary{shapes.geometric}
+\pagestyle{empty}
+\makeatletter
+\newwrite\fixtureout
+\immediate\openout\fixtureout=geometry.txt
+\newcommand\fixedshape[7]{%
+\begin{pgfpicture}\begingroup
+\pgfkeys{#7}%
+\setbox\pgfnodeparttextbox=\hbox{}%
+\wd\pgfnodeparttextbox=#3pt\ht\pgfnodeparttextbox=#4pt\dp\pgfnodeparttextbox=#5pt%
+\pgfsetlinewidth{#6pt}%
+\immediate\write\fixtureout{CASE #1}%
+\let\originalusepath\pgfusepath
+\def\pgfusepath##1{\pgfgetpath\fixturepath\immediate\write\fixtureout{PAINT ##1; PATH \meaning\fixturepath}\originalusepath{##1}}%
+\pgfmultipartnode{#2}{center}{fixture}{\pgfusepath{stroke}}%
+\pgfpointanchor{fixture}{center}\immediate\write\fixtureout{CENTER \the\pgf@x,\the\pgf@y}%
+\pgfpointanchor{fixture}{text}\immediate\write\fixtureout{TEXT \the\pgf@x,\the\pgf@y}%
+\endgroup\end{pgfpicture}\par}
+\makeatother
+\begin{document}
+\fixedshape{ellipse-empty}{ellipse}{0}{0}{0}{0.4}{/pgf/inner xsep=1.5pt,/pgf/inner ysep=1.5pt,/pgf/outer xsep=0pt,/pgf/outer ysep=0pt,/pgf/minimum width=1pt,/pgf/minimum height=1pt}
+\fixedshape{ellipse-wide}{ellipse}{48}{7}{2}{0.4}{/pgf/inner xsep=1.5pt,/pgf/inner ysep=1.5pt,/pgf/outer xsep=0pt,/pgf/outer ysep=0pt,/pgf/minimum width=1pt,/pgf/minimum height=1pt}
+\fixedshape{ellipse-tall}{ellipse}{8}{28}{5}{0.4}{/pgf/inner xsep=1.5pt,/pgf/inner ysep=1.5pt,/pgf/outer xsep=0pt,/pgf/outer ysep=0pt,/pgf/minimum width=1pt,/pgf/minimum height=1pt}
+\fixedshape{ellipse-asymmetric}{ellipse}{20}{8}{3}{0.4}{/pgf/inner xsep=1.5pt,/pgf/inner ysep=1.5pt,/pgf/outer xsep=0pt,/pgf/outer ysep=0pt,/pgf/minimum width=1pt,/pgf/minimum height=1pt}
+\fixedshape{diamond-empty}{diamond}{0}{0}{0}{0.4}{/pgf/inner xsep=1.5pt,/pgf/inner ysep=1.5pt,/pgf/outer xsep=0pt,/pgf/outer ysep=0pt,/pgf/minimum width=1pt,/pgf/minimum height=1pt}
+\fixedshape{diamond-wide}{diamond}{48}{7}{2}{0.4}{/pgf/inner xsep=1.5pt,/pgf/inner ysep=1.5pt,/pgf/outer xsep=0pt,/pgf/outer ysep=0pt,/pgf/minimum width=1pt,/pgf/minimum height=1pt}
+\fixedshape{diamond-tall}{diamond}{8}{28}{5}{0.4}{/pgf/inner xsep=1.5pt,/pgf/inner ysep=1.5pt,/pgf/outer xsep=0pt,/pgf/outer ysep=0pt,/pgf/minimum width=1pt,/pgf/minimum height=1pt}
+\fixedshape{diamond-asymmetric}{diamond}{20}{8}{3}{0.4}{/pgf/inner xsep=1.5pt,/pgf/inner ysep=1.5pt,/pgf/outer xsep=0pt,/pgf/outer ysep=0pt,/pgf/minimum width=1pt,/pgf/minimum height=1pt}
+\fixedshape{regular-polygon-empty}{regular polygon}{0}{0}{0}{0.4}{/pgf/inner xsep=1.5pt,/pgf/inner ysep=1.5pt,/pgf/outer xsep=0pt,/pgf/outer ysep=0pt,/pgf/minimum width=1pt,/pgf/minimum height=1pt}
+\fixedshape{regular-polygon-wide}{regular polygon}{48}{7}{2}{0.4}{/pgf/inner xsep=1.5pt,/pgf/inner ysep=1.5pt,/pgf/outer xsep=0pt,/pgf/outer ysep=0pt,/pgf/minimum width=1pt,/pgf/minimum height=1pt}
+\fixedshape{regular-polygon-tall}{regular polygon}{8}{28}{5}{0.4}{/pgf/inner xsep=1.5pt,/pgf/inner ysep=1.5pt,/pgf/outer xsep=0pt,/pgf/outer ysep=0pt,/pgf/minimum width=1pt,/pgf/minimum height=1pt}
+\fixedshape{regular-polygon-asymmetric}{regular polygon}{20}{8}{3}{0.4}{/pgf/inner xsep=1.5pt,/pgf/inner ysep=1.5pt,/pgf/outer xsep=0pt,/pgf/outer ysep=0pt,/pgf/minimum width=1pt,/pgf/minimum height=1pt}
+\fixedshape{star-empty}{star}{0}{0}{0}{0.4}{/pgf/inner xsep=1.5pt,/pgf/inner ysep=1.5pt,/pgf/outer xsep=0pt,/pgf/outer ysep=0pt,/pgf/minimum width=1pt,/pgf/minimum height=1pt}
+\fixedshape{star-wide}{star}{48}{7}{2}{0.4}{/pgf/inner xsep=1.5pt,/pgf/inner ysep=1.5pt,/pgf/outer xsep=0pt,/pgf/outer ysep=0pt,/pgf/minimum width=1pt,/pgf/minimum height=1pt}
+\fixedshape{star-tall}{star}{8}{28}{5}{0.4}{/pgf/inner xsep=1.5pt,/pgf/inner ysep=1.5pt,/pgf/outer xsep=0pt,/pgf/outer ysep=0pt,/pgf/minimum width=1pt,/pgf/minimum height=1pt}
+\fixedshape{star-asymmetric}{star}{20}{8}{3}{0.4}{/pgf/inner xsep=1.5pt,/pgf/inner ysep=1.5pt,/pgf/outer xsep=0pt,/pgf/outer ysep=0pt,/pgf/minimum width=1pt,/pgf/minimum height=1pt}
+\fixedshape{trapezium-empty}{trapezium}{0}{0}{0}{0.4}{/pgf/inner xsep=1.5pt,/pgf/inner ysep=1.5pt,/pgf/outer xsep=0pt,/pgf/outer ysep=0pt,/pgf/minimum width=1pt,/pgf/minimum height=1pt}
+\fixedshape{trapezium-wide}{trapezium}{48}{7}{2}{0.4}{/pgf/inner xsep=1.5pt,/pgf/inner ysep=1.5pt,/pgf/outer xsep=0pt,/pgf/outer ysep=0pt,/pgf/minimum width=1pt,/pgf/minimum height=1pt}
+\fixedshape{trapezium-tall}{trapezium}{8}{28}{5}{0.4}{/pgf/inner xsep=1.5pt,/pgf/inner ysep=1.5pt,/pgf/outer xsep=0pt,/pgf/outer ysep=0pt,/pgf/minimum width=1pt,/pgf/minimum height=1pt}
+\fixedshape{trapezium-asymmetric}{trapezium}{20}{8}{3}{0.4}{/pgf/inner xsep=1.5pt,/pgf/inner ysep=1.5pt,/pgf/outer xsep=0pt,/pgf/outer ysep=0pt,/pgf/minimum width=1pt,/pgf/minimum height=1pt}
+\fixedshape{isosceles-triangle-empty}{isosceles triangle}{0}{0}{0}{0.4}{/pgf/inner xsep=1.5pt,/pgf/inner ysep=1.5pt,/pgf/outer xsep=0pt,/pgf/outer ysep=0pt,/pgf/minimum width=1pt,/pgf/minimum height=1pt}
+\fixedshape{isosceles-triangle-wide}{isosceles triangle}{48}{7}{2}{0.4}{/pgf/inner xsep=1.5pt,/pgf/inner ysep=1.5pt,/pgf/outer xsep=0pt,/pgf/outer ysep=0pt,/pgf/minimum width=1pt,/pgf/minimum height=1pt}
+\fixedshape{isosceles-triangle-tall}{isosceles triangle}{8}{28}{5}{0.4}{/pgf/inner xsep=1.5pt,/pgf/inner ysep=1.5pt,/pgf/outer xsep=0pt,/pgf/outer ysep=0pt,/pgf/minimum width=1pt,/pgf/minimum height=1pt}
+\fixedshape{isosceles-triangle-asymmetric}{isosceles triangle}{20}{8}{3}{0.4}{/pgf/inner xsep=1.5pt,/pgf/inner ysep=1.5pt,/pgf/outer xsep=0pt,/pgf/outer ysep=0pt,/pgf/minimum width=1pt,/pgf/minimum height=1pt}
+\fixedshape{kite-empty}{kite}{0}{0}{0}{0.4}{/pgf/inner xsep=1.5pt,/pgf/inner ysep=1.5pt,/pgf/outer xsep=0pt,/pgf/outer ysep=0pt,/pgf/minimum width=1pt,/pgf/minimum height=1pt}
+\fixedshape{kite-wide}{kite}{48}{7}{2}{0.4}{/pgf/inner xsep=1.5pt,/pgf/inner ysep=1.5pt,/pgf/outer xsep=0pt,/pgf/outer ysep=0pt,/pgf/minimum width=1pt,/pgf/minimum height=1pt}
+\fixedshape{kite-tall}{kite}{8}{28}{5}{0.4}{/pgf/inner xsep=1.5pt,/pgf/inner ysep=1.5pt,/pgf/outer xsep=0pt,/pgf/outer ysep=0pt,/pgf/minimum width=1pt,/pgf/minimum height=1pt}
+\fixedshape{kite-asymmetric}{kite}{20}{8}{3}{0.4}{/pgf/inner xsep=1.5pt,/pgf/inner ysep=1.5pt,/pgf/outer xsep=0pt,/pgf/outer ysep=0pt,/pgf/minimum width=1pt,/pgf/minimum height=1pt}
+\fixedshape{dart-empty}{dart}{0}{0}{0}{0.4}{/pgf/inner xsep=1.5pt,/pgf/inner ysep=1.5pt,/pgf/outer xsep=0pt,/pgf/outer ysep=0pt,/pgf/minimum width=1pt,/pgf/minimum height=1pt}
+\fixedshape{dart-wide}{dart}{48}{7}{2}{0.4}{/pgf/inner xsep=1.5pt,/pgf/inner ysep=1.5pt,/pgf/outer xsep=0pt,/pgf/outer ysep=0pt,/pgf/minimum width=1pt,/pgf/minimum height=1pt}
+\fixedshape{dart-tall}{dart}{8}{28}{5}{0.4}{/pgf/inner xsep=1.5pt,/pgf/inner ysep=1.5pt,/pgf/outer xsep=0pt,/pgf/outer ysep=0pt,/pgf/minimum width=1pt,/pgf/minimum height=1pt}
+\fixedshape{dart-asymmetric}{dart}{20}{8}{3}{0.4}{/pgf/inner xsep=1.5pt,/pgf/inner ysep=1.5pt,/pgf/outer xsep=0pt,/pgf/outer ysep=0pt,/pgf/minimum width=1pt,/pgf/minimum height=1pt}
+\fixedshape{semicircle-empty}{semicircle}{0}{0}{0}{0.4}{/pgf/inner xsep=1.5pt,/pgf/inner ysep=1.5pt,/pgf/outer xsep=0pt,/pgf/outer ysep=0pt,/pgf/minimum width=1pt,/pgf/minimum height=1pt}
+\fixedshape{semicircle-wide}{semicircle}{48}{7}{2}{0.4}{/pgf/inner xsep=1.5pt,/pgf/inner ysep=1.5pt,/pgf/outer xsep=0pt,/pgf/outer ysep=0pt,/pgf/minimum width=1pt,/pgf/minimum height=1pt}
+\fixedshape{semicircle-tall}{semicircle}{8}{28}{5}{0.4}{/pgf/inner xsep=1.5pt,/pgf/inner ysep=1.5pt,/pgf/outer xsep=0pt,/pgf/outer ysep=0pt,/pgf/minimum width=1pt,/pgf/minimum height=1pt}
+\fixedshape{semicircle-asymmetric}{semicircle}{20}{8}{3}{0.4}{/pgf/inner xsep=1.5pt,/pgf/inner ysep=1.5pt,/pgf/outer xsep=0pt,/pgf/outer ysep=0pt,/pgf/minimum width=1pt,/pgf/minimum height=1pt}
+\fixedshape{circular-sector-empty}{circular sector}{0}{0}{0}{0.4}{/pgf/inner xsep=1.5pt,/pgf/inner ysep=1.5pt,/pgf/outer xsep=0pt,/pgf/outer ysep=0pt,/pgf/minimum width=1pt,/pgf/minimum height=1pt}
+\fixedshape{circular-sector-wide}{circular sector}{48}{7}{2}{0.4}{/pgf/inner xsep=1.5pt,/pgf/inner ysep=1.5pt,/pgf/outer xsep=0pt,/pgf/outer ysep=0pt,/pgf/minimum width=1pt,/pgf/minimum height=1pt}
+\fixedshape{circular-sector-tall}{circular sector}{8}{28}{5}{0.4}{/pgf/inner xsep=1.5pt,/pgf/inner ysep=1.5pt,/pgf/outer xsep=0pt,/pgf/outer ysep=0pt,/pgf/minimum width=1pt,/pgf/minimum height=1pt}
+\fixedshape{circular-sector-asymmetric}{circular sector}{20}{8}{3}{0.4}{/pgf/inner xsep=1.5pt,/pgf/inner ysep=1.5pt,/pgf/outer xsep=0pt,/pgf/outer ysep=0pt,/pgf/minimum width=1pt,/pgf/minimum height=1pt}
+\fixedshape{cylinder-empty}{cylinder}{0}{0}{0}{0.4}{/pgf/inner xsep=1.5pt,/pgf/inner ysep=1.5pt,/pgf/outer xsep=0pt,/pgf/outer ysep=0pt,/pgf/minimum width=1pt,/pgf/minimum height=1pt}
+\fixedshape{cylinder-wide}{cylinder}{48}{7}{2}{0.4}{/pgf/inner xsep=1.5pt,/pgf/inner ysep=1.5pt,/pgf/outer xsep=0pt,/pgf/outer ysep=0pt,/pgf/minimum width=1pt,/pgf/minimum height=1pt}
+\fixedshape{cylinder-tall}{cylinder}{8}{28}{5}{0.4}{/pgf/inner xsep=1.5pt,/pgf/inner ysep=1.5pt,/pgf/outer xsep=0pt,/pgf/outer ysep=0pt,/pgf/minimum width=1pt,/pgf/minimum height=1pt}
+\fixedshape{cylinder-asymmetric}{cylinder}{20}{8}{3}{0.4}{/pgf/inner xsep=1.5pt,/pgf/inner ysep=1.5pt,/pgf/outer xsep=0pt,/pgf/outer ysep=0pt,/pgf/minimum width=1pt,/pgf/minimum height=1pt}
+\fixedshape{ellipse-minima}{ellipse}{20}{8}{3}{0.4}{/pgf/inner xsep=1.5pt,/pgf/inner ysep=1.5pt,/pgf/outer xsep=0pt,/pgf/outer ysep=0pt,/pgf/minimum width=60pt,/pgf/minimum height=45pt}
+\fixedshape{diamond-aspect}{diamond}{20}{8}{3}{0.4}{/pgf/inner xsep=1.5pt,/pgf/inner ysep=1.5pt,/pgf/outer xsep=0pt,/pgf/outer ysep=0pt,/pgf/minimum width=1pt,/pgf/minimum height=1pt,/pgf/aspect=1.8}
+\fixedshape{diamond-minima}{diamond}{20}{8}{3}{0.4}{/pgf/inner xsep=1.5pt,/pgf/inner ysep=1.5pt,/pgf/outer xsep=0pt,/pgf/outer ysep=0pt,/pgf/minimum width=65pt,/pgf/minimum height=50pt,/pgf/aspect=.6}
+\fixedshape{regular-polygon-heptagon}{regular polygon}{20}{8}{3}{0.4}{/pgf/inner xsep=1.5pt,/pgf/inner ysep=1.5pt,/pgf/outer xsep=0pt,/pgf/outer ysep=0pt,/pgf/minimum width=1pt,/pgf/minimum height=1pt,/pgf/regular polygon sides=7}
+\fixedshape{regular-polygon-minimum}{regular polygon}{20}{8}{3}{0.4}{/pgf/inner xsep=1.5pt,/pgf/inner ysep=1.5pt,/pgf/outer xsep=0pt,/pgf/outer ysep=0pt,/pgf/minimum width=65pt,/pgf/minimum height=1pt,/pgf/regular polygon sides=5}
+\fixedshape{star-points}{star}{20}{8}{3}{0.4}{/pgf/inner xsep=1.5pt,/pgf/inner ysep=1.5pt,/pgf/outer xsep=0pt,/pgf/outer ysep=0pt,/pgf/minimum width=1pt,/pgf/minimum height=1pt,/pgf/star points=7}
+\fixedshape{star-ratio}{star}{20}{8}{3}{0.4}{/pgf/inner xsep=1.5pt,/pgf/inner ysep=1.5pt,/pgf/outer xsep=0pt,/pgf/outer ysep=0pt,/pgf/minimum width=1pt,/pgf/minimum height=1pt,/pgf/star point ratio=2.2}
+\fixedshape{star-height}{star}{20}{8}{3}{0.4}{/pgf/inner xsep=1.5pt,/pgf/inner ysep=1.5pt,/pgf/outer xsep=0pt,/pgf/outer ysep=0pt,/pgf/minimum width=1pt,/pgf/minimum height=1pt,/pgf/star point height=8pt}
+\fixedshape{star-height-minimum}{star}{20}{8}{3}{0.4}{/pgf/inner xsep=1.5pt,/pgf/inner ysep=1.5pt,/pgf/outer xsep=0pt,/pgf/outer ysep=0pt,/pgf/minimum width=75pt,/pgf/minimum height=1pt,/pgf/star point height=8pt}
+\fixedshape{trapezium-angles}{trapezium}{20}{8}{3}{0.4}{/pgf/inner xsep=1.5pt,/pgf/inner ysep=1.5pt,/pgf/outer xsep=0pt,/pgf/outer ysep=0pt,/pgf/minimum width=1pt,/pgf/minimum height=1pt,/pgf/trapezium left angle=110,/pgf/trapezium right angle=50}
+\fixedshape{trapezium-stretch}{trapezium}{20}{8}{3}{0.4}{/pgf/inner xsep=1.5pt,/pgf/inner ysep=1.5pt,/pgf/outer xsep=0pt,/pgf/outer ysep=0pt,/pgf/minimum width=70pt,/pgf/minimum height=35pt,/pgf/trapezium stretches=true}
+\fixedshape{trapezium-stretch-body}{trapezium}{20}{8}{3}{0.4}{/pgf/inner xsep=1.5pt,/pgf/inner ysep=1.5pt,/pgf/outer xsep=0pt,/pgf/outer ysep=0pt,/pgf/minimum width=70pt,/pgf/minimum height=35pt,/pgf/trapezium stretches body=true}
+\fixedshape{isosceles-triangle-angle}{isosceles triangle}{20}{8}{3}{0.4}{/pgf/inner xsep=1.5pt,/pgf/inner ysep=1.5pt,/pgf/outer xsep=0pt,/pgf/outer ysep=0pt,/pgf/minimum width=1pt,/pgf/minimum height=1pt,/pgf/isosceles triangle apex angle=75}
+\fixedshape{isosceles-triangle-stretch}{isosceles triangle}{20}{8}{3}{0.4}{/pgf/inner xsep=1.5pt,/pgf/inner ysep=1.5pt,/pgf/outer xsep=0pt,/pgf/outer ysep=0pt,/pgf/minimum width=70pt,/pgf/minimum height=55pt,/pgf/isosceles triangle stretches=true}
+\fixedshape{kite-angles}{kite}{20}{8}{3}{0.4}{/pgf/inner xsep=1.5pt,/pgf/inner ysep=1.5pt,/pgf/outer xsep=0pt,/pgf/outer ysep=0pt,/pgf/minimum width=1pt,/pgf/minimum height=1pt,/pgf/kite upper vertex angle=100,/pgf/kite lower vertex angle=75}
+\fixedshape{kite-minimum}{kite}{20}{8}{3}{0.4}{/pgf/inner xsep=1.5pt,/pgf/inner ysep=1.5pt,/pgf/outer xsep=0pt,/pgf/outer ysep=0pt,/pgf/minimum width=60pt,/pgf/minimum height=80pt}
+\fixedshape{dart-angles}{dart}{20}{8}{3}{0.4}{/pgf/inner xsep=1.5pt,/pgf/inner ysep=1.5pt,/pgf/outer xsep=0pt,/pgf/outer ysep=0pt,/pgf/minimum width=1pt,/pgf/minimum height=1pt,/pgf/dart tip angle=60,/pgf/dart tail angle=120}
+\fixedshape{dart-minimum}{dart}{20}{8}{3}{0.4}{/pgf/inner xsep=1.5pt,/pgf/inner ysep=1.5pt,/pgf/outer xsep=0pt,/pgf/outer ysep=0pt,/pgf/minimum width=65pt,/pgf/minimum height=55pt}
+\fixedshape{semicircle-minimum}{semicircle}{20}{8}{3}{0.4}{/pgf/inner xsep=1.5pt,/pgf/inner ysep=1.5pt,/pgf/outer xsep=0pt,/pgf/outer ysep=0pt,/pgf/minimum width=75pt,/pgf/minimum height=55pt}
+\fixedshape{circular-sector-angle}{circular sector}{20}{8}{3}{0.4}{/pgf/inner xsep=1.5pt,/pgf/inner ysep=1.5pt,/pgf/outer xsep=0pt,/pgf/outer ysep=0pt,/pgf/minimum width=1pt,/pgf/minimum height=1pt,/pgf/circular sector angle=120}
+\fixedshape{circular-sector-obtuse}{circular sector}{20}{8}{3}{0.4}{/pgf/inner xsep=1.5pt,/pgf/inner ysep=1.5pt,/pgf/outer xsep=0pt,/pgf/outer ysep=0pt,/pgf/minimum width=1pt,/pgf/minimum height=1pt,/pgf/circular sector angle=150}
+\fixedshape{circular-sector-minimum}{circular sector}{20}{8}{3}{0.4}{/pgf/inner xsep=1.5pt,/pgf/inner ysep=1.5pt,/pgf/outer xsep=0pt,/pgf/outer ysep=0pt,/pgf/minimum width=65pt,/pgf/minimum height=45pt}
+\fixedshape{cylinder-aspect}{cylinder}{20}{8}{3}{0.4}{/pgf/inner xsep=1.5pt,/pgf/inner ysep=1.5pt,/pgf/outer xsep=0pt,/pgf/outer ysep=0pt,/pgf/minimum width=1pt,/pgf/minimum height=1pt,/pgf/aspect=.4}
+\fixedshape{cylinder-fills}{cylinder}{20}{8}{3}{0.4}{/pgf/inner xsep=1.5pt,/pgf/inner ysep=1.5pt,/pgf/outer xsep=0pt,/pgf/outer ysep=0pt,/pgf/minimum width=1pt,/pgf/minimum height=1pt,/pgf/cylinder uses custom fill=true,/pgf/cylinder body fill=blue,/pgf/cylinder end fill=red}
+\fixedshape{cylinder-minimum}{cylinder}{20}{8}{3}{0.4}{/pgf/inner xsep=1.5pt,/pgf/inner ysep=1.5pt,/pgf/outer xsep=0pt,/pgf/outer ysep=0pt,/pgf/minimum width=70pt,/pgf/minimum height=60pt,/pgf/aspect=.5}
+\fixedshape{trapezium-rotate-restricted}{trapezium}{20}{8}{3}{0.4}{/pgf/inner xsep=1.5pt,/pgf/inner ysep=1.5pt,/pgf/outer xsep=0pt,/pgf/outer ysep=0pt,/pgf/minimum width=1pt,/pgf/minimum height=1pt,/pgf/shape border rotate=90}
+\fixedshape{trapezium-rotate-negative}{trapezium}{20}{8}{3}{0.4}{/pgf/inner xsep=1.5pt,/pgf/inner ysep=1.5pt,/pgf/outer xsep=0pt,/pgf/outer ysep=0pt,/pgf/minimum width=1pt,/pgf/minimum height=1pt,/pgf/shape border rotate=-90}
+\fixedshape{trapezium-incircle-rotate}{trapezium}{20}{8}{3}{0.4}{/pgf/inner xsep=1.5pt,/pgf/inner ysep=1.5pt,/pgf/outer xsep=0pt,/pgf/outer ysep=0pt,/pgf/minimum width=1pt,/pgf/minimum height=1pt,/pgf/shape border rotate=37,/pgf/shape border uses incircle=true}
+\fixedshape{isosceles-triangle-rotate-restricted}{isosceles triangle}{20}{8}{3}{0.4}{/pgf/inner xsep=1.5pt,/pgf/inner ysep=1.5pt,/pgf/outer xsep=0pt,/pgf/outer ysep=0pt,/pgf/minimum width=1pt,/pgf/minimum height=1pt,/pgf/shape border rotate=90}
+\fixedshape{isosceles-triangle-rotate-negative}{isosceles triangle}{20}{8}{3}{0.4}{/pgf/inner xsep=1.5pt,/pgf/inner ysep=1.5pt,/pgf/outer xsep=0pt,/pgf/outer ysep=0pt,/pgf/minimum width=1pt,/pgf/minimum height=1pt,/pgf/shape border rotate=-90}
+\fixedshape{isosceles-triangle-incircle-rotate}{isosceles triangle}{20}{8}{3}{0.4}{/pgf/inner xsep=1.5pt,/pgf/inner ysep=1.5pt,/pgf/outer xsep=0pt,/pgf/outer ysep=0pt,/pgf/minimum width=1pt,/pgf/minimum height=1pt,/pgf/shape border rotate=37,/pgf/shape border uses incircle=true}
+\fixedshape{kite-rotate-restricted}{kite}{20}{8}{3}{0.4}{/pgf/inner xsep=1.5pt,/pgf/inner ysep=1.5pt,/pgf/outer xsep=0pt,/pgf/outer ysep=0pt,/pgf/minimum width=1pt,/pgf/minimum height=1pt,/pgf/shape border rotate=90}
+\fixedshape{kite-rotate-negative}{kite}{20}{8}{3}{0.4}{/pgf/inner xsep=1.5pt,/pgf/inner ysep=1.5pt,/pgf/outer xsep=0pt,/pgf/outer ysep=0pt,/pgf/minimum width=1pt,/pgf/minimum height=1pt,/pgf/shape border rotate=-90}
+\fixedshape{kite-incircle-rotate}{kite}{20}{8}{3}{0.4}{/pgf/inner xsep=1.5pt,/pgf/inner ysep=1.5pt,/pgf/outer xsep=0pt,/pgf/outer ysep=0pt,/pgf/minimum width=1pt,/pgf/minimum height=1pt,/pgf/shape border rotate=37,/pgf/shape border uses incircle=true}
+\fixedshape{dart-rotate-restricted}{dart}{20}{8}{3}{0.4}{/pgf/inner xsep=1.5pt,/pgf/inner ysep=1.5pt,/pgf/outer xsep=0pt,/pgf/outer ysep=0pt,/pgf/minimum width=1pt,/pgf/minimum height=1pt,/pgf/shape border rotate=90}
+\fixedshape{dart-rotate-negative}{dart}{20}{8}{3}{0.4}{/pgf/inner xsep=1.5pt,/pgf/inner ysep=1.5pt,/pgf/outer xsep=0pt,/pgf/outer ysep=0pt,/pgf/minimum width=1pt,/pgf/minimum height=1pt,/pgf/shape border rotate=-90}
+\fixedshape{dart-incircle-rotate}{dart}{20}{8}{3}{0.4}{/pgf/inner xsep=1.5pt,/pgf/inner ysep=1.5pt,/pgf/outer xsep=0pt,/pgf/outer ysep=0pt,/pgf/minimum width=1pt,/pgf/minimum height=1pt,/pgf/shape border rotate=37,/pgf/shape border uses incircle=true}
+\fixedshape{semicircle-rotate-restricted}{semicircle}{20}{8}{3}{0.4}{/pgf/inner xsep=1.5pt,/pgf/inner ysep=1.5pt,/pgf/outer xsep=0pt,/pgf/outer ysep=0pt,/pgf/minimum width=1pt,/pgf/minimum height=1pt,/pgf/shape border rotate=90}
+\fixedshape{semicircle-rotate-negative}{semicircle}{20}{8}{3}{0.4}{/pgf/inner xsep=1.5pt,/pgf/inner ysep=1.5pt,/pgf/outer xsep=0pt,/pgf/outer ysep=0pt,/pgf/minimum width=1pt,/pgf/minimum height=1pt,/pgf/shape border rotate=-90}
+\fixedshape{semicircle-incircle-rotate}{semicircle}{20}{8}{3}{0.4}{/pgf/inner xsep=1.5pt,/pgf/inner ysep=1.5pt,/pgf/outer xsep=0pt,/pgf/outer ysep=0pt,/pgf/minimum width=1pt,/pgf/minimum height=1pt,/pgf/shape border rotate=37,/pgf/shape border uses incircle=true}
+\fixedshape{circular-sector-rotate-restricted}{circular sector}{20}{8}{3}{0.4}{/pgf/inner xsep=1.5pt,/pgf/inner ysep=1.5pt,/pgf/outer xsep=0pt,/pgf/outer ysep=0pt,/pgf/minimum width=1pt,/pgf/minimum height=1pt,/pgf/shape border rotate=90}
+\fixedshape{circular-sector-rotate-negative}{circular sector}{20}{8}{3}{0.4}{/pgf/inner xsep=1.5pt,/pgf/inner ysep=1.5pt,/pgf/outer xsep=0pt,/pgf/outer ysep=0pt,/pgf/minimum width=1pt,/pgf/minimum height=1pt,/pgf/shape border rotate=-90}
+\fixedshape{circular-sector-incircle-rotate}{circular sector}{20}{8}{3}{0.4}{/pgf/inner xsep=1.5pt,/pgf/inner ysep=1.5pt,/pgf/outer xsep=0pt,/pgf/outer ysep=0pt,/pgf/minimum width=1pt,/pgf/minimum height=1pt,/pgf/shape border rotate=37,/pgf/shape border uses incircle=true}
+\fixedshape{cylinder-rotate-restricted}{cylinder}{20}{8}{3}{0.4}{/pgf/inner xsep=1.5pt,/pgf/inner ysep=1.5pt,/pgf/outer xsep=0pt,/pgf/outer ysep=0pt,/pgf/minimum width=1pt,/pgf/minimum height=1pt,/pgf/shape border rotate=90}
+\fixedshape{cylinder-rotate-negative}{cylinder}{20}{8}{3}{0.4}{/pgf/inner xsep=1.5pt,/pgf/inner ysep=1.5pt,/pgf/outer xsep=0pt,/pgf/outer ysep=0pt,/pgf/minimum width=1pt,/pgf/minimum height=1pt,/pgf/shape border rotate=-90}
+\fixedshape{cylinder-incircle-rotate}{cylinder}{20}{8}{3}{0.4}{/pgf/inner xsep=1.5pt,/pgf/inner ysep=1.5pt,/pgf/outer xsep=0pt,/pgf/outer ysep=0pt,/pgf/minimum width=1pt,/pgf/minimum height=1pt,/pgf/shape border rotate=37,/pgf/shape border uses incircle=true}
+\fixedshape{regular-polygon-rotate}{regular polygon}{20}{8}{3}{0.4}{/pgf/inner xsep=1.5pt,/pgf/inner ysep=1.5pt,/pgf/outer xsep=0pt,/pgf/outer ysep=0pt,/pgf/minimum width=1pt,/pgf/minimum height=1pt,/pgf/shape border rotate=37}
+\fixedshape{star-rotate}{star}{20}{8}{3}{0.4}{/pgf/inner xsep=1.5pt,/pgf/inner ysep=1.5pt,/pgf/outer xsep=0pt,/pgf/outer ysep=0pt,/pgf/minimum width=1pt,/pgf/minimum height=1pt,/pgf/shape border rotate=37}
+\end{document}

@@ -303,7 +303,7 @@ export async function runPointImportedPaintChecks(context) {
       if (ids.includes(expected.id)) {
         assert.ok(expected.importedTikzStyleReferenceId && expected.style.importedPaint)
         const key = before.diagram.importedTikzStyleReferences.find((ref) => ref.id === expected.importedTikzStyleReferenceId).key
-        delete expected.stylePresetId; delete expected.importedTikzStyleReferenceId; delete expected.style.importedPaint
+        delete expected.stylePresetId; delete expected.importedTikzStyleReferenceId; delete expected.style.importedPaint; delete expected.style.importedShape
         for (const code of Object.values(after.output)) {
           const paint = observeLiteralPointPaint(code, expected.text)
           assert.equal(paint.options.includes(key), false, `Cleared ${expected.id} has no external invocation`)

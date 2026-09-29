@@ -7,16 +7,18 @@ import { createPolygonStrokeRegion } from '../geometry/polygonStroke.ts'
 import { createDashCaps } from '../geometry/dashCaps.ts'
 import { effectiveSvgPointStroke, sameSvgPointStroke } from './svgPointStroke.ts'
 import { circleStrokeVertices } from '../geometry/circleStrokeContour.ts'
+import { resolvePointShapeParameters } from '../model/pointShapeParameters.ts'
 
 export function svgPointNodeLayout(style: PointStyle, state: SvgLabelState) {
   const body = placeSvgLabel(state.layout, svgPointNodeTextFontSize, 'center')
+  const strokeSettings = effectiveSvgPointStroke(style)
   const geometry = svgPointNodeGeometry(style, state.source === '' ? { width: 0, height: 0 } : {
     width: body.bounds.maxX - body.bounds.minX, height: body.bounds.maxY - body.bounds.minY,
-  })
-  const strokeSettings = effectiveSvgPointStroke(style)
+    depth: Math.max(0, state.layout.bounds.maxY * svgPointNodeTextFontSize),
+  }, undefined, strokeSettings.width)
   // The contour uses ordinary SVG scaling, so this width stays in local units
   // even when a responsive viewport changes its displayed thickness.
-  const stroke = strokeSettings.enabled ? strokeSettings.width : 0
+  const stroke = strokeSettings.enabled && !geometry.limitation ? strokeSettings.width : 0
   const strokeJoin = strokeSettings.join
   const circleCaps = geometry.kind === 'circle' && stroke > 0 && strokeSettings.cap === 'square'
     ? createDashCaps(geometry, stroke, strokeSettings.pattern, strokeSettings.phase, strokeSettings.cap) : null
@@ -39,8 +41,12 @@ export function svgPointNodeLayout(style: PointStyle, state: SvgLabelState) {
   }
   const selectionRadius = Math.max(dashCaps.radius, strokeRegion?.radius ?? 0, geometry.kind === 'circle' ? geometry.radius + stroke / 2
     : Math.max(geometry.radius, strokeRegion?.radius ?? 0))
-  return { body, geometry, paintedBounds, anchorClearanceBounds: { ...paintedBounds }, stroke, strokeJoin,
+  return { body, geometry, paintedBounds, anchorClearanceBounds: geometry.solution?.anchorBounds ?? { ...paintedBounds }, stroke, strokeJoin,
+    shapeParametersIdentity: svgPointShapeParametersIdentity(style),
     strokeContour, strokeRegion, strokeSettings, dashCaps, selectionRadius }
+}
+export function svgPointShapeParametersIdentity(style: Pick<PointStyle, 'shapeParameters'>): string {
+  return JSON.stringify(resolvePointShapeParameters(style.shapeParameters))
 }
 export type SvgPointNodeLayout = ReturnType<typeof svgPointNodeLayout>
 export type SvgPointNodeCommit = Readonly<{
@@ -65,6 +71,7 @@ export function currentSvgPointNodeLayout(point: PointStratum, commits: SvgPoint
   return entry?.ownerIdentity === svgPointNodeOwner(documentRevision, point.id)
     && entry.source === (point.text ?? '') && entry.fontGeneration === fontGeneration
     && entry.shape === point.style.shape && entry.size === point.style.size
+    && entry.layout.shapeParametersIdentity === svgPointShapeParametersIdentity(point.style)
     && sameSvgPointStroke(entry.layout.strokeSettings, strokeSettings) ? entry.layout : null
 }
 

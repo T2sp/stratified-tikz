@@ -1,250 +1,223 @@
-# Phase 32C Fix: implement geometric shapes with known 32B issues deferred
+# Phase 32C Fix: finish native acceptance with known 32B issues deferred
 
-## Authorized prerequisite change
+## Current objective and continuing authorization
 
-The user explicitly requested: **「32C fix を生成．特に，32B の既知問題は
-保留にしたままにします．」** Proceed with 32C implementation on the existing
-32A/32B code. Do not ask again whether incomplete 32B acceptance permits 32C.
+All eleven 32C shapes and their required options are implemented. Continue from
+that implementation: obtain fresh native evidence through the existing 32C
+review-only route, fix concrete new 32C defects if that run exposes any, and
+obtain matching independent review. Do not restart the shape implementation or
+build a second verification profile merely because the strict parent run failed.
 
-This instruction supersedes the requirement that 32B be fully verified and
-reviewed before 32C, in `prompts/phase-32c-implement.md`,
-`prompts/phase-32c-review.md`, and `docs/PHASE_32_PLAN.md`. It also supersedes
-older statements that 32C must remain deferred. Apply this amendment to both
-implementation and independent review, including their verification context.
-Preserve all other 32C requirements and the accepted 32A contracts.
+The user's explicit authorization remains in force: **32B の既知問題は保留に
+したままにします。** Full 32B acceptance is not a prerequisite to 32C
+implementation or review. This amendment supersedes older conflicting wording
+in the paired 32C prompts and plan. Do not ask again for that scope decision.
+Preserve accepted 32A behavior and all non-deferred 32B contracts.
 
-**Implement 32C; keep the known 32B problems on hold.** Do not start another
-32B geometry/oracle/transfer repair cycle, require their resolution as a 32C
-prerequisite, or implement 32D. This is an explicit scope decision, not a claim
-that 32B passed, nor adoption of the old conditional `stz-32b-core-v1` proposal.
-New 32C defects, regressions outside the named deferrals, and missing required
-32C evidence remain blockers to 32C acceptance.
+32B remains incomplete; `stz-32b-core-v1` remains unadopted. Only the named
+residual issues are deferred, not new 32C failures or missing 32C evidence.
+Do not resume the 32B geometry/oracle/transfer repair loop, implement 32D,
+commit, push, reset, or discard the existing implementation.
 
-## Starting state and evidence
+## Latest evidence and preserved checkout
 
-Read `AGENTS.md`, the paired 32C prompts, `docs/PHASE_32_PLAN.md`, and
-`prompts/phase-32b-fix.md`. The latter is the preserved 32B residual-issue
-record, not an instruction to resume its fixes. Inspect the actual checkout;
-preserve later compatible work and existing uncommitted changes.
+Read `AGENTS.md`, the paired 32C prompts, `docs/PHASE_32C_IMPLEMENTATION.md`,
+`docs/PHASE_32_PLAN.md`, and the unchanged residual record
+`prompts/phase-32b-fix.md`. Inspect the actual working tree before editing.
 
-At prompt creation, the checkout is clean on `phase/32c-shapes-geometry`, HEAD
-`7ebfcd283502e6dacad5a40cec7e96c023ba7d1c`, fingerprint:
+At this prompt update, the implementation is on `phase/32c-shapes-geometry`,
+HEAD `c3081ebea181bffeba791c701f45dd05711521a2`, with existing tracked changes
+and 24 nonignored untracked files. Its pre-update fingerprint is:
 
 ```text
-4baeb656ab57b9a579044a26ea7da401cf1715561cd3a4bc2eb1d929c415c8be
+bd71acbdee90f4b13992e3127276e5e71628fec73b4345c9f1832cee21fff2d0
 ```
 
-32C is **unimplemented**. The previous attempt stopped at its obsolete
-prerequisite and changed no source. This task includes the actual implementation,
-not just another prerequisite audit or a documentation-only status change.
+That identity matches the implementation handoff, independent review, and both
+before/after identities of the latest parent verification. Preserve all code,
+tests, reference fixtures, licenses, and policy files. This prompt edit changes
+the full-tree fingerprint; historical evidence is not fresh acceptance for the
+updated tree. Capture and verify the next actual identity, including untracked
+files, rather than hard-coding the old hash.
 
-- Prerequisite handoff: `/private/tmp/stz-phase32c-prerequisite/HANDOFF.md`.
-- Matching parent verification: `/var/folders/vk/7kf940pd4bx8f6cg3rzlmtc80000gn/T/stz-phase32c-before-review-ZRaJil/verification.json`.
-- Worker handoff: `/var/folders/vk/7kf940pd4bx8f6cg3rzlmtc80000gn/T/stz-phase-verifier-PJUXgs/response.json`.
+- Implementation handoff: `/private/tmp/stz-32c-fix-verification/HANDOFF.md`.
+- Independent review: `/private/tmp/stz-32c-independent-review.md`.
+- Latest parent report: `/var/folders/vk/7kf940pd4bx8f6cg3rzlmtc80000gn/T/stz-phase32c-before-review-BTrZUZ/verification.json`.
+- Parent worker handoff: `/var/folders/vk/7kf940pd4bx8f6cg3rzlmtc80000gn/T/stz-phase-verifier-rfjdHZ/response.json`.
+- Earlier child disposition: `/var/folders/vk/7kf940pd4bx8f6cg3rzlmtc80000gn/T/stz-phase32c-review-only-VBqL1l/32c-acceptance.json`.
 
-That parent ran successfully past browser startup: tests (4,451), build, diff,
-and label-assets passed; free-labels failed at the known supplemental
-`positive-full-closed-control`, connected-live candidate `(0,-14)`:
-`false !== true`, in `pointDashCapMechanismContract.mjs`. The cumulative report
-is failed, not a localhost EPERM result and not evidence that 32C was tested.
-These identities describe the pre-prompt tree; adding this file or implementing
-32C requires a new identity for subsequent evidence.
+Distinguish the two execution environments:
 
-## Explicitly deferred 32B inventory
-
-Retain the details and original evidence in `prompts/phase-32b-fix.md` and
-`/private/tmp/stz-32b-one-pass-fYEVjj/HANDOFF.md` without rewriting failures.
-
-| Deferred item | Existing scope and evidence limit |
+| Evidence | Actual result |
 | --- | --- |
-| Full-closed dash proximity disagreement | Literal triangle `0,0 24,0 12,16`, width 12, square caps, bevel joins, `[100,100]`, phase 1; 24 omissions. At `(0,-14)`, connected paint distance is about 5.77322 while production distance is 8, beyond the existing six-unit tolerance. |
-| Supported-shape transfer disagreements | Existing triangle/square/star/circle settings retain 20/7/12/6 omissions. Paint was captured at scale 16 and actions at scale 1; same-framing paint/action agreement remains unproven. These 45 observations are unresolved, not four passing workflows. |
-| Separate transfer harness reopening | `checkPointClosedDashTransfer.mjs` creates an owned-context page and later requests a second page from that context, causing `Please use browser.newContext()`. Saved SVGs exist, but reopening did not run; cleanup/error ordering obscures the earlier retained action failure. |
-| Full strict 32B acceptance | Historical 14/16 completed groups, incomplete paint/import and unexecuted final settled-SVG group do not establish full acceptance. All 22 App dash entries passed in the final bounded 32B run; the supplemental full-closed failure remains separate. |
+| Final implementation/child checks | 4,780 tests, build, strict TypeScript, changed-file lint/syntax and diff passed. All three native commands hit localhost `EPERM`; the child disposition is failed. |
+| Independent PGF references | 92 fixed-box cases and 94 reference tests passed; independent regeneration matched all three fixture artifacts. PGF 3.1.11a, recorded source hash/license and TeX commands are retained. |
+| Independent review | No unresolved confirmed code finding; Medium M1 remains for missing native acceptance. This is not a passing review. |
+| Latest parent `BTrZUZ` | 4,780 tests, build, diff and the full label-assets command passed. Chrome started and strict free-labels reached the known 32B full-closed assertion. This parent result is not `EPERM`. |
 
-Do not reopen these investigations, broaden their parameter grids, repair the
-separate transfer script, reinstate the rejected generic seam cap, inflate hit
-tolerance, perturb raw dash values, or weaken unrelated assertions as a way to
-finish 32C. Preserve completed solid-join, dash-cap, paint/import, lifecycle,
-normalization and local-override fixes and their regressions.
+The parent completed **14 of the now-required 17 groups**, with no page errors.
+All **22/22 App dash entries** passed; **20/21 supplemental mechanisms** passed.
+The only failed mechanism is `positive-full-closed-control`, connected-live
+candidate `(0,-14)`, `false !== true`. The existing exact named-failure
+classifier accepts these retained observations when replayed read-only.
+That classification is not scoped verification or fresh browser acceptance.
 
-An old incomplete aggregate report is not a blanket exemption for exports,
-native editing, or new shapes. Do not classify a new shape/parameter failure as
-known 32B solely because it reaches a shared geometry helper or the same stack.
-Bind any deferral to the named baseline case and retained observations. Record
-new failures separately; fix regressions introduced by 32C within its scope.
+The paint/import group is incomplete; `settled-SVG-export-standalone` and
+`point-node-geometric-shapes` did not execute. `BTrZUZ` contains only the five
+strict checks, not `check:free-labels:32c` or an accepted `32c-acceptance.json`.
+It therefore does not close review M1 or establish a new 32C geometry defect.
 
-## Implement the complete 32C scope
+## Use the implemented route, not another strict-only fix cycle
 
-Use the paired implementation prompt for detailed requirements, subject to the
-prerequisite and verification amendments here. Work in reviewable internal
-batches, completing all eleven shapes before claiming 32C implementation done:
+The needed route already exists in `scripts/automation/run-phase.mjs`,
+`phase-verification.mjs`, `phase-verification-worker.mjs`, and
+`phase32c-profile.mjs`. Its profile is
+`32c-geometric-shapes-deferred-32b-v1`. The package command is
+`check:free-labels:32c`.
 
-1. Ellipse, diamond, regular polygon, star.
-2. Trapezium, isosceles triangle, kite, dart.
-3. Semicircle, circular sector, cylinder.
-
-| Shape | Required configuration/behavior |
-| --- | --- |
-| diamond | `aspect` / `shape aspect` |
-| ellipse | Actual elliptical body enclosure |
-| trapezium | Left/right angles, angle shorthand, stretches, stretches body |
-| semicircle | Actual semicircular enclosure and content offset |
-| regular polygon | Sides and circle/radius fitting |
-| star | Points, point height, point ratio, ordered height/ratio mode |
-| isosceles triangle | Apex angle and stretches |
-| kite | Upper/lower vertex angles and vertex-angles shorthand |
-| dart | Tip and tail angles |
-| circular sector | Sector angle and content placement |
-| cylinder | `aspect` / `shape aspect`, custom-fill boolean, end/body fills |
-
-Keep basic circle and true rectangle supported. Legacy square and triangle
-remain regular polygons with four and three sides, distinct from rectangle and
-isosceles triangle. Preserve existing empty-node defaults and legacy size,
-hollow, paint and saved-document meanings.
-
-- Use typed shape parameters, deterministic defaults, ordered aliases and
-  overrides, explicit false, finite-domain validation and bounded work limits.
-  Preserve unsupported raw imported intent with a preview limitation; never
-  execute TeX, silently substitute a circle, or overwrite uncertain external
-  styles with invented defaults. Explicit local overrides must still work.
-- Implement pure shape solvers, preferably under `src/geometry/pointNodeShapes/`.
-  Carry body width/height/depth, inner/outer x/y separation, minimum width/height,
-  shape parameters, body origin and baseline as distinct inputs/results.
-  Return curved/compound contours, paint regions, bounds and usable hit data.
-- Implement actual shape-specific fitting, asymmetric offsets, polygon/star
-  radius rules, stretches and parameter-intrinsic minimum-size interactions.
-  Generic stock-path bounding-box scaling does not satisfy this scope.
-- Honor shape-border rotation and incircle rules, including shape-specific
-  restrictions/rounding, while leaving body glyphs upright. Cylinder requires
-  separate body/end fill regions with preserved independent paint semantics.
-- Integrate model/validation, imported styles, presets, inspector, cloning,
-  clipboard, JSON/history, both readable TikZ modes and library declarations.
-  Share current layout between preview, picking/drag and immutable settled
-  exports; retain separate body, shape, painted and anchor-clearance bounds.
-- Preserve authoritative raw text, whole-source pending/error fallback, MathJax
-  ownership and stale-result protection. Keep generated assets out of history.
-  Preserve direct/cursor input, 2D/3D work planes and model coordinates; point
-  `codim` remains 2 in 2D and 3 in 3D. Use strict TypeScript without `any`.
-
-32D still owns full configurable spacing/minimum-dimension controls and complete
-standard/numeric/shape-specific anchors. Prepare the independent solver inputs
-now; this deferral does not excuse incorrect default fitting or shape-parameter
-sizing in 32C. Avoid unrelated cleanup and explain any new dependency.
-
-## Independent references and finite 32C acceptance
-
-Use official PGF shape algorithms and record exact source/version, license,
-TeX engine, generation commands, units and tolerance rationale. The prior
-readiness probe found PGF 3.1.11a at
-`/usr/local/texlive/2026/texmf-dist/tex/generic/pgf/libraries/shapes/pgflibraryshapes.geometric.code.tex`;
-verify the current installation. `/private/tmp/stz-32c-readiness/` is preparation,
-not an eleven-shape conformance suite.
-
-Generate independent fixed-box references with known width/height/depth matching
-solver inputs. Compare contours and body placement, separating font/MathJax
-metrics from geometry. Expected results must not come from the solver under
-test. Keep TeX an offline reference tool, not an application runtime dependency.
-
-Register tests explicitly in `package.json`. Cover every shape's default and
-nondefault parameters; empty, wide, tall and asymmetric fixed boxes; each option's
-effect and validation boundary; alias/boolean/star ordering; representative
-rotation/incircle/stretch interactions; round trips and both TikZ modes.
-Use a finite per-shape manifest from the paired prompt, not an expanding general
-dash-conformance research matrix.
-
-Register `point-node-geometric-shapes` with actual production App scenarios:
-plain/math/mixed bodies, trusted selection and drag across convex/concave/curved/
-asymmetric contours, 2D/3D and hidden/locked/dimmed behavior. Require actual
-transparent/white downloads with all eleven shapes and separate cylinder paints,
-standalone reopening and immutable click-time source/shape parameters. Use an
-explicitly owned browser context for new multi-page checks. Do not inherit the
-deferred transfer harness's context-lifetime defect.
-
-## Verification amendment: separate 32C acceptance from deferred 32B results
-
-The current fail-fast free-labels command stops inside 32B paint/import before
-the final settled-SVG group. Merely appending 32C checks, accepting 14/16 groups,
-or running the unchanged strict gate until it passes will not satisfy this task.
-
-Implement the smallest explicit **32C-only** verification disposition needed to
-honor this user decision. Keep the default strict 32B policy unchanged. Inspect
-`scripts/checkFreeLabels.mjs`, `scripts/automation/phase-verification.mjs`, its
-worker, `scripts/automation/run-phase.mjs`, and their tests together:
-
-1. Ensure all non-deferred earlier scenarios, final settled-SVG export, and the
-   complete new 32C manifest actually execute. Isolate the named deferred checks
-   in a separate diagnostic run or narrowly record their structured failure and
-   continue. Never catch an entire paint/import group and call it complete.
-   Preserve independent failures and asynchronous/page errors.
-2. Retain raw command results and scenario outcomes (`failed`, `not_run`, etc.).
-   Record a separate phase-specific acceptance disposition with the explicit
-   user-authorized deferrals, current checkout identity and evidence paths.
-   Do not change an old failed report into a pass or drop its assertions/artifacts.
-   The separate 32B transfer investigation may remain deferred and need not be
-   rerun or repaired to start/accept 32C.
-3. Let that disposition reach independent **32C** review when all its required
-   checks pass, even if the strict cumulative diagnostic still reports the named
-   32B limitation. Keep runner, worker, evidence validator and review context in
-   agreement; a prompt-only waiver that the runner cannot honor is insufficient.
-   Scope acceptance to 32C and the exact deferrals, never a generic nonzero-exit
-   allowance, whole-group waiver or silent global policy reduction.
-4. Retain all twelve Phase 31F groups, accepted 32A behavior and non-deferred
-   32B contracts. Missing/unexecuted final SVG or 32C cases, new regressions,
-   malformed/stale evidence, unexpected errors and missing artifacts still fail
-   32C acceptance. Counts alone cannot establish coverage. Old partial browser
-   results cannot substitute for fresh runs on the implementation being reviewed.
-5. Add focused policy/runner negative tests for unrelated failures disguised as
-   known 32B, missing shapes/parameters, incomplete exit-zero reports, identity
-   mismatch, and incorrect phase/profile use. Preserve fresh-process loading of
-   updated policy and failure-before-commit behavior. Carry the scope amendment
-   into paired 32C instructions/plan and review handoff when implementing it, so
-   a fresh reviewer does not reimpose the superseded 32B prerequisite.
-
-Prefer a bounded, separate review-only route where that avoids changing the
-existing strict success/commit path. Never feed a failed cumulative report into
-that path as if it passed; this invocation does not authorize commit or push.
-
-Use Node >=22.12.0; this host requires the Homebrew PATH. Run:
+**Recommended next parent action, from the preserved working tree:**
 
 ```bash
-PATH=/opt/homebrew/bin:$PATH npm test
-PATH=/opt/homebrew/bin:$PATH npm run build
-git diff --check
-PATH=/opt/homebrew/bin:$PATH npm run check:label-assets
-PATH=/opt/homebrew/bin:$PATH npm run check:free-labels
+PATH=/opt/homebrew/bin:$PATH node scripts/automation/run-phase.mjs 32C review-deferred
 ```
 
-Also execute the documented 32C-specific acceptance command/disposition above,
-focused strict TypeScript, changed-code lint and script syntax checks. Report
-demonstrated baseline lint debt separately. Keep exact command lines, versions,
-logs and all results; a raw strict failure remains visible alongside the scoped
-32C result. Do not require an unrelated lint cleanup or further 32B repair.
+This fresh process runs tests, build, diff, label-assets, raw strict free-labels,
+then scoped free-labels. It validates the separate disposition and, only when
+that disposition is accepted, invokes independent review with the explicit
+32B deferral amendment. It exits without committing or pushing. It branches
+before the ordinary clean-tree/checkout requirement, so the current uncommitted
+implementation is supported; do not commit or reset merely to invoke it.
 
-Run browser checks with the available authorized execution mechanism. If a child
-hits localhost `EPERM`, retain the attempt and exact parent commands; use normal
-permission handling without changing sandbox settings. The browser-capable parent
-must supply fresh matching 32C and non-deferred acceptance evidence. An unavailable
-browser or required PGF reference is an evidence gap, never a pass. It does not
-prevent implementing the authorized source changes first.
+For verification without invoking review, use this alternative:
 
-## Review and handoff
+```bash
+PATH=/opt/homebrew/bin:$PATH node scripts/automation/run-phase.mjs 32C verify-deferred
+```
 
-Update 32C support/status in `docs/PREVIEW_UI.md`, `docs/SPEC.md`,
-`docs/ROADMAP.md` and `docs/PHASE_32_PLAN.md`. Link the unchanged 32B residual
-record, clearly distinguishing deferred defects from new 32C problems. Do not
-mark 32B complete or claim the earlier conditional profile was adopted.
+Do not routinely run both sequentially: `review-deferred` already repeats all
+verification. Use `verify-deferred` only when deliberately stopping before review.
 
-Finalize files before verification and retain a binary-aware tracked/untracked
-checkout identity. Obtain independent review using the paired 32C review prompt
-**with this prerequisite/acceptance amendment**. Known deferred 32B issues alone
-do not constitute a new 32C Medium finding; a new 32C defect or missing required
-32C/non-deferred evidence does. Keep any changed-tree verification gap explicit.
+The ordinary `32C fix`/`implement` path still runs strict
+`runVerification("before-review")` after its child and stops at the retained
+32B assertion. Repeating that path does not invoke the scoped check. If this
+prompt is executed inside that ordinary child, make any demonstrated targeted
+fix and provide the exact fresh-process `review-deferred` handoff above to the
+browser-capable parent. Do not expect a child-side handoff, environment change,
+or an edit to runner code to switch the already running parent's execution mode.
+Do not rewrite the ordinary strict success/commit path to accept failures.
 
-Report implemented shapes/options, reference results, tests/build/static checks,
-native coverage and downloads, raw strict verification status, scoped 32C
-acceptance/review status, and the carried 32B backlog separately. If successful,
-say **32C accepted with the named 32B issues deferred**, not that all Phase 32
-or strict 32B verification passed. If evidence is still missing, give an exact
-bounded handoff without restarting the 32B repair loop. Do not implement 32D,
-commit or push as part of this fix invocation.
+For focused diagnosis before the final aggregate run, the existing scoped
+browser command can be used with the configured runtime:
+
+```bash
+PATH=/opt/homebrew/bin:$PATH \
+STZ_PLAYWRIGHT_MODULE=/Users/takamatoshinori/.cache/codex-runtimes/codex-primary-runtime/dependencies/node/node_modules/playwright/index.mjs \
+STZ_BROWSER_EXECUTABLE='/Applications/Google Chrome.app/Contents/MacOS/Google Chrome' \
+npm run check:free-labels:32c
+```
+
+Retain its report/artifacts. A standalone scoped run does not replace the
+aggregate disposition and independent review. Use the available authorized
+browser execution mechanism and normal permission escalation if localhost
+startup is sandbox-blocked; do not change sandbox settings or route around an
+approval denial. If native execution remains unavailable, retain the exact
+failed attempt and parent command. Do not report another native pass from
+static checks, nor start speculative geometry repairs in response to `EPERM`.
+
+## Keep the finite 32C acceptance contract
+
+Preserve the implemented shapes: diamond, ellipse, trapezium, semicircle,
+regular polygon, star, isosceles triangle, kite, dart, circular sector and
+cylinder, plus basic circle/rectangle and legacy polygon square/triangle.
+Preserve typed parameters, ordered import aliases/false/star modes, independent
+paint, raw external intent, finite supported domains, shape-specific fitting,
+body offsets, rotation/incircle behavior, and separate cylinder paint regions.
+The documented circular-sector preview domain is 1–179 degrees; unsupported
+raw imported intent is retained with a limitation. Do not silently broaden it.
+
+Use the existing finite manifest in `scripts/pointGeometricShapesContract.mjs`
+and harness in `scripts/checkPointNodeGeometricShapes.mjs`. Required evidence is:
+
+- All 17 cumulative groups, including all non-deferred predecessor scenarios,
+  complete paint/import, final settled SVG and `point-node-geometric-shapes`.
+- Eleven per-shape scenarios, each with default/configured parameters and
+  empty/plain/math/mixed bodies: actual enclosure, offsets, upright glyphs,
+  source/model preservation and native shape/parameter controls.
+- The eight 2D/3D convex/concave/curved/asymmetric native selection/drag cases,
+  undo/redo, and hidden/locked/dimmed behavior.
+- Actual transparent and white downloads containing all eleven shapes, immutable
+  click-time source/parameters, separate cylinder paints, and standalone reopening
+  outside the App with no external assets.
+- Complete scenario/artifact identities and no unhandled page or cleanup errors,
+  authenticated against the final tracked/untracked checkout. Counts or screenshots
+  alone cannot establish acceptance.
+
+Do not replace native input/downloads with fixture state mutation or synthetic
+events merely to satisfy a failing assertion. Inspect what any failed check
+actually measures before changing either the product or the harness. Keep raw
+observations and the first failure through bounded diagnostics and cleanup.
+
+If the scoped run exposes a concrete new 32C bug, reproduce it and fix only
+that behavior and its meaningful registered regression. Preserve pure shared
+live/export geometry, strict TypeScript without `any`, authoritative source,
+pending/error fallback, explicit saved styles, codim/work-plane conventions,
+import uncertainty, and both readable TikZ modes. A shared stack/helper alone
+does not prove that a new failure belongs to deferred 32B.
+
+Keep independent PGF references at their recorded inputs and justified tolerance.
+Regenerate/recompare affected references when geometry or reference generation
+changes; do not recreate the entire implementation or enlarge the native matrix
+without a demonstrated defect. Preserve 32D's deferred configurable layout and
+anchor scope. Existing unrelated lint debt remains separate.
+
+## Exact 32B deferrals and result semantics
+
+The current profile names four carried items, detailed in `prompts/phase-32b-fix.md`:
+
+1. Literal full-closed triangle proximity: 24 retained omissions, including
+   `(0,-14)` at paint distance about 5.77322 and production distance 8.
+2. Supported-shape transfer's 20/7/12/6 omissions for triangle/square/star/circle,
+   with scale-16 paint versus scale-1 action uncertainty.
+3. The separate transfer harness's owned-context standalone reopening failure.
+4. Outstanding full strict 32B acceptance.
+
+Leave that record, the separate transfer investigation and original evidence
+intact. Do not repair them as a prerequisite or adopt the older conditional
+32B core proposal. Do not inflate hit tolerances, add the rejected generic seam
+cap, perturb dash values, weaken the exact classifier, or waive an entire group.
+
+The strict run retains the actual full-closed failure. The scoped run records
+only that exact literal mechanism as explicitly `not_run`, linked to the separate
+strict diagnostic; all other required scenarios must execute and pass. The
+classifier also checks the exact retained omissions and excludes independent
+errors. A similar error message alone is insufficient.
+
+A raw cumulative `verification.json` may correctly remain `failed` while the
+separate `32c-acceptance.json` is `accepted`. Require
+`phase32CDispositionMatchesCheckout` to authenticate both current reports and
+artifacts. Neither a generic nonzero exit nor a hand-edited JSON status is
+acceptable. New/moved omissions, missing shapes/options, stale identities,
+unexpected failures and page/cleanup errors still block 32C. Do not relabel
+historical `BTrZUZ` or child `VBqL1l` evidence as accepted.
+
+## Verification, review and completion
+
+After any targeted code/harness fix, run the appropriate registered regressions,
+strict TypeScript, changed-file lint and script syntax checks. The final
+`review-deferred` route owns the fresh complete tests/build/diff and all three
+browser commands; avoid redundant preliminary full runs without a reason.
+Finalize files before that route and retain exact commands, logs, versions,
+observations, SVG/PNG artifacts and the before/after checkout identity.
+
+Use the paired 32C review prompt with this continuing scope amendment. Review M1
+can close only with fresh accepted scoped browser evidence and independent
+inspection; the old review found no remaining code issue, not blanket approval
+of any later change. The reviewer must verify the actual disposition and native
+artifacts and remain read-only. New findings require a bounded targeted correction.
+
+Update current 32C status/handoff from observed results without erasing historical
+failures. Report raw strict status, scoped acceptance, independent review and the
+unchanged 32B backlog separately. If accepted, say **32C accepted with the named
+32B issues deferred**. If still blocked, identify the exact new failing scenario
+or missing native evidence and provide a concrete parent handoff. Do not declare
+32B complete, implement 32D, commit or push.

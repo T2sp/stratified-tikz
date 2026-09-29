@@ -1,4 +1,5 @@
 import { tikzStyleTargets } from './types.ts'
+import { literalPointShapeKeys, literalPointShapeNames } from './importedTikzShapes.ts'
 import { canonicalTikzStyleKey, literalDefinedColor, namedTikzColors, resolveTikzPaint, splitTikzOptions } from './importedTikzPaint.ts'
 import type { TikzColorBindings, TikzPaintPreview, TikzPreviewContext, TikzStylePreviewDefinition } from './importedTikzPaint.ts'
 import { createUserStylePresetFromStyle } from './stylePresets.ts'
@@ -63,7 +64,8 @@ const previewPrimitiveKeys = new Set([
   'draw', 'fill', 'color', 'text', 'opacity', 'draw opacity', 'fill opacity', 'text opacity',
   'line width', 'dash pattern', 'dash phase', 'line cap', 'cap', 'line join', 'join',
   'ultra thin', 'very thin', 'thin', 'semithick', 'thick', 'very thick', 'ultra thick',
-  'solid', 'dashed', 'dotted', 'densely dotted', 'circle', 'shape', 'inner sep',
+  'solid', 'dashed', 'dotted', 'densely dotted', 'shape', 'inner sep',
+  ...literalPointShapeNames, ...literalPointShapeKeys, 'shape aspect', 'trapezium angle', 'kite vertex angles', 'star rotate',
 ])
 export type TikzStylePreviewApproximation = TikzPaintPreview
 
@@ -679,7 +681,12 @@ function refreshImportedPointSnapshots(diagram: Diagram, context: TikzPreviewCon
     if (reference === undefined || resolveImportedTikzStyle(reference, context).executionUncertain) return style
     const previouslyUncertain = resolveImportedTikzStyle(reference, previousContext).executionUncertain === true
     if (style.importedPaint?.referenceId !== referenceId && !previouslyUncertain) return style
-    const resolvedStyle = importedTikzStylePresetStyle('point', reference, context)
+    const resolvedPreview = resolveImportedTikzStyle(reference, context)
+    const importedStyle = importedTikzStylePresetStyle('point', reference, context)
+    // A paint-only replacement does not claim authored geometry. Keep the
+    // existing 32B partial-style contract while refreshing declared 32C keys.
+    const resolvedStyle: PointStyle = { ...importedStyle, shape: resolvedPreview.pointShape ?? style.shape,
+      shapeParameters: { ...style.shapeParameters, ...resolvedPreview.shapeParameters } }
     // Legacy fallback values have no recorded intent either. On a supported
     // recovery, establish a fresh snapshot rather than infer authorship later.
     return style.importedPaint?.referenceId !== referenceId
@@ -740,8 +747,9 @@ function hasShapeStyleSignal(
   }
 
   return (
-    hasSignalOption(normalizedOptions, 'circle') ||
-    hasSignalOption(normalizedOptions, 'rectangle') ||
+    literalPointShapeNames.some((shape) => hasSignalOption(normalizedOptions, shape)) ||
+    literalPointShapeKeys.some((key) => hasSignalOption(normalizedOptions, key)) ||
+    hasSignalOption(normalizedOptions, 'shape') ||
     hasSignalOption(normalizedOptions, 'draw') ||
     hasSignalOption(normalizedOptions, 'fill') ||
     hasSignalOption(normalizedOptions, 'inner sep') ||
@@ -881,6 +889,7 @@ function pointStyleFromPreview(
     color: strokeColor,
     opacity: 1,
     shape: preview.pointShape ?? defaultPointStyle.shape,
+    ...(preview.shapeParameters === undefined ? {} : { shapeParameters: { ...preview.shapeParameters } }),
     fill: defaultPointStyle.fill,
     size: preview.pointSize ?? defaultPointStyle.size,
     paint: {

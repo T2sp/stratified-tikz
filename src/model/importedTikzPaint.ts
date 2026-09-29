@@ -1,4 +1,6 @@
-import type { HexColor, LineStyle, PointShape } from './types.ts'
+import { applyLiteralPointShapeOption } from './importedTikzShapes.ts'
+import { pointShapeParameterKeys, pointShapeParameterIssues } from './pointShapeParameters.ts'
+import type { HexColor, LineStyle, PointShape, PointShapeParameters } from './types.ts'
 
 /** Literal-only, bounded TikZ paint support. No TeX evaluation is performed. */
 export const namedTikzColors: Readonly<Record<string, HexColor>> = {
@@ -27,6 +29,7 @@ export type TikzPaintPreview = {
   dashPhase?: number
   lineCap?: 'butt' | 'round' | 'rect'
   lineJoin?: 'miter' | 'round' | 'bevel'
+  shapeParameters?: PointShapeParameters
   pointShape?: PointShape
   pointSize?: number
   diagnostics?: string[]
@@ -146,6 +149,7 @@ export function resolveTikzPaint(options: string, context: TikzPreviewContext = 
     const sourceId = context.colorSourceIds?.[name]
     if (sourceId !== undefined) dependencies.add(sourceId)
   })
+  const shapeFields = ['pointShape', ...pointShapeParameterKeys.map((field) => `shapeParameters.${field}`)]
   const paintFields = ['fillColor', 'fillEnabled', 'drawColor', 'drawEnabled', 'textColor', 'fillOpacity', 'drawOpacity', 'textOpacity', 'lineWidth', 'dashPattern', 'dashPhase', 'lineCap', 'lineJoin']
   // No safe prefix/suffix or local key boundary exists for a rejected saved
   // source. Do not traverse legacy options: even built-in color bindings and
@@ -154,7 +158,7 @@ export function resolveTikzPaint(options: string, context: TikzPreviewContext = 
   if (context.sourceDiagnostics?.length) return {
     executionUncertain: true,
     diagnostics: context.sourceDiagnostics.slice(0, 64),
-    unresolvedFields: paintFields,
+    unresolvedFields: [...paintFields, ...shapeFields],
     sourceDependencies: [...(context.sourceIds ?? [])],
   }
   const keyFields: Record<string, string[]> = {
@@ -184,7 +188,7 @@ export function resolveTikzPaint(options: string, context: TikzPreviewContext = 
   const loseExecutionCertainty = (message: string) => {
     bindingsKnown = false
     preview.executionUncertain = true
-    paintFields.forEach((field) => unresolved.add(field))
+    ;[...paintFields, ...shapeFields].forEach((field) => unresolved.add(field))
     retainAllSourceHints(`${message} Runtime color bindings and option handlers remain unknown; later paint cannot restore certainty.`)
   }
   // Known paint keys with ordinary invalid literals retain field-local recovery.
@@ -269,7 +273,7 @@ export function resolveTikzPaint(options: string, context: TikzPreviewContext = 
       if (candidates.length) continue
       if (equals < 0 && isColorOption(paintKey)) {
         color(paintKey)
-      } else if (['fill', 'draw', 'text', 'color'].includes(paintKey)) {
+      } else if (['fill', 'draw', 'text', 'color', 'cylinder end fill', 'cylinder body fill'].includes(paintKey)) {
         color(option.slice(equals + 1))
       } else if (!isPaintOrLayoutKey(paintKey)) {
         loseExecutionCertainty(`Unsupported executable preview option: ${option}`)
@@ -358,7 +362,7 @@ export function resolveTikzPaint(options: string, context: TikzPreviewContext = 
       // bindings to the fallback after arbitrary execution has become possible.
       if (!bindingsKnown) {
         if (value === undefined && isColorOption(key)) color(key)
-        else if (value !== undefined && ['fill', 'draw', 'text', 'color'].includes(key)) color(value)
+        else if (value !== undefined && ['fill', 'draw', 'text', 'color', 'cylinder end fill', 'cylinder body fill'].includes(key)) color(value)
         continue
       }
       if (key === 'draw' || key === 'fill') {
@@ -402,7 +406,7 @@ export function resolveTikzPaint(options: string, context: TikzPreviewContext = 
         else { preview.dashPattern = pattern as number[]; preview.lineStyle = 'solid'; resolved('dashPattern') }
       } else if ((key === 'line cap' || key === 'cap') && (value === 'butt' || value === 'round' || value === 'rect')) { preview.lineCap = value; resolved('lineCap') }
       else if ((key === 'line join' || key === 'join') && (value === 'miter' || value === 'round' || value === 'bevel')) { preview.lineJoin = value; resolved('lineJoin') }
-      else if ((key === 'circle' && value === undefined) || (key === 'shape' && value === 'circle')) preview.pointShape = 'circle'
+      else if (applyLiteralPointShapeOption(preview, key, value, { number: literalTikzNumber, dimension: literalTikzDimension, color, invalid, resolved })) { /* ordered shape option */ }
       else {
         const resolvedColor = value === undefined ? color(key) : null
         if (resolvedColor) { preview.color = resolvedColor; delete preview.drawColor; delete preview.fillColor; delete preview.textColor; resolved('fillColor', 'drawColor', 'textColor') }
@@ -412,6 +416,12 @@ export function resolveTikzPaint(options: string, context: TikzPreviewContext = 
     }
   }
   visit(options, context.key ? [canonicalTikzStyleKey(context.key)] : [])
+  for (const issue of pointShapeParameterIssues(preview.shapeParameters).filter((entry) => entry.message.startsWith('Dart tail'))) {
+    warn(issue.message)
+    unresolved.add('shapeParameters.dartTipAngle')
+    unresolved.add('shapeParameters.dartTailAngle')
+    if (preview.shapeParameters) { delete preview.shapeParameters.dartTipAngle; delete preview.shapeParameters.dartTailAngle }
+  }
   if (diagnostics.length) preview.diagnostics = diagnostics
   if (unresolved.size) preview.unresolvedFields = [...unresolved]
   if (dependencies.size) preview.sourceDependencies = [...new Set([...(context.sourceIds ?? []), ...dependencies])].filter((sourceId) => dependencies.has(sourceId))

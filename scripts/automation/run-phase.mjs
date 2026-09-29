@@ -7,7 +7,7 @@ import { isDeepStrictEqual } from "node:util";
 // Keep the identity guard fixed in the parent: a read-only review must not be
 // able to redefine this guard or replace the in-memory report it checks.
 // This guard neither runs verification nor selects/validates browser groups.
-import { verificationMatchesCheckout } from "./phase-verification.mjs";
+import { verificationMatchesCheckout, phase32CDispositionMatchesCheckout } from "./phase-verification.mjs";
 
 // const phase = process.argv[2];
 // const mode = process.argv[3] ?? "implement";
@@ -34,7 +34,7 @@ const phaseInput = process.argv[2];
 const mode = process.argv[3] ?? "implement";
 
 if (!phaseInput) {
-  console.error("Usage: node scripts/automation/run-phase.mjs <phase> [implement|fix|verify]");
+  console.error("Usage: node scripts/automation/run-phase.mjs <phase> [implement|fix|verify|verify-deferred|review-deferred]");
   console.error("Example: node scripts/automation/run-phase.mjs 9C");
   console.error("Example: node scripts/automation/run-phase.mjs 9C fix");
   console.error("Example: node scripts/automation/run-phase.mjs 31C verify");
@@ -43,9 +43,14 @@ if (!phaseInput) {
 
 const phase = phaseInput.toUpperCase();
 
-if (!["implement", "fix", "verify"].includes(mode)) {
+if (!["implement", "fix", "verify", "verify-deferred", "review-deferred"].includes(mode)) {
   console.error(`Unknown mode: ${mode}`);
   console.error("Use 'implement', 'fix', or 'verify'.");
+  process.exit(1);
+}
+
+if (["verify-deferred", "review-deferred"].includes(mode) && phase !== "32C") {
+  console.error("The deferred acceptance route is restricted to 32C review-only verification.");
   process.exit(1);
 }
 
@@ -460,6 +465,42 @@ function reviewVerificationContext(report) {
     "A child-sandbox localhost/Chrome restriction does not invalidate a successful matching parent run. Missing, failed, incomplete, or stale evidence still blocks acceptance; never substitute static results for browser results.",
     "Keep this review read-only. Any checkout change during review invalidates this verification and the runner will stop before committing.",
   ].join("\n");
+}
+
+if (["verify-deferred", "review-deferred"].includes(mode)) {
+  const response = runVerifierWorker("review-only", "verify-32c-deferred");
+  if (!phase32CDispositionMatchesCheckout(response, { cwd: process.cwd(), env })) {
+    console.error("Invalid, incomplete or stale 32C acceptance disposition. Not starting review.");
+    process.exit(1);
+  }
+  if (mode === "verify-deferred") {
+    console.log(`32C scoped verification accepted; raw strict result remains ${response.report.status}. Evidence: ${response.disposition.summaryPath}`);
+    process.exit(0);
+  }
+  mkdirSync("logs/codex", { recursive: true });
+  const context = [
+    "## User-authorized Phase 32C review-only acceptance amendment",
+    "Read prompts/phase-32c-fix.md. Its prerequisite and acceptance amendments supersede the old requirement for full 32B acceptance.",
+    "This is a 32C review with exactly the named 32B residual issues deferred, not acceptance of 32B or Phase 32D.",
+    `Scoped acceptance disposition: ${response.disposition.summaryPath}`,
+    `Raw cumulative report (retains failures): ${response.report.summaryPath}`,
+    `Current checkout fingerprint: ${response.report.checkout.fingerprint}`,
+    ...response.report.checks.map((check) => `- ${check.name}: ${check.status}, exit ${check.exitCode}; ${check.logPath}; artifacts ${check.artifactDir ?? "none"}`),
+    "Read all required current evidence. The scoped run must complete the final settled SVG group, all non-deferred predecessors and the complete eleven-shape manifest.",
+    "The failed raw strict literal supplemental case alone is not a new 32C finding. New failures, missing artifacts/scenarios or stale identity remain blockers.",
+    "Keep review read-only; this route never commits or pushes, regardless of ready_to_commit.",
+  ].join("\n");
+  const output = runCodex(spec.reviewPrompt, "logs/codex/32C-review-deferred.log", context);
+  let review;
+  try { review = extractReviewJson(output); }
+  catch (error) { console.error(error.message); process.exit(1); }
+  writeFileSync("logs/codex/32C-review-deferred-summary.json", JSON.stringify(review, null, 2) + "\n");
+  if (!phase32CDispositionMatchesCheckout(response, { cwd: process.cwd(), env })) {
+    console.error("Checkout changed during review. 32C evidence and review are stale."); process.exit(1);
+  }
+  if (!review.ready_to_commit) { console.error("32C review found blockers. No commit or push is authorized."); process.exit(1); }
+  console.log("32C accepted with the named 32B issues deferred. No commit or push performed.");
+  process.exit(0);
 }
 
 if (mode === "verify") {

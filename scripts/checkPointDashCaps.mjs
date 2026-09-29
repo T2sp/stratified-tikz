@@ -215,7 +215,7 @@ export async function observeLivePaint(page, artifactDir, stem, observation, per
   return live
 }
 
-export async function runPointDashCapChecks({ page, artifactDir, begin, saved, diagnose }) {
+export async function runPointDashCapChecks({ page, artifactDir, begin, saved, diagnose, profile }) {
   begin(dashCapScenario)
   const originalViewport = page.viewportSize(), cases = []
   let primary
@@ -359,7 +359,7 @@ export async function runPointDashCapChecks({ page, artifactDir, begin, saved, d
         catch (cleanupError) { primary ??= cleanupError; console.error('App live paint isolation cleanup:', cleanupError) }
       }
     }
-    try { await runPointDashCapMechanismChecks({ page, artifactDir }) } catch (error) { primary ??= error }
+    try { await runPointDashCapMechanismChecks({ page, artifactDir, profile }) } catch (error) { primary ??= error }
     if (primary) {
       try { await boundedPointDiagnostic(() => writeFile(resolve(artifactDir, `${dashCapScenario}.json`), JSON.stringify({ scenario: dashCapScenario, group: 'point-node-paint-import-persistence', result: 'failed', cases, error: { message: primary.message, stack: primary.stack } }, null, 2) + '\n'), 'dash-cap matrix failure evidence') }
       catch (diagnosticError) { console.error('Dash-cap matrix failure diagnostics:', diagnosticError) }
