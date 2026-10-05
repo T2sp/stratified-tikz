@@ -7,6 +7,8 @@ import { geometricShapeGroup as group, geometricShapeManifest, geometricBodyVari
 import { createOwnedAppPage } from './ownedAppPage.mjs'
 import { ownPageEvent } from './ownedPageEvent.mjs'
 import { resolvePointInspectorField } from './pointInspectorFields.mjs'
+import { createPointDiagnostics } from './pointCheckDiagnostics.mjs'
+import { selectGeometricPoint } from './pointGeometricSelection.mjs'
 
 const paint = { text: { color: '#000000', opacity: 1 }, fill: { enabled: true, color: '#e0f0ff', opacity: 1 },
   stroke: { enabled: true, color: '#203040', opacity: 1, width: .4, lineStyle: 'solid', dashPhase: 0, lineCap: 'butt', lineJoin: 'miter' } }
@@ -56,6 +58,8 @@ export async function runPointNodeGeometricShapeChecks({ browser, origin, artifa
   const page = await ownedContext.newPage(), url = `${origin}/stratified-tikz/scripts/fixtures/freeLabelsApp.html`
   const app = createOwnedAppPage({ page, expectedUrl: url, artifactDir, prefix: 'point-geometric-app' })
   let scenario = 'point-geometric-ellipse', primary
+  let selectionSequence = 0
+  const selectionDiagnostic = createPointDiagnostics({ artifactDir, observe, artifactPrefix: 'point-geometric-selection' })
   const waits = [], held = new Set()
   const state = () => app.readState()
   const settle = () => page.waitForFunction(() => !document.querySelector('[data-label-state="pending"]'), undefined, { timeout: 30_000 })
@@ -77,14 +81,9 @@ export async function runPointNodeGeometricShapeChecks({ browser, origin, artifa
     return input
   }
   async function select(id = 'app-point', boundary = false) {
-    await page.getByRole('button', { name: 'Select', exact: true }).click()
-    await page.locator('svg.svg-diagram').scrollIntoViewIfNeeded()
-    const rendered = await observeGeometricPoint(page, id)
-    assert.ok(rendered)
-    const click = boundary ? rendered.boundary : rendered.center
-    await page.mouse.click(click.x, click.y)
-    const selected = (await state()).selection
-    assert.equal(selected?.id, id, 'Native contour click selects its point')
+    const rendered = await selectGeometricPoint({ page, readState: state, observePoint: observeGeometricPoint,
+      diagnose: (details) => selectionDiagnostic(group, scenario, details), secondaryErrors: pageErrors,
+      scenario, sequence: ++selectionSequence, id, boundary })
     const open = page.getByRole('button', { name: 'Open inspector drawer', exact: true })
     if (await open.count()) await open.click()
     const expand = page.locator('#preview-inspector-drawer').getByRole('button', { name: 'Expand', exact: true })

@@ -22,6 +22,27 @@ unchanged. Native acceptance and final independent review remain pending;
 see the [current external handoff](/private/tmp/stz-32c-native-followup/HANDOFF.md)
 for final checkout identity, executed checks and exact parent continuation.
 
+The later browser-capable parent `eeZs2F` actually started Chrome: label-assets
+passed, raw strict free-labels retained the named 32B full-closed failure, and
+scoped free-labels completed 15/17 groups and the ellipse scenario. It failed
+selecting the fresh **circle** with body `native shape` during diamond setup,
+before changing the Shape control. This is a new 32C blocker, not a deferred
+32B case. The open drawer overlaps the circle in the failure image, but retained
+artifacts do not establish the click target or event delivery.
+
+The 2026-10-05 continuation began on clean successor HEAD `e9413f5`, which
+already contains the six earlier modifications. Child native startup again
+fails with localhost `EPERM`, so no cause correction is claimed. The existing
+shape loop now saves bounded, separate selection diagnostics before and after
+the single native click: current model/source, owner/request/document revision,
+tool/selection, bounds/CTMs, viewport/scroll, inspector state, screen hit stack,
+and trusted event targets. Registered controlled regressions preserve the
+selection assertion through diagnostic/cleanup failures and preserve boundary
+coordinates. These are diagnostic tests, not native acceptance. No geometry,
+PGF references, shape matrix or verification profile changed. See the
+[selection follow-up handoff](/private/tmp/stz-32c-selection-followup/HANDOFF.md)
+for frozen identity, current results and the required fresh parent continuation.
+
 ## Scope decision
 
 The user's [32C fix amendment](../prompts/phase-32c-fix.md) supersedes the older

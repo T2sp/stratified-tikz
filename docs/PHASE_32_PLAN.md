@@ -47,6 +47,18 @@ trusted-input evidence requirements. Fresh complete scoped evidence and matching
 independent review are still required; the named 32B backlog and deferred 32D
 scope are unchanged. See the [current 32C handoff](/private/tmp/stz-32c-native-followup/HANDOFF.md).
 
+The subsequent browser-capable `eeZs2F` parent passed label-assets and reached
+the scoped shape group, then failed native center selection of the fresh circle
+while setting up diamond, after ellipse passed (15/17 groups complete). Its raw
+and scoped disposition are both failed; this new failure is not deferred 32B.
+The clean `e9413f5` continuation adds separate bounded selection diagnostics and
+registered failure-ownership regressions. Child localhost `EPERM` prevents
+event-delivery reproduction, so the overlapping drawer remains a hypothesis
+and no cause correction or acceptance is claimed. The fresh browser-capable
+parent must diagnose those observations and complete the existing
+`32C review-deferred` route; see the
+[selection follow-up handoff](/private/tmp/stz-32c-selection-followup/HANDOFF.md).
+
 | Stage | Deliverable |
 | --- | --- |
 | 32A | MathJax bodies for nodes created by Add point, with matching geometry, picking, and settled SVG export |

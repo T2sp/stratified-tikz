@@ -12,6 +12,84 @@ import { phase32CDispositionMatchesCheckout, pointNodeScenarioArtifacts, allPoin
 import { geometricShapeManifest, geometricBodyVariants, geometricShapeScenarios, geometricShapeGroup,
   assertGeometricShapeEvidence } from '../../scripts/pointGeometricShapesContract.mjs'
 import { syntheticMechanismEvidence } from './pointDashCapMechanismFixture.mjs'
+import { selectGeometricPoint, installGeometricSelectionObserver, observeGeometricSelection,
+  removeGeometricSelectionObserver } from '../../scripts/pointGeometricSelection.mjs'
+
+// Controlled event-delivery boundaries exercise error ownership, not native
+// acceptance. The real reused App sequence remains in the eleven-shape loop.
+function selectionDeliveryControl(options = {}) {
+  const { observationFailure, evidenceFailure, cleanupFailure, mouseFailure } = options
+  const calls = [], observations = [], secondaryErrors = []
+  const rendered = { shape: 'circle', source: 'native shape', center: { x: 1250, y: 270 }, boundary: { x: 1190, y: 280 } }
+  const page = {
+    getByRole: () => ({ click: async () => { calls.push('Select') } }),
+    locator: () => ({ scrollIntoViewIfNeeded: async () => { calls.push('scroll') } }),
+    mouse: { click: async (x, y) => { calls.push(['native click', x, y]); if (mouseFailure) throw mouseFailure } },
+    evaluate: async (operation, argument) => {
+      if (operation === installGeometricSelectionObserver) { calls.push('install'); return }
+      if (operation === removeGeometricSelectionObserver) { calls.push('cleanup'); if (cleanupFailure) throw cleanupFailure; return }
+      assert.equal(operation, observeGeometricSelection)
+      calls.push('snapshot')
+      if (observationFailure) throw observationFailure
+      return { errors: [], layout: { shape: 'circle', source: 'native shape' }, requestedClick: argument.click,
+        selection: options.selection, elementFromPoint: { drawer: !options.selection },
+        events: calls.some(Array.isArray) ? ['pointerdown', 'pointerup', 'click'].map((type) => ({ type, trusted: true })) : [] }
+    },
+  }
+  return { calls, observations, secondaryErrors, rendered, page,
+    readState: async () => { calls.push('state'); return { selection: options.selection } },
+    observePoint: async () => { calls.push('rendered after scroll'); return rendered },
+    diagnose: async (details) => {
+      calls.push(details.boundary)
+      observations.push(structuredClone(details))
+      if (evidenceFailure) throw evidenceFailure
+    } }
+}
+test('selection diagnostics on one controlled page preserve successful then failed circle setup', async () => {
+  const current = { selection: { id: 'app-point' } }, control = selectionDeliveryControl(current)
+  assert.equal(await selectGeometricPoint({ ...control, scenario: 'point-geometric-ellipse', sequence: 1 }), control.rendered)
+  current.selection = undefined
+  await assert.rejects(selectGeometricPoint({ ...control, scenario: 'point-geometric-diamond', sequence: 2 }), (error) => {
+    assert.equal(error.code, 'ERR_ASSERTION'); assert.equal(error.actual, undefined); assert.equal(error.expected, 'app-point')
+    assert.match(error.message, /^Native contour click selects its point/)
+    return true
+  })
+  const expectedCalls = ['Select', 'scroll', 'rendered after scroll', 'install', 'snapshot', 'before-native-click',
+    ['native click', 1250, 270], 'state', 'snapshot', 'after-native-click-before-assertion', 'cleanup', 'selection-finished']
+  assert.deepEqual(control.calls, [...expectedCalls, ...expectedCalls])
+  for (const index of [0, 3]) {
+    assert.equal(control.observations[index].observation.before.layout.shape, 'circle')
+    assert.equal(control.observations[index + 1].observation.clickKind, 'center')
+    assert.equal(control.observations[index + 1].result, undefined)
+  }
+  assert.equal(control.observations[4].observation.after.elementFromPoint.drawer, true)
+  assert.match(control.observations.at(-1).primary.message, /^Native contour click selects its point/)
+})
+for (const failure of ['observationFailure', 'evidenceFailure', 'cleanupFailure']) {
+  test(`failed native selection retains its assertion through ${failure}`, async () => {
+    const control = selectionDeliveryControl({ [failure]: new Error(`controlled ${failure}`) })
+    await assert.rejects(selectGeometricPoint({ ...control, scenario: 'point-geometric-diamond', sequence: 2 }), (error) => {
+      assert.equal(error.expected, 'app-point'); assert.match(error.message, /^Native contour click selects its point/); return true
+    })
+    assert.equal(control.calls.filter((call) => Array.isArray(call) && call[0] === 'native click').length, 1)
+    assert.ok(control.calls.includes('cleanup'))
+    assert.ok(control.secondaryErrors.some((message) => message.includes(failure)))
+  })
+  test(`successful selection cannot hide ${failure}`, async () => {
+    const control = selectionDeliveryControl({ selection: { id: 'app-point' }, [failure]: new Error(`controlled ${failure}`) })
+    await assert.rejects(selectGeometricPoint({ ...control, scenario: 'point-geometric-ellipse', sequence: 1 }))
+    assert.ok(control.secondaryErrors.some((message) => message.includes(failure)))
+  })
+}
+test('boundary selection keeps measured boundary input and native action failure ownership', async () => {
+  const primary = new Error('native mouse action failed'), control = selectionDeliveryControl({ mouseFailure: primary,
+    observationFailure: new Error('observation failed'), cleanupFailure: new Error('cleanup failed') })
+  await assert.rejects(selectGeometricPoint({ ...control, scenario: 'point-geometric-native-contours-2d-3d', sequence: 12,
+    boundary: true }), (error) => error === primary)
+  assert.deepEqual(control.calls.find(Array.isArray), ['native click', 1190, 280])
+  assert.equal(control.observations[0].observation.clickKind, 'boundary')
+  assert.equal(control.observations.at(-1).primary.message, primary.message)
+})
 
 const mechanisms = syntheticMechanismEvidence()
 test('supplemental primary and independent cleanup failures remain structured and unclassifiable', async () => {
