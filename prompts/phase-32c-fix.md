@@ -1,12 +1,13 @@
-# Phase 32C Fix: finish native acceptance with known 32B issues deferred
+# Phase 32C Fix: resolve native selection failure with known 32B issues deferred
 
 ## Current objective and continuing authorization
 
-All eleven 32C shapes and their required options are implemented. Continue from
-that implementation: obtain fresh native evidence through the existing 32C
-review-only route, fix concrete new 32C defects if that run exposes any, and
-obtain matching independent review. Do not restart the shape implementation or
-build a second verification profile merely because the strict parent run failed.
+All eleven 32C shapes and their required options are implemented. The latest
+browser-capable parent ran the existing scoped route and exposed a new native
+selection failure. Continue from that implementation: diagnose and make a
+bounded correction for the exact failure below, then obtain fresh complete
+native evidence and matching independent review. Do not restart the shape
+implementation or build a second verification profile.
 
 The user's explicit authorization remains in force: **32B の既知問題は保留に
 したままにします。** Full 32B acceptance is not a prerequisite to 32C
@@ -25,47 +26,131 @@ Read `AGENTS.md`, the paired 32C prompts, `docs/PHASE_32C_IMPLEMENTATION.md`,
 `docs/PHASE_32_PLAN.md`, and the unchanged residual record
 `prompts/phase-32b-fix.md`. Inspect the actual working tree before editing.
 
-At this prompt update, the implementation is on `phase/32c-shapes-geometry`,
-HEAD `c3081ebea181bffeba791c701f45dd05711521a2`, with existing tracked changes
-and 24 nonignored untracked files. Its pre-update fingerprint is:
+Immediately before this prompt edit, the actual checkout was on `phase/32c-shapes-geometry`,
+HEAD `e80d86b90a0e5daf9802a43cfa00decd0f6b2972`, with six tracked files modified
+and no nonignored untracked files. Its pre-update fingerprint is:
 
 ```text
-bd71acbdee90f4b13992e3127276e5e71628fec73b4345c9f1832cee21fff2d0
+d77c44175a923f85c2921a711b58b4c5ab2bacd5a7c24f28786d8865530ea835
 ```
 
-That identity matches the implementation handoff, independent review, and both
-before/after identities of the latest parent verification. Preserve all code,
-tests, reference fixtures, licenses, and policy files. This prompt edit changes
-the full-tree fingerprint; historical evidence is not fresh acceptance for the
-updated tree. Capture and verify the next actual identity, including untracked
-files, rather than hard-coding the old hash.
+That identity matches the current native-followup handoff and both before/after
+identities of the latest parent verification. The older `c3081eb` dirty checkout
+and its `bd71acbd...` fingerprint are historical, not the current starting tree.
+Preserve all implementation, tests, reference fixtures, licenses and policy files,
+including the six existing modifications:
 
-- Implementation handoff: `/private/tmp/stz-32c-fix-verification/HANDOFF.md`.
-- Independent review: `/private/tmp/stz-32c-independent-review.md`.
-- Latest parent report: `/var/folders/vk/7kf940pd4bx8f6cg3rzlmtc80000gn/T/stz-phase32c-before-review-BTrZUZ/verification.json`.
-- Parent worker handoff: `/var/folders/vk/7kf940pd4bx8f6cg3rzlmtc80000gn/T/stz-phase-verifier-rfjdHZ/response.json`.
-- Earlier child disposition: `/var/folders/vk/7kf940pd4bx8f6cg3rzlmtc80000gn/T/stz-phase32c-review-only-VBqL1l/32c-acceptance.json`.
+- `src/ui/inspector/PointShapeFields.tsx`.
+- `scripts/checkPointNodeGeometricShapes.mjs`.
+- `scripts/pointGeometricShapesContract.mjs`.
+- `tests/scripts/phase32cVerification.test.mjs`.
+- `docs/PHASE_32C_IMPLEMENTATION.md` and `docs/PHASE_32_PLAN.md`.
 
-Distinguish the two execution environments:
+These changes add native editable cylinder hexadecimal controls, trusted-input
+observations and rejection controls; invalid drafts stay outside saved styles.
+Preserve that correction. Its real native cylinder scenario has not yet executed.
+This prompt edit changes the full-tree fingerprint; the retained evidence is not
+fresh acceptance for the updated tree. Capture the next actual identity, including
+untracked files, rather than hard-coding any historical hash.
+
+- Current implementation/child handoff: `/private/tmp/stz-32c-native-followup/HANDOFF.md`.
+- Matched child review: `/private/tmp/stz-32c-native-followup/INDEPENDENT_REVIEW.md`.
+- Latest browser-capable parent worker: `/var/folders/vk/7kf940pd4bx8f6cg3rzlmtc80000gn/T/stz-phase-verifier-GHnMkv/response.json`.
+- Latest parent raw report: `/var/folders/vk/7kf940pd4bx8f6cg3rzlmtc80000gn/T/stz-phase32c-review-only-eeZs2F/verification.json`.
+- Latest parent disposition: `/var/folders/vk/7kf940pd4bx8f6cg3rzlmtc80000gn/T/stz-phase32c-review-only-eeZs2F/32c-acceptance.json`.
+
+Distinguish historical child startup failures from the latest real browser result:
 
 | Evidence | Actual result |
 | --- | --- |
-| Final implementation/child checks | 4,780 tests, build, strict TypeScript, changed-file lint/syntax and diff passed. All three native commands hit localhost `EPERM`; the child disposition is failed. |
+| Current native-followup child | 4,797 tests, build, strict TypeScript, changed-file lint/syntax and diff passed. Native attempts hit localhost `EPERM`; its `dwfcgN` disposition is failed. |
 | Independent PGF references | 92 fixed-box cases and 94 reference tests passed; independent regeneration matched all three fixture artifacts. PGF 3.1.11a, recorded source hash/license and TeX commands are retained. |
-| Independent review | No unresolved confirmed code finding; Medium M1 remains for missing native acceptance. This is not a passing review. |
-| Latest parent `BTrZUZ` | 4,780 tests, build, diff and the full label-assets command passed. Chrome started and strict free-labels reached the known 32B full-closed assertion. This parent result is not `EPERM`. |
+| Matched child review | Needs changes, Medium M1 for missing native acceptance, `ready_to_commit: false`; no unresolved confirmed code finding at that earlier review. |
+| Latest parent `eeZs2F` | Tests, build, diff and the full label-assets command passed. Both strict and scoped free-labels started Chrome and failed at different assertions. This result is not `EPERM`. |
 
-The parent completed **14 of the now-required 17 groups**, with no page errors.
-All **22/22 App dash entries** passed; **20/21 supplemental mechanisms** passed.
-The only failed mechanism is `positive-full-closed-control`, connected-live
-candidate `(0,-14)`, `false !== true`. The existing exact named-failure
-classifier accepts these retained observations when replayed read-only.
-That classification is not scoped verification or fresh browser acceptance.
+The latest strict `check:free-labels` retains the named 32B failure:
+`positive-full-closed-control`, connected-live candidate `(0,-14)`,
+`false !== true`, at `pointDashCapMechanismContract.mjs:175`.
+It is diagnostic evidence for the existing exact classifier, not permission to
+repair or waive additional 32B behavior.
 
-The paint/import group is incomplete; `settled-SVG-export-standalone` and
-`point-node-geometric-shapes` did not execute. `BTrZUZ` contains only the five
-strict checks, not `check:free-labels:32c` or an accepted `32c-acceptance.json`.
-It therefore does not close review M1 or establish a new 32C geometry defect.
+The scoped `check:free-labels:32c` progressed past that deferral, completed
+**15 of 17 cumulative groups**, including `point-node-paint-import-persistence`,
+and saved `point-geometric-ellipse` as passed. It then failed within
+`point-node-geometric-shapes`, scenario `point-geometric-diamond`.
+`settled-SVG-export-standalone` did not execute. There are no recorded page
+errors, but incomplete groups and missing remaining shape/actions/download
+evidence still block acceptance.
+
+Both raw `verification.json` and separate `32c-acceptance.json` are **failed**.
+The acceptance gate stopped routed independent review; the earlier review M1
+is still open. Do not keep describing the parent as strict-only or blocked by
+localhost permissions, and do not relabel this scoped failure as deferred 32B.
+
+## Diagnose the exact native selection failure first
+
+The primary assertion is:
+
+```text
+Native contour click selects its point
+actual: undefined
+expected: 'app-point'
+select: scripts/checkPointNodeGeometricShapes.mjs:87
+caller: scripts/checkPointNodeGeometricShapes.mjs:184
+```
+
+Read the retained scoped artifacts under:
+
+```text
+/var/folders/vk/7kf940pd4bx8f6cg3rzlmtc80000gn/T/stz-phase32c-review-only-eeZs2F/06-check-free-labels-32c/artifacts/
+```
+
+Start with `free-labels-evidence.json`, `point-geometric-ellipse.json`,
+`point-geometric-failure.json`, `point-geometric-app-failure.json`,
+`point-geometric-app-failure.png` and `point-geometric-app-lifecycle.json`.
+Retain the corresponding `command.log` and original strict artifacts separately.
+
+The scenario name does **not** establish a diamond solver defect. At the failing
+call, the loop has loaded a fresh **circle** with body `native shape` and calls
+`select()` before changing the Shape control to diamond. `boundary` defaults to
+`false`, so the actual click uses `rendered.center`, despite the generic assertion
+text saying contour. The failure snapshot still has `data-point-shape="circle"`.
+The first ellipse scenario completed; the failure occurs while setting up the
+next scenario on the reused App page. Neither a diamond boundary click nor the
+eight 2D/3D contour interactions had executed.
+
+The failure DOM retains an open inspector drawer and `No selection`. The native
+action history opens/expands the drawer in the ellipse scenario and contains no
+close before this failure; the screenshot shows the circle partly behind the
+drawer. Overlay interception is a concrete hypothesis, but the existing evidence
+does not record the actual click target or screen click coordinates. Confirm
+event delivery before attributing the failure to geometry or to the drawer.
+
+Use bounded native reproduction to compare the first successful setup with
+the next failing setup. Capture observations **before** asserting selection:
+scenario/setup shape, source/model and layout revision, selected tool and
+selection before/after, canvas/point bounds, screen CTMs, requested click
+coordinates, viewport and scroll offsets, inspector/drawer state and bounds,
+`elementFromPoint`/`elementsFromPoint` at the click location, and trusted pointer
+events/targets. Observe the geometry after the Select toolbar action and canvas
+scrolling, as the current helper does. Keep diagnostics separate from passed
+scenario records and retain the primary assertion if observation or cleanup fails.
+
+Determine whether the native click reaches the current rendered point, an
+overlay, an offscreen location, or a stale layout, and whether a completed App
+update is being observed. Inspect actual screen-to-model picking only after
+confirming event delivery. Drawer persistence, scrolling, layout readiness and
+selection update timing are hypotheses to measure, not established causes.
+
+Fix only the demonstrated cause in the product or harness and add a meaningful
+registered regression for the failing sequence. A justified harness correction
+may close an obstructing drawer through its real UI, bring the real canvas
+target into view, or wait for a specific App state. Preserve native mouse input,
+the expected selected point, later contour-boundary checks and original failure
+evidence. Do not select through fixture state mutation, dispatch synthetic
+events, retry blindly, add arbitrary sleeps, nudge coordinates to hide a failure,
+inflate hit tolerance, skip diamond or waive the shape group. Do not alter shape
+solvers/PGF references unless reproduction demonstrates a geometry defect.
 
 ## Use the implemented route, not another strict-only fix cycle
 
@@ -75,7 +160,7 @@ The needed route already exists in `scripts/automation/run-phase.mjs`,
 `32c-geometric-shapes-deferred-32b-v1`. The package command is
 `check:free-labels:32c`.
 
-**Recommended next parent action, from the preserved working tree:**
+**Final parent action after the targeted correction and finalized files:**
 
 ```bash
 PATH=/opt/homebrew/bin:$PATH node scripts/automation/run-phase.mjs 32C review-deferred
@@ -198,7 +283,9 @@ separate `32c-acceptance.json` is `accepted`. Require
 artifacts. Neither a generic nonzero exit nor a hand-edited JSON status is
 acceptable. New/moved omissions, missing shapes/options, stale identities,
 unexpected failures and page/cleanup errors still block 32C. Do not relabel
-historical `BTrZUZ` or child `VBqL1l` evidence as accepted.
+historical `BTrZUZ`, child `VBqL1l`/`dwfcgN`, or latest failed `eeZs2F` evidence
+as accepted. Earlier reports remain historical: `BTrZUZ` ran only the strict
+checks, whereas `eeZs2F` actually ran and failed the scoped shape group.
 
 ## Verification, review and completion
 

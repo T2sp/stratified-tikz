@@ -91,21 +91,81 @@ export async function runPointNodeGeometricShapeChecks({ browser, origin, artifa
     if (await expand.count()) await expand.click()
     return rendered
   }
+  async function colorParameter(key, value, label) {
+    const caption = `${label} hex`, token = `${scenario}:${key}`
+    const control = await resolvePointInspectorField(page, caption, 'input[type="text"]')
+    let primary
+    try {
+      await control.evaluate((element, token) => {
+        const registry = window.__stzGeometricColorInputs ??= new Map()
+        if (registry.has(token)) throw new Error(`Color observation is already owned: ${token}`)
+        const owned = { element, beforeValue: element.value, inputType: element.type, events: [] }
+        owned.listener = (event) => owned.events.push({ type: event.type, trusted: event.isTrusted, value: element.value })
+        registry.set(token, owned)
+        element.addEventListener('input', owned.listener)
+      }, token)
+      try { await control.fill(value, { timeout: 5000 }) } catch (error) { primary = error }
+      let observation
+      try {
+        observation = await page.evaluate((token) => {
+          const owned = window.__stzGeometricColorInputs.get(token)
+          return { inputType: owned.inputType, beforeValue: owned.beforeValue,
+            finalInputType: owned.element.type, finalValue: owned.element.value, events: [...owned.events] }
+        }, token)
+        observation = { parameter: key, caption, expectedValue: value, ...observation,
+          finalModelValue: (await model()).strata[0].style.shapeParameters?.[key],
+          ...(primary ? { actionError: { message: primary.message, stack: primary.stack } } : {}) }
+        // Keep raw native events and values before any success assertion.
+        await observe(`${scenario}-${key}-native-input`, { group, observation })
+      } catch (error) {
+        if (primary) pageErrors.push(`Color observation after primary failure: ${error.message}`)
+        throw primary ?? error
+      }
+      if (primary) throw primary
+      assert.equal(observation.inputType, 'text', `${key}: native hexadecimal text input`)
+      assert.equal(observation.finalInputType, 'text', `${key}: control remains a text input`)
+      assert.equal(observation.beforeValue.toLowerCase(), '#ffffff', `${key}: actual default input`)
+      assert.notEqual(observation.beforeValue.toLowerCase(), value.toLowerCase(), `${key}: edit changes the default`)
+      assert.ok(observation.events.length > 0, `${key}: native input event was observed`)
+      assert.ok(observation.events.every((event) => event.type === 'input' && event.trusted === true),
+        `${key}: all observed input events are trusted`)
+      const finalInput = observation.events.at(-1)
+      assert.equal(finalInput.type, 'input'); assert.equal(finalInput.trusted, true)
+      assert.equal(finalInput.value, value)
+      assert.equal(observation.finalValue, value)
+      assert.equal(observation.finalModelValue, value)
+      return observation
+    } catch (error) { primary ??= error; throw primary }
+    finally {
+      try {
+        await page.evaluate((token) => {
+          const registry = window.__stzGeometricColorInputs, owned = registry?.get(token)
+          if (owned) owned.element.removeEventListener('input', owned.listener)
+          registry?.delete(token)
+          if (registry?.size === 0) delete window.__stzGeometricColorInputs
+        }, token)
+      } catch (error) {
+        if (!primary) throw error
+        pageErrors.push(`Color input listener cleanup: ${error.message}`)
+      }
+    }
+  }
   async function parameters(spec) {
+    const nativeColorInputs = []
     for (const [key, value] of Object.entries(spec.parameters)) {
       const label = parameterLabels[key]
-      const selector = typeof value === 'boolean' ? 'input[type="checkbox"]' : key === 'starPointMode' ? 'select'
-        : typeof value === 'string' ? 'input[type="color"]' : 'input[type="text"]'
-      const control = await resolvePointInspectorField(page, label, selector)
-      if (typeof value === 'boolean') await control.setChecked(value)
-      else if (key === 'starPointMode') await control.selectOption(value)
-      else if (typeof value === 'string') await control.evaluate((element, value) => {
-        Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, 'value').set.call(element, value)
-        element.dispatchEvent(new Event('input', { bubbles: true })); element.dispatchEvent(new Event('change', { bubbles: true }))
-      }, value)
-      else await control.fill(String(value))
+      if (typeof value === 'string' && key !== 'starPointMode') {
+        nativeColorInputs.push(await colorParameter(key, value, label))
+      } else {
+        const selector = typeof value === 'boolean' ? 'input[type="checkbox"]' : key === 'starPointMode' ? 'select' : 'input[type="text"]'
+        const control = await resolvePointInspectorField(page, label, selector)
+        if (typeof value === 'boolean') await control.setChecked(value)
+        else if (key === 'starPointMode') await control.selectOption(value)
+        else await control.fill(String(value))
+      }
       assert.equal((await model()).strata[0].style.shapeParameters[key], value, `Native parameter ${key}`)
     }
+    return nativeColorInputs
   }
   async function save(details) {
     const evidence = { scenario, group, result: 'passed', pageErrors: [...pageErrors], ...details }
@@ -124,7 +184,7 @@ export async function runPointNodeGeometricShapeChecks({ browser, origin, artifa
       await load(JSON.stringify(initial)); await settle(); await select()
       await (await resolvePointInspectorField(page, 'Shape', 'select')).selectOption(spec.shape)
       assert.equal((await model()).strata[0].style.shape, spec.shape)
-      await parameters(spec)
+      const nativeColorInputs = await parameters(spec)
       const configuredStyle = structuredClone((await model()).strata[0].style)
       for (const mode of ['default', 'configured']) for (const body of geometricBodyVariants) {
         const input = await document(spec, body.source, 2, mode === 'configured')
@@ -139,7 +199,7 @@ export async function runPointNodeGeometricShapeChecks({ browser, origin, artifa
         cases.push(entry)
         await observe(`${scenario}-${mode}-${body.key}`, { group, entry })
       }
-      await save({ shape: spec.shape, parameters: spec.parameters, cases, nativeShapeControl: true, nativeStyle: configuredStyle })
+      await save({ shape: spec.shape, parameters: spec.parameters, cases, nativeShapeControl: true, nativeStyle: configuredStyle, nativeColorInputs })
     }
     scenario = 'point-geometric-native-contours-2d-3d'
     const interactions = []

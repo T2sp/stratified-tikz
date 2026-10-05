@@ -54,6 +54,27 @@ export function assertGeometricShapeEvidence(evidence, name) {
     assert.equal(evidence.nativeShapeControl, true)
     assert.equal(evidence.nativeStyle.shape, spec.shape)
     for (const [key, value] of Object.entries(spec.parameters)) assert.equal(evidence.nativeStyle.shapeParameters[key], value)
+    const colorParameters = spec.shape === 'cylinder' ? [
+      ['cylinderEndFill', 'Cylinder end fill hex'], ['cylinderBodyFill', 'Cylinder body fill hex'],
+    ] : []
+    assert.ok(Array.isArray(evidence.nativeColorInputs), 'Native color input observations are explicit')
+    assert.equal(evidence.nativeColorInputs.length, colorParameters.length)
+    for (const [parameter, caption] of colorParameters) {
+      const inputs = evidence.nativeColorInputs.filter((entry) => entry.parameter === parameter)
+      assert.equal(inputs.length, 1, `Unique native input for ${parameter}`)
+      const input = inputs[0], value = spec.parameters[parameter]
+      assert.equal(input.caption, caption); assert.equal(input.expectedValue, value)
+      assert.equal(input.inputType, 'text'); assert.equal(input.finalInputType, 'text')
+      assert.equal(input.beforeValue.toLowerCase(), '#ffffff', `${parameter}: observed default color`)
+      assert.notEqual(input.beforeValue.toLowerCase(), value.toLowerCase(), `${parameter}: native edit changes default`)
+      assert.equal(input.actionError, undefined)
+      assert.ok(Array.isArray(input.events) && input.events.length > 0, `${parameter}: observed input event`)
+      assert.ok(input.events.every((event) => event.type === 'input' && event.trusted === true), `${parameter}: all inputs are trusted`)
+      const finalInput = input.events.at(-1)
+      assert.equal(finalInput.trusted, true, `${parameter}: final input is trusted`)
+      assert.equal(finalInput.value, value)
+      assert.equal(input.finalValue, value); assert.equal(input.finalModelValue, value)
+    }
   } else if (name === 'point-geometric-native-contours-2d-3d') {
     assert.equal(evidence.cases.length, 8)
     for (const dimension of [2, 3]) for (const shape of ['diamond', 'star', 'semicircle', 'dart']) {

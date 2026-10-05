@@ -1,6 +1,8 @@
+import { useId, useState } from 'react'
 import { pointShapeTikzKeys } from '../../model/importedTikzShapes.ts'
 import { markPointShapeOverrides, pointShapeParameterIssues, resolvePointShapeParameters } from '../../model/pointShapeParameters.ts'
-import type { PointShapeParameters, PointStyle } from '../../model/types.ts'
+import type { HexColor, PointShapeParameters, PointStyle } from '../../model/types.ts'
+import { isHexColorString } from '../colorInput.ts'
 import { EditableColorField, EditableParsedNumberField, EditableSelectField } from './InspectorField.tsx'
 
 const shapeFields: Readonly<Partial<Record<PointStyle['shape'], readonly (keyof PointShapeParameters)[]>>> = {
@@ -38,8 +40,8 @@ export function PointShapeFields({ style, prefix = '', onChange }: {
     </label>
     if (key === 'starPointMode') return <EditableSelectField key={key} label={label} value={values.starPointMode}
       options={['ratio', 'height'] as const} onChange={(next) => update(key, next)} />
-    if (key === 'cylinderEndFill' || key === 'cylinderBodyFill') return <EditableColorField key={key} label={label}
-      value={values[key]} onChange={(next) => update(key, next as `#${string}`)} />
+    if (key === 'cylinderEndFill' || key === 'cylinderBodyFill') return <PointShapeColorField key={key} label={label}
+      value={values[key]} onChange={(next) => update(key, next)} />
     return <EditableParsedNumberField key={key} label={label} value={value as number}
       parse={(draft) => {
         if (!draft.trim()) return null
@@ -48,4 +50,31 @@ export function PointShapeFields({ style, prefix = '', onChange }: {
       }} invalidMessage={`Enter a supported ${rawLabel}; shape limits prevent degenerate or unbounded contours.`}
       onChange={(next) => update(key, next)} />
   })}</>
+}
+
+// Keep the swatch and an editable exact color value for the cylinder's two paints.
+function PointShapeColorField({ label, value, onChange }: {
+  label: string; value: HexColor; onChange: (value: HexColor) => void
+}) {
+  const [draft, setDraft] = useState<{ committed: HexColor; text: string }>({ committed: value, text: value })
+  const warningId = useId()
+  if (draft.committed !== value) setDraft({ committed: value, text: value })
+  const text = draft.committed === value ? draft.text : value
+  const invalid = !isHexColorString(text)
+  return <>
+    <EditableColorField label={label} value={value} onChange={(next) => {
+      if (isHexColorString(next)) onChange(next)
+    }} />
+    <label className="inspector-field">
+      <span className="inspector-field-label">{label} hex</span>
+      <input className="inspector-input" type="text" value={text} spellCheck={false}
+        aria-invalid={invalid} aria-describedby={invalid ? warningId : undefined}
+        onChange={(event) => {
+          const next = event.currentTarget.value
+          setDraft({ committed: value, text: next })
+          if (isHexColorString(next)) onChange(next)
+        }} />
+      {invalid && <span id={warningId} className="inspector-field-error" role="status">Enter a #RRGGBB color.</span>}
+    </label>
+  </>
 }

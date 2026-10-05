@@ -52,6 +52,11 @@ function literalFailure() {
 function shapeEvidence(spec) {
   return { scenario: `point-geometric-${spec.slug}`, group: geometricShapeGroup, result: 'passed', pageErrors: [], shape: spec.shape,
     parameters: spec.parameters, nativeShapeControl: true, nativeStyle: { shape: spec.shape, shapeParameters: spec.parameters },
+    nativeColorInputs: spec.shape === 'cylinder' ? [
+      ['cylinderEndFill', 'Cylinder end fill hex'], ['cylinderBodyFill', 'Cylinder body fill hex'],
+    ].map(([parameter, caption]) => ({ parameter, caption, expectedValue: spec.parameters[parameter],
+      inputType: 'text', beforeValue: '#FFFFFF', finalInputType: 'text', finalValue: spec.parameters[parameter],
+      finalModelValue: spec.parameters[parameter], events: [{ type: 'input', trusted: true, value: spec.parameters[parameter] }] })) : [],
     cases: ['default', 'configured'].flatMap((mode) => geometricBodyVariants.map(({ key, source }) => ({ mode, body: key, source, modelUnchanged: true,
       rendered: { shape: spec.shape, parameters: mode === 'configured' ? spec.parameters : {}, source, state: 'ready', contourLength: 20,
         bounds: { x: -10, y: -10, width: 20, height: 20 }, math: ['math', 'mixed'].includes(key) ? 1 : 0, bodyUpright: true,
@@ -129,6 +134,52 @@ for (const fault of ['missing-body', 'duplicate-body', 'missing-parameter', 'out
     assert.throws(() => assertGeometricShapeEvidence(evidence, evidence.scenario))
   })
 }
+for (const fault of ['missing-color', 'duplicate-key', 'wrong-key', 'wrong-value', 'untrusted-input', 'no-input',
+  'wrong-event-type', 'wrong-control-type', 'changed-control-type', 'already-configured', 'wrong-final-control', 'wrong-final-model', 'action-failed']) {
+  test(`32C cylinder native color evidence rejects ${fault}`, () => {
+    const spec = geometricShapeManifest.find(({ shape }) => shape === 'cylinder'), evidence = shapeEvidence(spec)
+    const input = evidence.nativeColorInputs[0]
+    if (fault === 'missing-color') evidence.nativeColorInputs.pop()
+    if (fault === 'duplicate-key') evidence.nativeColorInputs[1] = structuredClone(input)
+    if (fault === 'wrong-key') input.parameter = 'cylinderUsesCustomFill'
+    if (fault === 'wrong-value') input.expectedValue = '#123456'
+    if (fault === 'untrusted-input') input.events[0].trusted = false
+    if (fault === 'no-input') input.events = []
+    if (fault === 'wrong-event-type') input.events[0].type = 'change'
+    if (fault === 'wrong-control-type') input.inputType = 'color'
+    if (fault === 'changed-control-type') input.finalInputType = 'color'
+    if (fault === 'already-configured') input.beforeValue = input.expectedValue
+    if (fault === 'wrong-final-control') input.finalValue = '#123456'
+    if (fault === 'wrong-final-model') input.finalModelValue = '#123456'
+    if (fault === 'action-failed') input.actionError = { message: 'native input failed' }
+    assert.throws(() => assertGeometricShapeEvidence(evidence, evidence.scenario))
+  })
+}
+test('32C cylinder model equality alone cannot replace final-valued trusted input', () => {
+  const spec = geometricShapeManifest.find(({ shape }) => shape === 'cylinder'), evidence = shapeEvidence(spec)
+  const input = evidence.nativeColorInputs[0]
+  input.events = [{ type: 'input', trusted: true, value: '#FFFFFF' }]
+  assert.equal(input.finalValue, input.expectedValue)
+  assert.equal(input.finalModelValue, input.expectedValue)
+  assert.throws(() => assertGeometricShapeEvidence(evidence, evidence.scenario))
+})
+test('32C cylinder evidence rejects a synthetic final event after a trusted intermediate edit', () => {
+  const spec = geometricShapeManifest.find(({ shape }) => shape === 'cylinder'), evidence = shapeEvidence(spec)
+  evidence.nativeColorInputs[0].events.push({ type: 'input', trusted: false, value: spec.parameters.cylinderEndFill })
+  assert.throws(() => assertGeometricShapeEvidence(evidence, evidence.scenario))
+})
+test('32C cylinder evidence rejects an untrusted intermediate event before a trusted final edit', () => {
+  const spec = geometricShapeManifest.find(({ shape }) => shape === 'cylinder'), evidence = shapeEvidence(spec)
+  evidence.nativeColorInputs[0].events.unshift({ type: 'input', trusted: false, value: '#123456' })
+  assert.equal(evidence.nativeColorInputs[0].events.at(-1).trusted, true)
+  assert.equal(evidence.nativeColorInputs[0].events.at(-1).value, spec.parameters.cylinderEndFill)
+  assert.throws(() => assertGeometricShapeEvidence(evidence, evidence.scenario))
+})
+test('32C non-cylinder scenarios cannot carry unrelated color input observations', () => {
+  const spec = geometricShapeManifest.find(({ shape }) => shape === 'ellipse'), evidence = shapeEvidence(spec)
+  evidence.nativeColorInputs = shapeEvidence(geometricShapeManifest.find(({ shape }) => shape === 'cylinder')).nativeColorInputs
+  assert.throws(() => assertGeometricShapeEvidence(evidence, evidence.scenario))
+})
 test('review-only disposition rejects malformed, wrong-profile, failed, incomplete, or stale envelopes', () => {
   for (const response of [{}, { report: {} }, { report: { kind: 'phase32c-review-only', phase: '32B' }, disposition: { status: 'accepted' } },
     { report: { kind: 'phase32c-review-only', phase: '32C', profile: phase32cProfile }, disposition: { phase: '32C', status: 'accepted', profile: 'strict' } }]) {

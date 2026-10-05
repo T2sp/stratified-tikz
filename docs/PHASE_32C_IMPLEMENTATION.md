@@ -7,6 +7,21 @@ and triangle retain their four/three-sided regular polygon identities and
 their exact accepted default contour order. Acceptance requires fresh matching
 verification and independent review; implementation presence alone is not a pass.
 
+The fresh 2026-10-04 child `review-deferred` attempt on HEAD `e80d86b`
+completed 4,780 tests, build and diff, then failed at label-assets localhost
+startup (`listen EPERM`). Its fingerprint was
+`7b1f5bc74fee7a4150822a1b7a9ed55316f92b6ede16f909ad781b6615eac8ed`;
+[the failed report](/var/folders/vk/7kf940pd4bx8f6cg3rzlmtc80000gn/T/stz-phase32c-review-only-kGjRec/verification.json)
+is retained separately from the historical browser-capable parent result.
+Independent preflight identified synthetic cylinder color-control events as
+a 32C evidence gap. The targeted correction adds editable hexadecimal fields
+beside the two cylinder swatches and requires actual trusted input observations,
+changed default values, and matching control/model values in the native manifest.
+Invalid color drafts do not change saved styles. Geometry and PGF inputs are
+unchanged. Native acceptance and final independent review remain pending;
+see the [current external handoff](/private/tmp/stz-32c-native-followup/HANDOFF.md)
+for final checkout identity, executed checks and exact parent continuation.
+
 ## Scope decision
 
 The user's [32C fix amendment](../prompts/phase-32c-fix.md) supersedes the older

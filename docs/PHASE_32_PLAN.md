@@ -39,6 +39,14 @@ forward without another repair cycle. The raw strict 32B result remains failed.
 non-deferred earlier behavior still required. See [32C implementation and
 verification](PHASE_32C_IMPLEMENTATION.md).
 
+32C's eleven-shape implementation is present, but native acceptance remains
+pending. The 2026-10-04 child review-only attempt passed 4,780 tests/build/diff
+and then hit label-assets localhost `EPERM`. A bounded correction replaces
+synthetic cylinder color-parameter input with direct hexadecimal controls and
+trusted-input evidence requirements. Fresh complete scoped evidence and matching
+independent review are still required; the named 32B backlog and deferred 32D
+scope are unchanged. See the [current 32C handoff](/private/tmp/stz-32c-native-followup/HANDOFF.md).
+
 | Stage | Deliverable |
 | --- | --- |
 | 32A | MathJax bodies for nodes created by Add point, with matching geometry, picking, and settled SVG export |
