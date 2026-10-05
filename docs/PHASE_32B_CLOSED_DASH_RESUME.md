@@ -128,3 +128,66 @@ The parent must obtain complete matching strict evidence after any correction,
 then read-only review using `prompts/phase-32b-review.md` and verify identity again.
 Missing native transfer/action/reopen results, the retained full-closed failure,
 unexecuted strict groups and missing acceptance review keep 32B incomplete.
+
+## Native measurement attempt after the harness correction (2026-10-05)
+
+The next actual checkout was clean `494c7d7eedd6d251ae9a518f8bebc2ed89d3ed76`
+on `phase/32b-color-opacity-outline`, with tracked/untracked fingerprint
+`1349b15f6141db93470876cde1ea40c8da6a6644a3a7e6e648e2bb375e2ae48b`.
+Its twelve preceding tracked-file changes match the resumed handoff's binary
+diff, and all seven formerly untracked helpers/tests/document match their
+recorded hashes. They were already included in this starting commit. No reset,
+commit, push, helper reconstruction or production correction occurred here.
+
+The latest retained browser-capable parent `c0eiFc` is separate evidence on
+fingerprint `dbbf7b01272ed968e69bffb9ca76de20f38740f0f2ca205e11c2727d8b07faa1`.
+Its 4,486 tests, build, diff and label-assets passed with Node v26.9.0 and
+Chrome 154.0.8037.95. Strict free-labels failed at
+`positive-full-closed-control: connected-live candidate 0,-14`. All 22 App
+dash entries passed, including both corrected square-zero-off rows; 20/21
+supplemental mechanisms passed. Fourteen groups completed without page errors;
+paint/import remained incomplete and final settled SVG did not execute.
+That parent did not invoke the separate transfer and stopped before review.
+Its report, requested JSONs, linked literal SVGs, PNGs and command log were
+authenticated read-only; the completed PNG/cap analysis was not rerun.
+
+The existing `sameSettingScaleComparison` reproduces the retained scale question:
+at `(0,-14)`, scale-1 center distance is `6.519202405202649`, versus
+`5.773220775702242` at scale 16. Its scale-1 pixel-cell interval is
+`[5.812095624016101, 7.226309186389197]`, hence uncertain. Eighteen of the
+24 retained omissions remain definite under that diagnostic. The separately
+authenticated retained analysis records thirteen with opaque-pixel support,
+including `(-8,-8)`. Pixel-cell quantization is not a complete vector antialias
+error bound. These literal observations have no trusted App pointer actions;
+all 24 raw scale-16 omissions and the original `.14` strict gate remain intact.
+
+One fresh execution of the already corrected transfer used Homebrew Node
+v26.9.0 and external artifacts at
+`/private/tmp/stz-32b-native-measure-2jbDz4/native-transfer/`.
+`transfer-run.json` retains `result: failed`, primary stage
+`development-server-listen`, and `listen EPERM 127.0.0.1:5173`.
+Before/after identities match the starting fingerprint above. Chrome did not
+start, no page was owned, all four shapes are `not_run`, and no action-scale
+paint, trusted actions, saved SVGs or reopening results were produced. The
+exact command and log are retained in that directory's external parent handoff.
+No permission change or startup retry was made.
+
+Without that native measurement, the fully covered positive-interval cap
+hypothesis remains conditional. Source inspection also confirms that simply
+adding square-cap families would switch the circle's stroke contour to the
+existing 256-edge polygon branch. Its current contour/source and scale-specific
+paint must be observed before choosing a shared geometry correction. The
+rejected generic seam-cap radius and exterior phantom-hit negatives remain.
+Production geometry, tolerance, raw dash values and acceptance policy are unchanged.
+
+The browser-capable parent's next action remains the separate transfer command
+above, with a fresh external `STZ_CLOSED_DASH_TRANSFER_DIR`. The ordinary
+cumulative runner does not automatically execute it. Inspect both scales,
+trusted ordinary/Alt controls, source/framing restoration and actual saved-file
+reopening before any evidence-supported correction. Then finalize the checkout,
+run `32B verify` on that final identity, and obtain independent read-only review
+only after complete matching strict verification. This status edit changes the
+full-tree identity; final identity, build/diff results, authentication and concrete
+parent commands are retained in
+`/private/tmp/stz-32b-native-measure-2jbDz4/HANDOFF.md` and `handoff.json`.
+No new native acceptance or review pass is claimed. **32B remains incomplete.**

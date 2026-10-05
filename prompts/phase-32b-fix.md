@@ -1,4 +1,4 @@
-# Phase 32B Fix: measure native closed-dash transfer after the harness correction
+# Phase 32B Fix: native transfer and the new owned-App navigation failure
 
 ## Current user instruction and scope
 
@@ -22,6 +22,9 @@ from that implementation; do not recreate those helpers, add a second sampling
 profile or repeat a child-only static repair cycle. The next missing measurement
 is the existing four-shape transfer in a browser-capable process, followed by
 any evidence-supported narrow correction and complete strict acceptance.
+The latest cumulative parent also exposes an earlier owned-App document loss.
+Diagnose that independent failure without waiving ownership checks or treating
+it as the retained full-closed failure. Both paths remain required for acceptance.
 
 Read `AGENTS.md`, the paired 32B prompts, `docs/PHASE_32_PLAN.md`,
 `docs/PHASE_32B_IMPLEMENTATION.md`, and the endpoint/zero-dash/live-paint
@@ -34,64 +37,128 @@ or move to another phase branch to recover an older state.
 
 Immediately before this prompt edit, the checkout was on
 `phase/32b-color-opacity-outline`, HEAD
-`d46946bb6b0134e47bbe339d2b42ee8896f25598`, with 12 tracked files modified
-and seven nonignored untracked files. Its identity matches the resumed child
-handoff and both before/after identities of the latest parent `c0eiFc` report:
+`494c7d7eedd6d251ae9a518f8bebc2ed89d3ed76`, with only three status documents
+modified and no nonignored untracked files. Its identity matches the current
+native-measure handoff and both before/after identities of parent `03pAet`:
 
 ```text
-dbbf7b01272ed968e69bffb9ca76de20f38740f0f2ca205e11c2727d8b07faa1
+22ad6c547200be65411819b148a76d60ce15fe9640b050d5194d4beda367ce0d
 ```
 
-Preserve all current changes, including the new lifecycle, coordinate and
-sampling helpers, their three registered test files and the resumed investigation
-document. `package.json`, verifier policy/fixtures and their registered tests
-already include the diagnostic bindings. Do not reset or commit merely to obtain
-a clean tree. This is the current starting tree, not historical `40e0ccf`/`NUG5nw`
-or `f8213c4` evidence.
+Preserve the implemented lifecycle, coordinate and sampling helpers, their
+registered tests, package/verifier bindings and all current compatible work.
+These are already present in the successor HEAD; do not reconstruct the former
+12-file/seven-untracked implementation diff. Preserve the current modifications
+to `docs/PHASE_32B_CLOSED_DASH_RESUME.md`, `docs/PHASE_32B_IMPLEMENTATION.md` and
+`docs/PHASE_32_PLAN.md`. Do not reset or commit merely to obtain a clean tree.
+This is the current starting tree, not historical `d46946bb`/`c0eiFc`,
+`40e0ccf`/`NUG5nw` or `f8213c4` evidence.
 Editing this prompt changes the full-tree fingerprint. Capture the actual next
 tracked/untracked identity rather than hard-coding this hash or treating retained
 verification as acceptance of later edits.
 
-- Resumed implementation handoff: `/private/tmp/stz-32b-resume-l2zpIT/HANDOFF.md`, with identities/logs in `handoff.json`.
-- Final child transfer attempt: `/private/tmp/stz-32b-resume-l2zpIT/native-transfer-final/transfer-run.json`, with `native-final-summary.json` and `native-transfer-final.log` beside that directory.
+- Current native-measure handoff: `/private/tmp/stz-32b-native-measure-2jbDz4/HANDOFF.md`, with authentication/identities/logs in `handoff.json` and linked records.
+- Latest child transfer attempt: `/private/tmp/stz-32b-native-measure-2jbDz4/native-transfer/transfer-run.json`, with `native-transfer.log` beside that directory.
+- Latest parent worker: `/var/folders/vk/7kf940pd4bx8f6cg3rzlmtc80000gn/T/stz-phase-verifier-rmGHJ6/response.json`.
+- Latest parent raw verification: `/var/folders/vk/7kf940pd4bx8f6cg3rzlmtc80000gn/T/stz-phase32b-before-review-03pAet/verification.json`.
+- Latest strict artifacts: `/var/folders/vk/7kf940pd4bx8f6cg3rzlmtc80000gn/T/stz-phase32b-before-review-03pAet/05-check-free-labels/artifacts/`.
+- Earlier resumed implementation handoff: `/private/tmp/stz-32b-resume-l2zpIT/HANDOFF.md`.
 - Independent retained-PNG measurement: `/private/tmp/stz-32b-resume-retained-3K96NZ/READ_ONLY_MEASUREMENT.md`.
-- Latest parent worker: `/var/folders/vk/7kf940pd4bx8f6cg3rzlmtc80000gn/T/stz-phase-verifier-AVZJ8I/response.json`.
-- Latest parent raw verification: `/var/folders/vk/7kf940pd4bx8f6cg3rzlmtc80000gn/T/stz-phase32b-before-review-c0eiFc/verification.json`.
-- Latest strict artifacts: `/var/folders/vk/7kf940pd4bx8f6cg3rzlmtc80000gn/T/stz-phase32b-before-review-c0eiFc/05-check-free-labels/artifacts/`.
+- Earlier full-closed parent report: `/var/folders/vk/7kf940pd4bx8f6cg3rzlmtc80000gn/T/stz-phase32b-before-review-c0eiFc/verification.json`, with its strict artifacts retained beside the report.
 
 The latest parent passed **4,486 tests** (zero failed/skipped/cancelled), build, diff
 and the full label-assets command. Chrome **154.0.8037.95** started on Node
 **v26.9.0**; this result is not a child localhost `EPERM` failure.
-Strict `check:free-labels` failed at `point-node-paint-import-persistence`:
+Strict `check:free-labels` failed at `real-App-workflows`, within
+`real-App-input-JSON-history-reused-ID-load`, stage `document-b-ready`:
 
 ```text
-positive-full-closed-control: connected-live candidate 0,-14
-false !== true
-scripts/pointDashCapMechanismContract.mjs:181
-scripts/checkPointDashCapMechanism.mjs:209
+page.evaluate: Execution context was destroyed, most likely because of a navigation
+scripts/appGeometryDiagnostics.mjs:343
+boundedPointDiagnostic: scripts/pointCheckDiagnostics.mjs:11
 ```
 
-All **22/22 App dash entries** passed, including both corrected `square-zero-off`
-rows. **20/21 supplemental mechanisms** passed; only the full-closed literal
-case failed. **14/16 cumulative groups** completed, with no recorded page errors.
-The paint/import group is incomplete and `settled-SVG-export-standalone` did not
-execute. The raw report remains **failed** and the parent stopped before review,
-commit and push. Local/static successes do not complete 32B.
+**13/16 cumulative groups** completed, with no recorded page errors. The real-App
+group started but did not complete. Paint/import and final settled-SVG groups did
+not execute. Do not claim that this run passed all 22 App dash entries or reached
+the full-closed assertion: those observations belong to earlier `c0eiFc`.
+The raw report remains **failed** and the parent stopped before review/commit/push.
 
-Keep the child and parent outcomes separate. The final child `BJmYPf` verifier
-passed tests/build/diff but failed label-assets at localhost `EPERM`; its strict
-free-labels did not execute. The final child transfer likewise stopped before
-Chrome and recorded all four shapes `not_run`. In contrast, `c0eiFc` started
-Chrome and reproduced the actual strict assertion above. It did **not** invoke
-`checkPointClosedDashTransfer.mjs`. Neither result supplies the missing transfer
-native actions/reopening; independent acceptance review remains `not_run`.
+The latest restricted child ran the already corrected transfer once, on clean
+pre-document-edit fingerprint `1349b15f6141db93470876cde1ea40c8da6a6644a3a7e6e648e2bb375e2ae48b`.
+It failed at `listen EPERM 127.0.0.1:5173` before Chrome; all four shapes are
+`not_run`, with no action-scale paint, actions, saved SVGs or reopening. It then
+changed only the three status documents and passed build/diff. Its handoff was
+written before the later `03pAet` parent outcome, so it cannot describe that new
+navigation failure. Neither run supplies the missing native transfer result.
 
-Start with `free-labels-evidence.json`, `point-paint-dash-caps.json`,
-`point-paint-dash-cap-mechanism.json`, and
-`point-paint-dash-cap-mechanism-positive-full-closed-control.json`, together with
-their linked literal SVGs, connected capture PNGs/metadata and `command.log`.
+Earlier `c0eiFc` genuinely started Chrome, passed 4,486 tests/build/diff/assets,
+all 22 App dash rows and 20/21 supplemental mechanisms, completing 14/16 groups.
+It retained the full-closed `(0,-14)` assertion and 24 raw omissions. That defect
+is still unresolved; `03pAet` stopped earlier and neither reconfirms nor resolves
+it. Independent acceptance review remains `not_run`. Preserve all three outcome
+types: child startup restriction, new owned-App document loss and earlier literal
+paint disagreement. None may be relabelled as another or waived as a known issue.
 
-The retained `NUG5nw` measurements and latest diagnostic expose a finite scale
+## Diagnose the new owned-App document loss
+
+Read the latest `free-labels-evidence.json`, `app-failure.json/png`,
+`app-lifecycle.json`, `app-geometry-index.json`, final geometry observations
+`app-geometry-0346.json` through `0353.json`, persistence observations and
+`app-document-b-pending.png`, together with `command.log`.
+
+The workflow loads held document A, then document B reusing the label ID, records
+B pending, releases B and starts `document-b-ready` for
+`$\mathord{\mathrm{j}}$`. The last stable-geometry observation still has the
+original document generation and exact fixture API. The lifecycle then records:
+
+```text
+[vite] server connection lost. Polling for restart...
+same-URL main-frame-navigation
+[vite] connecting...
+[vite] connected.
+```
+
+The failure snapshot has a different generation, `readyState: interactive`,
+undefined `window.stzAppLabels`, and an empty App root. The geometry observer is
+missing after replacement; that diagnostic error is secondary to the original
+destroyed-context rejection. The installed Vite reconnect code logs that message
+and reloads after a successful restart ping. This supports a reconnect-induced
+document replacement, but the cause of the WebSocket/server loss is not yet
+established. It does not establish a JSON-load, geometry or paint regression.
+
+Use a bounded focused reproduction of the existing complete App workflow and
+its diagnostic controls. Inspect `checkFreeLabelsApp.mjs`,
+`checkFreeLabelsAppFocused.mjs`, `appGeometryDiagnostics.mjs`, `ownedAppPage.mjs`
+and the cumulative runner's Vite ownership. Capture host/page timing, actual
+listen address, owning server instance and lifetime, server close/restart/errors,
+watcher/reload and WebSocket events, console/navigation/request events, and
+document/API generations around B release and geometry reads. Correlate any
+concurrent processes or cleanup with the disconnect before choosing a fix.
+
+The retained actual address is port 5173. Inspect the installed Vite port
+resolution: the existing `port: 0` configuration did not result in an ephemeral
+listen port. Do not assume changing it to `0` again provides isolation. Use only
+the verified server owned by this invocation; do not point acceptance at an
+unrelated existing server, kill another user's server, or run overlapping browser
+checks on shared ownership while diagnosing the loss. Same URL alone does not
+authenticate the server or the Document.
+
+Fix the demonstrated server/process/harness or product cause only. Keep native
+Load JSON, held-conversion/obsolete-completion, reused-ID preservation and all
+geometry/pointer assertions intact. Do not catch the context-loss error and
+reacquire the new document, refresh the API/marker, retry reads until they pass,
+enlarge timeouts blindly, or suppress navigation/ownership checks. Do not merely
+disable HMR/lifecycle evidence to hide the disconnect. Preserve first-error
+ordering, bounded diagnostics/cleanup and late rejection ownership. Add a
+meaningful registered regression for any correction, including rejection of
+same-URL replacement. A new complete run must start with new explicit ownership;
+continuing the interrupted run cannot establish acceptance.
+
+## Retained full-closed evidence and implemented transfer
+
+Read the earlier `c0eiFc` paint matrix JSONs, linked SVG/PNGs and command log
+separately. The retained `NUG5nw` measurements and `c0eiFc` diagnostic expose a finite scale
 question. At
 `(0,-14)`, the same connected literal source has measured paint distance
 `5.773220775702242` at CTM scale 16 but `6.519202405202649` at scale 1.
@@ -226,12 +293,28 @@ PATH=/opt/homebrew/bin:$PATH node scripts/checkPointClosedDashTransfer.mjs
 ```
 
 The ordinary `32B fix` parent runs the standard cumulative browser commands;
-it does not automatically invoke this separate transfer. The latest `c0eiFc`
-is another such cumulative run, not the requested four-shape measurement.
+it does not automatically invoke this separate transfer. Latest `03pAet` is
+another cumulative run, interrupted before paint/import, not the requested
+four-shape measurement.
 If this prompt runs inside a restricted child, retain the exact failed native
 attempt and hand off this command to a fresh browser-capable process. Do not
 expect a child handoff or runner edit to change an already running parent's mode,
 or repeat completed harness corrections in response to localhost `EPERM`.
+
+Independently diagnose the new owned-App failure with the existing focused
+complete App workflow and its five diagnostic controls:
+
+```bash
+PATH=/opt/homebrew/bin:$PATH npm run check:free-labels:app
+```
+
+Use fresh owned server/browser resources and external artifacts with the actual
+listen address recorded. Keep this separate from the transfer rather than running
+overlapping processes against an unverified shared server. Review the retained
+navigation timeline before a new run; additional observation is justified to
+identify the disconnect, but a pass from retrying alone is not a causal diagnosis
+or a substitute for final cumulative acceptance. Do not repeatedly rerun the full
+aggregate to rediscover the same earlier-group failure.
 
 After finalizing the implementation, harness, tests and status/handoff files, the
 browser-capable parent must obtain complete strict evidence on that final tree:
