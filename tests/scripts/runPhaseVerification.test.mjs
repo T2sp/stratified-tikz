@@ -1345,7 +1345,7 @@ for (const fault of ['missing-grid', 'hidden-phantom', 'mismatched-audit-file'])
   })
 }
 
-for (const fault of ['missing-matrix', 'unpassed-case', 'omitted-grid-cell', 'mismatched-case-file', 'rounded-source-file', 'changed-pattern-file', 'zero-cap-distance-mismatch']) {
+for (const fault of ['missing-matrix', 'unpassed-case', 'omitted-grid-cell', 'mismatched-case-file', 'rounded-source-file', 'changed-pattern-file', 'zero-cap-distance-mismatch', 'changed-connected-contour-hash']) {
   test(`32B cumulative native mechanism policy rejects ${fault}`, (t) => {
     const fixture = checkoutFixture(t); completePointEvidence(fixture)
     const artifacts = JSON.parse(fixture.env.STZ_TEST_POINT_ARTIFACT_VALUES)
@@ -1357,6 +1357,13 @@ for (const fault of ['missing-matrix', 'unpassed-case', 'omitted-grid-cell', 'mi
     if (fault === 'rounded-source-file') artifacts[`${dashCapMechanismStem}-${entry.key}.input.svg`] = '<svg xmlns="http://www.w3.org/2000/svg"><polygon points="5,-5 -5,-5 -5,5 5,5"></polygon></svg>'
     if (fault === 'changed-pattern-file') artifacts[`${dashCapMechanismStem}-${entry.key}.input.svg`] = artifacts[`${dashCapMechanismStem}-${entry.key}.input.svg`].replace('stroke-dasharray="0 10"', 'stroke-dasharray="none"')
     if (fault === 'zero-cap-distance-mismatch') entry.samples.find((sample) => sample[9] === 'hit')[11] += 1
+    if (fault === 'changed-connected-contour-hash') {
+      const hash = '0'.repeat(64)
+      entry.livePaint.contourSha256 = hash; entry.sameSettingScaleComparison.contourSha256 = hash
+      for (const capture of entry.livePaint.captures) capture.contourSha256 = hash
+      for (const capture of entry.sameSettingScaleComparison.captures) capture.contourSha256 = hash
+      artifacts[`${dashCapMechanismStem}-${entry.key}.json`] = structuredClone(entry)
+    }
     fixture.env.STZ_TEST_POINT_ARTIFACT_VALUES = JSON.stringify(artifacts)
     assert.equal(failedVerification(t, fixture, '32B').report.status, 'failed')
   })

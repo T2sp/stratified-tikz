@@ -1,5 +1,12 @@
 # Phase 32 Plan: Point-node math, paint, geometric shapes, and layout
 
+Current 32B residual status: [closed-dash work resumed](PHASE_32B_CLOSED_DASH_RESUME.md).
+The retained `NUG5nw` strict report remains failed at the full-closed supplemental,
+with 22/22 App entries passed and 14/16 groups complete. Transfer context ownership
+and same-setting action-scale diagnostics are corrected. Fresh native transfer,
+complete strict verification and subsequent independent review remain required;
+no core profile is adopted and 32C/32D implementation has not begun.
+
 Status: 32A is accepted. The `gtRban` parent report completed all 15 groups,
 all 11 named point scenarios and required artifacts, followed by an independent
 passing review. Its tracked diff and four then-untracked file hashes match the

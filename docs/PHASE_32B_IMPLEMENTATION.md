@@ -1,5 +1,14 @@
 # Phase 32B: Independent point paint and imported styles
 
+Current continuation: [resumed closed-dash investigation](PHASE_32B_CLOSED_DASH_RESUME.md).
+The `NUG5nw` parent passed all 22 App entries and 20/21 supplemental entries,
+but retained the full-closed failure and completed only 14/16 groups. Independent
+same-source measurements distinguish action-scale pixel quantization from the
+unchanged scale-16 `.14` oracle. Transfer context/error ownership and native
+action-framing capture are corrected; new browser execution is still pending.
+Production geometry and the accepted square-zero-off correction are preserved.
+32B remains incomplete; the strict profile is unchanged and no review pass is claimed.
+
 Latest continuation: [connected capture isolation](PHASE_32B_LIVE_PAINT_ACCEPTANCE.md#targeted-capture-isolation-continuation).
 The `gHadrw` parent reached Chrome, passed tests/build/diff/label-assets, and
 failed free-labels with 18/22 App and 20/21 supplemental entries passed.

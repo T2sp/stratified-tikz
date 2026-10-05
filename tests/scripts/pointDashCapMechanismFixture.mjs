@@ -1,7 +1,8 @@
 import { createHash } from 'node:crypto'
 import { deflateSync } from 'node:zlib'
 import { inspectConnectedLivePaintPng } from '../../scripts/connectedLivePaintOracle.mjs'
-import { dashCapMechanismCases, dashCapMechanismColumns, dashCapMechanismGrid, dashCapMechanismStem, dashLivePaintColumns, retainedDashContainmentDisagreement } from '../../scripts/pointDashCapMechanismContract.mjs'
+import { compareConnectedPaintSampling } from '../../scripts/connectedPaintSampling.mjs'
+import { dashCapMechanismCases, dashCapMechanismColumns, dashCapMechanismGrid, dashCapMechanismStem, dashCapMechanismScaleWitnesses, dashLivePaintColumns, retainedDashContainmentDisagreement } from '../../scripts/pointDashCapMechanismContract.mjs'
 
 const pngCache = new Map(), pixelCache = new Map()
 const variant = (key) => ['zero-butt-control', 'zero-terminal-seam', 'zero-off-continuous', 'positive-before-corner'].includes(key) ? key : 'rectangle'
@@ -74,13 +75,15 @@ export function syntheticMechanismEvidence() {
       grid: { ...dashCapMechanismGrid }, columns: [...dashCapMechanismColumns], geometry: { bounds: { minX: -23, minY: -23, maxX: 23, maxY: 23 }, radius: 33, capBounds: empty ? null : { minX: -23, minY: -23, maxX: 23, maxY: 23 }, capRadius: empty ? 0 : 32.5, familyCount: empty ? 0 : 4 },
       samples, probes: (spec.probes ?? []).map(row), counts: { hits: samples.filter((r) => r[9] === 'hit').length, misses: samples.filter((r) => r[9] === 'miss').length, uncertain: samples.filter((r) => r[9] === 'uncertain').length } }
     const stem = `${dashCapMechanismStem}-${spec.key}`, all = [...samples, ...entry.probes].map(([x, y]) => ({ local: { x, y } }))
+    const contourSha256 = createHash('sha256').update(syntheticMechanismLiveSvg(entry).match(/<polygon\b[\s\S]*<\/polygon>/u)[0]).digest('hex')
     entry.livePaint = { method: 'actual live SVG screenshot PNG; no SVG reconstruction', sourceFile: `${stem}.live.svg`, sourcePoints: spec.points,
+      contourSha256,
       sourceSha256: createHash('sha256').update(syntheticMechanismLiveSvg(entry)).digest('hex'), columns: [...dashLivePaintColumns],
       rasterCoreContainmentDisagreements: samples.filter((r) => r[8] && !r[7]).map((r) => ({ x: r[0], y: r[1] })), captures: [1, 16].map((scale) => {
         const side = 128 * scale, png = syntheticMechanismLivePng(scale, spec.key), ctm = { a: scale, b: 0, c: 0, d: scale, e: 64 * scale, f: 64 * scale }, pixelDistances = pixels(scale, spec.key, all)
         const liveRow = (r, i) => [r[0], r[1], ...pixelDistances.samples[i].rgba, pixelDistances.samples[i].paintCore, r[7]]
         return { scale, side, width: side, height: side, file: `${stem}.live-scale-${scale}.png`, sha256: createHash('sha256').update(png).digest('hex'), bytes: png.length,
-          ctm, afterCtm: { ...ctm }, containmentResolutionChanges: { samples: [], probes: [] }, viewport: { width: 2048, height: 2048 }, clip: { x: 0, y: 0, width: side, height: side }, sourceUnchanged: true,
+          ctm, afterCtm: { ...ctm }, contourSha256, containmentResolutionChanges: { samples: [], probes: [] }, viewport: { width: 2048, height: 2048 }, clip: { x: 0, y: 0, width: side, height: side }, sourceUnchanged: true,
           stroke: structuredClone(entry.native.stroke), vertices: structuredClone(entry.native.vertices), pathLength: entry.native.pathLength, pixelDistances,
           samples: samples.map(liveRow), probes: entry.probes.map((r, i) => liveRow(r, samples.length + i)) }
       }) }
@@ -92,6 +95,7 @@ export function syntheticMechanismEvidence() {
     }
     entry.interactionOracle = { method: 'connected-live-paint-plus-continuous-stroke-and-contour-interior', capture: capture.file, pngSha256: capture.sha256, sourceSha256: entry.livePaint.sourceSha256,
       tolerance: 6, uncertainty: .14, samples: samples.map(liveRow), probes: entry.probes.map((r, i) => liveRow(r, samples.length + i)), mismatches: [] }
+    entry.sameSettingScaleComparison = compareConnectedPaintSampling(entry, dashCapMechanismScaleWitnesses(spec))
     entry.mismatches = samples.filter((r) => r[9] !== 'uncertain' && r[12] !== (r[9] === 'hit')).map((r) => ({ local: { x: r[0], y: r[1] }, expected: r[9], hit: r[12] }))
     return entry
   }) }

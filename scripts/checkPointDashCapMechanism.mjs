@@ -4,7 +4,8 @@ import { resolve } from 'node:path'
 import ts from 'typescript'
 import { boundedPointDiagnostic } from './pointCheckDiagnostics.mjs'
 import { inspectConnectedLivePaintPng } from './connectedLivePaintOracle.mjs'
-import { dashCapMechanismCases, dashCapMechanismColumns, dashCapMechanismGrid, dashCapMechanismStem, dashLivePaintColumns, assertDashCapMechanismEntry, assertDashCapMechanismEvidence } from './pointDashCapMechanismContract.mjs'
+import { compareConnectedPaintSampling } from './connectedPaintSampling.mjs'
+import { dashCapMechanismCases, dashCapMechanismColumns, dashCapMechanismGrid, dashCapMechanismStem, dashCapMechanismScaleWitnesses, dashLivePaintColumns, assertDashCapMechanismEntry, assertDashCapMechanismEvidence } from './pointDashCapMechanismContract.mjs'
 
 // Node 22.12 supports this browser command but does not strip .ts by default.
 // Use the existing TypeScript dependency for these two type-only-import pure
@@ -98,6 +99,7 @@ async function observe(page, spec) {
 async function observeLivePaint(page, spec, observed, save, progress) {
   const stem = `${dashCapMechanismStem}-${spec.key}`
   const livePaint = { method: 'actual live SVG screenshot PNG; no SVG reconstruction', sourceFile: `${stem}.live.svg`, sourcePoints: spec.points,
+    contourSha256: createHash('sha256').update(observed.polygonMarkup).digest('hex'),
     columns: dashLivePaintColumns, captures: [], rasterCoreContainmentDisagreements: observed.samples.filter((row) => row[8] && !row[7]).map((row) => ({ x: row[0], y: row[1] })) }
   await progress(livePaint)
   for (const scale of [1, 16]) {
@@ -108,7 +110,7 @@ async function observeLivePaint(page, spec, observed, save, progress) {
       const css = getComputedStyle(polygon), matrix = polygon.getScreenCTM()
       return { scale, side, viewport: { width: innerWidth, height: innerHeight }, sourceUnchanged: polygon.outerHTML === markup,
         ctm: Object.fromEntries(['a', 'b', 'c', 'd', 'e', 'f'].map((key) => [key, matrix[key]])),
-        vertices: [...polygon.points].map(({ x, y }) => ({ x, y })), pathLength: polygon.getTotalLength(), xml: svg.outerHTML,
+        vertices: [...polygon.points].map(({ x, y }) => ({ x, y })), pathLength: polygon.getTotalLength(), xml: svg.outerHTML, contourSource: polygon.outerHTML,
         stroke: { width: parseFloat(css.strokeWidth), pattern: css.strokeDasharray === 'none' ? null : css.strokeDasharray.split(/[ ,]+/u).map(parseFloat), phase: parseFloat(css.strokeDashoffset), cap: css.strokeLinecap, join: css.strokeLinejoin, miterLimit: Number(css.strokeMiterlimit), fill: css.fill } }
     }, { scale, markup: observed.polygonMarkup }), `live mechanism ${spec.key} scale ${scale} source`, 5000)
     const clip = { x: 0, y: 0, width: side, height: side }, file = `${stem}.live-scale-${scale}.png`
@@ -132,10 +134,11 @@ async function observeLivePaint(page, spec, observed, save, progress) {
         afterCtm: Object.fromEntries(['a', 'b', 'c', 'd', 'e', 'f'].map((key) => [key, matrix[key]])), samples: samples.map(sample), probes: probes.map(sample) }
     }, { png: png.toString('base64'), scale, samples: observed.samples, probes: observed.probes, markup: observed.polygonMarkup }), `live mechanism ${spec.key} scale ${scale} PNG samples`, 6000)
     const pixelDistances = inspectConnectedLivePaintPng(png, { ctm: metadata.ctm, samples: [...observed.samples, ...observed.probes].map(([x, y]) => ({ local: { x, y } })), region: { minX: -64, minY: -64, maxX: 64, maxY: 64 } })
-    const { xml, ...source } = metadata
+    const { xml, contourSource, ...source } = metadata
+    const contourSha256 = createHash('sha256').update(contourSource).digest('hex')
     if (scale === 16) { await save(livePaint.sourceFile, xml); livePaint.sourceSha256 = createHash('sha256').update(xml).digest('hex') }
     const containmentChanges = (originals, rows) => rows.filter((row, index) => row[7] !== originals[index][7]).map((row) => ({ x: row[0], y: row[1], before: !row[7], after: row[7] }))
-    livePaint.captures.push({ ...source, ...decoded, pixelDistances, containmentResolutionChanges: { samples: containmentChanges(observed.samples, decoded.samples), probes: containmentChanges(observed.probes, decoded.probes) }, sourceUnchanged: source.sourceUnchanged && decoded.sourceUnchanged, file, clip, bytes: png.length, sha256: createHash('sha256').update(png).digest('hex') })
+    livePaint.captures.push({ ...source, ...decoded, pixelDistances, contourSha256, containmentResolutionChanges: { samples: containmentChanges(observed.samples, decoded.samples), probes: containmentChanges(observed.probes, decoded.probes) }, sourceUnchanged: source.sourceUnchanged && decoded.sourceUnchanged, file, clip, bytes: png.length, sha256: createHash('sha256').update(png).digest('hex') })
     await progress(livePaint)
   }
   return livePaint
@@ -198,6 +201,10 @@ export async function runPointDashCapMechanismChecks({ page, artifactDir }) {
       const liveSamples = entry.samples.map(compareLive), liveProbes = entry.probes.map((row, index) => compareLive(row, entry.samples.length + index))
       entry.interactionOracle = { method: 'connected-live-paint-plus-continuous-stroke-and-contour-interior', capture: capture.file, pngSha256: capture.sha256, sourceSha256: entry.livePaint.sourceSha256,
         tolerance: 6, uncertainty: .14, samples: liveSamples, probes: liveProbes, mismatches: liveSamples.filter(({ expected, hit }) => expected !== 'uncertain' && hit !== (expected === 'hit')) }
+      // Scale-one pixel centers have a different local cell size. Record the
+      // independently derived quantization intervals before the unchanged
+      // strict scale-sixteen assertion, including every retained omission.
+      entry.sameSettingScaleComparison = compareConnectedPaintSampling(entry, dashCapMechanismScaleWitnesses(spec))
       await save(`${stem}.json`, JSON.stringify(entry, null, 2) + '\n'); await persist()
       assertDashCapMechanismEntry({ ...entry, result: 'passed' }, spec)
       entry.result = 'passed'

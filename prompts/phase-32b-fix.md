@@ -1,4 +1,4 @@
-# Phase 32B Fix: resume the closed-dash residual investigation
+# Phase 32B Fix: measure native closed-dash transfer after the harness correction
 
 ## Current user instruction and scope
 
@@ -16,33 +16,50 @@ adopt `stz-32b-core-v1` or authorize a new profile, a blanket deferral, 32C/32D
 implementation, unrelated cleanup, commit or push. Strict 32B gates remain
 required; a deferral used for later 32C work does not waive them here.
 
+The resumed pass has already implemented the transfer context/first-failure/
+saved-file reopening correction and action-scale paint diagnostics. Continue
+from that implementation; do not recreate those helpers, add a second sampling
+profile or repeat a child-only static repair cycle. The next missing measurement
+is the existing four-shape transfer in a browser-capable process, followed by
+any evidence-supported narrow correction and complete strict acceptance.
+
 Read `AGENTS.md`, the paired 32B prompts, `docs/PHASE_32_PLAN.md`,
 `docs/PHASE_32B_IMPLEMENTATION.md`, and the endpoint/zero-dash/live-paint
-investigation documents before editing. Inspect the actual checkout and retain
+investigation documents, including `docs/PHASE_32B_CLOSED_DASH_RESUME.md`, before
+editing. Inspect the actual checkout and retain
 all historical evidence and later compatible work. Do not reset or discard work
 or move to another phase branch to recover an older state.
 
 ## Latest parent evidence and preserved checkout
 
-Immediately before this prompt edit, the checkout was clean on
+Immediately before this prompt edit, the checkout was on
 `phase/32b-color-opacity-outline`, HEAD
-`40e0ccf7083ec426b0a73449f05414b801075499`, with no nonignored untracked files.
-Its identity matches both before/after identities of the latest `NUG5nw` report:
+`d46946bb6b0134e47bbe339d2b42ee8896f25598`, with 12 tracked files modified
+and seven nonignored untracked files. Its identity matches the resumed child
+handoff and both before/after identities of the latest parent `c0eiFc` report:
 
 ```text
-337f72155e9442cc6ed03e35295af8e200378982bbec718cf82ecd8ed7c89866
+dbbf7b01272ed968e69bffb9ca76de20f38740f0f2ca205e11c2727d8b07faa1
 ```
 
-This is the current starting tree, not the historical `f8213c4` identity below.
+Preserve all current changes, including the new lifecycle, coordinate and
+sampling helpers, their three registered test files and the resumed investigation
+document. `package.json`, verifier policy/fixtures and their registered tests
+already include the diagnostic bindings. Do not reset or commit merely to obtain
+a clean tree. This is the current starting tree, not historical `40e0ccf`/`NUG5nw`
+or `f8213c4` evidence.
 Editing this prompt changes the full-tree fingerprint. Capture the actual next
 tracked/untracked identity rather than hard-coding this hash or treating retained
 verification as acceptance of later edits.
 
-- Latest worker handoff: `/var/folders/vk/7kf940pd4bx8f6cg3rzlmtc80000gn/T/stz-phase-verifier-GFtKkT/response.json`.
-- Latest raw verification: `/var/folders/vk/7kf940pd4bx8f6cg3rzlmtc80000gn/T/stz-phase32b-before-review-NUG5nw/verification.json`.
-- Strict free-label artifacts: `/var/folders/vk/7kf940pd4bx8f6cg3rzlmtc80000gn/T/stz-phase32b-before-review-NUG5nw/05-check-free-labels/artifacts/`.
+- Resumed implementation handoff: `/private/tmp/stz-32b-resume-l2zpIT/HANDOFF.md`, with identities/logs in `handoff.json`.
+- Final child transfer attempt: `/private/tmp/stz-32b-resume-l2zpIT/native-transfer-final/transfer-run.json`, with `native-final-summary.json` and `native-transfer-final.log` beside that directory.
+- Independent retained-PNG measurement: `/private/tmp/stz-32b-resume-retained-3K96NZ/READ_ONLY_MEASUREMENT.md`.
+- Latest parent worker: `/var/folders/vk/7kf940pd4bx8f6cg3rzlmtc80000gn/T/stz-phase-verifier-AVZJ8I/response.json`.
+- Latest parent raw verification: `/var/folders/vk/7kf940pd4bx8f6cg3rzlmtc80000gn/T/stz-phase32b-before-review-c0eiFc/verification.json`.
+- Latest strict artifacts: `/var/folders/vk/7kf940pd4bx8f6cg3rzlmtc80000gn/T/stz-phase32b-before-review-c0eiFc/05-check-free-labels/artifacts/`.
 
-The parent passed **4,451 tests** (zero failed/skipped/cancelled), build, diff
+The latest parent passed **4,486 tests** (zero failed/skipped/cancelled), build, diff
 and the full label-assets command. Chrome **154.0.8037.95** started on Node
 **v26.9.0**; this result is not a child localhost `EPERM` failure.
 Strict `check:free-labels` failed at `point-node-paint-import-persistence`:
@@ -50,8 +67,8 @@ Strict `check:free-labels` failed at `point-node-paint-import-persistence`:
 ```text
 positive-full-closed-control: connected-live candidate 0,-14
 false !== true
-scripts/pointDashCapMechanismContract.mjs:175
-scripts/checkPointDashCapMechanism.mjs:202
+scripts/pointDashCapMechanismContract.mjs:181
+scripts/checkPointDashCapMechanism.mjs:209
 ```
 
 All **22/22 App dash entries** passed, including both corrected `square-zero-off`
@@ -61,12 +78,21 @@ The paint/import group is incomplete and `settled-SVG-export-standalone` did not
 execute. The raw report remains **failed** and the parent stopped before review,
 commit and push. Local/static successes do not complete 32B.
 
+Keep the child and parent outcomes separate. The final child `BJmYPf` verifier
+passed tests/build/diff but failed label-assets at localhost `EPERM`; its strict
+free-labels did not execute. The final child transfer likewise stopped before
+Chrome and recorded all four shapes `not_run`. In contrast, `c0eiFc` started
+Chrome and reproduced the actual strict assertion above. It did **not** invoke
+`checkPointClosedDashTransfer.mjs`. Neither result supplies the missing transfer
+native actions/reopening; independent acceptance review remains `not_run`.
+
 Start with `free-labels-evidence.json`, `point-paint-dash-caps.json`,
 `point-paint-dash-cap-mechanism.json`, and
 `point-paint-dash-cap-mechanism-positive-full-closed-control.json`, together with
 their linked literal SVGs, connected capture PNGs/metadata and `command.log`.
 
-The latest supplemental captures already expose a finite scale question. At
+The retained `NUG5nw` measurements and latest diagnostic expose a finite scale
+question. At
 `(0,-14)`, the same connected literal source has measured paint distance
 `5.773220775702242` at CTM scale 16 but `6.519202405202649` at scale 1.
 Production distance is 8, the retained clone-raster continuous-control distance
@@ -81,18 +107,62 @@ The supplemental has no trusted App pointer actions; all 22 actual App dash
 entries passed. Preserve the raw failing classification without claiming it
 establishes a new ordinary App miss at this witness.
 
-The separate four-shape transfer was not rerun by `NUG5nw`; its 20/7/12/6
-omissions and context error remain historical observations in the residual
-record below. The linked old transfer reports were unavailable at this prompt
-update. Recheck access;
-do not claim to have reauthenticated unavailable files or infer a new transfer
-pass from the cumulative run. Retain an availability note and reproduce the
-same finite transfer when needed.
+The read-only standard-library PNG remeasurement reproduced all 24 raw
+scale-16 omissions. At scale 1, `(0,-14)` has pixel-cell center-distance bounds
+`[5.812095624016101, 7.226309186389197]` and is uncertain. Eighteen of the 24
+remain discrepancies under the thresholded half-cell approximation; six become
+uncertain. Thirteen have fully opaque pixel centers whose distance plus the
+half-cell diagonal is below six. For example, `(-8,-8)` has opaque-center
+distance `3.5355339059327378` and upper cell bound `4.242640687119286`, against
+retained production distance `8.049844718999244`. These are retained literal
+paint measurements, not new App selections or a reason to erase all 24 failures.
+
+The half-cell diagonals are about `.044194` at scale 16 and `.707107` at scale 1.
+They bound pixel-center quantization only; they do not establish a complete
+vector antialias boundary or scale invariance. The independent continuous-bevel
+region plus **both initial and terminal square caps** fits this one fully covered
+literal contour at scale 16 within `.074304`; a terminal cap alone fails at the
+painted `(-6,-6)`. The corresponding scale-1 vector/center residual can reach
+`1.302790`, beyond half-cell uncertainty. This is a conditioned hypothesis to
+test on the supported contours, not permission to restore a generic seam cap.
+
+The separate four-shape transfer has no new native result. Historical 20/7/12/6
+omissions and the old context error remain in the residual record below. The
+linked old transfer reports remain unavailable (`ENOENT`); do not claim they
+were reauthenticated or infer a transfer pass from `c0eiFc`. Their historical
+context defect is now corrected in source, with regressions; actual saved-file
+reopening is still unverified because the new transfer has not started Chrome.
+
+## Implemented correction to preserve
+
+- `closedDashTransferLifecycle.mjs` and the transfer entry point explicitly own
+  the context/pages, observe errors on all pages and use bounded cleanup.
+  Candidate/action failure stays primary while export/reopen/evidence/cleanup
+  failures are retained separately. Exact saved bytes reopen through a file URL
+  while the main fixture remains alive.
+- `closedDashTransferCoordinates.mjs` independently compares measured root
+  bounds/viewBox conversion with the contour CTM for capture and trusted actions,
+  retaining source, stroke, viewport and model/history.
+- `connectedPaintSampling.mjs` records CTM-derived pixel-cell calibration and
+  definite/uncertain diagnostic rows. The transfer captures connected live and
+  continuous paint at both native action scale 1 and diagnostic scale 16, with
+  actual candidate/selection observations and retained witnesses.
+- Supplemental `sameSettingScaleComparison`, contour/source hash authentication,
+  verifier bindings and their fixtures/tests are registered. The original
+  scale-16 `.14` gate, all 24 raw omissions and all existing required paths remain.
+
+The child passed 96 focused tests, strict production/fixture TypeScript and
+changed-script lint/syntax checks; all 4,486 tests and build also passed.
+Production geometry, six-unit tolerance, raw emitted dash values and passing
+square-zero-off behavior were not changed. Preserve these implemented foundations;
+helper tests and readonly pixel replay do not establish native acceptance.
 
 ## Bounded investigation and correction
 
-1. Reproduce and explain the exact retained full-closed witness and its candidate
-   omissions. Keep the literal triangle `0,0 24,0 12,16`, width 12, square caps,
+1. Read and authenticate the completed retained measurement and latest
+   `sameSettingScaleComparison`; do not repeat the completed PNG/cap analysis as
+   a substitute for the missing native transfer. Keep the literal triangle
+   `0,0 24,0 12,16`, width 12, square caps,
    bevel joins, `[100,100]`, phase 1 and six-unit proximity. Retain the existing
    scale-16 uncertainty and raw classifications; independently calibrate sampling
    error at action scale rather than reusing `.14` there. Compare connected paint,
@@ -101,31 +171,33 @@ same finite transfer when needed.
    closure, seam joins/caps and coordinate conversion using independent observed
    paint; a production helper or native `isPointInStroke` alone is not an oracle.
    Do not assume the rejected generic seam cap is the answer.
-2. Repair the demonstrated transfer harness defect in
-   `scripts/checkPointClosedDashTransfer.mjs`: explicitly own a browser context
-   so the main and standalone pages can coexist. Preserve the first action or
-   candidate failure as primary while still recording export/reopen and cleanup
-   failures separately. Observe errors on every owned page and close owned
-   resources through bounded cleanup. Add registered tests for context ownership
-   and primary-error preservation; a harness-only correction is not a geometry
-   fix or evidence that reopening succeeded.
-3. Resolve the transfer's scale-16 paint versus scale-1 action uncertainty before
-   treating its 45 historical omissions as an action-time paint result. Use only
-   the existing triangle/square/star/circle and their one retained setting.
-   Capture the connected source and actual paint at the native action framing,
-   recording fresh CTM, viewport, clipping, source hash, stroke attributes,
-   model/history and independently converted sample/click coordinates. Compare
-   the magnified capture under the same settings; quantify raster uncertainty
-   in local units instead of assuming rendering is invariant across scales.
-   Keep definite/uncertain classifications explicit. Do not use an arbitrary
-   enlarged error band to erase definite discrepancies.
+2. Run the **already corrected** `scripts/checkPointClosedDashTransfer.mjs` in
+   a browser-capable process on the preserved tree. Do not reconstruct the
+   lifecycle, coordinate or sampling helpers. Preserve native page ownership,
+   primary-error ordering and raw diagnostics; correct them further only for
+   a demonstrated new defect. Confirm the saved-file reopen route actually runs.
+3. Inspect that run's scale-1 live/continuous paint, scale-16 counterparts,
+   calibrated rows, trusted candidate/selection observations and source/framing
+   restoration. Use only the existing triangle/square/star/circle and one setting.
+   Authenticate fresh CTM, viewport, clipping, source hashes, exact stroke values,
+   model/history and independent sample/click conversions. Distinguish pixel-cell
+   uncertainty from vector antialiasing before treating the historical 45
+   omissions as action-time paint results. An uncertain `(0,-14)` does not erase
+   the other opaque-supported literal omissions. Do not add an arbitrary wider
+   band or silently replace the strict magnified oracle with the diagnostic.
 4. Use trusted ordinary/Alt actions for the disputed witness, a painted positive
    control and genuine exterior; keep all native candidates and selection
    observations, source restoration and raw failures. Preserve the exact emitted
    `100.00000000000001` dash entries. Reopen the saved SVGs outside the fixture and
    retain actual results. Fixture serialization is separate from the required
    real App downloads and final settled-SVG group.
-5. Make the smallest correction justified by those observations, in production
+5. Test the fully covered positive-interval cap hypothesis against those observed
+   supported contours before changing shared geometry. Preserve multi-interval,
+   zero-on/zero-off, genuine exterior and rejected generic-cap negatives. For the
+   circle, inspect the existing `svgPointNodeLayout` branch that uses a 256-edge
+   stroke contour when cap families are present; do not silently alter circle
+   approximation, paint bounds or export/picking semantics by adding caps.
+   Make the smallest correction justified by observations, in production
    geometry or the harness as appropriate. Keep shared paint/bounds/picking and
    live/export geometry consistent, strict TypeScript without `any`, authoritative
    model coordinates, codim/work-plane rules, raw source/style intent, immutable
@@ -145,12 +217,21 @@ specific next measurement rather than starting a speculative geometry rewrite.
 
 Use Node >=22.12.0 with Homebrew first in PATH. Run registered focused regressions,
 strict TypeScript, changed-file lint and script syntax checks after a correction.
-For bounded native transfer diagnosis, use the existing entry point and configured
-Playwright/Chrome runtime, retaining a fresh external artifact directory:
+**Next browser-capable parent action:** run the existing transfer entry point
+with the configured Playwright/Chrome runtime and a fresh external artifact
+directory:
 
 ```bash
 PATH=/opt/homebrew/bin:$PATH node scripts/checkPointClosedDashTransfer.mjs
 ```
+
+The ordinary `32B fix` parent runs the standard cumulative browser commands;
+it does not automatically invoke this separate transfer. The latest `c0eiFc`
+is another such cumulative run, not the requested four-shape measurement.
+If this prompt runs inside a restricted child, retain the exact failed native
+attempt and hand off this command to a fresh browser-capable process. Do not
+expect a child handoff or runner edit to change an already running parent's mode,
+or repeat completed harness corrections in response to localhost `EPERM`.
 
 After finalizing the implementation, harness, tests and status/handoff files, the
 browser-capable parent must obtain complete strict evidence on that final tree:
@@ -223,6 +304,10 @@ of this limited change found no substantive issue.
 
 ## Residual issues retained from the earlier pass
 
+This section preserves the earlier residual record and its original evidence.
+The context-ownership defect described here is corrected in the current source;
+native reopening and strict acceptance still require the measurements above.
+
 ### 1. Closed-path dash proximity disagreement
 
 The strict supplemental `positive-full-closed-control` remains unresolved:
@@ -262,7 +347,7 @@ without a supported-workflow discrepancy. These results do not satisfy that
 condition. The user's decision here permits carrying the open issues forward;
 it does not automatically adopt that earlier proposal.
 
-### 2. Transfer harness cannot reopen the saved SVGs
+### 2. Historical transfer reopening failure; source correction now present
 
 All four rows subsequently fail with `Please use browser.newContext()` at
 `scripts/checkPointClosedDashTransfer.mjs:153`. The entry point creates its page
@@ -272,9 +357,10 @@ requested by `page.context().newPage()`.
 Each `.export.svg` was saved, but standalone reopening and its assertions did
 not execute. This later error becomes the headline failure before the earlier
 retained `actionFailure` is rethrown, obscuring the candidate omissions in the
-terminal summary. Both errors remain in the per-shape records. A future targeted
-harness repair should explicitly own a browser context and preserve primary
-failure ordering. It was deliberately not folded into a second repair cycle.
+terminal summary. Both errors were retained in the per-shape records. That
+earlier pass deferred explicit context ownership and primary-failure ordering.
+The resumed pass has now implemented those corrections as described above;
+actual native reopening remains unverified.
 
 ### 3. Complete strict browser acceptance remains outstanding
 
