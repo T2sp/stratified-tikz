@@ -1,3 +1,4 @@
+import { changedPointShapeFields, markPointShapeOverrides, resolvePointShapeParameters } from './pointShapeParameters.ts'
 import {
   labelAnchors,
   lineStyles,
@@ -265,7 +266,9 @@ export function clonePointPaint(paint: PointPaint): PointPaint {
 }
 
 export function clonePointStyle(style: PointStyle): PointStyle {
-  return { ...style, ...(style.paint === undefined ? {} : { paint: clonePointPaint(style.paint) }),
+  return { ...style, ...(style.shapeParameters === undefined ? {} : { shapeParameters: { ...style.shapeParameters } }),
+    ...(style.importedShape === undefined ? {} : { importedShape: { ...style.importedShape, baselineParameters: { ...style.importedShape.baselineParameters }, overriddenFields: [...style.importedShape.overriddenFields] } }),
+    ...(style.paint === undefined ? {} : { paint: clonePointPaint(style.paint) }),
     ...(style.importedPaint === undefined ? {} : { importedPaint: {
       ...style.importedPaint, baseline: clonePointPaint(style.importedPaint.baseline),
       overriddenFields: [...style.importedPaint.overriddenFields],
@@ -278,7 +281,7 @@ export function normalizePointStyle(style: PointStyle): PointStyle {
 }
 
 export function createImportedPointPaintSnapshot(style: PointStyle, referenceId: string): PointStyle {
-  return { ...clonePointStyle(style), importedPaint: {
+  return { ...clonePointStyle(style), importedShape: { referenceId, baselineShape: style.shape, baselineParameters: { ...style.shapeParameters }, overriddenFields: [] }, importedPaint: {
     referenceId, baseline: clonePointPaint(getPointPaint(style)), overriddenFields: [],
   } }
 }
@@ -287,6 +290,7 @@ export function createImportedPointPaintSnapshot(style: PointStyle, referenceId:
 export function pointStyleForImportedReference(style: PointStyle, referenceId: string | undefined): PointStyle {
   const result = clonePointStyle(style)
   if (result.importedPaint?.referenceId !== referenceId) delete result.importedPaint
+  if (result.importedShape?.referenceId !== referenceId) delete result.importedShape
   return result
 }
 
@@ -314,7 +318,11 @@ export function markPointPaintOverrides(style: PointStyle, fields: readonly Poin
 
 /** Capture distinguishable historical/manual edits without claiming equal fallbacks. */
 export function recordPointPaintEdit(before: PointStyle, after: PointStyle): PointStyle {
-  const result = clonePointStyle(after)
+  let result = clonePointStyle(after)
+  if (before.importedShape !== undefined) {
+    result.importedShape = { ...before.importedShape, baselineParameters: { ...before.importedShape.baselineParameters }, overriddenFields: [...before.importedShape.overriddenFields, ...(result.importedShape?.overriddenFields ?? [])] }
+    result = markPointShapeOverrides(result, changedPointShapeFields(before, after))
+  }
   if (before.importedPaint === undefined) return result
   const inherited = result.importedPaint?.referenceId === before.importedPaint.referenceId
     ? result.importedPaint.overriddenFields : []
@@ -346,6 +354,18 @@ export function refreshImportedPointPaintSnapshot(style: PointStyle, resolvedSty
       else Reflect.set(paint[channel], property, Array.isArray(value) ? [...value] : value)
     }
   }
+  if (result.importedShape?.referenceId === referenceId) {
+    const shapeIntent = result.importedShape
+    const shapeFields = new Set(shapeIntent.overriddenFields)
+    if (inferSnapshotDifferences) changedPointShapeFields({ ...style, shape: shapeIntent.baselineShape, shapeParameters: shapeIntent.baselineParameters }, style).forEach((field) => shapeFields.add(field))
+    const parameters = { ...resolvedStyle.shapeParameters }
+    for (const key of Object.keys(style.shapeParameters ?? {}) as (keyof import('./types.ts').PointShapeParameters)[]) {
+      if (shapeFields.has(key)) Reflect.set(parameters, key, style.shapeParameters?.[key])
+    }
+    result.shape = shapeFields.has('shape') ? style.shape : resolvedStyle.shape
+    result.shapeParameters = parameters
+    result.importedShape = { referenceId, baselineShape: resolvedStyle.shape, baselineParameters: { ...resolvedStyle.shapeParameters }, overriddenFields: [...shapeFields] }
+  }
   return { ...result, paint, opacity: overridden.has('opacity') ? result.opacity : resolvedStyle.opacity, importedPaint: {
     referenceId, baseline: clonePointPaint(resolved), overriddenFields: [...overridden],
   } }
@@ -369,6 +389,8 @@ export function updatePointFill(style: PointStyle, fill: PointFill): PointStyle 
 
 export function pointStylesEqual(first: PointStyle, second: PointStyle): boolean {
   if (first.opacity !== second.opacity || first.shape !== second.shape || first.size !== second.size) return false
+  if (JSON.stringify(resolvePointShapeParameters(first.shapeParameters)) !== JSON.stringify(resolvePointShapeParameters(second.shapeParameters))) return false
+  if (JSON.stringify(first.importedShape) !== JSON.stringify(second.importedShape)) return false
   if (JSON.stringify(first.importedPaint) !== JSON.stringify(second.importedPaint)) return false
   const a = getPointPaint(first)
   const b = getPointPaint(second)

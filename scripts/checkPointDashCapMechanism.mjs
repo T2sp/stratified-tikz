@@ -1,3 +1,4 @@
+import { phase32cProfile, deferredMechanismKey, mechanismNotRun, assertScopedMechanismEvidence } from './automation/phase32c-profile.mjs'
 import { readFile, writeFile } from 'node:fs/promises'
 import { createHash } from 'node:crypto'
 import { resolve } from 'node:path'
@@ -144,8 +145,13 @@ async function observeLivePaint(page, spec, observed, save, progress) {
   return livePaint
 }
 
-export async function runPointDashCapMechanismChecks({ page, artifactDir }) {
-  const evidence = { result: 'observed', scope: 'supplemental native SVG geometry; App pointer matrix remains separately required', cases: [] }
+export async function runPointDashCapMechanismChecks({ page, artifactDir, profile = 'strict' }) {
+  const evidence = { result: 'observed', ...(profile === phase32cProfile ? { profile } : {}), scope: 'supplemental native SVG geometry; App pointer matrix remains separately required', cases: [] }
+  const secondary = (stage, error) => {
+    evidence.secondaryErrors ??= []
+    evidence.secondaryErrors.push({ stage, message: error.message, stack: error.stack })
+    console.error(`Dash mechanism ${stage}:`, error)
+  }
   const save = (name, data) => boundedPointDiagnostic(() => writeFile(resolve(artifactDir, name), data), `write ${name}`, 5000)
   const persist = () => save(`${dashCapMechanismStem}.json`, JSON.stringify(evidence, null, 2) + '\n')
   const originalViewport = page.viewportSize()
@@ -155,13 +161,16 @@ export async function runPointDashCapMechanismChecks({ page, artifactDir }) {
     geometry = await boundedPointDiagnostic(loadDashMechanismGeometry, 'load production dash geometry', 5000) }
   catch (error) {
     evidence.result = 'failed'; evidence.error = { message: error.message, stack: error.stack }
-    try { await persist() } catch (writeError) { console.error('Dash mechanism loader failure evidence:', writeError) }
-    try { await page.setViewportSize(originalViewport) } catch (cleanupError) { console.error('Dash mechanism viewport cleanup:', cleanupError) }
+    try { await persist() } catch (writeError) { secondary('loader failure evidence', writeError) }
+    try { await page.setViewportSize(originalViewport) } catch (cleanupError) { secondary('viewport cleanup', cleanupError) }
     throw error
   }
   const { createDashCaps, distanceToDashCaps, createPolygonStrokeRegion, distanceToPolygonStroke } = geometry
   let primary
   for (const spec of dashCapMechanismCases) {
+    if (profile === phase32cProfile && spec.key === deferredMechanismKey) {
+      evidence.cases.push(mechanismNotRun()); await persist(); continue
+    }
     const stem = `${dashCapMechanismStem}-${spec.key}`
     const vertices = spec.points.split(' ').map((pair) => { const [x, y] = pair.split(',').map(Number); return { x, y } })
     const entry = { key: spec.key, result: 'observed', specification: spec, source: { kind: 'literal-independent-SVG', rawPoints: spec.points, vertices, model: spec.model ?? null } }
@@ -212,14 +221,20 @@ export async function runPointDashCapMechanismChecks({ page, artifactDir }) {
       primary ??= error; entry.result = 'failed'; entry.error = { message: error.message, stack: error.stack }
     }
     try { await boundedPointDiagnostic(() => page.evaluate(() => document.querySelector('[data-stz-dash-mechanism]')?.remove()), `remove mechanism ${spec.key}`, 5000) }
-    catch (error) { if (primary) console.error('Dash mechanism cleanup:', error); else { primary = error; entry.result = 'failed'; entry.error = { message: error.message, stack: error.stack } } }
+    catch (error) { if (primary) secondary('cleanup', error); else { primary = error; entry.result = 'failed'; entry.error = { message: error.message, stack: error.stack } } }
     try { await save(`${stem}.json`, JSON.stringify(entry, null, 2) + '\n'); await persist() }
-    catch (error) { if (primary) console.error('Dash mechanism failure evidence:', error); else primary = error }
+    catch (error) { if (primary) secondary('failure evidence', error); else primary = error }
   }
-  try { await page.setViewportSize(originalViewport) } catch (error) { if (primary) console.error('Dash mechanism viewport cleanup:', error); else primary = error }
+  try { await page.setViewportSize(originalViewport) } catch (error) { if (primary) secondary('viewport cleanup', error); else primary = error }
   evidence.result = primary ? 'failed' : 'passed'
-  try { await persist() } catch (error) { if (primary) console.error('Dash mechanism final evidence:', error); else primary = error }
+  try { await persist() } catch (error) { if (primary) secondary('final evidence', error); else primary = error }
+  // An independent cleanup/write error must never inherit the named literal
+  // deferral, even when the final evidence write itself could not be retained.
+  if (primary && evidence.secondaryErrors?.length) throw new AggregateError([primary,
+    ...evidence.secondaryErrors.map(({ stage, message }) => new Error(`${stage}: ${message}`))],
+  `Additional dash mechanism failures after primary: ${primary.message}`, { cause: primary })
   if (primary) throw primary
-  assertDashCapMechanismEvidence(evidence)
+  if (profile === phase32cProfile) assertScopedMechanismEvidence(evidence)
+  else assertDashCapMechanismEvidence(evidence)
   return evidence
 }

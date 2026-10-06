@@ -302,19 +302,19 @@ test('common xcolor names, chained mixtures and literal definecolor models are b
   if (loaded.ok) assert.deepEqual(loaded.diagram.externalTikzStyleSources, result.externalTikzStyleSources)
 })
 
-test('invalid values and deferred shape/layout options are retained and diagnosed', () => {
+test('invalid values and deferred layout options are diagnosed while 32C shapes resolve', () => {
   const options = String.raw`fill=unknownFill,text=unknown,draw opacity=1.2,line width=NaN,opacity=0x1,minimum size=1cm,rectangle,isosceles triangle,text width=3cm`
   const preview = parseTikzStylePreviewOptions(options)
   assert.equal(preview.fillColor, undefined)
   assert.equal(preview.textColor, undefined)
-  assert.equal(preview.pointShape, undefined)
+  assert.equal(preview.pointShape, 'isosceles triangle')
   assert.equal(preview.pointSize, undefined)
   assert.equal(preview.executionUncertain, undefined, 'ordinary invalid literals do not imply execution')
-  assert.equal(preview.diagnostics?.length, 9)
+  assert.equal(preview.diagnostics?.length, 7)
   const result = importTikzStyleFile(diagram(), 'paint.sty', `\\tikzstyle{node}=[${options}]`)
   assert.equal(result.references[0].options, options)
-  assert.equal(result.references[0].previewDiagnostics?.length, 9)
-  assert.equal(result.parseResult.warnings.length, 9)
+  assert.equal(result.references[0].previewDiagnostics?.length, 7)
+  assert.equal(result.parseResult.warnings.length, 7)
 })
 
 test('draw/fill none, white fill, zero opacity and bare draw/fill remain distinct', () => {

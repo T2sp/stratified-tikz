@@ -1769,9 +1769,14 @@ report/log paths, inspected artifacts and remaining gates.
 ## Phase 32: Point-node math, paint, geometric shapes, and layout
 
 Status: 32A is accepted by the complete `gtRban` parent report and independent
-review. 32B independent paint, migration, ordered import and cumulative harness
-are implemented; fresh parent acceptance and independent review remain
-open. 32C and 32D remain planned. See the
+review. 32B completed matching strict verification (4,550 tests and all 16
+browser groups), native transfer/SVG reopening and independent review, then
+was merged into main. This takes precedence over the incoming 32C branch's
+earlier [32B deferrals](../prompts/phase-32b-fix.md); those failed records remain
+historical. 32D remains planned.
+All eleven shapes and parameters now have implementation paths; fresh native
+acceptance and independent review of the combined 32C checkout remain required.
+See the
 [Phase 32 plan](./PHASE_32_PLAN.md) and
 [32B implementation and evidence](./PHASE_32B_IMPLEMENTATION.md).
 

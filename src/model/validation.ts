@@ -1,3 +1,4 @@
+import { pointShapeParameterIssues, pointShapeFields } from './pointShapeParameters.ts'
 import {
   absoluteCubicBezierPointsFromControlMode,
   isFiniteVec3,
@@ -3243,8 +3244,18 @@ function validatePointStyle(
     pushError(
       errors,
       `${path}.shape`,
-      'Point shape must be circle, square, triangle, or star.',
+      'Point shape must be a supported basic or geometric shape.',
     )
+  }
+
+  for (const issue of pointShapeParameterIssues(style.shapeParameters)) pushError(errors, `${path}.shapeParameters${issue.field ? `.${issue.field}` : ''}`, issue.message)
+  if (style.importedShape !== undefined) {
+    const intent: unknown = style.importedShape
+    if (!isRecord(intent) || typeof intent.referenceId !== 'string' || !intent.referenceId || typeof intent.baselineShape !== 'string' || !isPointShape(intent.baselineShape) ||
+        pointShapeParameterIssues(intent.baselineParameters).length > 0 || !Array.isArray(intent.overriddenFields) ||
+        !intent.overriddenFields.every((field) => typeof field === 'string' && (pointShapeFields as readonly string[]).includes(field)) || new Set(intent.overriddenFields).size !== intent.overriddenFields.length) {
+      pushError(errors, `${path}.importedShape`, 'Imported shape metadata must contain a valid baseline and unique supported fields.')
+    }
   }
 
   if (!isPointFill(style.fill)) {
@@ -3566,6 +3577,9 @@ function validateImportedTikzStyleReferenceUsages(
   )
 
   diagram.userStylePresets?.forEach((preset, index) => {
+    if (preset.kind === 'point' && isRecord(preset.style.importedShape) && preset.style.importedShape.referenceId !== preset.importedTikzStyleReferenceId) {
+      pushError(errors, `userStylePresets[${index}].style.importedShape.referenceId`, 'Imported shape metadata must match the active imported reference.')
+    }
     if (preset.kind === 'point' && isRecord(preset.style.importedPaint) && preset.style.importedPaint.referenceId !== preset.importedTikzStyleReferenceId) {
       pushError(errors, `userStylePresets[${index}].style.importedPaint.referenceId`, 'Imported paint metadata must match the active imported reference.')
     }
@@ -3579,6 +3593,9 @@ function validateImportedTikzStyleReferenceUsages(
   })
 
   diagram.strata.forEach((stratum, index) => {
+    if (stratum.geometricKind === 'point' && isRecord(stratum.style.importedShape) && stratum.style.importedShape.referenceId !== stratum.importedTikzStyleReferenceId) {
+      pushError(errors, `strata[${index}].style.importedShape.referenceId`, 'Imported shape metadata must match the active imported reference.')
+    }
     if (stratum.geometricKind === 'point' && isRecord(stratum.style.importedPaint) && stratum.style.importedPaint.referenceId !== stratum.importedTikzStyleReferenceId) {
       pushError(errors, `strata[${index}].style.importedPaint.referenceId`, 'Imported paint metadata must match the active imported reference.')
     }

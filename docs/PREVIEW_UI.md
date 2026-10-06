@@ -68,12 +68,32 @@ Pending and failed conversion show the whole latest source literally, preserving
 edge/repeated spaces, tabs and physical lines. Empty source retains the old empty
 node size. Text remains black, hollow remains white-filled, `size / 2` remains
 inner separation, and the border remains 0.4pt. Independent paint controls and
-new geometric shapes are deferred to 32B/32C.
+new geometric shapes are implemented in the later 32B/32C sections below.
 
 SVG export captures the complete point and rebuilds both its body and contour
 after settlement; editing or loading another diagram during export affects the
 next export. Raw JSON, history and standalone/inline TikZ remain authoritative
 and unchanged by conversion. No formula cache or measurements are saved.
+
+## Geometric point shapes (Phase 32C)
+
+The Shape selector includes ellipse, diamond, trapezium, semicircle, regular
+polygon, star, isosceles triangle, kite, dart, circular sector and cylinder, plus
+circle/rectangle and legacy square/triangle regular polygons. Shape-specific
+fields appear below it: aspect, counts, angles, stretches, star height/ratio,
+and cylinder custom body/end fills. Border rotation leaves the body upright;
+PGF's incircle and restricted-rotation rules determine the contour fitting.
+Set ordinary Fill enabled off to expose cylinder custom fills without an
+overlaid generic fill. Legacy hollow continues to mean white-filled.
+
+Parameters survive presets, JSON, clipboard, history and both TikZ exports.
+Unsupported imported keys remain raw with preview diagnostics. Full configurable
+spacing/minimum-size and anchor controls remain in 32D. The implementation and
+independent fixed-box oracle are described in the
+[32C record](PHASE_32C_IMPLEMENTATION.md); native acceptance/review remain
+separate gates. The [named 32B deferrals](../prompts/phase-32b-fix.md) describe
+this branch before main's later 32B completion, which now takes precedence.
+Fresh strict acceptance of the combined 32C checkout remains required.
 Native Add point, picking, font-ready, and downloaded standalone coverage is
 implemented in `checkPointNodes.mjs` / `checkPointNodesApp.mjs`; execution in the
 32A child stopped at localhost `EPERM`. Support is not yet browser-accepted:
@@ -1716,7 +1736,7 @@ identity and last-definition-wins order; raw source and external key spelling
 remain unchanged. A missing root reference is diagnosed even if `ns/base` exists.
 Imported partial styles use materialized application node defaults consistently
 in preview and export. This is not arbitrary TeX execution or support for the
-deferred 32C/32D shapes and layout options. See
+32D layout and anchor options. The later 32C section describes shape support. See
 [paint grammar and compatibility](PHASE_32B_IMPLEMENTATION.md).
 
 New JSON saves use envelope version 2 and explicit point paint, including saved

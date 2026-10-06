@@ -1,3 +1,5 @@
+import { pointShapeTikzKeys } from '../model/importedTikzShapes.ts'
+import { changedPointShapeFields, pointShapeParameterKeys, resolvePointShapeParameters } from '../model/pointShapeParameters.ts'
 import { changedPointPaintFields, getPointPaint } from '../model/styles.ts'
 import type {
   BoundaryPathSnapshot,
@@ -26,7 +28,6 @@ import type {
   PathArrowOptions,
   PathInlineNode,
   PathInlineNodeOptions,
-  PointShape,
   PointStratum,
   PointStyle,
   PointPaintField,
@@ -6627,7 +6628,7 @@ function pointStyleTikzOptions(
   if (style.paint === undefined) {
     const pointColor = context.colors.define(colorBaseName, style.color)
     return [
-      ...pointShapeOptions(style.shape, context),
+      ...pointShapeOptions(style, colorBaseName, context),
       `fill=${style.fill === 'filled' ? pointColor : 'white'}`,
       `draw=${pointColor}`,
       `opacity=${formatNumber(style.opacity)}`,
@@ -6635,7 +6636,7 @@ function pointStyleTikzOptions(
     ]
   }
   return [
-    ...pointShapeOptions(style.shape, context),
+    ...pointShapeOptions(style, colorBaseName, context),
     ...pointPaintTikzOptions(style, colorBaseName, context),
     `inner sep=${formatNumber(style.size / 2)}pt`,
   ]
@@ -6696,7 +6697,7 @@ function pointStyleOptionsForElement(
       // Leave text alpha inherited until external options have run. An early
       // explicit text opacity would mask an unknown style's fill opacity.
       ...(unresolved.length === 0 ? [] : pointPaintTikzOptions(style, colorBaseName, context).filter((option) => !option.startsWith('text opacity='))),
-      ...pointShapeOptions(style.shape, context),
+      ...pointShapeOptions(style, colorBaseName, context),
       `inner sep=${formatNumber(style.size / 2)}pt`,
       ...importedStyle.options,
       ...pointImportedStyleOverrideOptions(
@@ -6949,9 +6950,25 @@ function pointImportedStyleOverrideOptions(
   })
   return [
     ...paintOptions,
-    ...(baseline.kind !== 'pointStyle' || style.shape !== baseline.shape ? pointShapeOptions(style.shape, context) : []),
+    ...pointImportedShapeOverrideOptions(reference, style, baseline, colorBaseName, context),
     ...(baseline.kind !== 'pointStyle' || style.size !== baseline.size ? [`inner sep=${formatNumber(style.size / 2)}pt`] : []),
   ]
+}
+
+function pointImportedShapeOverrideOptions(
+  reference: ImportedTikzStyleReference, style: PointStyle, baseline: UserStylePreset['style'],
+  colorBaseName: string, context: GenerateContext,
+): string[] {
+  const preview = resolveImportedTikzStyle(reference, context.importedTikzResolution)
+  const intent = style.importedShape?.referenceId === reference.id ? style.importedShape : undefined
+  const fields = new Set(intent?.overriddenFields ?? [])
+  if (!preview.executionUncertain && baseline.kind === 'pointStyle') {
+    const comparison = intent === undefined ? baseline : { ...baseline, shape: intent.baselineShape, shapeParameters: intent.baselineParameters }
+    for (const field of changedPointShapeFields(comparison, style)) fields.add(field)
+  }
+  // Fallback defaults never overwrite unsupported external raw intent. A
+  // deliberate local edit may restore one field without claiming its siblings.
+  return pointShapeOptions(style, colorBaseName, context, fields)
 }
 
 function labelImportedStyleOverrideOptions(
@@ -7051,23 +7068,43 @@ function fillRuleTikzOptions(fillRule: 'nonzero' | 'evenOdd'): string[] {
 }
 
 function pointShapeOptions(
-  shape: PointShape,
+  style: PointStyle,
+  colorBaseName: string,
   context: GenerateContext,
+  fields?: ReadonlySet<import('../model/types.ts').PointShapeField>,
 ): string[] {
-  if (shape !== 'circle') {
+  const { shape } = style
+  if (shape !== 'circle' && shape !== 'rectangle') context.coordinates.hasNonCircularPointShape = true
+  const shapeOptions: string[] = fields === undefined || fields.has('shape')
+    ? shape === 'square' ? ['regular polygon', 'regular polygon sides=4']
+      : shape === 'triangle' ? ['regular polygon', 'regular polygon sides=3']
+      : shape === 'star' ? ['star', `star points=${formatNumber(style.shapeParameters?.starPoints ?? 5)}`]
+      : [shape]
+    : []
+  const parameters = style.shapeParameters ?? {}
+  const resolved = resolvePointShapeParameters(parameters)
+  // Emit inactive star size first. The active mode always comes last, preserving
+  // PGF's ordered key semantics while retaining the other saved parameter.
+  const ordered = [...pointShapeParameterKeys.filter((key) => !['starPointHeight', 'starPointRatio', 'starPointMode'].includes(key)),
+    ...(resolved.starPointMode === 'height' ? ['starPointRatio', 'starPointHeight'] as const : ['starPointHeight', 'starPointRatio'] as const)]
+  for (const field of ordered) {
+    if (parameters[field] === undefined && !((parameters.starPointMode !== undefined || fields?.has('starPointMode')) && field === (resolved.starPointMode === 'height' ? 'starPointHeight' : 'starPointRatio'))) continue
+    if (fields !== undefined && !fields.has(field) && !(fields.has('starPointMode') && (field === 'starPointHeight' || field === 'starPointRatio'))) continue
+    // Legacy square/triangle are fixed polygons irrespective of stale controls.
+    if (field === 'regularPolygonSides' && (shape === 'square' || shape === 'triangle')) continue
+    const value = resolved[field]
+    const output = typeof value === 'number' ? `${formatNumber(value)}${field === 'starPointHeight' ? 'pt' : ''}`
+      : typeof value === 'boolean' ? String(value)
+      : field === 'cylinderEndFill' || field === 'cylinderBodyFill'
+        ? context.colors.define(`${colorBaseName}${field === 'cylinderEndFill' ? 'CylinderEnd' : 'CylinderBody'}`, value as HexColor)
+        : value
+    shapeOptions.push(`${pointShapeTikzKeys[field]}=${output}`)
+    // Shape changes retain their explicit parameter values. Even when the
+    // current body is a basic circle/rectangle, emitted geometric keys must
+    // have their PGF handlers loaded.
     context.coordinates.hasNonCircularPointShape = true
   }
-
-  switch (shape) {
-    case 'circle':
-      return ['circle']
-    case 'square':
-      return ['regular polygon', 'regular polygon sides=4']
-    case 'triangle':
-      return ['regular polygon', 'regular polygon sides=3']
-    case 'star':
-      return ['star', 'star points=5']
-  }
+  return shapeOptions
 }
 
 function defineCurveCoordinates(

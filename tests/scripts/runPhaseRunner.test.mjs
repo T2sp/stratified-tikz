@@ -54,7 +54,7 @@ function fixture(t, phase = '31B', options = {}) {
   // The verifier independently checks generated post-key paint. Keep its real
   // oracle and transitive helpers in the isolated checkout so both the parent
   // identity import and each fresh verification worker load the same modules.
-  for (const file of ['pointPaintOracle.mjs', 'pointCheckDiagnostics.mjs', 'pointResponsiveFraming.mjs', 'pointPolygonJoinContract.mjs', 'pointDashCapContract.mjs', 'pointDashCapMechanismContract.mjs', 'connectedLivePaintOracle.mjs', 'connectedPaintSampling.mjs']) {
+  for (const file of ['pointGeometricShapesContract.mjs', 'pointPaintOracle.mjs', 'pointCheckDiagnostics.mjs', 'pointResponsiveFraming.mjs', 'pointPolygonJoinContract.mjs', 'pointDashCapContract.mjs', 'pointDashCapMechanismContract.mjs', 'connectedLivePaintOracle.mjs', 'connectedPaintSampling.mjs']) {
     cpSync(join(automationDir, '..', file), join(cwd, 'scripts', file))
   }
   const runner = join(localAutomationDir, 'run-phase.mjs')
@@ -85,7 +85,7 @@ function fixture(t, phase = '31B', options = {}) {
   writeFileSync(join(cwd, 'package.json'), JSON.stringify({
     private: true,
     scripts: { test: 'node check.cjs test', build: 'node check.cjs build',
-      'check:label-assets': 'node check.cjs browser', 'check:free-labels': 'node check.cjs free-browser' },
+      'check:label-assets': 'node check.cjs browser', 'check:free-labels': 'node check.cjs free-browser', 'check:free-labels:32c': 'node check.cjs free-browser' },
   }))
   writeFileSync(join(cwd, 'check.cjs'), `
 const { mkdirSync, writeFileSync, appendFileSync } = require('node:fs');
@@ -501,7 +501,7 @@ for (const phase of ['32A', '32B', '32C', '32D']) {
     const { cwd, git, run, initialHead } = fixture(t, phase)
     const result = await run('implement', { STZ_TEST_FREE_LABEL_GROUPS: JSON.stringify(combinedLabelGroups) })
     assert.notEqual(result.status, 0)
-    assert.match(result.stderr, phase === '32A' ? /15 required groups/ : /16 required groups/)
+    assert.match(result.stderr, phase === '32A' ? /15 required groups/ : phase === '32B' ? /16 required groups/ : /17 required groups/)
     assert.equal(git('rev-parse', 'HEAD'), initialHead)
     assert.throws(() => readFileSync(join(cwd, 'logs/review-prompt.txt')), { code: 'ENOENT' })
     assert.doesNotMatch(result.stdout, /\$ git (?:add|commit|push)\b/)
@@ -535,3 +535,22 @@ test('32B live parent reloads newly required paint evidence before review and co
   assert.throws(() => readFileSync(join(cwd, 'logs/review-prompt.txt')), { code: 'ENOENT' })
   assert.doesNotMatch(result.stdout, /\$ git (?:add|commit|push)\b/)
 })
+
+for (const mode of ['verify-deferred', 'review-deferred']) {
+  test(`32C ${mode} rejects exit-zero incomplete evidence before review or any commit`, async (t) => {
+    const { cwd, git, run, initialHead } = fixture(t, '32C')
+    const result = await run(mode, { STZ_TEST_FREE_LABEL_GROUPS: JSON.stringify(combinedLabelGroups) })
+    assert.notEqual(result.status, 0)
+    assert.match(result.stderr, /evidence is incomplete or invalid/)
+    assert.equal(git('rev-parse', 'HEAD'), initialHead)
+    assert.throws(() => readFileSync(join(cwd, 'logs/review-prompt.txt')), { code: 'ENOENT' })
+    assert.doesNotMatch(result.stdout, /\$ git (?:add|commit|push)\b/)
+  })
+  test(`32B cannot request the 32C-only ${mode} route`, async (t) => {
+    const { cwd, git, run, initialHead } = fixture(t, '32B')
+    const result = await run(mode)
+    assert.notEqual(result.status, 0); assert.match(result.stderr, /restricted to 32C/)
+    assert.equal(git('rev-parse', 'HEAD'), initialHead)
+    assert.throws(() => readFileSync(join(cwd, 'logs/review-prompt.txt')), { code: 'ENOENT' })
+  })
+}

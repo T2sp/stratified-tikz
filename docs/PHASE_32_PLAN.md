@@ -3,11 +3,15 @@
 Current 32B countermeasure execution (2026-10-06): the authenticated parent
 reproduced the four-shape transfer, exercised native point workflows, and applied
 the measured uninterrupted-dash seam correction and both-page ownership guards.
-See [the current investigation](PHASE_32B_OWNED_APP_NAVIGATION.md). Final acceptance
-requires matching complete strict verification and independent read-only review;
-their outcomes and immutable tree identity are retained at
+See [the current investigation](PHASE_32B_OWNED_APP_NAVIGATION.md). Matching complete
+strict verification and independent read-only review passed: 4,550 tests, all
+16 browser groups, native transfer and saved SVG reopening. Their outcomes and
+immutable accepted tree identity are retained at
 `/private/tmp/stz-32b-four-countermeasures-20261006/HANDOFF.md`.
-No core profile is adopted; 32C/32D remain deferred. The records below are historical.
+Completed 32B was merged into main before this 32C merge and takes precedence
+over the incoming branch's earlier 32B deferrals. The combined 32C checkout still
+requires fresh strict browser acceptance and independent review. No core profile
+is adopted; 32D remains deferred. The records below are historical.
 
 Previous 32B residual status: [closed-dash work resumed](PHASE_32B_CLOSED_DASH_RESUME.md).
 The latest `03pAet` stopped earlier at an independent
@@ -40,7 +44,8 @@ filesystem scheduling. The native policy now requires 29 scenarios in the same
 16 groups and 856 artifacts, preserving all earlier coverage, including six
 responsive downloads and their 91 artifacts. Fresh matching parent verification
 and independent review must accept the new tree before 32B is complete.
-32C/32D remain deferred. See the final section of the implementation report for
+At that historical handoff 32C/32D remained deferred. The later explicit
+[32C fix amendment](../prompts/phase-32c-fix.md) authorizes 32C now; 32D stays deferred. See the final section of the implementation report for
 executed checks and the frozen-tree handoff; historical browser evidence does
 not cover these new fixes.
 The [native endpoint continuation](PHASE_32B_NATIVE_ENDPOINT_INVESTIGATION.md)
@@ -52,7 +57,32 @@ paint. Its finite core inventory remains a proposal, not a policy change;
 strict verification and the bounded full-closed transfer decision remain open.
 
 Implement the following stages in the user's requested order. Each stage must
-remain usable and pass its own acceptance checks before the next stage begins.
+remain usable and pass its own acceptance checks, subject to the explicit 32C
+exception: carry the named [32B residual issues](../prompts/phase-32b-fix.md)
+forward without another repair cycle. The raw strict 32B result remains failed.
+32C uses a separate narrow acceptance disposition, with all new shapes and
+non-deferred earlier behavior still required. See [32C implementation and
+verification](PHASE_32C_IMPLEMENTATION.md).
+
+32C's eleven-shape implementation is present, but native acceptance remains
+pending. The 2026-10-04 child review-only attempt passed 4,780 tests/build/diff
+and then hit label-assets localhost `EPERM`. A bounded correction replaces
+synthetic cylinder color-parameter input with direct hexadecimal controls and
+trusted-input evidence requirements. Fresh complete scoped evidence and matching
+independent review are still required; the named 32B backlog and deferred 32D
+scope are unchanged. See the [current 32C handoff](/private/tmp/stz-32c-native-followup/HANDOFF.md).
+
+The subsequent browser-capable `eeZs2F` parent passed label-assets and reached
+the scoped shape group, then failed native center selection of the fresh circle
+while setting up diamond, after ellipse passed (15/17 groups complete). Its raw
+and scoped disposition are both failed; this new failure is not deferred 32B.
+The clean `e9413f5` continuation adds separate bounded selection diagnostics and
+registered failure-ownership regressions. Child localhost `EPERM` prevents
+event-delivery reproduction, so the overlapping drawer remains a hypothesis
+and no cause correction or acceptance is claimed. The fresh browser-capable
+parent must diagnose those observations and complete the existing
+`32C review-deferred` route; see the
+[selection follow-up handoff](/private/tmp/stz-32c-selection-followup/HANDOFF.md).
 
 | Stage | Deliverable |
 | --- | --- |

@@ -260,7 +260,7 @@ export type PathInlineNode = {
   options: PathInlineNodeOptions
 }
 
-export const pointShapes = ['circle', 'square', 'triangle', 'star'] as const
+export const pointShapes = ['circle', 'rectangle', 'square', 'triangle', 'diamond', 'ellipse', 'trapezium', 'semicircle', 'regular polygon', 'star', 'isosceles triangle', 'kite', 'dart', 'circular sector', 'cylinder'] as const
 export type PointShape = (typeof pointShapes)[number]
 
 export const pointFills = ['filled', 'hollow'] as const
@@ -646,6 +646,39 @@ export type ImportedPointPaint = {
   overriddenFields: PointPaintField[]
 }
 
+/** Bounded literal PGF parameters; absence uses deterministic PGF 3.1.11a defaults. */
+export type PointShapeParameters = {
+  aspect?: number
+  borderRotate?: number
+  borderUsesIncircle?: boolean
+  trapeziumLeftAngle?: number
+  trapeziumRightAngle?: number
+  trapeziumStretches?: boolean
+  trapeziumStretchesBody?: boolean
+  regularPolygonSides?: number
+  starPoints?: number
+  starPointHeight?: number
+  starPointRatio?: number
+  starPointMode?: 'height' | 'ratio'
+  isoscelesTriangleApexAngle?: number
+  isoscelesTriangleStretches?: boolean
+  kiteUpperVertexAngle?: number
+  kiteLowerVertexAngle?: number
+  dartTipAngle?: number
+  dartTailAngle?: number
+  circularSectorAngle?: number
+  cylinderUsesCustomFill?: boolean
+  cylinderEndFill?: HexColor
+  cylinderBodyFill?: HexColor
+}
+export type PointShapeField = 'shape' | keyof PointShapeParameters
+export type ImportedPointShape = {
+  referenceId: string
+  baselineShape: PointShape
+  baselineParameters: PointShapeParameters
+  overriddenFields: PointShapeField[]
+}
+
 export type PointStyle = {
   kind: 'pointStyle'
   /** Authoritative paint when present; absence denotes legacy paint semantics. */
@@ -656,6 +689,8 @@ export type PointStyle = {
   color: HexColor
   opacity: Opacity
   shape: PointShape
+  shapeParameters?: PointShapeParameters
+  importedShape?: ImportedPointShape
   fill: PointFill
   size: number
 }

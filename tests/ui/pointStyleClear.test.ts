@@ -105,6 +105,18 @@ test('ordinary quick-bar paint edits keep the external association and provenanc
   assertValidPointDiagramReload(edited)
 })
 
+test('clear retains geometric shape parameters and undo restores independent shape provenance', () => {
+  const diagram = updateStratumStyleById(importedPointClearDiagram(), 'p', (style) => style.kind === 'pointStyle'
+    ? { ...style, shape: 'kite', shapeParameters: { kiteUpperVertexAngle: 100, kiteLowerVertexAngle: 75, borderRotate: 37 } } : style)
+  const before = findPoint(diagram, 'p').style
+  assert.ok(before.importedShape)
+  const cleared = findPoint(clearPointsWithHistory(diagram, ['p']), 'p').style
+  assert.equal(cleared.importedShape, undefined)
+  assert.equal(cleared.shape, 'kite')
+  assert.deepEqual(cleared.shapeParameters, before.shapeParameters)
+  assert.notStrictEqual(cleared.shapeParameters, before.shapeParameters)
+})
+
 function importedPointClearDiagram(): Diagram {
   const empty = createEmptyDiagram({ ambientDimension: 2 })
   let diagram: Diagram = {
@@ -163,6 +175,7 @@ function clearPointsWithHistory(diagram: Diagram, ids: readonly string[]): Diagr
     delete expected.stylePresetId
     delete expected.importedTikzStyleReferenceId
     delete expected.style.importedPaint
+    delete expected.style.importedShape
     assert.deepEqual(after, expected, 'only the preset, external association and its provenance are removed')
     assert.notStrictEqual(after.style, before.style)
     assert.notStrictEqual(after.style.paint, before.style.paint)

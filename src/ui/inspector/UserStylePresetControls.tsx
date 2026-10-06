@@ -1,3 +1,5 @@
+import { PointShapeFields } from './PointShapeFields.tsx'
+import { markPointShapeOverrides } from '../../model/pointShapeParameters.ts'
 import { PointPaintFields } from './PointPaintFields.tsx'
 import { getPointPaint, updatePointColor, updatePointFill } from '../../model/styles.ts'
 import { useMemo, useState } from 'react'
@@ -823,8 +825,9 @@ function PresetStyleFields({
             label="Preset shape"
             value={preset.style.shape}
             options={pointShapes}
-            onChange={(shape) => onChange({ ...preset.style, shape })}
+            onChange={(shape) => onChange(markPointShapeOverrides({ ...preset.style, shape }, ['shape']))}
           />
+          <PointShapeFields style={preset.style} prefix="Preset " onChange={onChange} />
           <EditableSelectField<PointFill>
             label="Preset fill"
             value={preset.style.fill}

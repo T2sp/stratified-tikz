@@ -1,3 +1,5 @@
+import { phase32cProfile, resolveVerificationProfile, mechanismNotRun } from './automation/phase32c-profile.mjs'
+import { runPointNodeGeometricShapeChecks } from './checkPointNodeGeometricShapes.mjs'
 /**
  * Actual-browser Phase 31C checks against production SvgDiagram and its event
  * handlers. Uses the existing external-Playwright convention; adds no package.
@@ -17,10 +19,13 @@ import { runAppChecksWithGeometryControls } from './checkFreeLabelsAppFocused.mj
 import { runInlineLabelChecks } from './checkInlineLabels.mjs'
 import { runPointThenAppChecks } from './checkPointNodes.mjs'
 import { runPointNodePaintChecks } from './checkPointNodePaint.mjs'
-import { pointNodeScenarios } from './automation/phase-verification.mjs'
+import { allPointNodeScenarios as pointNodeScenarios } from './automation/phase-verification.mjs'
 import { runCombinedLabelChecks } from './checkCombinedLabels.mjs'
 import { runSettledSvgExportChecks, runSettledSvgVisibilityChecks } from './checkSettledSvgExports.mjs'
 
+const args = process.argv.slice(2)
+assert.ok(args.every((arg) => arg.startsWith('--phase=') || arg.startsWith('--profile=')), 'Unknown browser verification argument')
+const profile = resolveVerificationProfile(args.find((arg) => arg.startsWith('--profile='))?.slice(10), args.find((arg) => arg.startsWith('--phase='))?.slice(8))
 const artifactDir = resolve(process.env.STZ_SMOKE_ARTIFACT_DIR ?? '/private/tmp/stz-free-labels-' + Date.now())
 await mkdir(artifactDir, { recursive: true })
 const { checkout, diff, untracked } = captureBrowserCheckoutSnapshot()
@@ -51,7 +56,8 @@ let stage = 'playwright-import'
 let checkpoint = null
 let primaryFailure
 async function save(result, error) {
-  await writeFile(resolve(artifactDir, 'free-labels-evidence.json'), JSON.stringify({ result, stage, environment, checkout,
+  await writeFile(resolve(artifactDir, 'free-labels-evidence.json'), JSON.stringify({ result, stage, environment, checkout, profile,
+    deferredScenarios: profile === phase32cProfile ? [mechanismNotRun()] : [],
     checkpoint, started, checkpoints, completed, incompleteGroups: scenarios.filter((name) => !completed.includes(name)),
     unexecuted: scenarios.filter((name) => !started.includes(name)),
     coverageNote: 'Started/checkpoints and diagnostics describe execution, not passing assertions. Evidence records passed scenarios; groups complete only after all their assertions return.',
@@ -469,8 +475,9 @@ try {
   await runCombinedLabelChecks({ page, record, observe, artifactDir, startGroup, completeGroup })
   await runPointThenAppChecks({ page, browser, origin, ownedServer: server, record, observe, artifactDir, startGroup, completeGroup,
     setStage: (value) => { stage = value } }, (context) => runAppChecksWithGeometryControls({ ...context, ownedServer: server }))
-  await runPointNodePaintChecks({ page, browser, origin, record, observe, artifactDir, startGroup, completeGroup,
+  await runPointNodePaintChecks({ page, browser, origin, record, observe, artifactDir, startGroup, completeGroup, profile,
     setStage: (value) => { stage = value } })
+  await runPointNodeGeometricShapeChecks({ browser, origin, record, observe, artifactDir, startGroup, completeGroup, setStage: (value) => { stage = value } })
   stage = 'settled-SVG-export-standalone'
   await startGroup('settled-SVG-export-standalone')
   await runSettledSvgVisibilityChecks({ browser, page, record, observe, artifactDir })

@@ -1413,3 +1413,30 @@ The browser policy adds `point-node-paint-import-persistence` cumulatively to al
 31F and 32A groups. Completion still requires fresh terminal success, named
 scenario observations, actual standalone downloads, matching checkout identity,
 and independent review. See [32B evidence and grammar](PHASE_32B_IMPLEMENTATION.md).
+
+## Phase 32C geometric point-node contract
+
+`PointStyle.shapeParameters` adds typed optional geometric parameters without
+changing legacy size/hollow/paint semantics. Eleven PGF geometric shapes are
+implemented along with circle and true rectangle; square and triangle remain
+regular polygons. Ordered imported aliases, booleans and star height/ratio mode
+preserve explicit intent. Invalid or unsupported raw options remain external
+source with a visible preview limitation, while deliberate local overrides
+survive re-resolution. Counts and angles use the finite domains documented in
+[the 32C implementation record](PHASE_32C_IMPLEMENTATION.md).
+
+Pure fixed-box solvers return actual curved/compound contours and body placement,
+with distinct shape/body/paint/anchor-clearance bounds. Cylinder has separate
+body/end fill regions and an open internal border. Current layout revision and
+immutable export captures include every shape parameter. Body glyphs remain
+upright under border rotation. No generated asset is stored in model/history.
+The reference suite pins PGF 3.1.11a, fixed TeX boxes and source hashes.
+
+The earlier user amendment deferred only the named
+[32B residual cases](../prompts/phase-32b-fix.md) while this branch was developed.
+Main's later completed 32B takes precedence; those deferrals describe the
+historical branch rather than current 32B acceptance. Default strict verification
+stays unchanged. Fresh acceptance of the combined 32C checkout requires all
+earlier strict checks, final settled SVG and the new geometric manifest.
+Unexecuted/missing native or PGF evidence is a blocker. 32D layout/anchors and
+commit/push are outside this fix.

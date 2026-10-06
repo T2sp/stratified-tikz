@@ -29,7 +29,7 @@ const importedSource = String.raw`% Phase 32B native import acceptance; literal 
 \tikzset{paint imported node/.style={paint base node,text opacity=.6},
   paint text node/.style={text=red},
   paint ordered node/.style={circle,draw=green,fill=PaintBlue,draw opacity=.2,opacity=.8,fill opacity=.3,text opacity=.6},
-  paint unsupported node/.style={circle,trapezium left angle=70}}
+  paint unsupported node/.style={circle,rounded trapezium corners=70}}
 `
 
 export async function runPointNodePaintChecks(context) {
@@ -120,7 +120,7 @@ export async function runPointNodePaintChecks(context) {
   }
   async function saved(details) {
     await writeFile(resolve(artifactDir, `${scenario}.json`), JSON.stringify({ scenario, group, result: 'passed', ...details }, null, 2) + '\n')
-    await record(scenario, { group, result: 'passed', artifacts: pointNodeScenarioArtifacts(scenario) })
+    await record(scenario, { group, result: 'passed', artifacts: pointNodeScenarioArtifacts(scenario, context.profile) })
   }
   async function tikz() {
     const output = {}
@@ -265,7 +265,7 @@ export async function runPointNodePaintChecks(context) {
       if (key === 'paint ordered node') assertPointPaint(observation, { fill: 'rgb(0, 0, 255)', stroke: 'rgb(0, 255, 0)', fillAlpha: .3, strokeAlpha: .8, text: 'rgb(0, 0, 0)', textAlpha: .6 })
       if (key === 'paint unsupported node') {
         const reference = (await model()).importedTikzStyleReferences.find((entry) => entry.id === current.importedTikzStyleReferenceId)
-        assert.ok(reference.options.includes('trapezium left angle=70'))
+        assert.ok(reference.options.includes('rounded trapezium corners=70'))
         assert.ok(reference.previewDiagnostics?.length > 0, 'Deferred layout is visibly diagnosed')
         assert.match(await inspector.innerText(), /unsupported|preview|deferred/i)
       }
@@ -470,7 +470,7 @@ alias outer node/.style={/tikz/alias node}}`, 'alias outer node', '#00ff00'],
       begin: (name) => { scenario = name }, saved, diagnose: observeCase })
     await runPointPolygonJoinChecks({ page: rendererPage, artifactDir,
       begin: (name) => { scenario = name }, saved, diagnose: observeCase })
-    await runPointDashCapChecks({ page: rendererPage, artifactDir,
+    await runPointDashCapChecks({ page: rendererPage, artifactDir, profile: context.profile,
       begin: (name) => { scenario = name }, saved, diagnose: observeCase })
     assert.deepEqual(errors, []); await completeGroup(group)
   } catch (error) {

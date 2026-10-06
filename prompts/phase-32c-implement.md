@@ -82,7 +82,11 @@ sizing, while 32D completes configurable layout and anchor conformance.
 
 ## Prerequisites and scope
 
-32A and 32B must be implemented, verified, and reviewed. Preserve shared runtime,
+The explicit [32C fix amendment](phase-32c-fix.md) authorizes implementation
+and review on the accepted 32A and existing 32B code with the exact issues in
+[the unchanged 32B residual record](phase-32b-fix.md) deferred. Full strict 32B
+acceptance is not a prerequisite. This does not adopt `stz-32b-core-v1`, claim
+32B passed, or authorize 32D. Preserve shared runtime,
 whole-node export, independent paint, ordered import resolution, and migration
 contracts. Read their paired prompts and actual interfaces.
 
@@ -199,6 +203,16 @@ expected results or claiming reference conformance.
   with cumulative parent policy. Keep Phase 31F and 32A/32B groups required.
 
 ## Browser verification and evidence
+
+The user-authorized 32C-only disposition is additional to the unchanged strict
+command. Use `npm run check:free-labels:32c` and the explicit
+`node scripts/automation/run-phase.mjs 32C verify-deferred` / `review-deferred`
+routes documented in [the implementation record](../docs/PHASE_32C_IMPLEMENTATION.md).
+Retain raw strict failure, exact checkout identity and artifacts; the scoped
+run must complete every non-deferred earlier case, final settled SVG and all
+32C cases. Only the named 32B deferrals are exempt; new defects, unexpected
+errors, incomplete cases, stale identities and missing artifacts still block.
+The review-only route never enters the success/commit path.
 
 Use real production components and native App events, actual MathJax conversions,
 and downloaded SVGs reopened outside the App. Controlled delayed adapters are
