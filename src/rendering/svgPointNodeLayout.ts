@@ -20,7 +20,10 @@ export function svgPointNodeLayout(style: PointStyle, state: SvgLabelState) {
   const strokeJoin = strokeSettings.join
   const circleCaps = geometry.kind === 'circle' && stroke > 0 && strokeSettings.cap === 'square'
     ? createDashCaps(geometry, stroke, strokeSettings.pattern, strokeSettings.phase, strokeSettings.cap) : null
-  const strokeContour = circleCaps?.families.length
+  // Seam-only caps have the exact native circle tangent. Interior dash
+  // endpoints still need the established finite contour to share SVG paint's
+  // endpoint subdivision; a fully covered dash must retain its circle source.
+  const strokeContour = circleCaps?.families.length && !circleCaps.seamOnly
     ? { ...geometry, kind: 'polygon' as const, vertices: circleStrokeVertices(geometry.radius) } : geometry
   // Bounds, selection decoration and exterior picking share the actual union
   // of strips and joins, including overlapping wide strokes (miter limit 10).

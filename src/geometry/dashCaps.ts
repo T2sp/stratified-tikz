@@ -7,7 +7,7 @@ type CapFamily = Repetitions & { sign: -1 | 1; isolatedDot: boolean } & (
   | { kind: 'circle'; radius: number })
 export type DashCaps = {
   families: CapFamily[]; halfWidth: number; cap: 'square' | 'round' | 'butt'
-  bounds: Bounds | null; radius: number
+  bounds: Bounds | null; radius: number; seamOnly: boolean
 }
 type Contour = { kind: 'circle' | 'polygon'; radius: number; vertices: readonly Vec2[] }
 
@@ -90,7 +90,7 @@ function exactRepetitions(offset: bigint, step: bigint, min: bigint, max: bigint
  */
 export function createDashCaps(contour: Contour, width: number, pattern: readonly number[] | undefined,
   phase: number, cap: DashCaps['cap']): DashCaps {
-  const result: DashCaps = { families: [], halfWidth: width / 2, cap, bounds: null, radius: 0 }
+  const result: DashCaps = { families: [], halfWidth: width / 2, cap, bounds: null, radius: 0, seamOnly: false }
   if (!(width > 0) || !pattern?.length || cap === 'butt') return result
   if (!Number.isFinite(phase) || pattern.some((part) => !Number.isFinite(part) || part < 0)) return result
   const rawPeriod = pattern.reduce((sum, part) => sum + part, 0)
@@ -164,7 +164,7 @@ export function createDashCaps(contour: Contour, width: number, pattern: readonl
   }
   let start = 0
   let rightAtStart = false, leftAtEnd = false
-  let dotAtStart = false
+  let dotAtStart = false, uninterruptedOn = false
   const tail = length % period
   const endOffset = offset >= 0 && offset >= period - tail ? offset - (period - tail) : offset + tail
   const exactEndOffset = exactPeriod === undefined ? undefined : exactMod(exactOffset! + binaryUnits(length), exactPeriod)
@@ -176,6 +176,8 @@ export function createDashCaps(contour: Contour, width: number, pattern: readonl
       add(exactMod(first - exactOffset, exactPeriod), -1, false, first === last)
       add(exactMod(last - exactOffset, exactPeriod), 1, false, first === last)
       rightAtStart ||= exactOffset >= first && exactOffset < last
+      uninterruptedOn ||= exactOffset >= first && exactOffset < last
+        && binaryUnits(length) < last - exactOffset
       leftAtEnd ||= (exactEndOffset > first && exactEndOffset <= last)
         || (exactEndOffset === 0n && last === exactPeriod && last > first)
       dotAtStart ||= first === last && exactOffset === first
@@ -184,6 +186,10 @@ export function createDashCaps(contour: Contour, width: number, pattern: readonl
       add(endpoint(end, suffix[i + 1]), 1, false, start === end)
       rightAtStart ||= offset >= 0 ? offset >= start && offset < end
         : offset >= -suffix[i] && offset < -suffix[i + 1]
+      const startsOn = offset >= 0 ? offset >= start && offset < end
+        : offset >= -suffix[i] && offset < -suffix[i + 1]
+      const remainingOn = offset >= 0 ? end - offset : -suffix[i + 1] - offset
+      uninterruptedOn ||= startsOn && remainingOn > length
       leftAtEnd ||= (endOffset >= 0 ? endOffset > start && endOffset <= end
         : endOffset > -suffix[i] && endOffset <= -suffix[i + 1])
         || (endOffset === 0 && suffix[i + 1] === 0 && end > start)
@@ -196,7 +202,15 @@ export function createDashCaps(contour: Contour, width: number, pattern: readonl
   // Initial isolated dots still have their full native square/disk extent.
   const firstPainted = rightAtStart || dotAtStart
   const lastPainted = leftAtEnd
-  if (firstPainted && lastPainted) {
+  if (cap === 'square' && uninterruptedOn && !dotAtStart) {
+    // A single positive dash extending beyond the whole closed contour is
+    // clipped into an independently capped subpath by native SVG paint. Both
+    // seam tangents are required; joining distinct on pieces across the seam
+    // below remains a different mechanism and must not gain these caps.
+    result.seamOnly = result.families.length === 0
+    add(0, -1, true)
+    add(length, 1, true)
+  } else if (firstPainted && lastPainted) {
     // Preserve a joined positive seam. Adding either oriented seam cap would
     // contradict retained native triangle paint. Two square raster/containment
     // disagreements remain explicit failures in the native harness; they do

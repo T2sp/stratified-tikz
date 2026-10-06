@@ -2,15 +2,15 @@
  * cumulative predecessors and can never establish phase acceptance. */
 import assert from 'node:assert/strict'
 import { mkdir, writeFile } from 'node:fs/promises'
-import { isAbsolute, resolve } from 'node:path'
+import { basename, isAbsolute, resolve } from 'node:path'
 import { pathToFileURL } from 'node:url'
 import { performance } from 'node:perf_hooks'
-import { createServer } from 'vite'
 import { captureBrowserCheckoutSnapshot } from './browserCheckoutSnapshot.mjs'
 import { runNativePointChecks } from './checkPointNodesApp.mjs'
 import { finishFocusedResources } from './checkFreeLabelsAppFocused.mjs'
 import { boundedPointDiagnostic } from './pointCheckDiagnostics.mjs'
 import { pointNodeScenarioArtifacts } from './automation/phase-verification.mjs'
+import { startOwnedViteServer } from './ownedViteServer.mjs'
 
 const bodyGroup = 'point-node-body-layout-lifecycle'
 const exportGroup = 'point-node-settled-export'
@@ -57,7 +57,7 @@ export async function runFocusedNativePointAcceptance({
   env = process.env,
   captureCheckout = captureBrowserCheckoutSnapshot,
   loadChromium = async (moduleName) => (await import(isAbsolute(moduleName) ? pathToFileURL(moduleName).href : moduleName)).chromium,
-  createViteServer = createServer,
+  startViteServer = startOwnedViteServer,
   nativeChecks = runNativePointChecks,
   write = writeFile,
   diagnosticTimeoutMs = 2000,
@@ -144,25 +144,28 @@ export async function runFocusedNativePointAcceptance({
     stage = 'playwright-import'
     const chromium = await loadChromium(environment.playwrightModule)
     stage = 'development-server-listen'
-    if (!environment.baseUrl) {
-      server = await createViteServer({ server: { host: '127.0.0.1', port: 0 }, logLevel: 'error' })
-      await boundedPointDiagnostic(() => server.listen(), 'focused native server listen', 30_000)
-      const address = server.httpServer.address()
-      assert.ok(address && typeof address !== 'string')
-      environment.baseUrl = `http://127.0.0.1:${address.port}`
-    }
+    assert.equal(env.STZ_BROWSER_BASE_URL, undefined,
+      'Focused native point diagnosis requires a fresh invocation-owned server')
+    server = await startViteServer({ artifactDir })
+    environment.baseUrl = server.origin
+    environment.ownedServer = { ownerId: server.ownerId, instanceId: server.instanceId,
+      address: server.address, pid: process.pid, lifecycleArtifact: basename(server.lifecyclePath) }
     stage = 'browser-launch'
+    const netLog = environment.browserExecutable ? { artifact: 'chromium-netlog.json', captureMode: 'Default' } : undefined
+    if (netLog) environment.browserNetLog = netLog
     browser = await chromium.launch({ headless: true, timeout: 30_000,
-      ...(environment.browserExecutable ? { executablePath: environment.browserExecutable } : {}) })
+      ...(environment.browserExecutable ? { executablePath: environment.browserExecutable,
+        args: [`--log-net-log=${resolve(artifactDir, netLog.artifact)}`, `--net-log-capture-mode=${netLog.captureMode}`] } : {}) })
     environment.browserVersion = browser.version()
     stage = 'renderer-fixture'
     page = await browser.newPage({ viewport: environment.rendererViewport })
     page.on('pageerror', onPageError)
-    await page.goto(`${environment.baseUrl}/stratified-tikz/scripts/fixtures/freeLabels.html`, { timeout: 30_000 })
+    const response = await page.goto(`${environment.baseUrl}/stratified-tikz/scripts/fixtures/freeLabels.html`, { timeout: 30_000 })
+    await server.authenticate(response)
     await page.waitForFunction(() => window.stzLabels !== undefined, undefined, { timeout: 30_000 })
     stage = 'point-node-native-input'; await save('running')
     await runFocusedNativePointWorkflow({ browser, origin: environment.baseUrl, page, artifactDir,
-      saved, startGroup, completeGroup, observe,
+      saved, startGroup, completeGroup, observe, ownedServer: server,
       diagnose: (group, scenario, details) => observe(`${scenario}-observed`, { group, scenario, result: 'observed', ...details }),
       setStage: (value) => { stage = value },
     }, nativeChecks)
@@ -172,7 +175,14 @@ export async function runFocusedNativePointAcceptance({
     assert.equal(afterCheckout.fingerprint, checkout.fingerprint,
       'Focused execution preserves tracked, untracked and binary checkout identity')
     stage = 'resource-cleanup'
-  } catch (error) { primary = error; await saveFailure() }
+  } catch (error) {
+    primary = error; await saveFailure()
+    if (server) {
+      try { await boundedPointDiagnostic(() => server.flush('focused-native-primary-failure'),
+        'focused native owned-server failure evidence', cleanupTimeoutMs) }
+      catch (secondaryError) { await diagnoseSecondary('owned-server failure evidence', secondaryError) }
+    }
+  }
   finally {
     primary = await finishFocusedResources(primary, [
       ...(page ? [['renderer listener removal', () => page.off('pageerror', onPageError)],

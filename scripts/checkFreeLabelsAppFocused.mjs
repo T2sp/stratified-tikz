@@ -5,7 +5,7 @@ import { mkdir, writeFile } from 'node:fs/promises'
 import { isAbsolute, resolve } from 'node:path'
 import { pathToFileURL } from 'node:url'
 import { performance } from 'node:perf_hooks'
-import { createServer } from 'vite'
+import { startOwnedViteServer } from './ownedViteServer.mjs'
 import { captureBrowserCheckoutSnapshot } from './browserCheckoutSnapshot.mjs'
 import { runAppChecks } from './checkFreeLabelsApp.mjs'
 import { createOwnedAppPage } from './ownedAppPage.mjs'
@@ -32,7 +32,7 @@ export async function finishFocusedResources(primary, operations, diagnose, time
   return failure
 }
 
-export async function runAppGeometryNativeControls({ browser, origin, artifactDir, record }) {
+export async function runAppGeometryNativeControls({ browser, origin, artifactDir, record, ownedServer }) {
   const controls = []
   const expectedUrl = `${origin}/stratified-tikz/scripts/fixtures/freeLabelsApp.html`
   for (const fault of ['stalled-frames', 'never-stable-svg', 'missing-api', 'wrong-api', 'same-url-reload']) {
@@ -45,7 +45,8 @@ export async function runAppGeometryNativeControls({ browser, origin, artifactDi
     let primary, loadEvent
     try {
       await app.install()
-      await page.goto(expectedUrl, { timeout: 30_000 })
+      const response = await page.goto(expectedUrl, { timeout: 30_000 })
+      await ownedServer?.authenticate(response)
       const before = await boundedPointDiagnostic(() => app.start(), 'control App startup readiness', 35_000)
       await geometry.install()
       const json = await app.readState()
@@ -173,7 +174,7 @@ export async function runFocusedAppAcceptance() {
   const environment = { nodeVersion: process.version, browserVersion: null,
     playwrightModule: process.env.STZ_PLAYWRIGHT_MODULE ?? 'playwright',
     browserExecutable: process.env.STZ_BROWSER_EXECUTABLE ?? null,
-    baseUrl: process.env.STZ_BROWSER_BASE_URL ?? null }
+    baseUrl: null, serverLifecycleArtifact: 'owned-vite-lifecycle.json' }
   const evidence = [], secondary = []
   let stage = 'checkout-capture', browser, server, checkout, primary
   const started = stamp()
@@ -205,21 +206,18 @@ export async function runFocusedAppAcceptance() {
     const moduleName = environment.playwrightModule
     const { chromium } = await import(isAbsolute(moduleName) ? pathToFileURL(moduleName).href : moduleName)
     stage = 'development-server-listen'
-    if (!environment.baseUrl) {
-      server = await createServer({ server: { host: '127.0.0.1', port: 0 }, logLevel: 'error' })
-      await boundedPointDiagnostic(() => server.listen(), 'focused server listen', 30_000)
-      const address = server.httpServer.address()
-      assert.ok(address && typeof address !== 'string')
-      environment.baseUrl = `http://127.0.0.1:${address.port}`
-    }
+    assert.equal(process.env.STZ_BROWSER_BASE_URL, undefined, 'Focused App diagnosis requires a fresh invocation-owned server')
+    server = await startOwnedViteServer({ artifactDir })
+    environment.baseUrl = server.origin
+    environment.ownedServer = { instanceId: server.instanceId, address: server.address, pid: process.pid }
     stage = 'browser-launch'
     browser = await chromium.launch({ headless: true, timeout: 30_000,
       ...(environment.browserExecutable ? { executablePath: environment.browserExecutable } : {}) })
     environment.browserVersion = browser.version()
     stage = 'real-App-workflows'; await save('running')
-    await runAppChecks({ browser, origin: environment.baseUrl, artifactDir, record })
+    await runAppChecks({ browser, origin: environment.baseUrl, artifactDir, record, ownedServer: server })
     stage = 'native-diagnostic-controls'; await save('running')
-    await runAppGeometryNativeControls({ browser, origin: environment.baseUrl, artifactDir, record })
+    await runAppGeometryNativeControls({ browser, origin: environment.baseUrl, artifactDir, record, ownedServer: server })
     stage = 'checkout-identity-after'
     const after = captureBrowserCheckoutSnapshot().checkout
     assert.equal(after.fingerprint, checkout.fingerprint, 'Focused execution preserves tracked, untracked and binary checkout identity')

@@ -33,7 +33,7 @@ class Page extends EventEmitter {
 async function setup(t, options = {}) {
   const artifactDir = await mkdtemp(join(tmpdir(), 'stz-owned-app-test-'))
   const timings = []
-  const page = new Page(), app = createOwnedAppPage({ page, expectedUrl: url, artifactDir,
+  const page = options.page ?? new Page(), app = createOwnedAppPage({ page, expectedUrl: url, artifactDir,
     observeDiagnostic: (entry) => timings.push(entry), ...options })
   // Install cleanup before startup so a startup/persistence failure cannot leave
   // owned listeners or temporary files behind. Retain opt-in timing separately.
@@ -49,7 +49,7 @@ async function setup(t, options = {}) {
       } finally { await rm(artifactDir, { recursive: true, force: true }) }
     }
   })
-  await app.install(); const startup = await app.start()
+  await app.install({ currentDocument: options.installCurrentDocument ?? false }); const startup = await app.start()
   return { app, page, startup, artifactDir, timings }
 }
 
@@ -70,6 +70,43 @@ test('owned document boundary rejects wrong page, URL, API, and same-URL replace
 test('standalone continuity compares saved model, runtime model, exact history and document revision independently', () => {
   assert.doesNotThrow(() => assertOwnedAppState(state, { ...state }))
   for (const key of Object.keys(state)) assert.throws(() => assertOwnedAppState(state, { ...state, [key]: 'changed' }), new RegExp(key))
+})
+
+test('already loaded renderer is owned once with its exact API, model/history and source revision', async (t) => {
+  const page = new Page(), installs = [], rendererUrl = url.replace('freeLabelsApp.html', 'freeLabels.html')
+  page.currentUrl = rendererUrl; page.document.url = rendererUrl
+  page.snapshot = { json: state.json, history: state.history, sourceRevision: 7 }
+  page.addInitScript = async (operation, key) => installs.push({ operation: operation.name, key })
+  const { app, startup, artifactDir } = await setup(t, { page, expectedUrl: rendererUrl, prefix: 'point-native-renderer',
+    apiName: 'stzLabels', stateFields: ['json', 'history', 'sourceRevision'], installCurrentDocument: true })
+  assert.deepEqual(startup.state, page.snapshot)
+  assert.equal(app.browserIdentity().apiName, 'stzLabels')
+  assert.equal(installs.length, 1)
+  assert.equal(page.calls.filter((entry) => entry.operation === 'installOwnedAppDocumentMarker').length, 1)
+  const originalApi = { state: () => page.snapshot }
+  const globals = { window: { stzLabels: originalApi, stzAppLabels: { state() { throw new Error('Wrong API must not run') } },
+    __stzOwnedAppDocument: { generation: 'document-1', api: originalApi } }, location: { href: rendererUrl } }
+  page.evaluate = async (operation, argument) => runInNewContext(`(${operation.toString()})(argument)`, { ...globals, argument })
+  assert.deepEqual(await app.readState(), page.snapshot)
+  globals.window.__stzOwnedAppDocument.generation = 'replacement'
+  await assert.rejects(app.readState(), /continuity lost/)
+  assert.equal(installs.length, 1, 'A failed renderer is never reattached')
+  await app.dispose()
+  const lifecycle = JSON.parse(await readFile(join(artifactDir, 'point-native-renderer-lifecycle.json'), 'utf8'))
+  assert.equal(lifecycle.apiName, 'stzLabels')
+  assert.equal(lifecycle.expected.generation, 'document-1')
+})
+
+test('a renderer API selected for diagnostics never invokes the unrelated App API', () => {
+  const rendererApi = { state() { throw new Error('Diagnostics must not execute either API') } }
+  const context = { window: { stzLabels: rendererApi, stzAppLabels: { state() { throw new Error('Wrong API') } },
+    marker: { api: rendererApi, generation: 'renderer-document', nativeActions: [] } },
+    performance: { now: () => 0, timeOrigin: 1 }, location: { href: url },
+    document: { readyState: 'complete', title: 'renderer', contentType: 'text/html', scripts: [],
+      getElementById: () => ({ localName: 'div', childElementCount: 1 }) } }
+  const observation = runInNewContext(`(${observeOwnedAppDocument.toString()})({key:'marker',apiName:'stzLabels'})`, context)
+  assert.equal(observation.api.sameInstance, true)
+  assert.equal(observation.generation, 'renderer-document')
 })
 
 test('wrapper retains distinct standalone open/capture/close and preserves App state through helper return', async (t) => {
@@ -199,12 +236,16 @@ test('DOM diagnostic has bounded nodes, attributes, text and scripts without exe
   const nodes = Array.from({ length: 700 }, (_, index) => ({ nodeType: index % 2 ? 3 : 1,
     textContent: 'text'.repeat(400), localName: 'div', attributes: Array.from({ length: 40 }, () => ({ name: 'data-name', value: 'attribute'.repeat(300) })) }))
   const context = { window: { stzAppLabels: api, marker: { api, generation: 'generation', nativeActions: [] } },
+    performance: { now: () => 125.5, timeOrigin: 1700000000000 },
     location: { href: url }, NodeFilter: { SHOW_ELEMENT: 1, SHOW_TEXT: 4 }, Node: { TEXT_NODE: 3 },
     document: { readyState: 'complete', title: 'title', contentType: 'text/html', documentElement: nodes[0],
       getElementById: () => ({ localName: 'div', childElementCount: 1 }),
       scripts: Array.from({ length: 40 }, () => ({ src: 'source'.repeat(800), type: 'module', textContent: 'module'.repeat(100) })),
       createTreeWalker() { let index = 0; return { currentNode: nodes[0], nextNode: () => nodes[++index] ?? null } } } }
   const captured = runInNewContext(`(${observeOwnedAppDocument.toString()})({ key: 'marker', includeDom: true })`, context)
+  assert.equal(captured.timing.monotonicMs, 125.5)
+  assert.equal(captured.timing.timeOriginMs, 1700000000000)
+  assert.ok(Number.isFinite(captured.timing.wallMs))
   assert.equal(captured.dom.truncated, true)
   assert.ok(captured.dom.nodes.length <= 512); assert.ok(captured.dom.bytes <= 64_000)
   assert.equal(captured.scripts.length, 24)
@@ -231,4 +272,99 @@ test('evidence write failures do not replace primary even when failing DOM and s
   assert.ok(diagnostics.length >= 3)
   const lifecycle = JSON.parse(await readFile(join(artifactDir, 'point-paint-app-lifecycle.json'), 'utf8'))
   assert.equal(lifecycle.failure.error.message, primary.message)
+})
+
+test('owned timing correlates document and Vite requests with bounded bidirectional WebSocket events', async (t) => {
+  const { app, page, artifactDir } = await setup(t)
+  const request = (requestUrl, navigation = false, frame = page, accept = '') => ({ url: () => requestUrl,
+    method: () => 'GET', resourceType: () => navigation ? 'document' : 'script',
+    isNavigationRequest: () => navigation, frame: () => frame, headers: () => ({ accept }),
+    failure: () => ({ errorText: 'network failed' }) })
+  for (const item of [request(url, true), request('http://127.0.0.1:5174/stratified-tikz/@vite/client')]) {
+    page.emit('request', item)
+    page.emit('response', { request: () => item, url: item.url, status: () => 200 })
+    page.emit('requestfinished', item)
+  }
+  const ping = request('http://127.0.0.1:5174/stratified-tikz/', false, page, 'text/x-vite-ping')
+  page.emit('request', ping)
+  page.emit('requestfailed', ping)
+  for (const item of [request('/ordinary-app-module.tsx'), request(url, true, new Page())]) page.emit('request', item)
+  const socket = new EventEmitter(); socket.url = () => 'ws://127.0.0.1:5174/stratified-tikz/'
+  page.emit('websocket', socket)
+  socket.emit('framereceived', { payload: '{"type":"connected"}' })
+  socket.emit('framesent', { payload: '{"type":"ping"}' })
+  socket.emit('framereceived', { payload: '{"type":"full-reload","path":"*"}' })
+  socket.emit('framesent', { payload: '{"type":"application-secret","body":"omitted"}' })
+  socket.emit('framereceived', { payload: 'x'.repeat(64_001) })
+  socket.emit('socketerror', 'retained socket error')
+  socket.emit('close')
+  await app.dispose()
+  const lifecycle = JSON.parse(await readFile(join(artifactDir, 'point-paint-app-lifecycle.json'), 'utf8'))
+  const requests = lifecycle.events.filter((entry) => entry.event.startsWith('request-') || entry.event === 'response')
+  assert.equal(requests.length, 7)
+  assert.deepEqual(requests.map((entry) => entry.requestId), [1, 1, 1, 2, 2, 2, 3])
+  const pingFailed = lifecycle.events.find((entry) => entry.event === 'requestfailed')
+  assert.equal(pingFailed.requestId, 3)
+  assert.equal(pingFailed.vitePing, true)
+  assert.equal(pingFailed.requestUrl, ping.url())
+  assert.equal(pingFailed.failure, 'network failed')
+  assert.deepEqual(lifecycle.events.filter((entry) => entry.event === 'module-websocket').map(({ direction, type }) => ({ direction, type })), [
+    { direction: 'received', type: 'connected' }, { direction: 'sent', type: 'ping' }, { direction: 'received', type: 'full-reload' },
+  ])
+  assert.ok(!JSON.stringify(lifecycle).includes('application-secret'))
+  const omitted = lifecycle.events.find((entry) => entry.event === 'websocket-frame-omitted')
+  assert.deepEqual({ direction: omitted.direction, payloadBytes: omitted.payloadBytes }, { direction: 'received', payloadBytes: 64_001 })
+  assert.deepEqual(lifecycle.events.slice(-2).map((entry) => entry.event), ['websocket-error', 'websocket-closed'])
+  for (const entry of lifecycle.events) {
+    assert.ok(Number.isFinite(entry.host.wallMs) && Number.isFinite(entry.host.monotonicMs))
+    assert.equal(entry.host.processId, process.pid)
+  }
+  assert.equal(socket.eventNames().length, 0, 'Every socket listener belongs to bounded App disposal')
+  assert.equal(page.eventNames().length, 0)
+})
+
+test('disconnect and same-URL replacement retain context loss first and never reacquire the App', async (t) => {
+  const { app, page, startup, artifactDir } = await setup(t)
+  const originalGeneration = startup.document.generation
+  const primary = new Error('page.evaluate: Execution context was destroyed, most likely because of a navigation')
+  const socket = new EventEmitter(); socket.url = () => 'ws://127.0.0.1:5174/stratified-tikz/'
+  page.emit('websocket', socket); socket.emit('close')
+  page.emit('console', { type: () => 'log', text: () => '[vite] server connection lost. Polling for restart...', location: () => ({}) })
+  page.document.generation = 'document-2'; page.document.readyState = 'interactive'
+  page.document.api = { type: 'undefined', stateType: 'undefined', sameInstance: false }; page.document.root.children = 0
+  page.emit('framenavigated', page)
+  let reacquisitions = 0
+  page.addInitScript = async () => { reacquisitions++; throw new Error('Must not reauthenticate a replaced document') }
+  page.waitForFunction = async () => { reacquisitions++; throw new Error('Must not wait for replacement API readiness') }
+  const initialCalls = page.calls.length
+  await assert.rejects(app.checkpoint('document-b-ready'), /generation changed/)
+  const evidence = await app.failure(primary, { stage: 'document-b-ready' })
+  assert.equal(evidence.error.message, primary.message)
+  assert.equal(evidence.snapshot.document.generation, 'document-2')
+  assert.equal(evidence.snapshot.document.url, startup.document.url)
+  assert.equal(reacquisitions, 0)
+  assert.ok(page.calls.slice(initialCalls).every((call) => call.operation === 'observeOwnedAppDocument' || call.screenshot),
+    'The replacement fixture API must never execute')
+  await app.dispose()
+  const lifecycle = JSON.parse(await readFile(join(artifactDir, 'point-paint-app-lifecycle.json'), 'utf8'))
+  assert.equal(lifecycle.expected.generation, originalGeneration)
+  assert.equal(lifecycle.failure.error.message, primary.message)
+  const timeline = lifecycle.events.filter((entry) => ['websocket-closed', 'console', 'main-frame-navigation'].includes(entry.event))
+  assert.deepEqual(timeline.map((entry) => entry.event), ['websocket-closed', 'console', 'main-frame-navigation'])
+  assert.ok(timeline.every((entry, index) => index === 0 || entry.host.monotonicMs >= timeline[index - 1].host.monotonicMs))
+})
+
+test('WebSocket diagnostic subscriptions stay bounded and release every retained socket', async (t) => {
+  const { app, page, artifactDir } = await setup(t)
+  const sockets = Array.from({ length: 40 }, () => {
+    const socket = new EventEmitter(); socket.url = () => 'ws://127.0.0.1:5174/stratified-tikz/'
+    page.emit('websocket', socket); return socket
+  })
+  assert.ok(sockets.slice(0, 32).every((socket) => socket.eventNames().length === 4))
+  assert.ok(sockets.slice(32).every((socket) => socket.eventNames().length === 0))
+  await app.dispose()
+  const lifecycle = JSON.parse(await readFile(join(artifactDir, 'point-paint-app-lifecycle.json'), 'utf8'))
+  assert.equal(lifecycle.socketCount, 32)
+  assert.equal(lifecycle.droppedSockets, 8)
+  assert.ok(sockets.every((socket) => socket.eventNames().length === 0))
 })

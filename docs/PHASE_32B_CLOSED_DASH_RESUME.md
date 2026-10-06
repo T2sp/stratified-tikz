@@ -1,6 +1,14 @@
 # Closed-dash residual investigation resumed
 
-32B remains **incomplete**. This continuation resumes the residual work under
+The 2026-10-06 parent countermeasure execution is recorded in
+[the current navigation and transfer investigation](PHASE_32B_OWNED_APP_NAVIGATION.md).
+It actually exercised all four shapes and saved-SVG reopening, then applied the
+observed uninterrupted-dash seam correction. Matching final strict verification
+and independent review determine acceptance; their frozen-tree outcomes are at
+`/private/tmp/stz-32b-four-countermeasures-20261006/HANDOFF.md`.
+The earlier continuation below is preserved as historical evidence.
+
+At the earlier continuation, 32B remained **incomplete**. It resumed residual work under
 the current fix prompt. Strict acceptance, all 16 groups, the complete paint/import
 group, actual App downloads, settled-SVG standalone reopening and subsequent
 independent review remain required. The proposed core profile is not adopted.
@@ -10,6 +18,17 @@ on `phase/32b-color-opacity-outline`. Its tracked/untracked identity is retained
 outside the checkout at `/private/tmp/stz-32b-resume-l2zpIT/start-checkout.json`.
 No reset, dependency addition, commit, push or 32C/32D implementation occurred.
 The accepted square-zero-off ordinary-control/Alt-cycling correction is preserved.
+
+The current `4a4a780` continuation preserves all of the implementation below.
+The independent latest `03pAet` owned-App replacement and the demonstrated Vite
+port-zero isolation defect are documented in
+[the navigation investigation](PHASE_32B_OWNED_APP_NAVIGATION.md). That parent
+stopped at 13/16 groups before paint/import; it neither reconfirms nor resolves
+the earlier full-closed failure. The transfer was attempted first on this
+continuation's starting tree and again failed before Chrome at localhost `EPERM`.
+Native four-shape action/reopen evidence remains missing. Existing transfer
+context, coordinate and sampling helpers are preserved; only invocation-owned
+server startup/authentication is shared with the App diagnostic correction.
 
 ## Observed retained evidence
 

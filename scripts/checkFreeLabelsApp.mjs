@@ -9,7 +9,7 @@ import { saveAppJson, checkAppJsonReload } from './appJsonPersistence.mjs'
 import { createOwnedAppPage } from './ownedAppPage.mjs'
 import { clickAppPointer, createAppGeometryDiagnostics, readAppGeometry, waitForAppFrames, waitForStableAppGeometry } from './appGeometryDiagnostics.mjs'
 
-export async function runAppChecks({ browser, origin, record, artifactDir }) {
+export async function runAppChecks({ browser, origin, record, artifactDir, ownedServer }) {
   const page = await browser.newPage({ viewport: { width: 1600, height: 1200 }, acceptDownloads: true })
   const errors = []
   let droppedErrors = 0
@@ -26,10 +26,12 @@ export async function runAppChecks({ browser, origin, record, artifactDir }) {
   let primary, cleanupFailure, persistenceIndex = 0, stage = { name: 'startup' }, generation
   const boundary = async (name, operation, details = {}, timeoutMs = 30_000) => {
     const context = { stage, ...details }
+    await ownedServer?.flush(`App:${stage.name}:${name}:before`)
     return diagnostics.around(name, async () => {
       await app.checkpoint(`${name}:before`)
       const result = await operation()
       await app.checkpoint(`${name}:after`)
+      await ownedServer?.flush(`App:${stage.name}:${name}:after`)
       return result
     }, context, timeoutMs)
   }
@@ -326,7 +328,8 @@ export async function runAppChecks({ browser, origin, record, artifactDir }) {
   }
   try {
     await app.install()
-    await page.goto(expectedUrl)
+    const response = await page.goto(expectedUrl)
+    await ownedServer?.authenticate(response)
     generation = (await boundedPointDiagnostic(() => app.start(), 'App startup readiness', 35_000)).document.generation
     await diagnostics.install()
     await waitFor(() => {
@@ -461,7 +464,8 @@ export async function runAppChecks({ browser, origin, record, artifactDir }) {
   } catch (error) {
     primary = error
     // Host evidence is saved before any potentially unavailable browser call.
-    for (const capture of [() => diagnostics.failure(error, { stage, errors, droppedErrors, actions }),
+    for (const capture of [() => ownedServer?.flush(`App:${stage.name}:primary-failure`),
+      () => diagnostics.failure(error, { stage, errors, droppedErrors, actions }),
       () => app.failure(error, { stage, errors, droppedErrors, actions })]) {
       try { await capture() } catch (secondary) { console.error('App failure capture:', secondary) }
     }

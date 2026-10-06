@@ -8,7 +8,7 @@ import { homedir } from 'node:os'
 import { isAbsolute, join, resolve } from 'node:path'
 import { fileURLToPath, pathToFileURL } from 'node:url'
 import { createHash } from 'node:crypto'
-import { createServer } from 'vite'
+import { startOwnedViteServer } from './ownedViteServer.mjs'
 import { captureBrowserCheckoutSnapshot } from './browserCheckoutSnapshot.mjs'
 import { boundedPointDiagnostic } from './pointCheckDiagnostics.mjs'
 import { connectedPaintCaptureMetadata, inspectConnectedLivePaintPng } from './connectedLivePaintOracle.mjs'
@@ -16,6 +16,7 @@ import { withConnectedLivePaintIsolation } from './connectedLivePaintIsolation.m
 import { closedDashTransferErrorDetails as details, createClosedDashTransferContext, createClosedDashTransferFailures } from './closedDashTransferLifecycle.mjs'
 import { calibrateConnectedPaintSampling, classifyConnectedPaintSampling } from './connectedPaintSampling.mjs'
 import { assertClosedDashTransferCoordinates, observeClosedDashTransferCoordinates } from './closedDashTransferCoordinates.mjs'
+import { assertClosedDashTransferAction, observeClosedDashTriangleEndpointCaps } from './closedDashTransferActionContract.mjs'
 
 export const closedDashTransferCases = ['triangle', 'square', 'star', 'circle'].map((shape) => ({
   shape, size: 5.892556509887896, widthPt: 10, patternPt: [100 / 1.2, 100 / 1.2], phasePt: 1 / 1.2,
@@ -26,6 +27,9 @@ const sha = (bytes) => createHash('sha256').update(bytes).digest('hex')
 // Keep the finite historical witnesses even if native-scale sampling is
 // uncertain. They do not acquire a required hit merely from magnified pixels.
 const retainedWitnesses = { triangle: { x: 2, y: -24 }, square: { x: 10, y: -16 }, star: { x: -4, y: -20 }, circle: { x: 14, y: -10 } }
+// These native before-fix failures must stay exercised after the first current
+// diagnostic discrepancy changes. They already belong to the original grid.
+const retainedDefiniteWitnesses = { triangle: { x: 0, y: -22 }, square: { x: 12, y: -14 }, star: { x: -2, y: -20 } }
 export async function runClosedDashTransfer({ page, contextOwner, artifactDir }) {
   const evidence = { result: 'observed', scope: 'Bounded supported-point transfer investigation; not cumulative native acceptance or an adopted limitation',
     mechanism: 'One positive dash covers the complete closed path: width12, square caps, bevel joins, nominal [100,100], phase1. Raw model [100/1.2,100/1.2] emits [100.00000000000001,100.00000000000001]; the SVG source retains that conversion exactly.', cases: [] }
@@ -156,9 +160,17 @@ export async function runClosedDashTransfer({ page, contextOwner, artifactDir })
       const witness = entry.actionSamples.find(({ local }) => local.x === retainedWitnesses[spec.shape].x && local.y === retainedWitnesses[spec.shape].y)
       assert.ok(witness, 'Exact retained finite disputed witness')
       entry.actionCtm = actionCtm; entry.actions = []
-      const actionSamples = [witness, entry.actionSamples.find(({ definiteDiscrepancy }) => definiteDiscrepancy), actionPositive, actionExterior]
-        .filter((sample, index, list) => sample && list.findIndex((other) => other && other.local.x === sample.local.x && other.local.y === sample.local.y) === index)
-      for (const sample of actionSamples) {
+      const retainedDefinite = retainedDefiniteWitnesses[spec.shape]
+      const actionSamples = [
+        { sample: witness, role: 'retained-witness' },
+        { sample: retainedDefinite && entry.actionSamples.find(({ local }) => local.x === retainedDefinite.x && local.y === retainedDefinite.y), role: 'retained-definite-witness' },
+        { sample: entry.actionSamples.find(({ definiteDiscrepancy }) => definiteDiscrepancy), role: 'sampling-discrepancy' },
+        { sample: actionPositive, role: 'painted-positive' },
+        { sample: actionExterior, role: 'exterior' },
+      ].filter(({ sample }, index, list) => sample && list.findIndex(({ sample: other }) => other && other.local.x === sample.local.x && other.local.y === sample.local.y) === index)
+      for (const { sample, role } of actionSamples) {
+        const strictSample = entry.samples.find(({ local }) => local.x === sample.local.x && local.y === sample.local.y)
+        assert.ok(strictSample, 'Native action retains a sample from the unchanged strict magnified oracle')
         try {
           await page.evaluate(() => { window.stzLabels.select(null); window.stzTransferClicks = window.stzLabels.observeEmptyPointSelectionClicks() })
           for (const alt of [false, true]) {
@@ -166,6 +178,21 @@ export async function runClosedDashTransfer({ page, contextOwner, artifactDir })
             assertClosedDashTransferCoordinates(freshCoordinates, { expectedScale: 1, source: before.source, json: before.json, history: before.history })
             const freshCtm = freshCoordinates.ctm, click = freshCoordinates.samples[0].screenFromRoot
             assert.deepEqual(freshCtm, actionCtm, 'Fresh action transform retains restored ordinary framing')
+            const ordinaryTarget = await boundedPointDiagnostic(() => page.evaluate((screen) => {
+              const root = document.querySelector('svg.svg-diagram')
+              const target = document.elementFromPoint(screen.x, screen.y)
+              const point = target?.closest('[data-point-id]')
+              return { pointId: point && root.contains(point) ? point.getAttribute('data-point-id') : null,
+                tagName: target?.localName ?? null, insideRoot: target !== null && root.contains(target) }
+            }, click), 'transfer pre-action native DOM target', 5000)
+            const literalSample = before.samples.find(({ local }) => local.x === sample.local.x && local.y === sample.local.y)
+            const independentEndpointCaps = spec.shape === 'triangle' ? {
+              ...observeClosedDashTriangleEndpointCaps({ source: before.source, local: sample.local,
+                insideContour: literalSample.insideContour, nativeStrokeContains: literalSample.nativeStrokeContains,
+                background: entry.actionLive.isolation.background }),
+              sourceSha256: entry.sourceSha256, sourceAuthenticated: freshCoordinates.source === before.source
+                && entry.actionLive.isolation.valid && entry.actionLive.source === before.source,
+            } : undefined
             if (alt) await boundedPointDiagnostic(() => page.keyboard.down('Alt'), 'transfer Alt key press', 5000)
             try { await boundedPointDiagnostic(() => page.mouse.click(click.x, click.y), 'transfer trusted pointer action', 5000) }
             catch (error) { failures.note('action', error); entry.actionFailure ??= details(error); throw error }
@@ -175,8 +202,10 @@ export async function runClosedDashTransfer({ page, contextOwner, artifactDir })
             }
             const observedAction = await boundedPointDiagnostic(() => page.evaluate(() => ({ event: window.stzTransferClicks.read().at(-1), selection: window.stzLabels.state().selection })), 'transfer action and actual selection', 5000)
             const action = observedAction.event
-            entry.actions.push({ local: sample.local, expected: sample.expected, sampling: sample.combinedDistanceBounds,
-              ctm: freshCtm, coordinates: freshCoordinates.samples[0], selection: observedAction.selection, ...action })
+            const observation = { shape: spec.shape, local: sample.local, role, candidateExpected: strictSample.expected, rawCellExpected: sample.expected,
+              sampling: sample.combinedDistanceBounds, ordinaryTarget, independentEndpointCaps,
+              ctm: freshCtm, coordinates: freshCoordinates.samples[0], selection: observedAction.selection, ...action }
+            entry.actions.push(observation)
             await persist()
             try {
               assert.equal(action.trusted, true); assert.equal(action.overlayExcluded, true)
@@ -185,10 +214,7 @@ export async function runClosedDashTransfer({ page, contextOwner, artifactDir })
               // This mapping check does not change the six-unit hit tolerance.
               assert.ok(Math.abs(action.point.x - 450 - sample.local.x) <= 1e-9)
               assert.ok(Math.abs(action.point.y - 350 - sample.local.y) <= 1e-9)
-              if (sample.expected !== 'uncertain') {
-                assert.deepEqual([...action.candidates].sort(), sample.expected === 'hit' ? ['p'] : [])
-                assert.deepEqual(observedAction.selection, sample.expected === 'hit' ? { kind: 'stratum', id: 'p' } : null)
-              }
+              assertClosedDashTransferAction(observation, strictSample)
             }
             catch (error) { failures.note('action', error); entry.actionFailure ??= details(error) }
           }
@@ -281,8 +307,9 @@ export async function main({ artifactDir = process.env.STZ_CLOSED_DASH_TRANSFER_
     const snapshot = captureBrowserCheckoutSnapshot(); report.checkout = snapshot.checkout
     await writeFile(resolve(artifactDir, 'checkout.diff'), snapshot.diff); await writeFile(resolve(artifactDir, 'checkout-untracked.json'), JSON.stringify(snapshot.untracked))
     report.stage = 'development-server-listen'; await save()
-    server = await createServer({ server: { host: '127.0.0.1', port: 0 }, logLevel: 'error' }); await server.listen()
-    const address = server.httpServer.address(); assert.ok(address && typeof address !== 'string')
+    server = await startOwnedViteServer({ artifactDir })
+    report.ownedServer = { instanceId: server.instanceId, address: server.address, origin: server.origin,
+      pid: process.pid, lifecycleArtifact: 'owned-vite-lifecycle.json' }
     report.stage = 'browser-launch'; await save()
     const fallback = join(homedir(), '.cache/codex-runtimes/codex-primary-runtime/dependencies/node/node_modules/playwright/index.mjs')
     const moduleName = process.env.STZ_PLAYWRIGHT_MODULE ?? (existsSync(fallback) ? fallback : 'playwright')
@@ -292,7 +319,9 @@ export async function main({ artifactDir = process.env.STZ_CLOSED_DASH_TRANSFER_
     contextOwner = await createClosedDashTransferContext({ browser, pageErrors: report.pageErrors, ownedPages: report.ownedPages })
     report.contextOwnership = 'explicit browser.newContext; all fixture and standalone pages owned and observed'
     page = await contextOwner.newPage('main-fixture')
-    await page.goto(`http://127.0.0.1:${address.port}/stratified-tikz/scripts/fixtures/freeLabels.html`); await page.waitForFunction(() => window.stzLabels !== undefined)
+    const response = await page.goto(`${server.origin}/stratified-tikz/scripts/fixtures/freeLabels.html`)
+    await server.authenticate(response)
+    await page.waitForFunction(() => window.stzLabels !== undefined)
     report.stage = 'supported-shapes'; await save()
     const evidence = await runClosedDashTransfer({ page, contextOwner, artifactDir }); report.cases = evidence.cases.map(({ shape, result }) => ({ shape, result }))
     assert.deepEqual(report.pageErrors, []); report.result = 'passed'
