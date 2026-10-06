@@ -549,20 +549,45 @@ test('independent square-circle tangential caps exceed radius plus half-width wh
   }
 })
 
-test('uninterrupted dashes acquire neither caps at crossed corners nor an artificial closed-path seam', () => {
-  for (const shape of ['triangle', 'circle', 'square', 'star'] as const) {
-    const solid = fixture(shape, { lineStyle: 'solid', lineCap: 'rect' })
-    const expected = pendingSvgPointNodeLayout(solid.point)
-    for (const dashPattern of [[1000, 1]]) {
-      const input = fixture(shape, { dashPattern, dashPhase: 1 })
-      const dashed = pendingSvgPointNodeLayout(input.point)
-      boundsClose(dashed.paintedBounds, expected.paintedBounds)
-      close(dashed.selectionRadius, expected.selectionRadius)
-      for (const local of [{ x: 0, y: -24 }, { x: 0, y: 28 }, { x: -6, y: -28 }]) {
-        assert.equal(picked(input, local), picked(solid, local), JSON.stringify({ shape, dashPattern, local }))
-      }
-    }
+for (const { shape, local, paintDistance, nativeUpper } of [
+  { shape: 'triangle', local: { x: 0, y: -22 }, paintDistance: 4.402813376126678, nativeUpper: 5.450523271439117 },
+  { shape: 'square', local: { x: 12, y: -14 }, paintDistance: 3.2018671310658724, nativeUpper: 4.514993334118502 },
+  { shape: 'star', local: { x: -2, y: -20 }, paintDistance: 4.308648642556039, nativeUpper: 5.450523271439117 },
+  { shape: 'circle', local: { x: 14, y: -10 }, paintDistance: 5.043753872365304, nativeUpper: 6.4079839066822375 },
+] as const) test(`fully covered ${shape} square dashes retain native seam paint in picking and settled export`, async () => {
+  // Fresh connected transfer observations at the one retained setting. The
+  // three polygon rows also failed trusted ordinary/Alt actions at scale 1;
+  // the circle row is a strict scale-16 hit with uncertain scale-1 sampling.
+  assert.ok(paintDistance < 5.86)
+  if (shape !== 'circle') assert.ok(nativeUpper < 6)
+  const input = fixture(shape, { width: 10, dashPattern: [100 / 1.2, 100 / 1.2], dashPhase: 1 / 1.2 }, 5.892556509887896)
+  const entry = await committed(input.point)
+  const pending = pendingSvgPointNodeLayout(input.point)
+  for (const layout of [pending, entry.layout]) {
+    assert.equal(layout.dashCaps.seamOnly, true)
+    assert.equal(layout.dashCaps.families.length, 2)
+    assert.equal(layout.strokeContour.kind, shape === 'circle' ? 'circle' : 'polygon')
   }
+  boundsClose(pending.paintedBounds, entry.layout.paintedBounds)
+  close(pending.selectionRadius, entry.layout.selectionRadius)
+  for (const current of [undefined, entry]) for (const scale of [.5, 1, 1.5]) {
+    assert.equal(picked(input, local, current, scale), true)
+    assert.equal(picked(input, { x: -40, y: -40 }, current, scale), false)
+  }
+  const frozen = capture(input.point)
+  const [state] = await settleSvgExportLabels([frozen])
+  const markup = renderSettledSvgLabelDocument(frozen, state)
+  assert.match(markup, /stroke-dasharray="100\.00000000000001 100\.00000000000001"/)
+  assert.match(markup, /stroke-dashoffset="1"/)
+  assert.match(markup, /stroke-linecap="square"/)
+  if (shape === 'circle') {
+    assert.match(markup, /<circle /)
+    assert.doesNotMatch(markup, /<polygon /)
+    close(entry.layout.selectionRadius, Math.hypot(11, 6))
+  } else assert.match(markup, /<polygon /)
+})
+
+test('zero-length gaps retain separately capped subpaths', () => {
   const observation = raster.observations.find(({ id }) => id === 'triangle-zero-off')!
   const layout = pendingSvgPointNodeLayout(rasterFixture(observation).point)
   const addition = addedNativeCapPolicy(observation)!

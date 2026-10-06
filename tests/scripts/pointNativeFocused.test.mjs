@@ -16,10 +16,11 @@ async function fixture(t, overrides = {}) {
   const artifactDir = await mkdtemp(join(tmpdir(), 'stz-point-focused-test-'))
   t.after(() => rm(artifactDir, { recursive: true, force: true }))
   const calls = [], handlers = new Map()
+  const response = { fixtureResponse: true }
   const page = {
     on(name, handler) { handlers.set(name, handler); calls.push(`on:${name}`) },
     off(name, handler) { assert.equal(handlers.get(name), handler); handlers.delete(name); calls.push(`off:${name}`) },
-    async goto(url, options) { calls.push({ goto: url, options }) },
+    async goto(url, options) { calls.push({ goto: url, options }); return response },
     async waitForFunction(callback, argument, options) {
       assert.match(callback.toString(), /window.stzLabels !== undefined/)
       assert.equal(argument, undefined); assert.equal(options.timeout, 30_000)
@@ -33,14 +34,22 @@ async function fixture(t, overrides = {}) {
     async close() { calls.push('browser close') },
   }
   const server = {
-    httpServer: { address: () => ({ port: 23456 }) },
-    async listen() { calls.push('server listen') },
+    ownerId: 'test-owned-server', instanceId: 'test-owned-instance',
+    origin: 'http://127.0.0.1:23456', address: { address: '127.0.0.1', family: 'IPv4', port: 23456 },
+    lifecyclePath: join(artifactDir, 'owned-vite-lifecycle.json'),
+    async authenticate(actual) {
+      assert.ok(actual, 'Owned fixture authentication requires a navigation response')
+      assert.equal(actual, response); calls.push('renderer response authenticated')
+    },
+    async flush(boundary) { calls.push({ serverFlush: boundary }) },
     async close() { calls.push('server close') },
   }
   const nativeChecks = async (context) => {
     calls.push('whole shared workflow invocation')
     assert.equal(context.page, page); assert.equal(context.browser, browser)
     assert.equal(context.origin, 'http://127.0.0.1:23456')
+    assert.equal(context.ownedServer, server)
+    assert.ok(calls.includes('renderer response authenticated'), 'Fixture server is authenticated before native work')
     await context.diagnose(bodyGroup, persistence, { boundary: 'mocked-before-controls', ambientDimension: 3, mode: 'standalone' })
     await context.saved(persistence, { unitTestOnly: true }, bodyGroup)
     context.setStage('point-node-settled-export')
@@ -58,11 +67,11 @@ async function fixture(t, overrides = {}) {
       assert.equal(name, 'playwright'); calls.push('playwright import')
       return { launch: async (options) => { calls.push({ launch: options }); return browser } }
     },
-    createViteServer: async (options) => { calls.push({ server: options }); return server },
+    startViteServer: async (options) => { calls.push({ ownedServerStart: options }); return server },
     nativeChecks, diagnosticTimeoutMs: 500, cleanupTimeoutMs: 100,
     ...overrides,
   }
-  return { options, page, browser, server, calls, handlers,
+  return { options, page, browser, server, response, calls, handlers,
     report: async () => JSON.parse(await readFile(join(artifactDir, reportName), 'utf8')) }
 }
 
@@ -98,7 +107,10 @@ test('focused runner retains normal fixture viewport, binary identity and explic
   assert.deepEqual(await readFile(join(f.options.artifactDir, 'checkout.diff')), Buffer.from([0, 255, 10]))
   assert.equal(JSON.parse(await readFile(join(f.options.artifactDir, 'checkout-untracked.json'))).files['binary.png'].data, 'AP8=')
   assert.deepEqual(f.calls.find((item) => item.newPage), { newPage: { viewport: { width: 1100, height: 850 } } })
-  assert.deepEqual(f.calls.find((item) => item.server), { server: { server: { host: '127.0.0.1', port: 0 }, logLevel: 'error' } })
+  assert.deepEqual(f.calls.find((item) => item.ownedServerStart), { ownedServerStart: { artifactDir: f.options.artifactDir } })
+  assert.deepEqual(report.environment.ownedServer, { ownerId: 'test-owned-server', instanceId: 'test-owned-instance',
+    address: f.server.address, pid: process.pid, lifecycleArtifact: 'owned-vite-lifecycle.json' })
+  assert.ok(f.calls.indexOf('renderer response authenticated') < f.calls.indexOf('renderer API ready'))
   assert.deepEqual(f.calls.find((item) => item.launch), { launch: { headless: true, timeout: 30_000 } })
   assert.deepEqual(f.calls.slice(-4), ['off:pageerror', 'page close', 'browser close', 'server close'])
   assert.equal(f.handlers.size, 0)
@@ -129,6 +141,16 @@ test('native primary error and complete call log survive cleanup failures and a 
   assert.equal(f.calls.at(-1), 'server close'); assert.equal(f.handlers.size, 0)
 })
 
+test('explicit Chrome launch retains a Default NetLog artifact without changing network settings', async (t) => {
+  const executablePath = '/configured/Google Chrome'
+  const f = await fixture(t, { env: { STZ_BROWSER_EXECUTABLE: executablePath } })
+  await runFocusedNativePointAcceptance(f.options)
+  assert.deepEqual(f.calls.find((item) => item.launch), { launch: { headless: true, timeout: 30_000,
+    executablePath, args: [`--log-net-log=${join(f.options.artifactDir, 'chromium-netlog.json')}`, '--net-log-capture-mode=Default'] } })
+  assert.deepEqual((await f.report()).environment.browserNetLog,
+    { artifact: 'chromium-netlog.json', captureMode: 'Default' })
+})
+
 test('oversized native error message, stack and separate log have explicit bounded truncation', async (t) => {
   const primary = new Error('m'.repeat(70_000))
   primary.stack = 's'.repeat(70_000)
@@ -145,13 +167,60 @@ test('oversized native error message, stack and separate log have explicit bound
 test('server listen restriction is reported at its actual stage without browser launch or native completion', async (t) => {
   const primary = Object.assign(new Error('listen EPERM: operation not permitted 127.0.0.1'), { code: 'EPERM' })
   const f = await fixture(t)
-  f.server.listen = async () => { throw primary }
+  f.options.startViteServer = async ({ artifactDir }) => {
+    assert.equal(artifactDir, f.options.artifactDir); f.calls.push('owned startup failed'); throw primary
+  }
   await assert.rejects(runFocusedNativePointAcceptance(f.options), (error) => error === primary)
   const report = await f.report()
   assert.equal(report.stage, 'development-server-listen'); assert.equal(report.error.code, 'EPERM')
   assert.deepEqual(report.startedNativeScopes, []); assert.deepEqual(report.evidence, [])
   assert.equal(f.calls.some((item) => item.launch), false)
+  assert.equal(f.calls.at(-1), 'owned startup failed')
+  assert.equal(f.calls.includes('server close'), false, 'Startup helper owns cleanup before returning a server')
+})
+
+test('focused native diagnosis rejects external server adoption before browser launch', async (t) => {
+  const f = await fixture(t, { env: { STZ_BROWSER_BASE_URL: 'http://127.0.0.1:5173' } })
+  await assert.rejects(runFocusedNativePointAcceptance(f.options), /fresh invocation-owned server/)
+  const report = await f.report()
+  assert.equal(report.stage, 'development-server-listen')
+  assert.equal(f.calls.some((item) => item.ownedServerStart || item.launch), false)
+  assert.deepEqual(report.startedNativeScopes, [])
+})
+
+test('fixture response ownership failure stops before native workflow and retains owned cleanup', async (t) => {
+  const primary = new Error('Owned Vite navigation reached another server instance')
+  const f = await fixture(t)
+  f.server.authenticate = async (response) => { assert.equal(response, f.response); throw primary }
+  await assert.rejects(runFocusedNativePointAcceptance(f.options), (error) => error === primary)
+  const report = await f.report()
+  assert.equal(report.stage, 'renderer-fixture'); assert.equal(report.error.message, primary.message)
+  assert.equal(f.calls.includes('renderer API ready'), false)
+  assert.equal(f.calls.includes('whole shared workflow invocation'), false)
+  assert.ok(f.calls.some((item) => item.serverFlush === 'focused-native-primary-failure'))
+  assert.deepEqual(f.calls.slice(-4), ['off:pageerror', 'page close', 'browser close', 'server close'])
+})
+
+test('owned-server failure evidence cannot replace native failure or skip owned cleanup', async (t) => {
+  const primary = new Error('native original failure')
+  const f = await fixture(t, { nativeChecks: async () => { throw primary } })
+  f.server.flush = async () => { throw new Error('server evidence failure') }
+  await assert.rejects(runFocusedNativePointAcceptance(f.options), (error) => error === primary)
+  const report = await f.report()
+  assert.equal(report.error.message, primary.message)
+  assert.equal(report.secondary[0].name, 'owned-server failure evidence')
+  assert.equal(report.secondary[0].error.message, 'server evidence failure')
   assert.equal(f.calls.at(-1), 'server close')
+})
+
+test('a final owned-server close failure prevents a focused pass', async (t) => {
+  const primary = new Error('owned lifecycle evidence incomplete')
+  const f = await fixture(t)
+  f.server.close = async () => { f.calls.push('server close'); throw primary }
+  await assert.rejects(runFocusedNativePointAcceptance(f.options), (error) => error === primary)
+  const report = await f.report()
+  assert.equal(report.result, 'failed'); assert.equal(report.stage, 'resource-cleanup')
+  assert.equal(report.error.message, primary.message)
 })
 
 test('failed capture/report writes cannot replace the native primary failure or skip cleanup', async (t) => {

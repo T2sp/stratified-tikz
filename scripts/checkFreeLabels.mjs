@@ -9,7 +9,7 @@ import assert from 'node:assert/strict'
 import { mkdir, writeFile } from 'node:fs/promises'
 import { isAbsolute, resolve } from 'node:path'
 import { pathToFileURL } from 'node:url'
-import { createServer } from 'vite'
+import { startOwnedViteServer } from './ownedViteServer.mjs'
 import { captureBrowserCheckoutSnapshot } from './browserCheckoutSnapshot.mjs'
 import { runGeometryChecks } from './checkFreeLabelGeometry.mjs'
 import { runRaceChecks } from './checkFreeLabelRaces.mjs'
@@ -96,21 +96,24 @@ try {
   const moduleName = environment.playwrightModule
   const { chromium } = await import(isAbsolute(moduleName) ? pathToFileURL(moduleName).href : moduleName)
   stage = 'development-server-listen'
-  server = process.env.STZ_BROWSER_BASE_URL ? null
-    : await createServer({ server: { host: '127.0.0.1', port: 0 }, logLevel: 'error' })
-  if (server) await server.listen()
-  const address = server?.httpServer.address()
-  assert.ok(process.env.STZ_BROWSER_BASE_URL || (address && typeof address !== 'string'))
-  const origin = process.env.STZ_BROWSER_BASE_URL ?? `http://127.0.0.1:${address.port}`
+  assert.equal(process.env.STZ_BROWSER_BASE_URL, undefined, 'Native acceptance requires a fresh invocation-owned server')
+  server = await startOwnedViteServer({ artifactDir })
+  const origin = server.origin
+  environment.ownedServer = { instanceId: server.instanceId, address: server.address, pid: process.pid,
+    lifecycleArtifact: 'owned-vite-lifecycle.json' }
   environment.baseUrl = origin
   stage = 'browser-launch'
+  const browserNetLog = environment.browserExecutable ? resolve(artifactDir, 'chromium-netlog.json') : undefined
+  if (browserNetLog) environment.browserNetLog = { artifact: 'chromium-netlog.json', captureMode: 'Default' }
   browser = await chromium.launch({ headless: true,
+    ...(browserNetLog ? { args: [`--log-net-log=${browserNetLog}`, '--net-log-capture-mode=Default'] } : {}),
     ...(process.env.STZ_BROWSER_EXECUTABLE ? { executablePath: process.env.STZ_BROWSER_EXECUTABLE } : {}) })
   environment.browserVersion = browser.version()
   stage = 'renderer-fixture'
   page = await browser.newPage({ viewport: { width: 1100, height: 850 } })
   page.on('pageerror', (error) => pageErrors.push(error.message))
-  await page.goto(`${origin}/stratified-tikz/scripts/fixtures/freeLabels.html`)
+  const response = await page.goto(`${origin}/stratified-tikz/scripts/fixtures/freeLabels.html`)
+  await server.authenticate(response)
   await page.waitForFunction(() => window.stzLabels !== undefined)
 
   const mount = (labels, extra = {}) => page.evaluate((options) => window.stzLabels.mount(options), { labels, ...extra })
@@ -464,8 +467,8 @@ try {
   await runInlineLabelChecks({ page, record, observe, artifactDir, startGroup, completeGroup })
   stage = 'combined-free-inline-workflows'
   await runCombinedLabelChecks({ page, record, observe, artifactDir, startGroup, completeGroup })
-  await runPointThenAppChecks({ page, browser, origin, record, observe, artifactDir, startGroup, completeGroup,
-    setStage: (value) => { stage = value } }, runAppChecksWithGeometryControls)
+  await runPointThenAppChecks({ page, browser, origin, ownedServer: server, record, observe, artifactDir, startGroup, completeGroup,
+    setStage: (value) => { stage = value } }, (context) => runAppChecksWithGeometryControls({ ...context, ownedServer: server }))
   await runPointNodePaintChecks({ page, browser, origin, record, observe, artifactDir, startGroup, completeGroup,
     setStage: (value) => { stage = value } })
   stage = 'settled-SVG-export-standalone'
@@ -475,6 +478,7 @@ try {
   await completeGroup('settled-SVG-export-standalone')
   assert.deepEqual(pageErrors, [], 'Browser raised no uncaught errors')
   assert.deepEqual(new Set(completed), new Set(scenarios), 'All required groups completed')
+  assert.ok(server, 'Native acceptance requires a fresh invocation-owned server')
   stage = 'resource-cleanup'
 } catch (error) {
   primaryFailure = error

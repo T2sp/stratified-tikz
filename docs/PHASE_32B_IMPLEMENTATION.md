@@ -1,5 +1,28 @@
 # Phase 32B: Independent point paint and imported styles
 
+Current countermeasure execution (2026-10-06): [the owned-page and transfer
+investigation](PHASE_32B_OWNED_APP_NAVIGATION.md) records actual browser-capable
+reproduction, measured seam geometry, both-page guards, authenticated focused
+startup and transport diagnostics. Acceptance requires matching complete strict
+verification and independent read-only review; final results and tree identity
+are retained at `/private/tmp/stz-32b-four-countermeasures-20261006/HANDOFF.md`.
+No core profile is adopted. The continuation records below are historical.
+
+Previous continuation: [resumed closed-dash investigation](PHASE_32B_CLOSED_DASH_RESUME.md).
+The latest `03pAet` instead stopped at the earlier
+[owned-App document replacement](PHASE_32B_OWNED_APP_NAVIGATION.md): 13/16 groups,
+without paint/import or final settled SVG. Its disconnect cause is unproven;
+bounded server/page timing and authenticated isolated server ownership now support
+the separate focused reproduction. Production geometry and strict gates remain.
+The earlier retained `c0eiFc` parent passed all 22 App entries and 20/21 supplemental
+entries, but retained the full-closed failure and completed only 14/16 groups. Independent
+same-source measurements distinguish action-scale pixel quantization from the
+unchanged scale-16 `.14` oracle. Transfer context/error ownership and native
+action-framing capture are corrected. The next transfer attempt on `494c7d7`
+failed at localhost `EPERM` before Chrome; all four shapes remain `not_run`.
+Production geometry and the accepted square-zero-off correction are preserved.
+32B remains incomplete; the strict profile is unchanged and no review pass is claimed.
+
 Latest continuation: [connected capture isolation](PHASE_32B_LIVE_PAINT_ACCEPTANCE.md#targeted-capture-isolation-continuation).
 The `gHadrw` parent reached Chrome, passed tests/build/diff/label-assets, and
 failed free-labels with 18/22 App and 20/21 supplemental entries passed.

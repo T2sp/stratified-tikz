@@ -15,6 +15,53 @@ const contour = { kind: 'polygon' as const, radius: 0,
 const close = (actual: number, expected: number) => assert.ok(Math.abs(actual - expected) < 1e-10,
   `${actual} differs from ${expected}`)
 
+test('one positive dash covering the literal triangle retains both independently observed seam caps', () => {
+  const triangle = { kind: 'polygon' as const, radius: 0,
+    vertices: [{ x: 0, y: 0 }, { x: 24, y: 0 }, { x: 12, y: 16 }] }
+  const solid = createPolygonStrokeRegion(triangle.vertices, 12, 'bevel')
+  for (const phase of [1, 201, -199]) {
+    const caps = createDashCaps(triangle, 12, [100, 100], phase, 'square')
+    assert.equal(caps.seamOnly, true)
+    assert.equal(caps.families.length, 2)
+    // Native scale-16 paint requires the incoming terminal cap near (0,-14)
+    // and the outgoing initial cap at (-6,-6). Neither cap alone covers both.
+    close(distanceToDashCaps({ x: 0, y: -14 }, caps), 5.727128425310541)
+    close(distanceToDashCaps({ x: -6, y: -6 }, caps), 0)
+    close(distanceToPolygonStroke({ x: 0, y: -14 }, solid), 8)
+    assert.ok(distanceToPolygonStroke({ x: -6, y: -6 }, solid) > 0)
+    close(caps.bounds!.minX, -8.4); close(caps.bounds!.minY, -8.4)
+    close(caps.bounds!.maxX, 4.8); close(caps.bounds!.maxY, 6)
+    assert.ok(distanceToDashCaps({ x: -20, y: -20 }, caps) > 6)
+  }
+})
+
+test('full-contour caps require one uninterrupted on interval rather than painted seam endpoints', () => {
+  const triangle = { kind: 'polygon' as const, radius: 0,
+    vertices: [{ x: 0, y: 0 }, { x: 24, y: 0 }, { x: 12, y: 16 }] }
+  for (const pattern of [[32, 32], [5, 10, 100, 100], [10, 0]]) {
+    const caps = createDashCaps(triangle, 12, pattern, 1, 'square')
+    assert.equal(caps.seamOnly, false)
+  }
+  // An on endpoint exactly at the terminal seam keeps the existing half-open
+  // rule. The correction is conditioned on that interval extending beyond it.
+  assert.equal(createDashCaps(triangle, 12, [65, 100], 1, 'square').families.length, 0)
+  assert.equal(createDashCaps(triangle, 12, [100, 100], 100, 'square').families.length, 0)
+  assert.equal(createDashCaps(triangle, 12, undefined, 1, 'square').families.length, 0)
+  assert.equal(createDashCaps(triangle, 12, [100, 100], 1, 'round').families.length, 0)
+})
+
+test('full-contour classification retains exact small remaining lengths beside extreme intervals', () => {
+  for (const [large, off] of [[1e20, 1e19], [1e308, 1e308]]) {
+    const covered = createDashCaps(contour, 12, [5, 10, large, off], 20, 'square')
+    assert.equal(covered.seamOnly, true)
+    close(distanceToDashCaps({ x: -5, y: -5 }, covered), 0)
+    const endsAfterFifteen = createDashCaps(contour, 12, [5, 10, large, off], large, 'square')
+    assert.equal(endsAfterFifteen.seamOnly, false)
+    close(distanceToDashCaps({ x: -5, y: -5 }, endsAfterFifteen), 0)
+    close(distanceToDashCaps({ x: 10, y: 12 }, endsAfterFifteen), 1)
+  }
+})
+
 function endpoints(pattern: readonly number[], phase: number) {
   return createDashCaps(contour, 36, pattern, phase, 'square').families.map((family) => {
     assert.equal(family.kind, 'line')

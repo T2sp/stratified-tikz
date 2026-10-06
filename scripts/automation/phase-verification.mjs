@@ -240,8 +240,15 @@ function validateDashLivePaintFiles(artifactDir, live) {
   if (live.sourceFile) {
     assert.equal(resolve(artifactDir, live.sourceFile), join(artifactDir, live.sourceFile));
     assert.ok(!live.sourceFile.includes(".."));
-    assert.equal(sha256(readFileSync(join(artifactDir, live.sourceFile))), live.sourceSha256,
+    const source = readFileSync(join(artifactDir, live.sourceFile));
+    assert.equal(sha256(source), live.sourceSha256,
       "Live literal SVG matches its recorded source identity");
+    if (live.contourSha256) {
+      const contours = source.toString("utf8").match(/<polygon\b[\s\S]*?<\/polygon>/gu);
+      assert.equal(contours?.length, 1, "Literal scale comparison retains one connected contour");
+      assert.equal(sha256(contours[0]), live.contourSha256,
+        "Native and magnified captures bind the same retained literal contour");
+    }
   }
   for (const capture of live.captures) {
     if (capture.source) {

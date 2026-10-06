@@ -1,5 +1,26 @@
 # Phase 32 Plan: Point-node math, paint, geometric shapes, and layout
 
+Current 32B countermeasure execution (2026-10-06): the authenticated parent
+reproduced the four-shape transfer, exercised native point workflows, and applied
+the measured uninterrupted-dash seam correction and both-page ownership guards.
+See [the current investigation](PHASE_32B_OWNED_APP_NAVIGATION.md). Final acceptance
+requires matching complete strict verification and independent read-only review;
+their outcomes and immutable tree identity are retained at
+`/private/tmp/stz-32b-four-countermeasures-20261006/HANDOFF.md`.
+No core profile is adopted; 32C/32D remain deferred. The records below are historical.
+
+Previous 32B residual status: [closed-dash work resumed](PHASE_32B_CLOSED_DASH_RESUME.md).
+The latest `03pAet` stopped earlier at an independent
+[owned-App document replacement](PHASE_32B_OWNED_APP_NAVIGATION.md), with 13/16
+groups complete. Its initiating disconnect is unproven. Server isolation and
+bounded lifetime/traffic diagnostics are corrected without waiving ownership.
+The earlier retained `c0eiFc` strict report remains failed at the full-closed
+supplemental, with 22/22 App entries passed and 14/16 groups complete. The
+corrected transfer was attempted on preserved `494c7d7`; localhost `EPERM`
+stopped it before Chrome, leaving all four shapes `not_run`. Native transfer,
+complete matching strict verification and subsequent independent review remain
+required. No core profile is adopted and 32C/32D implementation has not begun.
+
 Status: 32A is accepted. The `gtRban` parent report completed all 15 groups,
 all 11 named point scenarios and required artifacts, followed by an independent
 passing review. Its tracked diff and four then-untracked file hashes match the

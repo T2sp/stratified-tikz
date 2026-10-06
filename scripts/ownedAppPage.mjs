@@ -24,9 +24,10 @@ export function installOwnedAppDocumentMarker(key) {
 }
 
 /** This deliberately never calls the fixture API, even on the failure path. */
-export function observeOwnedAppDocument({ key, includeDom = false }) {
-  const marker = window[key], api = window.stzAppLabels, root = document.getElementById('root')
+export function observeOwnedAppDocument({ key, includeDom = false, apiName = 'stzAppLabels' }) {
+  const marker = window[key], api = window[apiName], root = document.getElementById('root')
   const result = {
+    timing: { wallMs: Date.now(), monotonicMs: performance.now(), timeOriginMs: performance.timeOrigin },
     url: location.href, readyState: document.readyState, title: document.title.slice(0, 300),
     contentType: document.contentType, generation: marker?.generation ?? null,
     nativeActions: marker?.nativeActions ?? [],
@@ -70,9 +71,14 @@ export function assertOwnedAppState(before, after) {
 }
 
 /** Fail closed after startup. Never wait for, reload, or recreate a lost App. */
-export function createOwnedAppPage({ page, expectedUrl, artifactDir, prefix = 'point-paint-app', timeoutMs = 2000, observeDiagnostic }) {
+export function createOwnedAppPage({ page, expectedUrl, artifactDir, prefix = 'point-paint-app', timeoutMs = 2000, observeDiagnostic,
+  apiName = 'stzAppLabels', stateFields = ['json', 'runtimeDiagramJson', 'history', 'labelDocumentRevision'] }) {
+  assert.ok(['stzAppLabels', 'stzLabels'].includes(apiName), 'Known owned fixture API')
+  assert.ok(stateFields.includes('json') && stateFields.includes('history'), 'Owned fixture exposes model and history identity')
   const pageId = `app-${randomUUID()}`, events = [], listeners = [], transitions = []
-  let sequence = 0, droppedEvents = 0, crashed = false, expected, startup, lastState, failureRecord
+  const requestIds = new WeakMap()
+  let sequence = 0, droppedEvents = 0, socketCount = 0, droppedSockets = 0, requestCount = 0
+  let crashed = false, expected, startup, lastState, failureRecord
   const evidencePath = resolve(artifactDir, `${prefix}-lifecycle.json`)
   const diagnostic = async (operation, name, deadlineMs = timeoutMs) => {
     const started = performance.now()
@@ -87,7 +93,9 @@ export function createOwnedAppPage({ page, expectedUrl, artifactDir, prefix = 'p
     }
   }
   const add = (event, details = {}) => {
-    events.push({ sequence: ++sequence, at: new Date().toISOString(), event, pageId, url: clipped(page.url()), ...details })
+    events.push({ sequence: ++sequence, at: new Date().toISOString(), host: {
+      wallMs: Date.now(), monotonicMs: performance.now(), processId: process.pid,
+    }, event, pageId, url: clipped(page.url()), ...details })
     if (events.length > 256) { events.shift(); droppedEvents++ }
   }
   const on = (target, event, listener) => { target.on(event, listener); listeners.push(() => target.off(event, listener)) }
@@ -102,20 +110,59 @@ export function createOwnedAppPage({ page, expectedUrl, artifactDir, prefix = 'p
       add('console', { type: message.type(), text: clipped(message.text()), location: { url: clipped(message.location().url ?? ''), lineNumber: message.location().lineNumber, columnNumber: message.location().columnNumber } })
     }
   })
-  on(page, 'requestfailed', (request) => add('requestfailed', { requestUrl: clipped(request.url()), resourceType: request.resourceType(), failure: clipped(request.failure()?.errorText ?? '') }))
-  on(page, 'response', (response) => { if (response.status() >= 400) add('response-failure', { requestUrl: clipped(response.url()), status: response.status() }) })
+  const isVitePing = (request) => /(?:^|[,;\s])text\/x-vite-ping(?:$|[,;\s])/i.test(request?.headers?.().accept ?? '')
+  const relevantRequest = (request) => {
+    if (!request) return false
+    const navigation = request.isNavigationRequest?.() && request.frame?.() === page.mainFrame()
+    return navigation || isVitePing(request) || /\/@vite\/(?:client|ping)(?:[/?]|$)/.test(request.url())
+  }
+  const requestDetails = (request) => {
+    if (!requestIds.has(request)) requestIds.set(request, ++requestCount)
+    return { requestId: requestIds.get(request), requestUrl: clipped(request.url()),
+      method: request.method?.(), resourceType: request.resourceType(), navigation: request.isNavigationRequest?.() ?? false,
+      vitePing: isVitePing(request) }
+  }
+  on(page, 'requestfailed', (request) => add('requestfailed', {
+    ...(relevantRequest(request) ? requestDetails(request) : { requestUrl: clipped(request.url()), resourceType: request.resourceType() }),
+    failure: clipped(request.failure()?.errorText ?? ''),
+  }))
+  on(page, 'request', (request) => { if (relevantRequest(request)) add('request-started', requestDetails(request)) })
+  on(page, 'requestfinished', (request) => { if (relevantRequest(request)) add('request-finished', requestDetails(request)) })
+  on(page, 'response', (response) => {
+    const request = response.request?.()
+    if (relevantRequest(request)) add('response', { ...requestDetails(request), status: response.status() })
+    if (response.status() >= 400) add('response-failure', { requestUrl: clipped(response.url()), status: response.status() })
+  })
   on(page, 'websocket', (socket) => {
-    on(socket, 'framereceived', ({ payload }) => {
-      if (/reload|update|error/.test(String(payload))) add('module-websocket', { socketUrl: clipped(socket.url()), payload: clipped(payload) })
-    })
+    if (socketCount >= 32) { droppedSockets++; add('websocket-observation-omitted', { droppedSockets }); return }
+    const socketId = `socket-${++socketCount}`, socketUrl = clipped(socket.url())
+    add('websocket-opened', { socketId, socketUrl })
+    const frame = (direction, payload) => {
+      // Observe HMR control traffic only; never persist arbitrary application
+      // messages. The event and listener budgets remain finite after loss.
+      const payloadBytes = typeof payload === 'string' ? Buffer.byteLength(payload) : payload.byteLength
+      if (payloadBytes > 64_000) {
+        add('websocket-frame-omitted', { socketId, socketUrl, direction, payloadBytes }); return
+      }
+      const text = String(payload)
+      let type
+      try { type = JSON.parse(text)?.type } catch { type = text === 'ping' ? 'ping' : undefined }
+      if (['connected', 'ping', 'update', 'full-reload', 'error', 'custom'].includes(type)) {
+        add('module-websocket', { socketId, socketUrl, direction, type, payload: clipped(text) })
+      }
+    }
+    on(socket, 'framereceived', ({ payload }) => frame('received', payload))
+    on(socket, 'framesent', ({ payload }) => frame('sent', payload))
+    on(socket, 'close', () => add('websocket-closed', { socketId, socketUrl }))
+    on(socket, 'socketerror', (error) => add('websocket-error', { socketId, socketUrl, error: clipped(error, 4000) }))
   })
   add('created', { expectedUrl })
   const persist = (phase, extra = {}) => diagnostic(() => writeFile(evidencePath, JSON.stringify({
-    schema: 1, pageId, expectedUrl, expected, startup, droppedEvents, events, failure: failureRecord, ...extra,
+    schema: 1, pageId, expectedUrl, apiName, expected, startup, droppedEvents, socketCount, droppedSockets, events, failure: failureRecord, ...extra,
   }, null, 2) + '\n'), `owned App lifecycle evidence (${phase})`)
   async function capture(boundary, includeDom = false) {
     const snapshot = { boundary, pageId, expectedUrl, closed: page.isClosed(), crashed,
-      document: await diagnostic(() => page.evaluate(observeOwnedAppDocument, { key: markerKey, includeDom }), `owned App document capture (${boundary})`) }
+      document: await diagnostic(() => page.evaluate(observeOwnedAppDocument, { key: markerKey, includeDom, apiName }), `owned App document capture (${boundary})`) }
     add('document-observation', { boundary, document: { ...snapshot.document, dom: undefined } })
     await persist(`capture:${boundary}`)
     return snapshot
@@ -124,39 +171,54 @@ export function createOwnedAppPage({ page, expectedUrl, artifactDir, prefix = 'p
     assert.ok(expected, 'Owned App startup must complete before model observations')
     // Check and read atomically in the same browser task: a navigation between
     // a prior document check and this call cannot pass as the old App instance.
-    return diagnostic(() => page.evaluate(({ key, expected }) => {
-      const marker = window[key]
+    return diagnostic(() => page.evaluate(({ key, expected, apiName }) => {
+      const marker = window[key], api = window[apiName]
       if (location.href !== expected.url || marker?.generation !== expected.generation
-        || typeof window.stzAppLabels?.state !== 'function' || marker.api !== window.stzAppLabels) {
+        || typeof api?.state !== 'function' || marker.api !== api) {
         throw new Error('Owned App continuity lost before state read')
       }
-      return window.stzAppLabels.state()
-    }, { key: markerKey, expected }), 'owned App state read')
+      return api.state()
+    }, { key: markerKey, expected, apiName }), 'owned App state read')
   }
   async function checkpoint(boundary) {
     const snapshot = await capture(boundary)
     assertOwnedAppDocument(snapshot, expected)
     const state = await readState()
-    const continuity = Object.fromEntries(['json', 'runtimeDiagramJson', 'history', 'labelDocumentRevision'].map((key) => [key, state[key]]))
-    for (const key of ['json', 'runtimeDiagramJson', 'history']) {
+    const continuity = Object.fromEntries(stateFields.map((key) => [key, state[key]]))
+    for (const key of stateFields.filter((key) => ['json', 'runtimeDiagramJson', 'history'].includes(key))) {
       assert.equal(typeof continuity[key], 'string', `App continuity ${key} is available`)
       assert.ok(continuity[key].length <= 8_000_000, `App continuity ${key} exceeds evidence budget`)
+    }
+    for (const key of stateFields.filter((key) => ['labelDocumentRevision', 'sourceRevision'].includes(key))) {
+      assert.ok(Number.isFinite(continuity[key]), `Owned fixture continuity ${key} is available`)
     }
     lastState = { ...snapshot, state: continuity }
     return lastState
   }
   return {
     pageId, transitions, readState, checkpoint,
-    async install() { await page.addInitScript(installOwnedAppDocumentMarker, markerKey); await persist('install') },
+    browserIdentity() {
+      assert.ok(expected, 'Owned fixture startup must complete before point observations')
+      return { key: markerKey, expected: { ...expected }, apiName }
+    },
+    async install({ currentDocument = false } = {}) {
+      await page.addInitScript(installOwnedAppDocumentMarker, markerKey)
+      // The cumulative renderer is already loaded. Authenticate that Document
+      // once; this never navigates or reattaches after a continuity failure.
+      if (currentDocument) await diagnostic(() => page.evaluate(installOwnedAppDocumentMarker, markerKey), 'owned renderer initial document marker')
+      await persist('install')
+    },
     async start() {
-      await capture('startup-before-ready')
+      const initial = await capture('startup-before-ready')
       // The only readiness wait belongs to the legitimate initial navigation.
-      await page.waitForFunction(() => {
-        if (typeof window.stzAppLabels?.state !== 'function' || !document.getElementById('root')?.childElementCount) return false
-        try { return typeof window.stzAppLabels.state().runtimeDiagramJson === 'string' } catch { return false }
-      }, undefined, { timeout: 30_000 })
-      await page.evaluate((key) => { window[key].api = window.stzAppLabels }, markerKey)
+      await page.waitForFunction(({ apiName, readinessField }) => {
+        const api = window[apiName]
+        if (typeof api?.state !== 'function' || !document.getElementById('root')?.childElementCount) return false
+        try { return typeof api.state()[readinessField] === 'string' } catch { return false }
+      }, { apiName, readinessField: stateFields.includes('runtimeDiagramJson') ? 'runtimeDiagramJson' : 'json' }, { timeout: 30_000 })
+      await page.evaluate(({ key, apiName }) => { window[key].api = window[apiName] }, { key: markerKey, apiName })
       const ready = await capture('startup-ready')
+      assert.equal(ready.document.generation, initial.document.generation, 'Owned fixture document changed during initial startup')
       expected = { pageId, url: expectedUrl, generation: ready.document.generation }
       assert.equal(typeof expected.generation, 'string', 'Startup document generation is present')
       startup = await checkpoint('startup-committed')

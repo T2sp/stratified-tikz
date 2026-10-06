@@ -1,5 +1,14 @@
 # Phase 32B connected paint and bounded acceptance
 
+Current work: [closed-dash residual investigation resumed](PHASE_32B_CLOSED_DASH_RESUME.md).
+The scale-16 raw failure below is retained. Independent scale-1 decoding shows
+the original `(0,-14)` witness is uncertain under pixel-cell quantization;
+other literal omissions remain, including 13 supported by fully opaque pixels.
+These do not establish new trusted App actions or a fresh supported-shape pass.
+The historical four-shape files are unavailable; the corrected transfer harness
+must capture action-framing paint and execute reopen in the parent. Strict
+acceptance remains required and production geometry is unchanged.
+
 Status: the finite core profile below is **proposed, not adopted**. The active
 acceptance policy remains strict. Correcting a disproven interaction oracle
 does not waive a production defect or certify exported paint. 32B remains

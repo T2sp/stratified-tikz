@@ -14,10 +14,11 @@ import { captureNativePointSetup, diagnoseNativePointFailure } from './pointNati
 import { assertPointExportCompatibility } from './pointExportReference.mjs'
 import { createOwnedAppPage } from './ownedAppPage.mjs'
 import { createAppGeometryDiagnostics, waitForAppFrames } from './appGeometryDiagnostics.mjs'
+import { captureOwnedMetricPoint } from './pointMetricComparison.mjs'
 
 const nativeInvalidSource = '  $\\missingNativePoint$\t\n tail  '
 
-export async function runNativePointChecks({ browser, origin, page: rendererPage, artifactDir, saved, startGroup, completeGroup, observe, diagnose, setStage }) {
+export async function runNativePointChecks({ browser, origin, ownedServer, page: rendererPage, artifactDir, saved, startGroup, completeGroup, observe, diagnose, setStage }) {
   const page = await browser.newPage({ viewport: { width: 1600, height: 1200 }, acceptDownloads: true })
   const errors = [], owned = []
   const onPageError = (e) => { if (errors.length < 32) errors.push(e.message.slice(0, 4000)) }
@@ -25,7 +26,7 @@ export async function runNativePointChecks({ browser, origin, page: rendererPage
   const expectedUrl = `${origin}/stratified-tikz/scripts/fixtures/freeLabelsApp.html`
   const app = createOwnedAppPage({ page, expectedUrl, artifactDir, prefix: 'point-native-app' })
   const geometry = createAppGeometryDiagnostics({ page, artifactDir, prefix: 'point-native-controls', nativeControls: true })
-  let primary, cleanupFailure, nativeBoundary = { action: 'startup' }, savedDownload
+  let primary, cleanupFailure, rendererOwner, nativeBoundary = { action: 'startup' }, savedDownload
   const bodyGroup = 'point-node-body-layout-lifecycle', exportGroup = 'point-node-settled-export'
   let scenario = 'point-native-direct-cursor-workplanes-inspector-persistence'
   setStage?.('point-node-native-input')
@@ -97,9 +98,15 @@ export async function runNativePointChecks({ browser, origin, page: rendererPage
   }
   try {
     await app.install()
-    await page.goto(expectedUrl)
+    const response = await page.goto(expectedUrl)
+    await ownedServer?.authenticate(response)
     await app.start()
     await geometry.install()
+    rendererOwner = createOwnedAppPage({ page: rendererPage,
+      expectedUrl: `${origin}/stratified-tikz/scripts/fixtures/freeLabels.html`, artifactDir,
+      prefix: 'point-native-renderer', apiName: 'stzLabels', stateFields: ['json', 'history', 'sourceRevision'] })
+    await rendererOwner.install({ currentDocument: true })
+    await rendererOwner.start()
     const entries = []
     for (const ambientDimension of [2, 3]) {
       nativeBoundary = { ambientDimension, action: 'direct-cursor-sequence' }
@@ -155,18 +162,30 @@ export async function runNativePointChecks({ browser, origin, page: rendererPage
       const rendered = await inspect(points[0].id); assertPointLayout(rendered); assert.equal(rendered.source, source)
       assert.ok(code.standalone.includes(source) && code.inlineMath.includes(source))
       const invalid = nativeInvalidSource
-      await field.fill(invalid); await settle()
-      const invalidBody = await inspect(points[0].id)
+      await field.fill(invalid)
+      const metricInput = { id: points[0].id, source: invalid, ambientDimension }
+      const metricDiagnose = (details) => diagnose(bodyGroup, scenario, { ambientDimension, ...details })
+      const invalidBody = await captureOwnedMetricPoint({ page, owner: app, input: metricInput,
+        boundary: `${ambientDimension}d-native-invalid-body`, inspect, diagnose: metricDiagnose })
       // Same exact source/font at the real App viewport, a second native
       // viewport, and the isolated renderer. Keep CSS/viewBox/transforms intact;
       // collect both APIs before asserting, without attributing box differences.
+      await app.checkpoint(`${ambientDimension}d-native-metric:before-renderer-mount`)
+      await rendererOwner.checkpoint(`${ambientDimension}d-renderer-metric:before-mount`)
       await rendererPage.evaluate(({ text, ambientDimension }) => window.stzLabels.mount({ ambientDimension, labels: [], points: [{ id: 'metric-reference', text }] }), { text: invalid, ambientDimension })
-      await rendererPage.waitForFunction(() => !document.querySelector('[data-label-state="pending"]'))
-      const isolated = await capturePointCheck(() => inspectPoint(rendererPage, 'metric-reference'),
-        (details) => diagnose(bodyGroup, scenario, { context: 'isolated-metric-reference', ambientDimension, ...details }))
+      await rendererOwner.checkpoint(`${ambientDimension}d-renderer-metric:after-mount`)
+      const isolated = await captureOwnedMetricPoint({ page: rendererPage, owner: rendererOwner,
+        input: { ...metricInput, id: 'metric-reference' }, boundary: `${ambientDimension}d-renderer-metric`,
+        inspect: (id) => capturePointCheck(() => inspectPoint(rendererPage, id),
+          (details) => metricDiagnose({ context: 'isolated-metric-reference', ...details })), diagnose: metricDiagnose })
+      await app.checkpoint(`${ambientDimension}d-native-metric:after-renderer-inspection`)
+      await app.checkpoint(`${ambientDimension}d-native-metric:before-resize`)
       await page.setViewportSize({ width: 1440, height: 1080 })
-      const resized = await inspect(points[0].id)
+      const resized = await captureOwnedMetricPoint({ page, owner: app, input: metricInput,
+        boundary: `${ambientDimension}d-native-resized-metric`, inspect, diagnose: metricDiagnose })
       await page.setViewportSize({ width: 1600, height: 1200 })
+      await app.checkpoint(`${ambientDimension}d-native-metric:after-viewport-restoration`)
+      await rendererOwner.checkpoint(`${ambientDimension}d-renderer-metric:after-native-resize`)
       const metricComparison = { ambientDimension, invalidBody, isolated, resized }
       await diagnose(bodyGroup, scenario, { metricComparison })
       assertPositionedLiteral(isolated.literalObservation, invalid)
@@ -489,8 +508,10 @@ export async function runNativePointChecks({ browser, origin, page: rendererPage
   } catch (error) {
     primary = error
     for (const [name, operation] of [
+      ...(ownedServer ? [['native owned server failure', () => ownedServer.flush('point-native:primary-failure')]] : []),
       ['native control failure', () => geometry.failure(error, { ...nativeBoundary, savedDownload, errors })],
       ['native App failure', () => app.failure(error, { ...nativeBoundary, savedDownload, errors })],
+      ...(rendererOwner ? [['native renderer failure', () => rendererOwner.failure(error, { ...nativeBoundary, savedDownload, errors })]] : []),
     ]) {
       try { await boundedPointDiagnostic(operation, name, 20_000) }
       catch (secondary) { console.error(`${name} diagnostics:`, secondary) }
@@ -506,6 +527,7 @@ export async function runNativePointChecks({ browser, origin, page: rendererPage
       ['native control observer dispose', () => geometry.dispose()],
       ['native owned page close', () => page.close()],
       ['native App ownership dispose', () => app.dispose()],
+      ...(rendererOwner ? [['native renderer ownership dispose', () => rendererOwner.dispose()]] : []),
       ['native event drain', () => Promise.all(owned.map((wait) => wait.drain()))],
     ]) {
       try { await boundedPointDiagnostic(operation, name, 12_000) }

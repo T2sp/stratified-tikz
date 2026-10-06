@@ -39,6 +39,7 @@ async function setup(t, { failureAt, stalled = false }) {
   }
   page.goto = async (url) => {
     calls.push('goto'); assert.equal(url, expectedUrl); pageUrl = url
+    if (failureAt === 'authenticate') return { originalNativeResponse: true }
     throw primary
   }
   page.evaluate = async (operation, argument) => {
@@ -75,6 +76,10 @@ async function setup(t, { failureAt, stalled = false }) {
   }
   const unexpected = () => { throw new Error('Acceptance cannot continue after startup failure') }
   const result = runNativePointChecks({
+    ...(failureAt === 'authenticate' ? { ownedServer: {
+      authenticate: async (response) => { calls.push('authenticate'); assert.deepEqual(response, { originalNativeResponse: true }); throw primary },
+      flush: async (boundary) => { calls.push('server-flush'); assert.equal(boundary, 'point-native:primary-failure') },
+    } } : {}),
     browser: { newPage: async (options) => {
       newPages++
       assert.deepEqual(options, { viewport: { width: 1600, height: 1200 }, acceptDownloads: true })
@@ -138,6 +143,14 @@ test('native point orchestration retains install failure through capture, screen
   await assertFailureEvidence(input, false)
   assert.equal(input.calls.includes('goto'), false)
   assert.ok(input.calls.indexOf('stopAppGeometryObserver') < input.calls.indexOf('close'), 'Observer cleanup is attempted before close')
+})
+
+test('native App rejects an unauthenticated server response before readiness and retains ownership failure through cleanup', async (t) => {
+  const input = await setup(t, { failureAt: 'authenticate' })
+  await assertFailureEvidence(input, false)
+  assert.ok(input.calls.includes('authenticate'))
+  assert.ok(input.calls.indexOf('authenticate') < input.calls.indexOf('server-flush'))
+  assert.equal(input.calls.some((name) => name === 'readState'), false)
 })
 
 test('native point orchestration bounds stalled captures and close, owns late rejection, and completes later cleanup', { timeout: 10_000 }, async (t) => {

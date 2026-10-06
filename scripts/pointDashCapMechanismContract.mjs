@@ -1,4 +1,5 @@
 import assert from 'node:assert/strict'
+import { compareConnectedPaintSampling } from './connectedPaintSampling.mjs'
 
 export const dashCapMechanismStem = 'point-paint-dash-cap-mechanism'
 const rawSquare = '5.000000000000001,-5 -5,-5.000000000000001 -5.000000000000002,5 5,5.000000000000002'
@@ -34,6 +35,9 @@ export const dashCapMechanismCases = [
 ]
 export const dashCapMechanismColumns = ['x', 'y', 'paintAlpha', 'solidAlpha', 'paintDistance', 'solidDistance', 'insideContour', 'nativeStrokeContains', 'paintCore', 'expected', 'geometryDistance', 'capDistance', 'hit']
 export const dashCapMechanismGrid = { min: -32, max: 32, step: 2, size: 33, samples: 1089, uncertainty: .14, tolerance: 6 }
+// Existing grid cells retain the disputed threshold witness and a definite
+// native-scale omission even after a justified fix changes current candidates.
+export const dashCapMechanismScaleWitnesses = (spec) => spec.key === 'positive-full-closed-control' ? [{ x: 0, y: -14 }, { x: -8, y: -8 }] : []
 export function dashCapMechanismArtifacts() {
   return [`${dashCapMechanismStem}.json`, ...dashCapMechanismCases.flatMap(({ key }) => ['json', 'input.svg', 'raster.png', 'solid.input.svg', 'solid.raster.png', 'live.svg', 'live-scale-1.png', 'live-scale-16.png'].map((suffix) => `${dashCapMechanismStem}-${key}.${suffix}`))]
 }
@@ -53,6 +57,7 @@ function assertLivePaint(entry, spec) {
   const live = entry.livePaint, stem = `${dashCapMechanismStem}-${spec.key}`
   assert.equal(live.method, 'actual live SVG screenshot PNG; no SVG reconstruction')
   assert.equal(live.sourceFile, `${stem}.live.svg`); assert.ok(hash(live.sourceSha256))
+  assert.ok(hash(live.contourSha256))
   assert.equal(live.sourcePoints, spec.points); assert.deepEqual(live.columns, dashLivePaintColumns)
   assert.equal(live.captures.length, 2)
   const disagreements = entry.samples.filter((row) => row[8] && !row[7]).map((row) => ({ x: row[0], y: row[1] }))
@@ -65,6 +70,7 @@ function assertLivePaint(entry, spec) {
     assert.deepEqual(capture.ctm, { a: scale, b: 0, c: 0, d: scale, e: 64 * scale, f: 64 * scale })
     assert.deepEqual(capture.afterCtm, capture.ctm)
     assert.equal(capture.sourceUnchanged, true); assert.equal(capture.viewport.width >= side && capture.viewport.height >= side, true)
+    assert.equal(capture.contourSha256, live.contourSha256)
     assert.deepEqual(capture.stroke, entry.native.stroke); assert.deepEqual(capture.vertices, entry.native.vertices)
     assert.equal(capture.pathLength, entry.native.pathLength)
     const pixels = capture.pixelDistances
@@ -177,6 +183,7 @@ export function assertDashCapMechanismEntry(entry, spec) {
     }
   }
   assert.deepEqual(oracle.mismatches, [])
+  assert.deepEqual(entry.sameSettingScaleComparison, compareConnectedPaintSampling(entry, dashCapMechanismScaleWitnesses(spec)), 'Retain action-framing calibration separately from the unchanged strict scale-16 oracle')
   const live = capture.pixelDistances
   assert.ok(Number.isFinite(live.paintRadius) && live.paintRadius >= 0)
   assert.ok(entry.geometry.radius + .14 >= live.paintRadius)
