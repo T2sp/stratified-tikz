@@ -1,4 +1,9 @@
 import type { Diagram, TextLabel } from '../../model/types.ts'
+import type { TranslationVector } from '../../model/translation.ts'
+import {
+  isTextLabelSelectableInEditor,
+  type LayerFilter,
+} from '../layerFilter.ts'
 import {
   updateLabelById,
   updateVec3Coordinate,
@@ -16,6 +21,7 @@ import {
 import { LabelStyleEditor } from './LabelStyleEditor.tsx'
 import { StyleClipboardControls } from './StyleClipboardControls.tsx'
 import type { DiagramChangeHandler } from './types.ts'
+import { SingleSelectionActionsEditor } from './SingleSelectionActionsEditor.tsx'
 
 export type TextLabelInspectorProps = {
   diagram: Diagram
@@ -26,6 +32,9 @@ export type TextLabelInspectorProps = {
   onCopyStyle: () => void
   onPasteStyle: () => void
   pasteStyleDisabled?: boolean
+  layerFilter: LayerFilter
+  onDuplicateSelected: () => void
+  onTranslateSelected: (translation: TranslationVector) => void
 }
 
 export function TextLabelInspector({
@@ -37,6 +46,9 @@ export function TextLabelInspector({
   onCopyStyle,
   onPasteStyle,
   pasteStyleDisabled = false,
+  layerFilter,
+  onDuplicateSelected,
+  onTranslateSelected,
 }: TextLabelInspectorProps) {
   return (
     <div className="inspector-content editable-inspector">
@@ -117,6 +129,16 @@ export function TextLabelInspector({
           />
         </div>
       </section>
+
+      {isTextLabelSelectableInEditor(diagram, label, layerFilter) && (
+        <SingleSelectionActionsEditor
+          key={label.id}
+          diagram={diagram}
+          targetName="free text label"
+          onDuplicate={onDuplicateSelected}
+          onTranslate={onTranslateSelected}
+        />
+      )}
 
       <StyleClipboardControls
         clipboardSummary={styleClipboardSummary}

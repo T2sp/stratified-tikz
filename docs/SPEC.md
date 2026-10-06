@@ -725,6 +725,17 @@ references, not layer-bound objects, so they are excluded from layer-bound bulk
 operations. Shift-clicking across coordinate anchors and layer-bound objects
 replaces the selection instead of creating a mixed selection.
 
+Single selected strata and free text labels expose Inspector Duplicate and
+translation controls. This includes all point shapes, filled regions, all sheet
+types, template paths and grids. Coons patches retain their dedicated actions.
+Duplication creates an untranslated independent copy with new object/nested IDs
+and selects it. Translation accepts symbolic or numeric `dx`, `dy` and, in 3D,
+`dz`, using the same coordinate-reference detachment and stored-frame policy as
+bulk editing. Each successful operation is independently undoable. Hidden,
+locked or filtered objects cannot use these actions. Ambient regions can be
+duplicated, but their translation controls are disabled with an explanation:
+they represent the whole ambient space and have no coordinates to move.
+
 Coordinate-only multi-selection supports Inspector translation by `dx`, `dy`,
 and, in 3D, `dz`. In 2D, `dz` remains disabled and locked to `0`. It also
 supports drag translation from a selected coordinate marker when coordinate

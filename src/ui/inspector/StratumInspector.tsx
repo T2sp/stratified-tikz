@@ -38,7 +38,7 @@ import {
   isStratumSelectableInEditor,
   type LayerFilter,
 } from '../layerFilter.ts'
-import { SelectionTranslationSection } from './SelectionTranslationSection.tsx'
+import { SingleSelectionActionsEditor } from './SingleSelectionActionsEditor.tsx'
 
 export type StratumInspectorProps = {
   diagram: Diagram
@@ -52,8 +52,8 @@ export type StratumInspectorProps = {
   onSplitPath?: (target: PathSplitTarget, keepOriginal: boolean) => string
   onStartPathSplitPick?: (keepOriginal: boolean) => string
   layerFilter: LayerFilter
-  onDuplicatePath: () => void
-  onTranslatePath: (translation: TranslationVector) => void
+  onDuplicateSelected: () => void
+  onTranslateSelected: (translation: TranslationVector) => void
   onDuplicateCoonsPatch: (
     patchId: string,
   ) => DuplicateCoonsPatchActionResult
@@ -75,8 +75,8 @@ export function StratumInspector({
   onSplitPath,
   onStartPathSplitPick,
   layerFilter,
-  onDuplicatePath,
-  onTranslatePath,
+  onDuplicateSelected,
+  onTranslateSelected,
   onDuplicateCoonsPatch,
   onTranslateCoonsPatch,
 }: StratumInspectorProps) {
@@ -145,32 +145,23 @@ export function StratumInspector({
           />
         )}
 
-      {supportsPathDuplicateTranslation(stratum) &&
+      {!isCoonsPatchStratum(stratum) &&
         isStratumSelectableInEditor(diagram, stratum, layerFilter) && (
-          <>
-            <SelectionTranslationSection
-              diagram={diagram}
-              heading="Translate selected path"
-              onTranslate={onTranslatePath}
-            />
-            <section className="inspector-section">
-              <h3>Path actions</h3>
-              <div className="inspector-form">
-                <div className="inspector-field">
-                  <span className="inspector-field-label">Duplicate</span>
-                  <button
-                    type="button"
-                    className="toolbar-button"
-                    aria-label="Duplicate selected path"
-                    title="Duplicate this path and select the copy"
-                    onClick={onDuplicatePath}
-                  >
-                    Duplicate
-                  </button>
-                </div>
-              </div>
-            </section>
-          </>
+          <SingleSelectionActionsEditor
+            key={stratum.id}
+            diagram={diagram}
+            targetName={
+              stratum.geometricKind === 'curve' ? 'path' : stratum.geometricKind
+            }
+            onDuplicate={onDuplicateSelected}
+            onTranslate={onTranslateSelected}
+            translationDisabledReason={
+              stratum.geometricKind === 'region' &&
+              stratum.kind !== 'filledRegion'
+                ? 'Ambient regions describe the whole ambient space and have no coordinates to translate.'
+                : undefined
+            }
+          />
         )}
 
       {stratum.geometricKind === 'curve' && (
@@ -208,15 +199,6 @@ export function StratumInspector({
         onDiagramChange={onDiagramChange}
       />
     </div>
-  )
-}
-
-function supportsPathDuplicateTranslation(stratum: Stratum): boolean {
-  return (
-    stratum.geometricKind === 'curve' &&
-    (stratum.kind === 'polyline' ||
-      stratum.kind === 'cubicBezier' ||
-      stratum.kind === 'concatenatedPath')
   )
 }
 

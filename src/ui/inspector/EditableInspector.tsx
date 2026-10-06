@@ -197,8 +197,8 @@ export function EditableInspector({
         onSplitPath={onSplitPath}
         onStartPathSplitPick={onStartPathSplitPick}
         layerFilter={layerFilter}
-        onDuplicatePath={onBulkDuplicate}
-        onTranslatePath={onBulkTranslate}
+        onDuplicateSelected={onBulkDuplicate}
+        onTranslateSelected={onBulkTranslate}
         onDuplicateCoonsPatch={onDuplicateCoonsPatch}
         onTranslateCoonsPatch={onTranslateCoonsPatch}
       />
@@ -219,6 +219,9 @@ export function EditableInspector({
         pasteStyleDisabled={pasteStyleDisabled}
         onCopyStyle={onCopyStyle}
         onPasteStyle={onPasteStyle}
+        layerFilter={layerFilter}
+        onDuplicateSelected={onBulkDuplicate}
+        onTranslateSelected={onBulkTranslate}
       />
     )
 

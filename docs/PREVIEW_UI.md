@@ -1615,6 +1615,15 @@ selections expose fill color, fill opacity, stroke color, stroke opacity, and
 line width. Point selections expose color, opacity, size, shape, and fill mode.
 Label selections expose text color, opacity, font size, and anchor.
 
+For one selected object, the Inspector also exposes Duplicate and translation
+controls for regions, points (all shapes), sheets, paths/templates/grids and free
+text labels. Duplicate selects an untranslated copy; Expand its Inspector to
+continue editing. Translation uses `dx`, `dy` and, in 3D, `dz`; numeric and
+symbolic deltas are supported without cursor snap. Both operations use ordinary
+Undo/Redo. Coons patches keep their dedicated link-aware controls. Ambient
+regions have no coordinates: Duplicate is available and translation is disabled
+with an explanation. Hidden, locked and filtered objects cannot use the actions.
+
 Bulk layer changes move every selected object to the chosen layer and update
 layer metadata as needed. Bulk delete clears the selection and removes stale
 crossing states that depended on deleted curves. Bulk duplicate preserves

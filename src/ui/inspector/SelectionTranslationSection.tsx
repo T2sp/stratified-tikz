@@ -12,12 +12,16 @@ import {
 export type SelectionTranslationSectionProps = {
   diagram: Diagram
   heading?: string
+  ariaLabel?: string
+  disabledReason?: string
   onTranslate: (translation: TranslationVector) => void
 }
 
 export function SelectionTranslationSection({
   diagram,
   heading = 'Translate selected',
+  ariaLabel,
+  disabledReason,
   onTranslate,
 }: SelectionTranslationSectionProps) {
   const [dxInput, setDxInput] = useState('0')
@@ -38,15 +42,21 @@ export function SelectionTranslationSection({
     parsed.preview.x === 0 &&
     parsed.preview.y === 0 &&
     parsed.preview.z === 0
-  const canSubmit = parsed.ok && !isZero
-  const errorMessage = parsed.ok
-    ? isZero
-      ? 'Enter a non-zero translation.'
-      : ''
-    : parsed.error
+  const canSubmit = disabledReason === undefined && parsed.ok && !isZero
+  const errorMessage =
+    disabledReason ??
+    (parsed.ok
+      ? isZero
+        ? 'Enter a non-zero translation.'
+        : ''
+      : parsed.error)
 
   function submitTranslation(event: FormEvent<HTMLFormElement>): void {
     event.preventDefault()
+
+    if (disabledReason !== undefined) {
+      return
+    }
 
     if (!parsed.ok) {
       setStatus(parsed.error)
@@ -70,12 +80,14 @@ export function SelectionTranslationSection({
           label="dx"
           value={dxInput}
           invalid={!parsed.ok && parsed.error.startsWith('dx:')}
+          disabled={disabledReason !== undefined}
           onChange={setDxInput}
         />
         <SelectionTranslationInput
           label="dy"
           value={dyInput}
           invalid={!parsed.ok && parsed.error.startsWith('dy:')}
+          disabled={disabledReason !== undefined}
           onChange={setDyInput}
         />
         {diagram.ambientDimension === 3 && (
@@ -83,6 +95,7 @@ export function SelectionTranslationSection({
             label="dz"
             value={dzInput}
             invalid={!parsed.ok && parsed.error.startsWith('dz:')}
+            disabled={disabledReason !== undefined}
             onChange={setDzInput}
           />
         )}
@@ -91,6 +104,7 @@ export function SelectionTranslationSection({
           <button
             type="submit"
             className="toolbar-button"
+            aria-label={ariaLabel}
             disabled={!canSubmit}
             title={errorMessage}
           >
@@ -99,7 +113,7 @@ export function SelectionTranslationSection({
         </div>
         {(status !== '' || errorMessage !== '') && (
           <p className="inspector-status" role="status" aria-live="polite">
-            {status || errorMessage}
+            {errorMessage || status}
           </p>
         )}
       </form>
@@ -111,11 +125,13 @@ function SelectionTranslationInput({
   label,
   value,
   invalid,
+  disabled,
   onChange,
 }: {
   label: 'dx' | 'dy' | 'dz'
   value: string
   invalid: boolean
+  disabled: boolean
   onChange: (value: string) => void
 }) {
   return (
@@ -127,6 +143,7 @@ function SelectionTranslationInput({
         inputMode="decimal"
         aria-label={label}
         aria-invalid={invalid}
+        disabled={disabled}
         value={value}
         onChange={(event) => onChange(event.currentTarget.value)}
       />

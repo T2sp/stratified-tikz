@@ -26,8 +26,9 @@ import type {
 } from '../../src/model/types.ts'
 import { allLayersFilter, type LayerFilter } from '../../src/ui/layerFilter.ts'
 import type { SelectedElement } from '../../src/ui/selection.ts'
+import { createSingleSelectionInspectorCases } from '../fixtures/singleSelectionInspector.ts'
 
-test('expanded Inspector exposes duplicate and translate actions for one editable path', async () => {
+test('expanded Inspector exposes single-object actions and respects editable layer restrictions', async () => {
   const cacheDir = mkdtempSync(
     join(tmpdir(), 'stratified-tikz-single-path-inspector-'),
   )
@@ -52,6 +53,8 @@ test('expanded Inspector exposes duplicate and translate actions for one editabl
       'cubic-bezier',
       'arc-only-path',
       'mixed-path',
+      'grid',
+      'template-path',
     ]) {
       assertPathActions(
         renderInspector(loaded.EditableInspector, diagram, pathId),
@@ -59,7 +62,7 @@ test('expanded Inspector exposes duplicate and translate actions for one editabl
       )
     }
 
-    for (const unsupportedId of ['point', 'grid', 'template-path']) {
+    for (const unsupportedId of ['point']) {
       assertNoPathActions(
         renderInspector(loaded.EditableInspector, diagram, unsupportedId),
         unsupportedId,
@@ -91,6 +94,40 @@ test('expanded Inspector exposes duplicate and translate actions for one editabl
       ),
       'path outside the active layer filter',
     )
+
+    for (const entry of createSingleSelectionInspectorCases()) {
+      const targetName = entry.coons ? 'Coons patch' : entry.targetName
+      const markup = renderInspector(loaded.EditableInspector, entry.diagram, entry.selection.id)
+      assert.ok(markup.includes(`aria-label="Duplicate selected ${targetName}"`), entry.name)
+      assert.ok(markup.includes(`Translate selected ${targetName}`), entry.name)
+      if (entry.coons) assert.ok(!markup.includes('aria-label="Duplicate selected sheet"'), entry.name)
+      const dx = markup.match(entry.coons
+        ? /<input[^>]*aria-label="Coons patch translation dx"[^>]*>/
+        : /<input[^>]*aria-label="dx"[^>]*>/)?.[0]
+      assert.ok(dx, `${entry.name}: translation input`)
+      if (entry.movable) {
+        assert.doesNotMatch(dx, /disabled/, entry.name)
+      } else {
+        assert.match(dx, /disabled/, entry.name)
+        assert.match(markup, /Ambient regions.*no coordinates to translate/, entry.name)
+      }
+      if (entry.diagram.ambientDimension === 2) assert.doesNotMatch(markup, /aria-label="dz"/, entry.name)
+      else assert.match(markup, entry.coons ? /aria-label="Coons patch translation dz"/ : /aria-label="dz"/, entry.name)
+
+      const object = entry.selection.kind === 'label'
+        ? entry.diagram.labels.find((label) => label.id === entry.selection.id)
+        : entry.diagram.strata.find((stratum) => stratum.id === entry.selection.id)
+      assert.ok(object)
+      for (const restricted of [
+        { diagram: withLayerState(entry.diagram, { visible: false }, object.layer), filter: allLayersFilter },
+        { diagram: withLayerState(entry.diagram, { locked: true }, object.layer), filter: allLayersFilter },
+        { diagram: entry.diagram, filter: { kind: 'layer' as const, layer: object.layer + 1 } },
+      ]) {
+        const restrictedMarkup = renderInspector(loaded.EditableInspector, restricted.diagram, entry.selection.id, restricted.filter)
+        assert.ok(!restrictedMarkup.includes(`aria-label="Duplicate selected ${targetName}"`), `${entry.name}: restricted duplicate`)
+        assert.ok(!restrictedMarkup.includes(`Translate selected ${targetName}`), `${entry.name}: restricted translation`)
+      }
+    }
   } finally {
     await server.close()
     rmSync(cacheDir, { recursive: true, force: true })
@@ -100,13 +137,13 @@ test('expanded Inspector exposes duplicate and translate actions for one editabl
 function renderInspector(
   Inspector: React.ComponentType<Record<string, unknown>>,
   diagram: Diagram,
-  stratumId: string,
+  elementId: string,
   layerFilter: LayerFilter = allLayersFilter,
 ): string {
   const noOp = () => undefined
   const selectedElement: SelectedElement = {
-    kind: 'stratum',
-    id: stratumId,
+    kind: diagram.labels.some((label) => label.id === elementId) ? 'label' : 'stratum',
+    id: elementId,
   }
 
   return renderToStaticMarkup(
@@ -273,12 +310,13 @@ function gridClip(
 function withLayerState(
   diagram: Diagram,
   state: { visible?: boolean; locked?: boolean },
+  layer = 1,
 ): Diagram {
   return {
     ...diagram,
     layers: [
       {
-        value: 1,
+        value: layer,
         name: 'Path layer',
         ...state,
       },
