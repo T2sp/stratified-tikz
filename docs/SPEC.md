@@ -736,6 +736,14 @@ locked or filtered objects cannot use these actions. Ambient regions can be
 duplicated, but their translation controls are disabled with an explanation:
 they represent the whole ambient space and have no coordinates to move.
 
+Multi-selection translation applies the same Coons patch policy as the single
+patch action: each selected patch detaches its boundary links and moves by the
+same delta. For a patch-only selection, source paths, points and unselected
+patches stay unchanged.
+All selected objects are translated atomically in one undoable operation; an
+invalid or unrepresentable patch translation leaves the entire diagram and its
+links unchanged. Undo restores every translated object and its boundary links.
+
 Coordinate-only multi-selection supports Inspector translation by `dx`, `dy`,
 and, in 3D, `dz`. In 2D, `dz` remains disabled and locked to `0`. It also
 supports drag translation from a selected coordinate marker when coordinate

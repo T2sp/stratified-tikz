@@ -13,6 +13,7 @@ import {
 } from '../bulkEditing.ts'
 import type { Diagram, Vec3 } from '../../model/types.ts'
 import type { TranslationVector } from '../../model/translation.ts'
+import { isCoonsPatchStratum } from '../../model/coonsPatchTranslation.ts'
 import { normalizeColorInputValue } from '../colorInput.ts'
 import {
   parseFiniteNumber,
@@ -82,6 +83,10 @@ export function BulkSelectionInspector({
     model?.geometricKind ?? null,
     model?.count ?? selection.elements.length,
   )
+  const hasSelectedCoonsPatch = diagram.strata.some((stratum) =>
+    isCoonsPatchStratum(stratum) &&
+    selection.elements.some((element) => element.kind === 'stratum' && element.id === stratum.id),
+  )
 
   return (
     <div className="inspector-content editable-inspector">
@@ -139,6 +144,13 @@ export function BulkSelectionInspector({
         diagram={diagram}
         onTranslate={onBulkTranslate}
       />
+      {hasSelectedCoonsPatch && (
+        <p className="inspector-help">
+          Translating selected Coons patches detaches their boundary links.
+          Their unselected source paths and points stay in place. Undo restores the whole
+          translation together with the links.
+        </p>
+      )}
 
       <BulkPathConcatenationSection
         diagram={diagram}

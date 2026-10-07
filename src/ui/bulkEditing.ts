@@ -86,6 +86,12 @@ import {
   coonsPatchBoundarySourceRemapForDuplicatedStrata,
   remapLinkedCoonsPatchSourcesInStratum,
 } from '../model/coonsPatchLinks.ts'
+import {
+  isCoonsPatchStratum,
+  translateCoonsPatch,
+  type CoonsPatchStratum,
+} from '../model/coonsPatchTranslation.ts'
+import { validateDiagram } from '../model/validation.ts'
 
 export const bulkMixedValueLabel = 'Mixed'
 export const defaultFilledSurfaceLineWidth = 1.5
@@ -593,10 +599,58 @@ export function translateSelectedElements(
   }
 
   const selectedKeys = selectedElementKeySet(selection)
-  const selectedLayerBoundElements = selected.map((element) => ({
-    kind: element.kind,
-    id: element.element.id,
-  }))
+  const translatedCoonsPatches = new Map<string, CoonsPatchStratum>()
+
+  // Prepare each patch from the original snapshots before any selected boundary
+  // source is moved. The shared single-patch policy detaches its links and
+  // checks every required stored and sampled spatial preview.
+  for (const selectedElement of selected) {
+    if (
+      selectedElement.kind !== 'stratum' ||
+      !isCoonsPatchStratum(selectedElement.element)
+    ) {
+      continue
+    }
+
+    const result = translateCoonsPatch(
+      diagram,
+      selectedElement.element.id,
+      translation,
+    )
+
+    if (!result.ok) {
+      return {
+        ok: false,
+        diagram,
+        error: `Translate selected failed: ${result.error}`,
+      }
+    }
+
+    const translated = result.diagram.strata.find(
+      (stratum) => stratum.id === selectedElement.element.id,
+    )
+
+    if (translated === undefined || !isCoonsPatchStratum(translated)) {
+      return {
+        ok: false,
+        diagram,
+        error: 'Translate selected failed: translated Coons patch changed kind.',
+      }
+    }
+
+    translatedCoonsPatches.set(translated.id, translated)
+  }
+
+  const selectedLayerBoundElements = selected
+    .filter(
+      (element) =>
+        element.kind !== 'stratum' ||
+        !translatedCoonsPatches.has(element.element.id),
+    )
+    .map((element) => ({
+      kind: element.kind,
+      id: element.element.id,
+    }))
   const detached = detachCoordinateReferencesInElements(
     diagram,
     selectedLayerBoundElements,
@@ -632,7 +686,9 @@ export function translateSelectedElements(
         return stratum
       }
 
-      const translated = translateStratum(stratum, translation, context)
+      const translated =
+        translatedCoonsPatches.get(stratum.id) ??
+        translateStratum(stratum, translation, context)
       changed = changed || translated !== stratum
       changedCurve = changedCurve || stratum.geometricKind === 'curve'
       return translated
@@ -655,15 +711,35 @@ export function translateSelectedElements(
       }
     }
 
-    const nextDiagram = {
+    const candidate = {
       ...detachedDiagram,
       strata,
       labels,
     }
+    const nextDiagram = changedCurve
+      ? cleanPathCrossingStates(candidate)
+      : candidate
+
+    if (translatedCoonsPatches.size > 0) {
+      const validation = validateDiagram(nextDiagram)
+
+      if (!validation.valid) {
+        const first = validation.errors[0]
+
+        return {
+          ok: false,
+          diagram,
+          error:
+            first === undefined
+              ? 'Translate selected failed: translated diagram is invalid.'
+              : `Translate selected failed: ${first.path}: ${first.message}`,
+        }
+      }
+    }
 
     return {
       ok: true,
-      diagram: changedCurve ? cleanPathCrossingStates(nextDiagram) : nextDiagram,
+      diagram: nextDiagram,
       translated: true,
       translatedCount: selected.length,
     }

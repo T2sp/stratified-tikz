@@ -8,7 +8,11 @@ import {
   createPointStratum,
   createTextLabel,
 } from '../../src/model/constructors.ts'
-import { coonsPatchBoundaryLinkStatus } from '../../src/model/coonsPatchLinks.ts'
+import {
+  coonsPatchBoundaryLinkStatus,
+  synchronizeLinkedCoonsPatches,
+} from '../../src/model/coonsPatchLinks.ts'
+import { sampleCoonsPatch } from '../../src/geometry/curvedSheets.ts'
 import { createCoordinateAnchor } from '../../src/model/coordinateAnchors.ts'
 import {
   coordinateReferenceSourceForPoint,
@@ -51,6 +55,7 @@ import {
   type BulkOperationEditorState,
 } from '../../src/ui/bulkEditing.ts'
 import { allLayersFilter, type LayerFilter } from '../../src/ui/layerFilter.ts'
+import { translateCoonsPatch } from '../../src/ui/coonsPatchDuplicateTranslation.ts'
 import type { SelectedElement } from '../../src/ui/selection.ts'
 import {
   createDiagramHistory,
@@ -891,6 +896,232 @@ test('bulk translation is undoable', () => {
   assert.equal(translated.history.past.length, 1)
 })
 
+test('bulk translation moves both linked Coons patches sharing sources in one undoable edit', () => {
+  const diagram = createBulkCoonsPairDiagram()
+  const before = structuredClone(diagram)
+  const selection = bulkCoonsSelection('patch', 'patch-b')
+  const initial = createBulkState(diagram, selection)
+  const delta = { x: 2, y: -1, z: 0.5 }
+  const translated = applyBulkTranslateToEditorState(
+    initial,
+    parseTranslation(diagram, '2', '-1', '0.5'),
+  )
+
+  for (const id of ['patch', 'patch-b']) {
+    assertBulkCoonsMovedExactly(diagram, translated.editableDiagram, id, delta)
+    assert.deepEqual(coonsPatchBoundaryLinkStatus(translated.editableDiagram, id), {
+      kind: 'static',
+    })
+  }
+  assert.deepEqual(
+    translated.editableDiagram.strata.filter((stratum) => !['patch', 'patch-b'].includes(stratum.id)),
+    before.strata.filter((stratum) => !['patch', 'patch-b'].includes(stratum.id)),
+  )
+  assert.deepEqual(translated.selectedElement, selection)
+  assert.equal(translated.history.past.length, 1)
+  assert.deepEqual(diagram, before)
+  assert.equal(validateDiagram(translated.editableDiagram).valid, true)
+
+  const undone = undoLastDiagramChange(translated)
+  const redone = redoLastDiagramChange(undone)
+
+  assert.deepEqual(undone.editableDiagram, before)
+  assert.deepEqual(undone.selectedElement, selection)
+  assert.deepEqual(undone.history.past, [])
+  assert.equal(undone.history.future.length, 1)
+  for (const id of ['patch', 'patch-b']) {
+    assert.deepEqual(coonsPatchBoundaryLinkStatus(undone.editableDiagram, id), {
+      kind: 'linkedUpToDate',
+    })
+  }
+  assert.deepEqual(redone.editableDiagram, translated.editableDiagram)
+  assert.deepEqual(redone.selectedElement, selection)
+})
+
+test('bulk translation handles static and linked Coons patches together with single-patch policy', () => {
+  const diagram = createBulkCoonsPairDiagram()
+  delete findBulkCoonsPatch(diagram, 'patch-b').primitive.boundarySources
+  const translation = parseTranslation(diagram, '-0.5', '0.75', '1.25')
+  const single = translateCoonsPatch(diagram, 'patch', translation)
+  const result = translateSelectedElements(
+    diagram,
+    bulkCoonsSelection('patch', 'patch-b'),
+    translation,
+  )
+
+  assert.equal(single.ok, true)
+  assert.equal(result.ok, true)
+  if (!single.ok || !result.ok) {
+    throw new Error('Expected single and multiple Coons patch translation to succeed.')
+  }
+  assert.equal(result.translatedCount, 2)
+  for (const id of ['patch', 'patch-b']) {
+    assertBulkCoonsMovedExactly(diagram, result.diagram, id, {
+      x: -0.5,
+      y: 0.75,
+      z: 1.25,
+    })
+  }
+  assert.deepEqual(
+    findBulkCoonsPatch(result.diagram, 'patch'),
+    findBulkCoonsPatch(single.diagram, 'patch'),
+  )
+})
+
+test('bulk Coons translation takes each patch snapshot before translating selected source curves', () => {
+  const diagram = createBulkCoonsPairDiagram()
+  const selection = bulkCoonsSelection('patch', 'patch-b', 'bottom')
+  const translated = applyBulkTranslateToEditorState(
+    createBulkState(diagram, selection),
+    parseTranslation(diagram, '1', '2', '3'),
+  )
+  const source = findCurve(diagram, 'bottom')
+  const movedSource = findCurve(translated.editableDiagram, 'bottom')
+
+  assert.equal(source.kind, 'polyline')
+  assert.equal(movedSource.kind, 'polyline')
+  if (source.kind !== 'polyline' || movedSource.kind !== 'polyline') {
+    throw new Error('Expected polyline source.')
+  }
+  assert.deepEqual(movedSource.points, source.points.map((point) => ({
+    x: point.x + 1,
+    y: point.y + 2,
+    z: point.z + 3,
+  })))
+  for (const id of ['patch', 'patch-b']) {
+    assertBulkCoonsMovedExactly(diagram, translated.editableDiagram, id, {
+      x: 1,
+      y: 2,
+      z: 3,
+    })
+  }
+  assert.deepEqual(findCurve(translated.editableDiagram, 'right'), findCurve(diagram, 'right'))
+  assert.equal(translated.history.past.length, 1)
+  // The editor normalizes mixed geometric-kind selections to the first family.
+  assert.deepEqual(translated.selectedElement, bulkCoonsSelection('patch', 'patch-b'))
+  assert.deepEqual(undoLastDiagramChange(translated).editableDiagram, diagram)
+})
+
+test('bulk frozen stale Coons translation preserves each stored symbolic preview', () => {
+  const diagram = createBulkFrozenCoonsPairDiagram()
+  const before = structuredClone(diagram)
+  const translated = applyBulkTranslateToEditorState(
+    createBulkState(diagram, bulkCoonsSelection('point-patch', 'frozen-patch-b')),
+    parseTranslation(diagram, '1', '0', '0'),
+  )
+
+  assert.equal(validateDiagram(diagram).valid, true)
+  for (const id of ['point-patch', 'frozen-patch-b']) {
+    assert.equal(coonsPatchBoundaryLinkStatus(diagram, id).kind, 'linkedStale')
+    assertBulkCoonsMovedExactly(diagram, translated.editableDiagram, id, {
+      x: 1,
+      y: 0,
+      z: 0,
+    })
+    const patch = findBulkCoonsPatch(translated.editableDiagram, id)
+    assert.equal(patch.primitive.boundarySnapshotState, 'frozen')
+    const bottom = patch.primitive.bottom
+    assert.equal('kind' in bottom && bottom.kind, 'constantPoint')
+    if (!('kind' in bottom) || bottom.kind !== 'constantPoint') {
+      throw new Error('Expected frozen constant-point boundary.')
+    }
+    assert.equal(bottom.point.symbolic?.x.kind, 'symbolic')
+    if (bottom.point.symbolic?.x.kind !== 'symbolic') {
+      throw new Error('Expected symbolic frozen x coordinate.')
+    }
+    assert.equal(bottom.point.symbolic.x.expression, '(R) + 1')
+    assert.equal(bottom.point.symbolic.x.previewValue, id === 'point-patch' ? 1.2 : 1.7)
+  }
+  assert.equal(translated.editableDiagram.variables?.[0]?.previewValue, 9)
+  assert.deepEqual(diagram, before)
+  assert.deepEqual(undoLastDiagramChange(translated).editableDiagram, diagram)
+})
+
+for (const failure of ['rounded away', 'overflow', 'invalid primitive'] as const) {
+  test(`bulk Coons ${failure} failure preserves every selected object and history atomically`, () => {
+    const diagram = createBulkCoonsPairDiagram()
+    const badPatch = createBulkPointLinkedCoonsDiagram()
+    const patch = findBulkCoonsPatch(badPatch, 'point-patch')
+    const source = findPoint(badPatch, 'constant-point')
+    const x = failure === 'overflow' ? 1e307 : failure === 'rounded away' ? 1e16 : 0
+    source.position.x = x
+    for (const role of ['bottom', 'right', 'top', 'left'] as const) {
+      const boundary = patch.primitive[role]
+      if (!('kind' in boundary) || boundary.kind !== 'constantPoint') {
+        throw new Error('Expected constant-point boundary.')
+      }
+      boundary.point.x = x
+    }
+    if (failure === 'invalid primitive') patch.primitive.sampling.uSegments = 0
+    const ordinary = createPointStratum({
+      ambientDimension: 3,
+      id: 'ordinary-selected-point',
+      name: 'ordinary',
+      position: { x: 0, y: 0, z: 0 },
+    })
+    diagram.strata = [ordinary, ...diagram.strata, ...badPatch.strata]
+    const selection = bulkCoonsSelection('ordinary-selected-point', 'patch', 'point-patch')
+    const initial = createBulkState(diagram, selection)
+    initial.history.past = [structuredClone(diagram)]
+    initial.history.future = [structuredClone(diagram)]
+    const before = structuredClone(initial)
+    const translated = applyBulkTranslateToEditorState(
+      initial,
+      parseTranslation(diagram, failure === 'overflow' ? String(Number.MAX_VALUE) : '1', '0', '0'),
+    )
+
+    assert.deepEqual(initial, before)
+    assert.equal(translated.editableDiagram, initial.editableDiagram)
+    assert.deepEqual(translated.editableDiagram, before.editableDiagram)
+    assert.deepEqual(translated.selectedElement, selection)
+    assert.equal(translated.history, initial.history)
+    assert.deepEqual(translated.history, before.history)
+    assert.notEqual(translated.layerOperationStatus, '')
+    assert.doesNotMatch(translated.layerOperationStatus, /^Translated/)
+    assert.deepEqual(findBulkCoonsPatch(translated.editableDiagram, 'patch').primitive.boundarySources,
+      findBulkCoonsPatch(diagram, 'patch').primitive.boundarySources)
+    assert.deepEqual(findBulkCoonsPatch(translated.editableDiagram, 'point-patch').primitive.boundarySources,
+      findBulkCoonsPatch(diagram, 'point-patch').primitive.boundarySources)
+  })
+}
+
+test('zero bulk Coons translation keeps links and creates no history', () => {
+  const diagram = createBulkCoonsPairDiagram()
+  const selection = bulkCoonsSelection('patch', 'patch-b')
+  const initial = createBulkState(diagram, selection)
+  const translated = applyBulkTranslateToEditorState(initial, parseTranslation(diagram, '0', '0', '0'))
+
+  assert.equal(translated.editableDiagram, diagram)
+  assert.deepEqual(translated.selectedElement, selection)
+  assert.equal(translated.history, initial.history)
+  assert.equal(translated.history.past.length, 0)
+  assert.deepEqual(translated.editableDiagram, diagram)
+})
+
+for (const restriction of ['hidden', 'locked', 'filtered'] as const) {
+  test(`bulk Coons translation respects ${restriction} selected-layer restrictions`, () => {
+    const diagram = createBulkCoonsPairDiagram()
+    findBulkCoonsPatch(diagram, 'patch-b').layer = 1
+    diagram.layers = [
+      { value: 0, name: 'editable', visible: true, locked: false },
+      { value: 1, name: 'restricted', visible: restriction !== 'hidden', locked: restriction === 'locked' },
+    ]
+    const initial = createBulkState(
+      diagram,
+      bulkCoonsSelection('patch', 'patch-b'),
+      restriction === 'filtered' ? { kind: 'layer', layer: 0 } : allLayersFilter,
+    )
+    const before = structuredClone(diagram)
+    const translated = applyBulkTranslateToEditorState(initial, parseTranslation(diagram, '1', '2', '3'))
+
+    assert.equal(translated.editableDiagram, diagram)
+    assert.deepEqual(translated.editableDiagram, before)
+    assert.equal(translated.history, initial.history)
+    assert.equal(translated.history.past.length, 0)
+    assert.match(translated.layerOperationStatus, /not editable/)
+  })
+}
+
 test('bulk translation runs crossing cleanup for translated paths', () => {
   const diagram = createCrossingTranslationDiagram()
   const result = translateSelectedElements(
@@ -1322,6 +1553,117 @@ function createBulkLinkedCoonsDiagram(): Diagram {
     ...createEmptyDiagram({ ambientDimension: 3 }),
     strata: [...sources, patch],
     labels: [],
+  }
+}
+
+function bulkCoonsSelection(...ids: string[]): SelectedElement {
+  return {
+    kind: 'multi',
+    elements: ids.map((id) => ({ kind: 'stratum', id })),
+  }
+}
+
+function createBulkCoonsPairDiagram(): Diagram {
+  const diagram = createBulkLinkedCoonsDiagram()
+  const patch = findBulkCoonsPatch(diagram, 'patch')
+  const second = structuredClone(patch)
+  second.id = 'patch-b'
+  second.name = 'second selected linked patch'
+  second.style = { ...second.style, fillColor: '#AA4499', fillOpacity: 0.6 }
+  const unselected = structuredClone(patch)
+  unselected.id = 'patch-unselected'
+  unselected.name = 'unselected linked patch'
+  diagram.strata.push(second, unselected)
+  return synchronizeLinkedCoonsPatches(null, diagram).diagram
+}
+
+function createBulkFrozenCoonsPairDiagram(): Diagram {
+  const diagram = createBulkPointLinkedCoonsDiagram()
+  const patch = findBulkCoonsPatch(diagram, 'point-patch')
+  patch.primitive.boundarySnapshotState = 'frozen'
+  const second = structuredClone(patch)
+  second.id = 'frozen-patch-b'
+  for (const [candidate, preview] of [[patch, 0.2], [second, 0.7]] as const) {
+    for (const role of ['bottom', 'right', 'top', 'left'] as const) {
+      const boundary = candidate.primitive[role]
+      if (!('kind' in boundary) || boundary.kind !== 'constantPoint') {
+        throw new Error('Expected frozen constant-point boundary.')
+      }
+      boundary.point = {
+        x: preview,
+        y: 0,
+        z: 0,
+        symbolic: {
+          x: { kind: 'symbolic', expression: 'R', previewValue: preview },
+          y: { kind: 'numeric', value: 0 },
+          z: { kind: 'numeric', value: 0 },
+        },
+      }
+    }
+  }
+  diagram.variables = [{
+    id: 'current-R',
+    name: 'R',
+    macroName: 'coonsBulkR',
+    expression: '9',
+    previewValue: 9,
+  }]
+  diagram.strata = [patch, second]
+  return diagram
+}
+
+function assertBulkCoonsMovedExactly(
+  before: Diagram,
+  after: Diagram,
+  id: string,
+  delta: Vec3,
+): void {
+  const source = findBulkCoonsPatch(before, id)
+  const moved = findBulkCoonsPatch(after, id)
+  assert.equal(moved.id, source.id)
+  assert.equal(moved.name, source.name)
+  assert.equal(moved.layer, source.layer)
+  assert.deepEqual(moved.style, source.style)
+  assert.deepEqual(moved.label, source.label)
+  assert.deepEqual(moved.primitive.sampling, source.primitive.sampling)
+  assert.equal(moved.primitive.boundarySources, undefined)
+  for (const role of ['bottom', 'right', 'top', 'left'] as const) {
+    const oldBoundary = source.primitive[role]
+    const newBoundary = moved.primitive[role]
+    assert.equal(newBoundary.name, oldBoundary.name)
+    if ('kind' in oldBoundary && oldBoundary.kind === 'constantPoint') {
+      assert.equal('kind' in newBoundary && newBoundary.kind, 'constantPoint')
+      if (!('kind' in newBoundary) || newBoundary.kind !== 'constantPoint') {
+        throw new Error('Expected translated constant-point boundary.')
+      }
+      assertBulkVec3Moved(oldBoundary.point, newBoundary.point, delta)
+    } else if (!('kind' in oldBoundary) && !('kind' in newBoundary)) {
+      assert.equal(newBoundary.id, oldBoundary.id)
+      assert.equal(newBoundary.segments.length, oldBoundary.segments.length)
+      oldBoundary.segments.forEach((segment, index) => {
+        const movedSegment = newBoundary.segments[index]
+        assert.equal(movedSegment.kind, segment.kind)
+        assertBulkVec3Moved(segment.start, movedSegment.start, delta)
+        assertBulkVec3Moved(segment.end, movedSegment.end, delta)
+      })
+    } else {
+      throw new Error('Expected matching translated Coons boundary kinds.')
+    }
+  }
+  const oldMesh = sampleCoonsPatch(source.primitive)
+  const newMesh = sampleCoonsPatch(moved.primitive)
+  assert.deepEqual(newMesh.faces, oldMesh.faces)
+  assert.equal(newMesh.uSegments, oldMesh.uSegments)
+  assert.equal(newMesh.vSegments, oldMesh.vSegments)
+  oldMesh.vertices.forEach((vertex, index) => {
+    assertBulkVec3Moved(vertex, newMesh.vertices[index], delta)
+  })
+}
+
+function assertBulkVec3Moved(before: Vec3, after: Vec3, delta: Vec3): void {
+  for (const axis of ['x', 'y', 'z'] as const) {
+    const expected = before[axis] + delta[axis]
+    assert.ok(Math.abs(after[axis] - expected) < 1e-10, `${axis}: expected ${expected}, got ${after[axis]}`)
   }
 }
 
@@ -1937,7 +2279,7 @@ function parseTranslation(
 ): TranslationVector {
   const parsed = parseTranslationVectorFromInputs(diagram, { dx, dy, dz })
 
-  assert.equal(parsed.ok, true)
+  assert.equal(parsed.ok, true, parsed.ok ? undefined : parsed.error)
   if (!parsed.ok) {
     throw new Error(parsed.error)
   }

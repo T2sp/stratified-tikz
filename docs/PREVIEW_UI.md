@@ -1624,6 +1624,13 @@ Undo/Redo. Coons patches keep their dedicated link-aware controls. Ambient
 regions have no coordinates: Duplicate is available and translation is disabled
 with an explanation. Hidden, locked and filtered objects cannot use the actions.
 
+Select multiple Coons patches with Shift-click, Command-click or Ctrl-click,
+then Expand the Inspector and enter the shared `dx`, `dy` and `dz` under
+Translate selected. Apply moves all selected patches and detaches their boundary
+links, just as the single-patch action does. Unselected source paths and points
+stay in place. One Undo restores the entire movement and the links; if any patch
+cannot move by the requested delta, none of the selected objects changes.
+
 Bulk layer changes move every selected object to the chosen layer and update
 layer metadata as needed. Bulk delete clears the selection and removes stale
 crossing states that depended on deleted curves. Bulk duplicate preserves
