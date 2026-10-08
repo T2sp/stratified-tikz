@@ -1,4 +1,5 @@
 import { changedPointShapeFields, markPointShapeOverrides, resolvePointShapeParameters } from './pointShapeParameters.ts'
+import { changedPointLayoutFields, clonePointNodeDimensionSource, clonePointNodeLayout, markPointLayoutOverrides } from './pointNodeLayout.ts'
 import {
   labelAnchors,
   lineStyles,
@@ -267,6 +268,8 @@ export function clonePointPaint(paint: PointPaint): PointPaint {
 
 export function clonePointStyle(style: PointStyle): PointStyle {
   return { ...style, ...(style.shapeParameters === undefined ? {} : { shapeParameters: { ...style.shapeParameters } }),
+    ...(style.layout === undefined ? {} : { layout: clonePointNodeLayout(style.layout) }),
+    ...(style.importedLayout === undefined ? {} : { importedLayout: { ...style.importedLayout, baseline: clonePointNodeLayout(style.importedLayout.baseline), overriddenFields: [...style.importedLayout.overriddenFields] } }),
     ...(style.importedShape === undefined ? {} : { importedShape: { ...style.importedShape, baselineParameters: { ...style.importedShape.baselineParameters }, overriddenFields: [...style.importedShape.overriddenFields] } }),
     ...(style.paint === undefined ? {} : { paint: clonePointPaint(style.paint) }),
     ...(style.importedPaint === undefined ? {} : { importedPaint: {
@@ -281,7 +284,7 @@ export function normalizePointStyle(style: PointStyle): PointStyle {
 }
 
 export function createImportedPointPaintSnapshot(style: PointStyle, referenceId: string): PointStyle {
-  return { ...clonePointStyle(style), importedShape: { referenceId, baselineShape: style.shape, baselineParameters: { ...style.shapeParameters }, overriddenFields: [] }, importedPaint: {
+  return { ...clonePointStyle(style), importedLayout: { referenceId, baseline: clonePointNodeLayout(style.layout ?? {}), overriddenFields: [] }, importedShape: { referenceId, baselineShape: style.shape, baselineParameters: { ...style.shapeParameters }, overriddenFields: [] }, importedPaint: {
     referenceId, baseline: clonePointPaint(getPointPaint(style)), overriddenFields: [],
   } }
 }
@@ -291,6 +294,7 @@ export function pointStyleForImportedReference(style: PointStyle, referenceId: s
   const result = clonePointStyle(style)
   if (result.importedPaint?.referenceId !== referenceId) delete result.importedPaint
   if (result.importedShape?.referenceId !== referenceId) delete result.importedShape
+  if (result.importedLayout?.referenceId !== referenceId) delete result.importedLayout
   return result
 }
 
@@ -319,6 +323,10 @@ export function markPointPaintOverrides(style: PointStyle, fields: readonly Poin
 /** Capture distinguishable historical/manual edits without claiming equal fallbacks. */
 export function recordPointPaintEdit(before: PointStyle, after: PointStyle): PointStyle {
   let result = clonePointStyle(after)
+  if (before.importedLayout !== undefined) {
+    result.importedLayout = { ...before.importedLayout, baseline: clonePointNodeLayout(before.importedLayout.baseline), overriddenFields: [...before.importedLayout.overriddenFields, ...(result.importedLayout?.overriddenFields ?? [])] }
+    result = markPointLayoutOverrides(result, changedPointLayoutFields(before, after))
+  }
   if (before.importedShape !== undefined) {
     result.importedShape = { ...before.importedShape, baselineParameters: { ...before.importedShape.baselineParameters }, overriddenFields: [...before.importedShape.overriddenFields, ...(result.importedShape?.overriddenFields ?? [])] }
     result = markPointShapeOverrides(result, changedPointShapeFields(before, after))
@@ -366,6 +374,25 @@ export function refreshImportedPointPaintSnapshot(style: PointStyle, resolvedSty
     result.shapeParameters = parameters
     result.importedShape = { referenceId, baselineShape: resolvedStyle.shape, baselineParameters: { ...resolvedStyle.shapeParameters }, overriddenFields: [...shapeFields] }
   }
+  if (result.importedLayout?.referenceId === referenceId) {
+    const layoutIntent = result.importedLayout
+    const layoutFields = new Set(layoutIntent.overriddenFields)
+    if (inferSnapshotDifferences) changedPointLayoutFields({ ...style, layout: layoutIntent.baseline }, style).forEach((field) => layoutFields.add(field))
+    const layout = clonePointNodeLayout(resolvedStyle.layout ?? {})
+    for (const field of layoutFields) {
+      const value = style.layout?.[field]
+      if (value === undefined) Reflect.deleteProperty(layout, field)
+      else Reflect.set(layout, field, value)
+      if (field !== 'anchor') {
+        const source = style.layout?.units?.[field]
+        if (source === undefined) { if (layout.units) delete layout.units[field] }
+        else { layout.units = { ...layout.units, [field]: clonePointNodeDimensionSource(source, style.layout?.fontContext) } }
+      }
+    }
+    if (resolvedStyle.layout === undefined && style.layout === undefined && layoutFields.size === 0) delete result.layout
+    else result.layout = layout
+    result.importedLayout = { referenceId, baseline: clonePointNodeLayout(resolvedStyle.layout ?? {}), overriddenFields: [...layoutFields] }
+  }
   return { ...result, paint, opacity: overridden.has('opacity') ? result.opacity : resolvedStyle.opacity, importedPaint: {
     referenceId, baseline: clonePointPaint(resolved), overriddenFields: [...overridden],
   } }
@@ -391,6 +418,8 @@ export function pointStylesEqual(first: PointStyle, second: PointStyle): boolean
   if (first.opacity !== second.opacity || first.shape !== second.shape || first.size !== second.size) return false
   if (JSON.stringify(resolvePointShapeParameters(first.shapeParameters)) !== JSON.stringify(resolvePointShapeParameters(second.shapeParameters))) return false
   if (JSON.stringify(first.importedShape) !== JSON.stringify(second.importedShape)) return false
+  if (JSON.stringify(first.layout) !== JSON.stringify(second.layout)) return false
+  if (JSON.stringify(first.importedLayout) !== JSON.stringify(second.importedLayout)) return false
   if (JSON.stringify(first.importedPaint) !== JSON.stringify(second.importedPaint)) return false
   const a = getPointPaint(first)
   const b = getPointPaint(second)

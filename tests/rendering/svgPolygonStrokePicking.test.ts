@@ -105,7 +105,10 @@ for (const observation of raster.observations) {
       const input = fixture(observation.lineJoin, observation.width / 1.2, observation.shape, observation.size)
       const layout = pendingSvgPointNodeLayout(input.point)
       boundsClose(layout.paintedBounds, observation.rasterBounds, raster.boundsUncertainty)
-      assert.deepEqual(layout.anchorClearanceBounds, layout.paintedBounds)
+      const anchorStyle = { ...input.point.style, paint: { ...getPointPaint(input.point.style),
+        stroke: { ...getPointPaint(input.point.style).stroke, lineJoin: 'miter' as const } } }
+      assert.deepEqual(layout.anchorClearanceBounds, pendingSvgPointNodeLayout({ ...input.point, style: anchorStyle }).anchorClearanceBounds,
+        'PGF outer separation is independent of the painted line join')
       close(layout.selectionRadius, observation.rasterRadius, raster.distanceUncertainty)
       for (const probe of observation.probes) {
         // Every point further than the original contour's radius is exterior,
@@ -138,7 +141,9 @@ for (const [join, outside, expectedBounds] of [
       assert.equal(layout.stroke, 36)
       assert.equal(getPointPaint(input.point.style).fill.enabled, false)
       boundsClose(layout.paintedBounds, expectedBounds)
-      boundsClose(layout.anchorClearanceBounds, expectedBounds)
+      const anchorStyle = { ...input.point.style, paint: { ...getPointPaint(input.point.style),
+        stroke: { ...getPointPaint(input.point.style).stroke, lineJoin: 'miter' as const } } }
+      boundsClose(layout.anchorClearanceBounds, pendingSvgPointNodeLayout({ ...input.point, style: anchorStyle }).anchorClearanceBounds)
     }
     const independent = raster.observations.find(({ id }) => id === `triangle-${join}-wide`)!
     boundsClose(expectedBounds, independent.rasterBounds, raster.boundsUncertainty)

@@ -1,5 +1,6 @@
 import { tikzStyleTargets } from './types.ts'
 import { literalPointShapeKeys, literalPointShapeNames } from './importedTikzShapes.ts'
+import { clonePointNodeLayout, literalPointLayoutKeys } from './pointNodeLayout.ts'
 import { canonicalTikzStyleKey, literalDefinedColor, namedTikzColors, resolveTikzPaint, splitTikzOptions } from './importedTikzPaint.ts'
 import type { TikzColorBindings, TikzPaintPreview, TikzPreviewContext, TikzStylePreviewDefinition } from './importedTikzPaint.ts'
 import { createUserStylePresetFromStyle } from './stylePresets.ts'
@@ -66,6 +67,7 @@ const previewPrimitiveKeys = new Set([
   'ultra thin', 'very thin', 'thin', 'semithick', 'thick', 'very thick', 'ultra thick',
   'solid', 'dashed', 'dotted', 'densely dotted', 'shape', 'inner sep',
   ...literalPointShapeNames, ...literalPointShapeKeys, 'shape aspect', 'trapezium angle', 'kite vertex angles', 'star rotate',
+  ...literalPointLayoutKeys,
 ])
 export type TikzStylePreviewApproximation = TikzPaintPreview
 
@@ -686,7 +688,11 @@ function refreshImportedPointSnapshots(diagram: Diagram, context: TikzPreviewCon
     // A paint-only replacement does not claim authored geometry. Keep the
     // existing 32B partial-style contract while refreshing declared 32C keys.
     const resolvedStyle: PointStyle = { ...importedStyle, shape: resolvedPreview.pointShape ?? style.shape,
-      shapeParameters: { ...style.shapeParameters, ...resolvedPreview.shapeParameters } }
+      shapeParameters: { ...style.shapeParameters, ...resolvedPreview.shapeParameters },
+      ...(style.layout === undefined && resolvedPreview.pointLayout === undefined ? {} : {
+        layout: { ...style.layout, ...resolvedPreview.pointLayout,
+          ...(style.layout?.units === undefined && resolvedPreview.pointLayout?.units === undefined ? {} : { units: { ...style.layout?.units, ...resolvedPreview.pointLayout?.units } }) },
+      }) }
     // Legacy fallback values have no recorded intent either. On a supported
     // recovery, establish a fresh snapshot rather than infer authorship later.
     return style.importedPaint?.referenceId !== referenceId
@@ -890,6 +896,7 @@ function pointStyleFromPreview(
     opacity: 1,
     shape: preview.pointShape ?? defaultPointStyle.shape,
     ...(preview.shapeParameters === undefined ? {} : { shapeParameters: { ...preview.shapeParameters } }),
+    ...(preview.pointLayout === undefined ? {} : { layout: clonePointNodeLayout(preview.pointLayout) }),
     fill: defaultPointStyle.fill,
     size: preview.pointSize ?? defaultPointStyle.size,
     paint: {

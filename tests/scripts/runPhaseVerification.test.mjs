@@ -900,12 +900,12 @@ for (const phase of ['32A', '32B', '32C', '32D']) {
     const fixture = checkoutFixture(t)
     completePointEvidence(fixture)
     if (phase === '32A' || phase === '32B') assert.equal(verify(t, fixture, phase).status, 'passed')
-    else assert.throws(() => verify(t, fixture, phase), /17 required groups/)
+    else assert.throws(() => verify(t, fixture, phase), phase === '32D' ? /18 required groups/ : /17 required groups/)
   })
   test(`${phase} rejects an otherwise successful Phase 31F report`, (t) => {
     const fixture = checkoutFixture(t)
     fixture.env.STZ_TEST_FREE_LABEL_GROUPS = JSON.stringify(combinedLabelGroups)
-    assert.throws(() => verify(t, fixture, phase), phase === '32A' ? /15 required groups/ : phase === '32B' ? /16 required groups/ : /17 required groups/)
+    assert.throws(() => verify(t, fixture, phase), phase === '32A' ? /15 required groups/ : phase === '32B' ? /16 required groups/ : phase === '32D' ? /18 required groups/ : /17 required groups/)
   })
 }
 for (const fault of ['scenarios', 'terminal', 'identity', 'artifacts', 'corrupt-artifacts', 'page-error']) {
@@ -930,7 +930,7 @@ for (const phase of ['32B', '32C', '32D']) {
     fixture.env.STZ_TEST_FREE_LABEL_GROUPS = JSON.stringify(pointGroups.filter((group) => group !== 'point-node-paint-import-persistence'))
     evidence.evidence = evidence.evidence.filter((entry) => entry.group !== 'point-node-paint-import-persistence')
     fixture.env.STZ_TEST_POINT_EVIDENCE = JSON.stringify(evidence)
-    assert.throws(() => verify(t, fixture, phase), phase === '32B' ? /16 required groups/ : /17 required groups/)
+    assert.throws(() => verify(t, fixture, phase), phase === '32B' ? /16 required groups/ : phase === '32D' ? /18 required groups/ : /17 required groups/)
   })
 }
 test('32A continues accepting its complete pre-paint group and scenario set', (t) => {

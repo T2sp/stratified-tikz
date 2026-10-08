@@ -52,6 +52,17 @@ export function captureSvgLabelExport(input: SvgLabelExportCaptureInput): SvgLab
 function freezePointStyle(style: PointStyle): Readonly<PointStyle> {
   const copy = clonePointStyle(style)
   if (copy.shapeParameters) Object.freeze(copy.shapeParameters)
+  if (copy.layout) {
+    if (copy.layout.fontContext) Object.freeze(copy.layout.fontContext)
+    if (copy.layout.units) {
+      for (const unit of Object.values(copy.layout.units)) {
+        if (unit.fontContext) Object.freeze(unit.fontContext)
+        Object.freeze(unit)
+      }
+      Object.freeze(copy.layout.units)
+    }
+    Object.freeze(copy.layout)
+  }
   if (copy.paint) {
     Object.freeze(copy.paint.text)
     Object.freeze(copy.paint.fill)

@@ -1,5 +1,7 @@
 import { phase32cProfile, resolveVerificationProfile, mechanismNotRun } from './automation/phase32c-profile.mjs'
 import { runPointNodeGeometricShapeChecks } from './checkPointNodeGeometricShapes.mjs'
+import { runPointLayoutAnchorChecks } from './checkPointLayoutAnchors.mjs'
+import { layoutAnchorGroup } from './pointLayoutAnchorsContract.mjs'
 /**
  * Actual-browser Phase 31C checks against production SvgDiagram and its event
  * handlers. Uses the existing external-Playwright convention; adds no package.
@@ -38,7 +40,7 @@ const scenarios = [
   'inline-node-rendering-placement-halo-picking', 'inline-node-lifecycle-path-operations-export',
   'settled-SVG-export-standalone',
   'combined-free-inline-workflows',
-  ...Object.keys(pointNodeScenarios),
+  ...Object.keys(pointNodeScenarios).filter((group) => profile !== phase32cProfile || group !== layoutAnchorGroup),
 ]
 const completed = []
 const started = []
@@ -478,6 +480,7 @@ try {
   await runPointNodePaintChecks({ page, browser, origin, record, observe, artifactDir, startGroup, completeGroup, profile,
     setStage: (value) => { stage = value } })
   await runPointNodeGeometricShapeChecks({ browser, origin, record, observe, artifactDir, startGroup, completeGroup, setStage: (value) => { stage = value } })
+  if (profile !== phase32cProfile) await runPointLayoutAnchorChecks({ browser, origin, record, observe, artifactDir, startGroup, completeGroup, setStage: (value) => { stage = value } })
   stage = 'settled-SVG-export-standalone'
   await startGroup('settled-SVG-export-standalone')
   await runSettledSvgVisibilityChecks({ browser, page, record, observe, artifactDir })

@@ -54,7 +54,7 @@ function fixture(t, phase = '31B', options = {}) {
   // The verifier independently checks generated post-key paint. Keep its real
   // oracle and transitive helpers in the isolated checkout so both the parent
   // identity import and each fresh verification worker load the same modules.
-  for (const file of ['pointGeometricShapesContract.mjs', 'pointPaintOracle.mjs', 'pointCheckDiagnostics.mjs', 'pointResponsiveFraming.mjs', 'pointPolygonJoinContract.mjs', 'pointDashCapContract.mjs', 'pointDashCapMechanismContract.mjs', 'connectedLivePaintOracle.mjs', 'connectedPaintSampling.mjs']) {
+  for (const file of ['pointGeometricShapesContract.mjs', 'pointLayoutAnchorsContract.mjs', 'pointPaintOracle.mjs', 'pointCheckDiagnostics.mjs', 'pointResponsiveFraming.mjs', 'pointPolygonJoinContract.mjs', 'pointDashCapContract.mjs', 'pointDashCapMechanismContract.mjs', 'connectedLivePaintOracle.mjs', 'connectedPaintSampling.mjs']) {
     cpSync(join(automationDir, '..', file), join(cwd, 'scripts', file))
   }
   const runner = join(localAutomationDir, 'run-phase.mjs')
@@ -501,7 +501,7 @@ for (const phase of ['32A', '32B', '32C', '32D']) {
     const { cwd, git, run, initialHead } = fixture(t, phase)
     const result = await run('implement', { STZ_TEST_FREE_LABEL_GROUPS: JSON.stringify(combinedLabelGroups) })
     assert.notEqual(result.status, 0)
-    assert.match(result.stderr, phase === '32A' ? /15 required groups/ : phase === '32B' ? /16 required groups/ : /17 required groups/)
+    assert.match(result.stderr, phase === '32A' ? /15 required groups/ : phase === '32B' ? /16 required groups/ : phase === '32D' ? /18 required groups/ : /17 required groups/)
     assert.equal(git('rev-parse', 'HEAD'), initialHead)
     assert.throws(() => readFileSync(join(cwd, 'logs/review-prompt.txt')), { code: 'ENOENT' })
     assert.doesNotMatch(result.stdout, /\$ git (?:add|commit|push)\b/)
@@ -531,6 +531,21 @@ test('32B live parent reloads newly required paint evidence before review and co
     STZ_TEST_FREE_LABEL_GROUPS: JSON.stringify(pointMathGroups) })
   assert.notEqual(result.status, 0)
   assert.match(result.stderr, /16 required groups/)
+  assert.equal(git('rev-parse', 'HEAD'), initialHead)
+  assert.throws(() => readFileSync(join(cwd, 'logs/review-prompt.txt')), { code: 'ENOENT' })
+  assert.doesNotMatch(result.stdout, /\$ git (?:add|commit|push)\b/)
+})
+
+test('32D live parent reloads its cumulative layout and anchor policy before review or commit', async (t) => {
+  const current = readFileSync(join(automationDir, 'phase-verification.mjs'), 'utf8')
+  const obsolete = current.replace('"32D": [...pointNodeGroups, geometricShapeGroup, layoutAnchorGroup]', '"32D": [...pointNodeGroups, geometricShapeGroup]')
+  assert.notEqual(obsolete, current)
+  const { cwd, git, run, initialHead } = fixture(t, '32D', { initialFiles: { [verifierFile]: obsolete } })
+  const oldGroups = [...combinedLabelGroups, 'point-node-body-layout-lifecycle', 'point-node-picking-visibility',
+    'point-node-settled-export', 'point-node-paint-import-persistence', 'point-node-geometric-shapes']
+  const result = await run('implement', { STZ_TEST_IMPLEMENTATION_FILES: JSON.stringify({ [verifierFile]: current }),
+    STZ_TEST_FREE_LABEL_GROUPS: JSON.stringify(oldGroups) })
+  assert.notEqual(result.status, 0); assert.match(result.stderr, /18 required groups/)
   assert.equal(git('rev-parse', 'HEAD'), initialHead)
   assert.throws(() => readFileSync(join(cwd, 'logs/review-prompt.txt')), { code: 'ENOENT' })
   assert.doesNotMatch(result.stdout, /\$ git (?:add|commit|push)\b/)

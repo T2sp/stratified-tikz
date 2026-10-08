@@ -1,5 +1,6 @@
 import { phase32cProfile, phase32cDeferrals, phase32cAuthorization, resolveVerificationProfile, deferredMechanismKey, mechanismNotRun, assertScopedMechanismEvidence, assertNamedStrict32BFailure } from './phase32c-profile.mjs';
 import { geometricShapeGroup, geometricShapeScenarios, geometricShapeArtifacts, assertGeometricShapeEvidence } from '../pointGeometricShapesContract.mjs';
+import { layoutAnchorGroup, layoutAnchorScenarios, layoutAnchorArtifacts, assertLayoutAnchorEvidence } from '../pointLayoutAnchorsContract.mjs';
 import {
   closeSync,
   existsSync,
@@ -72,8 +73,10 @@ export const pointNodeScenarios = {
     "point-paint-mutation-directory-uncertainty", "point-paint-app-continuity", polygonJoinScenario, dashCapScenario,
   ],
 };
-export const allPointNodeScenarios = { ...pointNodeScenarios, [geometricShapeGroup]: geometricShapeScenarios };
+export const allPointNodeScenarios = { ...pointNodeScenarios, [geometricShapeGroup]: geometricShapeScenarios,
+  [layoutAnchorGroup]: layoutAnchorScenarios };
 export function pointNodeScenarioArtifacts(name, profile = "strict") {
+  if (layoutAnchorScenarios.includes(name)) return layoutAnchorArtifacts(name);
   if (geometricShapeScenarios.includes(name)) return geometricShapeArtifacts(name);
   if (name === dashCapScenario) return [...dashCapArtifacts(), ...dashCapMechanismArtifacts().filter((file) => profile !== phase32cProfile || !file.startsWith(`${dashCapMechanismStem}-${deferredMechanismKey}.`))];
   if (name === polygonJoinScenario) return polygonJoinArtifacts();
@@ -132,7 +135,7 @@ export function pointNodeScenarioArtifacts(name, profile = "strict") {
 const pointNodeGroups = [...combinedLabelGroups, ...Object.keys(pointNodeScenarios)];
 const pointNodeMathGroups = pointNodeGroups.filter((group) => group !== "point-node-paint-import-persistence");
 const phase32Groups = { "32A": pointNodeMathGroups, "32B": pointNodeGroups,
-  "32C": [...pointNodeGroups, geometricShapeGroup], "32D": [...pointNodeGroups, geometricShapeGroup] };
+  "32C": [...pointNodeGroups, geometricShapeGroup], "32D": [...pointNodeGroups, geometricShapeGroup, layoutAnchorGroup] };
 
 export function browserChecksForPhase(phase) {
   const normalized = String(phase).toUpperCase();
@@ -278,6 +281,34 @@ function validateDashLivePaintFiles(artifactDir, live) {
 }
 
 function validateTargetedPaintEvidence(artifactDir, name, group, profile = "strict") {
+  if (group === layoutAnchorGroup) {
+    const evidence = evidenceObject(artifactDir, `${name}.json`);
+    assertLayoutAnchorEvidence(evidence, name);
+    if (name.startsWith('point-layout-pending-')) {
+      const standalone = evidenceObject(artifactDir, `${name}-standalone.json`);
+      assert.deepEqual(standalone.pageErrors, []);
+      assert.deepEqual(standalone.expected, evidence.expected); assert.deepEqual(standalone.click, evidence.click);
+      assert.equal(standalone.reopened.length, evidence.expected.length);
+      assert.ok(standalone.requests.length > 0 && standalone.requests.every((url) => url.startsWith('file:')));
+      const svg = readFileSync(join(artifactDir, `${name}.svg`), 'utf8');
+      const escape = (value) => String(value).replaceAll('&', '&amp;').replaceAll('<', '&lt;').replaceAll('>', '&gt;').replaceAll('"', '&quot;');
+      for (const [index, expected] of evidence.expected.entries()) {
+        const actual = standalone.reopened[index], captured = evidence.click.snapshot.points.find(({ id }) => id === expected.id);
+        assert.ok(captured); assert.equal(captured.source, expected.source); assert.equal(captured.style.shape, expected.shape);
+        assert.deepEqual(captured.style.layout, expected.layout);
+        assert.equal(actual.source, expected.source); assert.equal(actual.errors, 0); assert.ok(actual.glyphs > 0);
+        assert.deepEqual(actual.contour, expected.rendered.contour);
+        assert.equal(actual.nodeTransform, expected.rendered.nodeTransform); assert.equal(actual.nodeTransform, captured.nodeTransform);
+        assert.equal(actual.bodyTransform, expected.rendered.bodyTransform);
+        assert.ok(svg.includes(`<title>${escape(expected.source)}</title>`));
+        for (const [key, value] of Object.entries(actual.contour.attributes)) assert.ok(svg.includes(`${key}="${escape(value)}"`));
+      }
+      assert.notDeepEqual(standalone.pending.contour, evidence.expected[0].rendered.contour,
+        'Captured pending contour is rebuilt after real MathJax settlement');
+      assert.equal(svg.includes('data-stratified-tikz-export-background="white"'), evidence.background === 'white');
+    }
+    return;
+  }
   if (group === geometricShapeGroup) {
     const evidence = evidenceObject(artifactDir, `${name}.json`);
     assertGeometricShapeEvidence(evidence, name);
@@ -789,9 +820,9 @@ export function validateBrowserEvidence(name, artifactDir, phase, checkout, prof
   const completed = evidence.completed;
   if (!Array.isArray(completed)
     || new Set(completed).size !== completed.length
-    || completed.some((group) => ![...pointNodeGroups, geometricShapeGroup].includes(group))
+    || completed.some((group) => ![...pointNodeGroups, geometricShapeGroup, layoutAnchorGroup].includes(group))
     || !requiredGroups.every((group) => completed.includes(group))
-    || ![freeLabelGroups, inlineCompleteGroups, allLabelGroups, combinedLabelGroups, pointNodeMathGroups, pointNodeGroups, phase32Groups["32C"]].some((groups) =>
+    || ![freeLabelGroups, inlineCompleteGroups, allLabelGroups, combinedLabelGroups, pointNodeMathGroups, pointNodeGroups, phase32Groups["32C"], phase32Groups["32D"]].some((groups) =>
       groups.length === completed.length && groups.every((group) => completed.includes(group)))) {
     throw new Error(`Phase ${phase} browser evidence must complete ${requiredGroups.length} required groups; only complete supported group sets are accepted`);
   }

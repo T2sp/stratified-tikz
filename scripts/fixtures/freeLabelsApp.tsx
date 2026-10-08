@@ -92,12 +92,15 @@ function pointExportClickSnapshot(ids: string[]) {
     const source = stratum.text ?? ''
     const documentContext = inspectOracleDocumentContext(body)
     const literalObservation = inspectPositionedLiteral(body, source)
-    return { id, source, modelSource: source, style: structuredClone(stratum.style),
+    return { id, source, modelSource: source, style: structuredClone(stratum.style), position: structuredClone(stratum.position),
+      layout: point.getAttribute('data-point-layout'), anchor: point.getAttribute('data-point-anchor'),
+      anchorOffset: point.getAttribute('data-point-anchor-offset'), nodeTransform: point.getAttribute('transform'),
       request: body.getAttribute('data-label-request'), pointRequest: point.getAttribute('data-point-request'),
       owner: point.getAttribute('data-point-node'), status: body.getAttribute('data-label-state'), runtime: pointRuntime(),
       literalObservation: { ...literalObservation, documentContext, documentUnchanged: before === serialize() } }
   })
   return { json: snapshot.json, history: snapshot.history, runtime: pointRuntime(), points,
+    camera: structuredClone(model.diagram.camera),
     documentUnchanged: before === serialize() }
 }
 let exportClick: ReturnType<typeof pointExportClickSnapshot> | undefined

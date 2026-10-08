@@ -1,5 +1,18 @@
 # Phase 32 Plan: Point-node math, paint, geometric shapes, and layout
 
+Current 32D implementation (2026-10-08): explicit spacing/minimum/anchor model,
+ordered unit-aware import and controls, per-shape anchor placement, and strict
+combined verification are being added on the current compatible checkout.
+32A and main's later 32B acceptance remain recorded below. This checkout's 32C
+fresh strict native acceptance and independent review are still unaccepted;
+implementation presence does not close that prerequisite or the final gate.
+32D now requires `point-node-layout-anchors-combined` cumulatively with every
+31F/32A–32C group. Child localhost startup returned `EPERM`; native browser and
+downloaded/reopened SVG results remain pending for the parent. Phase 32 is **not
+complete**. See [32D implementation and combined audit](PHASE_32D_IMPLEMENTATION.md).
+The execution records that follow are historical and retain their original
+stage/deferral dispositions.
+
 Current 32B countermeasure execution (2026-10-06): the authenticated parent
 reproduced the four-shape transfer, exercised native point workflows, and applied
 the measured uninterrupted-dash seam correction and both-page ownership guards.

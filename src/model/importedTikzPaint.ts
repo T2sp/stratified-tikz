@@ -1,6 +1,7 @@
 import { applyLiteralPointShapeOption } from './importedTikzShapes.ts'
 import { pointShapeParameterKeys, pointShapeParameterIssues } from './pointShapeParameters.ts'
-import type { HexColor, LineStyle, PointShape, PointShapeParameters } from './types.ts'
+import { applyLiteralPointLayoutOption, defaultPointNodeFontContext, parsePointNodeDimension, pointNodeLayoutFields } from './pointNodeLayout.ts'
+import type { HexColor, LineStyle, PointShape, PointShapeParameters, PointNodeFontContext, PointNodeLayoutOptions } from './types.ts'
 
 /** Literal-only, bounded TikZ paint support. No TeX evaluation is performed. */
 export const namedTikzColors: Readonly<Record<string, HexColor>> = {
@@ -32,6 +33,7 @@ export type TikzPaintPreview = {
   shapeParameters?: PointShapeParameters
   pointShape?: PointShape
   pointSize?: number
+  pointLayout?: PointNodeLayoutOptions
   diagnostics?: string[]
   unresolvedFields?: string[]
   sourceDependencies?: string[]
@@ -57,6 +59,8 @@ export type TikzPreviewContext = {
   /** Unknown source execution can redefine any style, color or key handler. */
   sourceDiagnostics?: readonly string[]
   key?: string
+  /** Recorded units context, independent from deferred font execution. */
+  pointFontContext?: PointNodeFontContext
 }
 /** Internal identity only: retain the user's key spelling in saved references. */
 export function canonicalTikzStyleKey(key: string): string {
@@ -74,12 +78,9 @@ const decimal = /^[+-]?(?:\d+(?:\.\d*)?|\.\d+)$/
 export function literalTikzNumber(value: string): number | null {
   return decimal.test(value.trim()) && Number.isFinite(Number(value)) ? Number(value) : null
 }
-export function literalTikzDimension(value: string, signed = false): number | null {
-  const match = value.trim().match(/^([+-]?(?:\d+(?:\.\d*)?|\.\d+))\s*(pt|mm|cm|in|bp)?$/)
-  if (!match) return null
-  const number = Number(match[1])
-  const factors: Record<string, number> = { pt: 1, mm: 72.27 / 25.4, cm: 72.27 / 2.54, in: 72.27, bp: 72.27 / 72 }
-  const result = number * factors[match[2] ?? 'pt']
+export function literalTikzDimension(value: string, signed = false, context: PointNodeFontContext = defaultPointNodeFontContext): number | null {
+  const result = parsePointNodeDimension(value, context)?.texPoints
+  if (result === undefined) return null
   return Number.isFinite(result) && (signed || result >= 0) ? result : null
 }
 export function literalTikzColor(value: string, colors: TikzColorBindings = {}, onBindingUse?: (name: string) => void): HexColor | null {
@@ -149,7 +150,14 @@ export function resolveTikzPaint(options: string, context: TikzPreviewContext = 
     const sourceId = context.colorSourceIds?.[name]
     if (sourceId !== undefined) dependencies.add(sourceId)
   })
-  const shapeFields = ['pointShape', ...pointShapeParameterKeys.map((field) => `shapeParameters.${field}`)]
+  const dimension = (value: string, signed = false): number | null => {
+    const parsed = parsePointNodeDimension(value, context.pointFontContext)
+    if (parsed && (parsed.unit === 'em' || parsed.unit === 'ex')) preview.pointLayout = {
+      ...preview.pointLayout, fontContext: { ...defaultPointNodeFontContext, ...context.pointFontContext },
+    }
+    return parsed && (signed || parsed.texPoints >= 0) ? parsed.texPoints : null
+  }
+  const shapeFields = ['pointShape', ...pointShapeParameterKeys.map((field) => `shapeParameters.${field}`), ...pointNodeLayoutFields.map((field) => `pointLayout.${field}`)]
   const paintFields = ['fillColor', 'fillEnabled', 'drawColor', 'drawEnabled', 'textColor', 'fillOpacity', 'drawOpacity', 'textOpacity', 'lineWidth', 'dashPattern', 'dashPhase', 'lineCap', 'lineJoin']
   // No safe prefix/suffix or local key boundary exists for a rejected saved
   // source. Do not traverse legacy options: even built-in color bindings and
@@ -309,14 +317,14 @@ export function resolveTikzPaint(options: string, context: TikzPreviewContext = 
         }
         warn(`Unsupported runtime key directory change: ${option}`)
         runtimeDirectoryKnown = false
-        paintFields.forEach((field) => unresolved.add(field))
+        ;[...paintFields, ...shapeFields].forEach((field) => unresolved.add(field))
         continue
       }
       if (!runtimeDirectoryKnown && !rawKey.startsWith('/')) {
         // Still inspect retained lists for executable effects after .cd.
         collectOptionDependencies(option, active, false)
         warn(`Unresolved option after unsupported runtime key directory change: ${option}`)
-        paintFields.forEach((field) => unresolved.add(field))
+        ;[...paintFields, ...shapeFields].forEach((field) => unresolved.add(field))
         continue
       }
       const canonicalKey = canonicalTikzStyleKey(rawKey)
@@ -343,7 +351,7 @@ export function resolveTikzPaint(options: string, context: TikzPreviewContext = 
             collectOptionDependencies(definition.options ?? '', [reference], false)
             for (const options of definition.dependencyOptions) collectOptionDependencies(options, [reference], false)
           }
-          paintFields.forEach((field) => unresolved.add(field))
+          ;[...paintFields, ...shapeFields].forEach((field) => unresolved.add(field))
         }
         continue
       }
@@ -389,16 +397,16 @@ export function resolveTikzPaint(options: string, context: TikzPreviewContext = 
         else { preview.color = resolvedColor; delete preview.drawColor; delete preview.fillColor; delete preview.textColor; resolved('fillColor', 'drawColor', 'textColor') }
       } else if (value === undefined && Object.hasOwn(thickness, key)) { preview.lineWidth = thickness[key]; resolved('lineWidth') }
       else if (value === undefined && Object.hasOwn(lineStyles, key)) { preview.lineStyle = lineStyles[key]; delete preview.dashPattern; resolved('dashPattern') }
-      else if (key === 'line width' || key === 'inner sep' || key === 'dash phase') {
-        const dimension = value === undefined ? null : literalTikzDimension(value, key === 'dash phase')
-        if (dimension === null || ((key === 'inner sep' || key === 'line width') && dimension === 0)) invalid()
-        else if (key === 'line width') { preview.lineWidth = dimension; resolved('lineWidth') }
-        else if (key === 'inner sep') preview.pointSize = dimension * 2
-        else { preview.dashPhase = dimension; resolved('dashPhase') }
+      else if (applyLiteralPointLayoutOption(preview, key, value, context.pointFontContext, invalid, resolved)) { /* ordered layout option */ }
+      else if (key === 'line width' || key === 'dash phase') {
+        const amount = value === undefined ? null : dimension(value, key === 'dash phase')
+        if (amount === null || (key === 'line width' && amount === 0)) invalid()
+        else if (key === 'line width') { preview.lineWidth = amount; resolved('lineWidth') }
+        else { preview.dashPhase = amount; resolved('dashPhase') }
       } else if (key === 'dash pattern' && value !== undefined) {
         if (value === '') { preview.lineStyle = 'solid'; delete preview.dashPattern; resolved('dashPattern'); continue }
-        const segments = [...value.matchAll(/\b(on|off)\s+([+-]?(?:\d+(?:\.\d*)?|\.\d+)\s*(?:pt|mm|cm|in|bp)?)/g)]
-        const pattern = segments.map((segment) => literalTikzDimension(segment[2]))
+        const segments = [...value.matchAll(/\b(on|off)\s+([+-]?(?:\d+(?:\.\d*)?|\.\d+)\s*(?:pt|mm|cm|in|bp|em|ex)?)/g)]
+        const pattern = segments.map((segment) => dimension(segment[2]))
         if (!segments.length || segments.length > 32 || segments.length % 2 !== 0 ||
           segments.map((segment) => segment[0]).join(' ').replace(/\s+/g, '') !== value.replace(/\s+/g, '') ||
           segments.some((segment, index) => segment[1] !== (index % 2 === 0 ? 'on' : 'off')) ||
@@ -406,7 +414,7 @@ export function resolveTikzPaint(options: string, context: TikzPreviewContext = 
         else { preview.dashPattern = pattern as number[]; preview.lineStyle = 'solid'; resolved('dashPattern') }
       } else if ((key === 'line cap' || key === 'cap') && (value === 'butt' || value === 'round' || value === 'rect')) { preview.lineCap = value; resolved('lineCap') }
       else if ((key === 'line join' || key === 'join') && (value === 'miter' || value === 'round' || value === 'bevel')) { preview.lineJoin = value; resolved('lineJoin') }
-      else if (applyLiteralPointShapeOption(preview, key, value, { number: literalTikzNumber, dimension: literalTikzDimension, color, invalid, resolved })) { /* ordered shape option */ }
+      else if (applyLiteralPointShapeOption(preview, key, value, { number: literalTikzNumber, dimension, color, invalid, resolved })) { /* ordered shape option */ }
       else {
         const resolvedColor = value === undefined ? color(key) : null
         if (resolvedColor) { preview.color = resolvedColor; delete preview.drawColor; delete preview.fillColor; delete preview.textColor; resolved('fillColor', 'drawColor', 'textColor') }

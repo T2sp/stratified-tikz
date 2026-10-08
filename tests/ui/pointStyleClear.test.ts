@@ -176,6 +176,7 @@ function clearPointsWithHistory(diagram: Diagram, ids: readonly string[]): Diagr
     delete expected.importedTikzStyleReferenceId
     delete expected.style.importedPaint
     delete expected.style.importedShape
+    delete expected.style.importedLayout
     assert.deepEqual(after, expected, 'only the preset, external association and its provenance are removed')
     assert.notStrictEqual(after.style, before.style)
     assert.notStrictEqual(after.style.paint, before.style.paint)

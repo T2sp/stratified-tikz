@@ -1,6 +1,7 @@
 import type { PointStyle, Vec2 } from '../model/types'
 import { solvePointNodeShape, type PointNodeShapeSolution } from '../geometry/pointNodeShapes/index.ts'
 import { resolvePointShapeParameters } from '../model/pointShapeParameters.ts'
+import { defaultPointNodeFontContext, resolvePointNodeLayoutOptions } from '../model/pointNodeLayout.ts'
 
 export type SvgPointNodeContentSize = {
   width: number
@@ -8,6 +9,8 @@ export type SvgPointNodeContentSize = {
   height: number
   /** Depth below the measured first baseline, in the same units. */
   depth?: number
+  /** Actual first text advance origin, distinct from overhanging ink bounds. */
+  originX?: number
 }
 
 export type SvgPointNodeBounds = {
@@ -39,10 +42,11 @@ export const svgPointNodeTexPointScale = 1.2
 /**
  * Match the shapes emitted by pointShapeOptions in the TikZ generator.
  * Content measurements and the returned geometry use SVG units; style.size
- * remains in TeX points. Outer sep affects PGF anchors, not the drawn shape.
+ * remains in TeX points. Outer sep follows each shape's PGF rules, including
+ * diamond's adjustment of both anchor clearance and the drawn contour.
  */
 export function svgPointNodeGeometry(
-  style: Pick<PointStyle, 'shape' | 'size' | 'shapeParameters'>,
+  style: Pick<PointStyle, 'shape' | 'size' | 'shapeParameters' | 'layout'>,
   contentSize: SvgPointNodeContentSize,
   texPointScale = svgPointNodeTexPointScale,
   lineWidth = 0.4 * texPointScale,
@@ -63,21 +67,31 @@ export function svgPointNodeGeometry(
   // vertex order and floating-point dash perimeter. New parameters use PGF's
   // shape-specific solver rather than generic bounding-box scaling.
   const parameters = resolvePointShapeParameters(style.shapeParameters)
-  const legacy = style.shape === 'circle'
+  const legacy = style.layout === undefined && (style.shape === 'circle'
     || (parameters.borderRotate === 0 && (style.shape === 'square' || style.shape === 'triangle'
       || (style.shape === 'star' && parameters.starPoints === 5
-        && parameters.starPointMode === 'ratio' && parameters.starPointRatio === 1.5)))
+        && parameters.starPointMode === 'ratio' && parameters.starPointRatio === 1.5))))
   if (!legacy) {
     const depth = Math.min(nonnegativeFinite(contentSize.depth ?? 0), 2 * halfHeight)
+    const layout = resolvePointNodeLayoutOptions({ ...style, size: nonnegativeFinite(style.size) }, lineWidth / scale)
     try {
       const solution = solvePointNodeShape({ shape: style.shape, unitScale: scale,
-        body: { width: 2 * halfWidth, height: 2 * halfHeight - depth, depth },
-        innerXSep: innerSep, innerYSep: innerSep, outerXSep: lineWidth / 2, outerYSep: lineWidth / 2,
-        minimumWidth: scale, minimumHeight: scale, lineWidth,
+        body: { width: 2 * halfWidth, height: 2 * halfHeight - depth, depth,
+          ...(contentSize.originX === undefined ? {} : { originX: contentSize.originX }) },
+        innerXSep: layout.innerXSep * scale, innerYSep: layout.innerYSep * scale,
+        outerXSep: layout.outerXSep * scale, outerYSep: layout.outerYSep * scale,
+        minimumWidth: layout.minimumWidth * scale, minimumHeight: layout.minimumHeight * scale, lineWidth,
+        anchor: layout.anchor,
+        // Saved context resolves em/ex dimensions only. Typography remains the
+        // existing default 10pt node font, including PGF's mid-anchor ex.
+        fontContext: { em: defaultPointNodeFontContext.fontSizePt * scale,
+          ex: defaultPointNodeFontContext.xHeightPt * scale },
         parameters: { ...parameters, starPointHeight: parameters.starPointHeight * scale },
       })
-      return { kind: 'polygon', radius: solution.radius, vertices: solution.contours[0].vertices,
-        bounds: solution.bounds, contentBounds: solution.bodyBounds, innerSep, solution }
+      return { kind: style.shape === 'circle' ? 'circle' : 'polygon', radius: solution.radius,
+        vertices: style.shape === 'circle' ? [] : solution.contours[0].vertices,
+        bounds: solution.bounds, contentBounds: solution.bodyBounds, innerSep, solution,
+        ...(solution.anchorDiagnostic ? { limitation: solution.anchorDiagnostic } : {}) }
     } catch (error) {
       if (!(error instanceof RangeError)) throw error
       // Keep the upright body selectable; this rectangle is a body hit region,

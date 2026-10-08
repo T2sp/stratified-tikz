@@ -1,0 +1,3 @@
+CASE circular-sector-singular-45
+FONT 10.00002pt,4.30554pt
+PAINT stroke; PATH macro:->\pgfsyssoftpath@movetotoken {23.62439pt}{0.0pt}\pgfsyssoftpath@linetotoken {-7.38887pt}{17.90547pt}\pgfsyssoftpath@curvetosupportatoken {-13.78513pt}{6.82681pt}\pgfsyssoftpath@curvetosupportbtoken {-13.78513pt}{-6.82681pt}\pgfsyssoftpath@curvetotoken {-7.38887pt}{-17.90547pt}\pgfsyssoftpath@closepathtoken {23.62439pt}{0.0pt}

@@ -141,8 +141,12 @@ test('outer separation is independent clearance, never additional paint or fill 
   for (const shape of shapes) {
     const normal = solvePointNodeShape(fixed(shape))
     const spaced = solvePointNodeShape({ ...fixed(shape), outerXSep: 4, outerYSep: 7 })
-    assert.deepEqual(normal.contours, spaced.contours)
-    assert.deepEqual(normal.bounds, spaced.bounds)
+    if (shape === 'diamond') {
+      assert.ok(spaced.bounds.maxX < normal.bounds.maxX, 'PGF diamond subtracts sqrt(2)*outer sep from its saved anchor axes for painting')
+    } else {
+      assert.deepEqual(normal.contours, spaced.contours)
+      assert.deepEqual(normal.bounds, spaced.bounds)
+    }
     assert.ok(spaced.anchorBounds.minX < normal.bounds.minX)
     assert.ok(spaced.anchorBounds.maxY > normal.bounds.maxY)
   }

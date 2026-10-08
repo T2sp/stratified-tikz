@@ -735,9 +735,9 @@ Export capture now optionally owns a whole point (frozen explicit legacy style,
 position and body inputs). Settlement reconstructs both shape and body from one
 layout, preserving the captured parent opacity. Empty point bodies retain their
 legacy contour size. Runtime failures, parser failures, and export deadlines
-retain complete literal source. Point browser acceptance is pending in this
-child environment; see `PHASE_32A_IMPLEMENTATION.md`. Paint expansion, new shape
-algorithms and layout/anchor controls remain 32B–32D work.
+retain complete literal source. The subsequent matching parent report and review
+accepted 32A; see `PHASE_32A_IMPLEMENTATION.md`. Paint, shape and layout expansion
+remain outside the conversion adapter and are documented below and in 32D.
 
 
 ## Phase 32B paint boundary
@@ -823,3 +823,29 @@ The [framing repair report](PHASE_32B_IMPLEMENTATION.md#responsive-fixture-frami
 records 2,836 passing tests and the exact final-tree handoff; child localhost
 `EPERM` establishes no native pass. Complete final-tree browser acceptance and
 subsequent independent review remain pending; 32C/32D remain deferred.
+
+## Phase 32D layout boundary
+
+Spacing, minima, anchor resolution and border-only rotation consume the shared
+body's measured advance, ink, height/depth and baseline outside the adapter.
+Point layout is runtime-only; explicit styles and unit-conversion context are
+the saved inputs. Conversion identity continues to use source/font/owner, so
+paint, anchor and camera edits reuse cached typesetting. Contextual em/ex metadata
+records each dimension axis's context, with the legacy shared context as fallback.
+It resolves input dimensions but does not change adapter typography or the actual
+mid-anchor font reference.
+
+The committed point view shifts body and contour by one selected-anchor offset;
+picking/selection use the same revision. Settled export freezes all model/projection
+inputs and rebuilds that shared view after conversion. Undefined shape/anchor
+constructions are diagnosed, while body conversion failure still displays the
+whole exact latest source. Valid negative padding may expose body ink outside the
+painted contour: picking and the selection ring include that actual ink. Painted
+bounds remain contour/stroke-only and anchor clearance does not inflate the hit
+or selection region. Free and inline labels retain their existing paths.
+For a shape/anchor diagnostic, the hidden requested contour contributes no hit or
+selection extent: only the exact body and its small adjacent SVG warning remain
+visible and pickable. Requested geometry remains separate diagnostic metadata.
+See [the current combined audit](PHASE_32D_IMPLEMENTATION.md) for support grammar,
+PGF references and pending strict native/review gates; earlier pending notes above
+are historical execution records.

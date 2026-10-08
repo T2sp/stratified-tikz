@@ -10,7 +10,7 @@ export type PointShapeBounds = {
 /** All lengths use one caller-selected unit (normally SVG units or TeX pt). */
 export type PointNodeShapeInput = {
   shape: PointShape
-  body: { width: number; height: number; depth: number }
+  body: { width: number; height: number; depth: number; originX?: number }
   innerXSep: number
   innerYSep: number
   outerXSep: number
@@ -23,6 +23,10 @@ export type PointNodeShapeInput = {
   unitScale?: number
   /** Dimensional parameters, particularly starPointHeight, use the same unit. */
   parameters?: PointShapeParameters
+  /** Placement anchor; preserved source is diagnosed when unsupported. */
+  anchor?: string
+  /** Current font dimensions, in the same geometry units (used by mid anchors). */
+  fontContext?: { em: number; ex: number }
 }
 
 export type PointShapeContour = {
@@ -49,9 +53,21 @@ export type PointNodeShapeSolution = {
   bodyOrigin: Vec2
   /** SVG y coordinate of the baseline, relative to the body-center node anchor. */
   baseline: number
-  /** Clearance is separate from the path and paint; complete anchors belong to 32D. */
+  /** Clearance is separate from the path and paint and is never a hit region. */
   anchorBounds: PointShapeBounds
+  /** Supported named anchors, relative to the upright text-box center, SVG y down. */
+  anchors: Readonly<Record<string, Vec2>>
+  placementAnchor: Vec2
+  anchorDiagnostic?: string
+  textCenter: Vec2
+  shapeCenter: Vec2
   /** Effective PGF border angle, in degrees (possibly rounded). */
   rotation: number
   radius: number
+}
+
+export type PointNodeAnchorResolution = {
+  supported: boolean
+  position: Vec2
+  diagnostic?: string
 }

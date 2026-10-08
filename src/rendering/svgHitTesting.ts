@@ -1172,17 +1172,29 @@ function collectPointCandidate(
     : currentSvgPointNodeLayout(pointStratum, pointCommits, documentRevision, fontGeneration)
   if (layout === null) return true
   const { geometry } = layout
-  const localPoint = { x: point.x - center.x, y: point.y - center.y }
-  const boundaryDistance = geometry.kind === 'circle'
-    ? Math.max(distance - geometry.radius - layout.stroke / 2, 0)
+  const localPoint = { x: point.x - center.x - layout.placementOffset.x,
+    y: point.y - center.y - layout.placementOffset.y }
+  const boundaryDistance = geometry.limitation ? Infinity : geometry.kind === 'circle'
+    ? Math.max(Math.hypot(localPoint.x, localPoint.y) - geometry.radius - layout.stroke / 2, 0)
     : pointInPolygon(localPoint, geometry.vertices)
       ? 0
       : layout.stroke > 0 && layout.strokeRegion
         ? distanceToPolygonStroke(localPoint, layout.strokeRegion)
         : distanceToClosedPolyline(localPoint, geometry.vertices)
+  // Valid negative separation can leave visible text outside its border.
+  // The body remains part of this point owner; outer anchor clearance never
+  // contributes to this hit region.
+  const content = geometry.contentBounds
+  const bodyDistance = (pointStratum.text ?? '') === '' ? Infinity : Math.hypot(
+    Math.max(content.minX - localPoint.x, localPoint.x - content.maxX, 0),
+    Math.max(content.minY - localPoint.y, localPoint.y - content.maxY, 0))
+  const warning = layout.warningBounds
+  const warningDistance = warning ? Math.hypot(
+    Math.max(warning.minX - (point.x - center.x), (point.x - center.x) - warning.maxX, 0),
+    Math.max(warning.minY - (point.y - center.y), (point.y - center.y) - warning.maxY, 0)) : Infinity
 
-  if (Math.min(boundaryDistance, distanceToDashCaps(localPoint, layout.dashCaps),
-    geometry.kind === 'circle' && layout.strokeRegion ? distanceToPolygonStroke(localPoint, layout.strokeRegion) : Infinity) > 6) {
+  if (Math.min(boundaryDistance, bodyDistance, warningDistance, geometry.limitation ? Infinity : distanceToDashCaps(localPoint, layout.dashCaps),
+    !geometry.limitation && geometry.kind === 'circle' && layout.strokeRegion ? distanceToPolygonStroke(localPoint, layout.strokeRegion) : Infinity) > 6) {
     return true
   }
 

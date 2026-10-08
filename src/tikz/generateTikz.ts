@@ -1,5 +1,6 @@
 import { pointShapeTikzKeys } from '../model/importedTikzShapes.ts'
 import { changedPointShapeFields, pointShapeParameterKeys, resolvePointShapeParameters } from '../model/pointShapeParameters.ts'
+import { changedPointLayoutFields, pointNodeLayoutFields, pointNodeLayoutTikzKeys, resolvePointNodeLayoutOptions } from '../model/pointNodeLayout.ts'
 import { changedPointPaintFields, getPointPaint } from '../model/styles.ts'
 import type {
   BoundaryPathSnapshot,
@@ -31,6 +32,7 @@ import type {
   PointStratum,
   PointStyle,
   PointPaintField,
+  PointNodeLayoutField,
   RegionStyle,
   SheetStyle,
   SheetStratum,
@@ -6632,14 +6634,25 @@ function pointStyleTikzOptions(
       `fill=${style.fill === 'filled' ? pointColor : 'white'}`,
       `draw=${pointColor}`,
       `opacity=${formatNumber(style.opacity)}`,
-      `inner sep=${formatNumber(style.size / 2)}pt`,
+      ...pointLayoutTikzOptions(style),
     ]
   }
   return [
     ...pointShapeOptions(style, colorBaseName, context),
     ...pointPaintTikzOptions(style, colorBaseName, context),
-    `inner sep=${formatNumber(style.size / 2)}pt`,
+    ...pointLayoutTikzOptions(style),
   ]
+}
+
+/** Numeric TeX-point output fixes the recorded em/ex context across packages. */
+function pointLayoutTikzOptions(style: PointStyle, fields?: ReadonlySet<PointNodeLayoutField>): string[] {
+  const resolved = resolvePointNodeLayoutOptions(style)
+  const options = fields === undefined ? [`inner sep=${formatNumber(style.size / 2)}pt`] : []
+  for (const field of pointNodeLayoutFields) {
+    if (fields === undefined ? style.layout?.[field] === undefined : !fields.has(field)) continue
+    options.push(`${pointNodeLayoutTikzKeys[field]}=${field === 'anchor' ? resolved.anchor : `${formatNumber(resolved[field])}pt`}`)
+  }
+  return options
 }
 
 function pointPaintTikzOptions(style: PointStyle, colorBaseName: string, context: GenerateContext): string[] {
@@ -6698,7 +6711,7 @@ function pointStyleOptionsForElement(
       // explicit text opacity would mask an unknown style's fill opacity.
       ...(unresolved.length === 0 ? [] : pointPaintTikzOptions(style, colorBaseName, context).filter((option) => !option.startsWith('text opacity='))),
       ...pointShapeOptions(style, colorBaseName, context),
-      `inner sep=${formatNumber(style.size / 2)}pt`,
+      ...pointLayoutTikzOptions(style),
       ...importedStyle.options,
       ...pointImportedStyleOverrideOptions(
         importedStyle.reference,
@@ -6951,8 +6964,24 @@ function pointImportedStyleOverrideOptions(
   return [
     ...paintOptions,
     ...pointImportedShapeOverrideOptions(reference, style, baseline, colorBaseName, context),
-    ...(baseline.kind !== 'pointStyle' || style.size !== baseline.size ? [`inner sep=${formatNumber(style.size / 2)}pt`] : []),
+    ...pointImportedLayoutOverrideOptions(reference, style, baseline, context),
   ]
+}
+
+function pointImportedLayoutOverrideOptions(reference: ImportedTikzStyleReference, style: PointStyle,
+  baseline: UserStylePreset['style'], context: GenerateContext): string[] {
+  const preview = resolveImportedTikzStyle(reference, context.importedTikzResolution)
+  const intent = style.importedLayout?.referenceId === reference.id ? style.importedLayout : undefined
+  const fields = new Set(intent?.overriddenFields ?? [])
+  if (!preview.executionUncertain && baseline.kind === 'pointStyle') {
+    const comparison = intent === undefined ? baseline : { ...baseline, layout: intent.baseline }
+    for (const field of changedPointLayoutFields(comparison, style)) fields.add(field)
+    if (style.size !== baseline.size) {
+      if (style.layout?.innerXSep === undefined) fields.add('innerXSep')
+      if (style.layout?.innerYSep === undefined) fields.add('innerYSep')
+    }
+  }
+  return pointLayoutTikzOptions(style, fields)
 }
 
 function pointImportedShapeOverrideOptions(

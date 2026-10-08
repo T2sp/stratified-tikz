@@ -1,0 +1,25 @@
+\documentclass{article}
+\usepackage{tikz}
+\usetikzlibrary{shapes.geometric}
+\pagestyle{empty}
+\makeatletter
+\newwrite\fixtureout
+\immediate\openout\fixtureout=geometry.txt
+\newcommand\fixedshape[8]{%
+\begin{pgfpicture}\begingroup\normalfont
+\pgfkeys{#7}%
+\setbox\pgfnodeparttextbox=\hbox{}%
+\wd\pgfnodeparttextbox=#3pt\ht\pgfnodeparttextbox=#4pt\dp\pgfnodeparttextbox=#5pt%
+\pgfsetlinewidth{#6pt}%
+\immediate\write\fixtureout{CASE #1}%
+\pgfmathsetlength\pgf@x{1em}\pgfmathsetlength\pgf@y{1ex}%
+\immediate\write\fixtureout{FONT \the\pgf@x,\the\pgf@y}%
+\let\originalusepath\pgfusepath
+\def\pgfusepath##1{\pgfgetpath\fixturepath\immediate\write\fixtureout{PAINT ##1; PATH \meaning\fixturepath}\originalusepath{##1}}%
+\pgfmultipartnode{#2}{center}{fixture}{\pgfusepath{stroke}}%
+\foreach\anchorname in {#8}{\pgfpointanchor{fixture}{\anchorname}\immediate\write\fixtureout{ANCHOR \anchorname; \the\pgf@x,\the\pgf@y}}%
+\endgroup\end{pgfpicture}\par}
+\makeatother
+\begin{document}
+\fixedshape{kite-singular-deep-negative-ray}{kite}{20}{8}{3}{0.4}{/pgf/inner xsep=-30pt,/pgf/inner ysep=-30pt,/pgf/outer xsep=0pt,/pgf/outer ysep=0pt,/pgf/minimum width=1pt,/pgf/minimum height=1pt}{-30}
+\end{document}
