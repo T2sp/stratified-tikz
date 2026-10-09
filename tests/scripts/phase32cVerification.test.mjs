@@ -15,59 +15,324 @@ import { syntheticMechanismEvidence } from './pointDashCapMechanismFixture.mjs'
 import { selectGeometricPoint, installGeometricSelectionObserver, observeGeometricSelection,
   removeGeometricSelectionObserver } from '../../scripts/pointGeometricSelection.mjs'
 
-// Controlled event-delivery boundaries exercise error ownership, not native
-// acceptance. The real reused App sequence remains in the eleven-shape loop.
+// These preparation and event-delivery controls are explicitly synthetic. They
+// exercise ordering/error ownership; the reused native App shape loop is the
+// browser acceptance gate.
 function selectionDeliveryControl(options = {}) {
   const { observationFailure, evidenceFailure, cleanupFailure, mouseFailure } = options
   const calls = [], observations = [], secondaryErrors = []
   const rendered = { shape: 'circle', source: 'native shape', center: { x: 1250, y: 270 }, boundary: { x: 1190, y: 280 } }
+  const staleRendered = { ...rendered, center: { x: 1510, y: 140 }, boundary: { x: 1450, y: 150 } }
+  const diagram = { ambientDimension: 2, strata: [{ id: 'app-point', geometricKind: 'point', codim: 2,
+    position: { x: 3, y: 3, z: 0 }, text: '  native shape\t\n',
+    style: { shape: 'circle', size: 8, opacity: 1, layout: { anchor: 'center', innerXSep: 2,
+      units: { innerXSep: { source: '2pt', unit: 'pt', texPoints: 2 } } } } }] }
+  const authoritative = { json: JSON.stringify({ version: 2, diagram }), runtimeDiagramJson: JSON.stringify(diagram),
+    history: JSON.stringify({ past: [], present: diagram, future: [] }), labelDocumentRevision: 10 }
+  const current = { selection: options.initialSelection ?? null, drawerOpen: options.drawerOpen ?? false,
+    scrolled: false, closeActions: 0, installed: false, events: [], preparationSnapshots: 0 }
+  const pointTarget = { tag: 'circle', pointId: 'app-point', drawer: false, svg: true, canvas: true, canvasRoot: false, pointHandle: false }
+  const handleTarget = { tag: 'circle', class: 'svg-geometry-handle', pointId: null, drawer: false,
+    svg: true, canvas: true, canvasRoot: false, pointHandle: true }
+  const overlayTarget = { tag: 'div', class: 'empty-inspector', pointId: null, drawer: true,
+    svg: false, canvas: false, canvasRoot: false, pointHandle: false }
+  const otherOverlayTarget = { ...overlayTarget, class: 'other-overlay', drawer: false }
+  const canvasTarget = { tag: 'svg', class: 'svg-diagram', drawer: false, svg: true, canvas: true, canvasRoot: true, pointHandle: false }
+  const target = () => ({ point: pointTarget, handle: handleTarget, drawer: overlayTarget, overlay: otherOverlayTarget,
+    wrongPoint: { ...pointTarget, pointId: 'other-point' } }[options.targetKind ?? 'point'])
+  const pathFor = (eventTarget) => {
+    if (options.missingPath) return []
+    if (!eventTarget.svg) return [eventTarget]
+    return [eventTarget, ...(eventTarget.pointHandle ? [{ tag: 'g', pointId: null, drawer: false,
+      svg: true, canvas: true, canvasRoot: false, pointHandle: false, ariaLabel: 'Selected point drag handles' }] : [
+      { tag: 'g', pointId: eventTarget.pointId, drawer: false, svg: true, canvas: true, canvasRoot: false, pointHandle: false }]), canvasTarget]
+  }
   const page = {
-    getByRole: () => ({ click: async () => { calls.push('Select') } }),
-    locator: () => ({ scrollIntoViewIfNeeded: async () => { calls.push('scroll') } }),
-    mouse: { click: async (x, y) => { calls.push(['native click', x, y]); if (mouseFailure) throw mouseFailure } },
+    getByRole: (role, { name, exact }) => {
+      assert.equal(role, 'button'); assert.equal(exact, true)
+      if (name === 'Select') return { click: async () => { calls.push('Select') } }
+      if (name === 'Close inspector drawer') return {
+        count: async () => { calls.push('close count'); return options.closeCount ?? Number(current.drawerOpen) },
+        click: async (settings) => {
+          assert.deepEqual(settings, { timeout: 5000 }); calls.push('close'); current.closeActions++
+          if (options.closeFailure) throw options.closeFailure
+          if (!options.detachFailure && !options.detachReportedSuccess) current.drawerOpen = false
+          if (options.mutateOnClose) options.mutateOnClose(authoritative)
+        },
+      }
+      assert.equal(name, 'Open inspector drawer')
+      return { count: async () => { calls.push('open count'); return options.openerCount ?? Number(!current.drawerOpen) },
+        getAttribute: async (attribute) => {
+          assert.equal(attribute, 'aria-expanded'); calls.push('open expanded')
+          return options.openerExpanded ?? (current.drawerOpen ? 'true' : 'false')
+        } }
+    },
+    locator: (selector) => {
+      if (selector === 'svg.svg-diagram') return { scrollIntoViewIfNeeded: async () => { calls.push('scroll'); current.scrolled = true } }
+      assert.equal(selector, '#preview-inspector-drawer')
+      return { count: async () => { calls.push('drawer count'); return options.drawerCount ?? Number(current.drawerOpen) },
+        waitFor: async (settings) => {
+          assert.deepEqual(settings, { state: 'detached', timeout: 5000 }); calls.push('wait detached')
+          if (options.detachFailure) throw options.detachFailure
+          if (options.detachReportedSuccess) return
+          assert.equal(current.drawerOpen, false)
+        } }
+    },
+    mouse: { click: async (x, y) => {
+      calls.push(['native click', x, y])
+      if (mouseFailure) throw mouseFailure
+      assert.equal(current.drawerOpen, false, 'synthetic canvas input follows verified drawer closure')
+      assert.equal(current.scrolled, true, 'synthetic canvas input follows canvas scrolling')
+      const expected = options.boundary ? rendered.boundary : rendered.center
+      assert.deepEqual({ x, y }, expected, 'synthetic canvas input uses post-preparation coordinates')
+      const eventTarget = options.eventTargetKind ? { ...target(), ...({ drawer: overlayTarget, overlay: otherOverlayTarget }[options.eventTargetKind]) } : target()
+      current.events = ['pointerdown', 'pointerup', 'click'].map((type) => {
+        const capturedContinuation = options.handleCapture && type !== 'pointerdown'
+        const deliveredTarget = capturedContinuation ? canvasTarget : eventTarget
+        return { type, trusted: options.untrustedType !== type, target: deliveredTarget,
+          path: capturedContinuation ? [canvasTarget] : pathFor(deliveredTarget),
+          client: options.farClick && type === 'click' ? { x: x + 20, y: y + 20 } : { x, y },
+          pointerId: options.mouseEventClick && type === 'click' ? null : options.wrongPointerId && type !== 'pointerdown' ? 8 : 7,
+          canvasHasPointerCapture: capturedContinuation && type === 'pointerup' && !options.missingCapture }
+      })
+      if (options.wrongEventOrder) current.events.reverse()
+      if (!options.selectionFailure) current.selection = { id: 'app-point' }
+    } },
     evaluate: async (operation, argument) => {
-      if (operation === installGeometricSelectionObserver) { calls.push('install'); return }
-      if (operation === removeGeometricSelectionObserver) { calls.push('cleanup'); if (cleanupFailure) throw cleanupFailure; return }
+      if (operation === installGeometricSelectionObserver) { calls.push('install'); current.installed = true; current.events = []; return }
+      if (operation === removeGeometricSelectionObserver) { calls.push('cleanup'); current.installed = false; if (cleanupFailure) throw cleanupFailure; return }
       assert.equal(operation, observeGeometricSelection)
-      calls.push('snapshot')
-      if (observationFailure) throw observationFailure
+      const preparationStage = current.preparationSnapshots % 2 === 0 ? 'inherited' : 'closed'
+      calls.push(argument.click ? 'snapshot' : `${preparationStage} snapshot`)
+      if (!argument.click) {
+        current.preparationSnapshots++
+        if (options.preparationObservationFailure === preparationStage) throw new Error(`controlled ${preparationStage} observation failure`)
+      }
+      if (observationFailure && argument.click) throw observationFailure
       return { errors: [], layout: { shape: 'circle', source: 'native shape' }, requestedClick: argument.click,
-        selection: options.selection, elementFromPoint: { drawer: !options.selection },
-        events: calls.some(Array.isArray) ? ['pointerdown', 'pointerup', 'click'].map((type) => ({ type, trusted: true })) : [] }
+        selection: structuredClone(current.selection), inspector: { open: current.drawerOpen, noSelection: !current.selection,
+          expansionControls: current.drawerOpen ? [{ text: 'Collapse', expanded: 'true' }] : [] },
+        geometry: { point: { screenCTM: { a: 3.1, b: 0, c: 0, d: 3.1,
+          e: current.scrolled ? rendered.center.x : staleRendered.center.x,
+          f: current.scrolled ? rendered.center.y : staleRendered.center.y } } },
+        elementFromPoint: argument.click ? target() : null, elementsFromPoint: argument.click ? pathFor(target()) : [],
+        events: [...current.events], droppedEvents: options.droppedEvents ?? 0 }
     },
   }
-  return { calls, observations, secondaryErrors, rendered, page,
-    readState: async () => { calls.push('state'); return { selection: options.selection } },
-    observePoint: async () => { calls.push('rendered after scroll'); return rendered },
+  return { calls, observations, secondaryErrors, rendered, staleRendered, page, current, authoritative,
+    readState: async () => { calls.push('state'); return structuredClone({ ...authoritative, selection: current.selection }) },
+    observePoint: async () => {
+      calls.push('rendered after scroll')
+      assert.equal(current.drawerOpen, false); assert.equal(current.scrolled, true)
+      return options.staleMeasurement ? staleRendered : rendered
+    },
     diagnose: async (details) => {
       calls.push(details.boundary)
       observations.push(structuredClone(details))
       if (evidenceFailure) throw evidenceFailure
     } }
 }
-test('selection diagnostics on one controlled page preserve successful then failed circle setup', async () => {
-  const current = { selection: { id: 'app-point' } }, control = selectionDeliveryControl(current)
-  assert.equal(await selectGeometricPoint({ ...control, scenario: 'point-geometric-ellipse', sequence: 1 }), control.rendered)
-  current.selection = undefined
-  await assert.rejects(selectGeometricPoint({ ...control, scenario: 'point-geometric-diamond', sequence: 2 }), (error) => {
-    assert.equal(error.code, 'ERR_ASSERTION'); assert.equal(error.actual, undefined); assert.equal(error.expected, 'app-point')
-    assert.match(error.message, /^Native contour click selects its point/)
-    return true
-  })
-  const expectedCalls = ['Select', 'scroll', 'rendered after scroll', 'install', 'snapshot', 'before-native-click',
-    ['native click', 1250, 270], 'state', 'snapshot', 'after-native-click-before-assertion', 'cleanup', 'selection-finished']
-  assert.deepEqual(control.calls, [...expectedCalls, ...expectedCalls])
-  for (const index of [0, 3]) {
-    assert.equal(control.observations[index].observation.before.layout.shape, 'circle')
-    assert.equal(control.observations[index + 1].observation.clickKind, 'center')
-    assert.equal(control.observations[index + 1].result, undefined)
+test('synthetic reused page closes inherited expanded/no-selection Inspector once before fresh diamond selection', async () => {
+  const control = selectionDeliveryControl(), saved = structuredClone(control.authoritative)
+  assert.equal(await selectGeometricPoint({ ...control, scenario: 'point-geometric-ellipse', sequence: 1,
+    requireUnselected: true }), control.rendered)
+  // The wrapper opens/expands the Inspector; a later JSON load retains that
+  // drawer while clearing selection and replacing the authoritative document.
+  control.current.drawerOpen = true; control.current.selection = null; control.current.scrolled = false
+  control.authoritative.labelDocumentRevision++; control.authoritative.history = JSON.stringify({ loaded: true, past: [], future: [] })
+  const loaded = structuredClone(control.authoritative), callStart = control.calls.length
+  assert.equal(await selectGeometricPoint({ ...control, scenario: 'point-geometric-diamond', sequence: 2,
+    requireUnselected: true }), control.rendered)
+  assert.equal(control.current.closeActions, 1)
+  const preparation = control.observations.find(({ boundary, observation }) => boundary === 'selection-prepared' && observation.sequence === 2)
+  assert.equal(preparation.observation.preparation.inherited.inspector.open, true)
+  assert.equal(preparation.observation.preparation.inherited.inspector.noSelection, true)
+  assert.deepEqual(preparation.observation.preparation.inherited.inspector.expansionControls, [{ text: 'Collapse', expanded: 'true' }])
+  assert.equal(preparation.observation.preparation.closed.inspector.open, false)
+  assert.deepEqual(control.authoritative, loaded)
+  assert.deepEqual(control.observations[0].observation.preparation.stateBefore.json, saved.json)
+  const calls = control.calls.slice(callStart)
+  for (const [earlier, later] of [['inherited snapshot', 'close'], ['close', 'wait detached'], ['wait detached', 'closed snapshot'],
+    ['closed snapshot', 'Select'], ['Select', 'scroll'], ['scroll', 'rendered after scroll'], ['rendered after scroll', 'native click']]) {
+    const at = (value) => calls.findIndex((call) => Array.isArray(call) ? call[0] === value : call === value)
+    assert.ok(at(earlier) >= 0 && at(earlier) < at(later), `${earlier} precedes ${later}`)
   }
-  assert.equal(control.observations[4].observation.after.elementFromPoint.drawer, true)
-  assert.match(control.observations.at(-1).primary.message, /^Native contour click selects its point/)
+  assert.equal(calls.filter((call) => Array.isArray(call) && call[0] === 'native click').length, 1)
+  assert.deepEqual(calls.find(Array.isArray), ['native click', control.rendered.center.x, control.rendered.center.y])
+  const before = control.observations.find(({ boundary, observation }) => boundary === 'before-native-click' && observation.sequence === 2).observation
+  assert.notDeepEqual(before.requestedClick, control.staleRendered.center)
+  assert.equal(before.before.geometry.point.screenCTM.e, control.rendered.center.x)
+  assert.equal(before.before.elementFromPoint.pointId, 'app-point')
+  assert.equal(control.current.installed, false)
+})
+test('synthetic already-closed Inspector is a no-op and fresh selection has intended event paths', async () => {
+  const control = selectionDeliveryControl(), before = structuredClone(control.authoritative)
+  await selectGeometricPoint({ ...control, scenario: 'point-geometric-ellipse', sequence: 1, requireUnselected: true })
+  assert.equal(control.current.closeActions, 0)
+  assert.equal(control.calls.includes('close count'), false); assert.equal(control.calls.includes('wait detached'), false)
+  assert.deepEqual(control.authoritative, before)
+  const preparation = control.observations.find(({ boundary }) => boundary === 'selection-prepared').observation.preparation
+  assert.equal(preparation.drawerCount, 0); assert.equal(preparation.closeActions, 0); assert.equal(preparation.closedDrawerCount, 0)
+  assert.equal(preparation.openerCount, 1); assert.equal(preparation.openerExpanded, 'false')
+  const after = control.observations.find(({ boundary }) => boundary === 'after-native-click-before-assertion').observation.after
+  for (const event of after.events) {
+    assert.equal(event.target.pointId, 'app-point'); assert.equal(event.target.svg, true)
+    assert.ok(event.path.some(({ pointId }) => pointId === 'app-point'))
+    assert.ok(event.path.some(({ tag, canvas }) => tag === 'svg' && canvas))
+  }
+})
+for (const fault of ['closeFailure', 'detachFailure']) {
+  test(`synthetic required drawer ${fault} stops native click and retains primary through diagnostic failures`, async () => {
+    const primary = new Error(`controlled ${fault}`), control = selectionDeliveryControl({ drawerOpen: true, [fault]: primary,
+      observationFailure: new Error('observation failed'), evidenceFailure: new Error('evidence failed'), cleanupFailure: new Error('cleanup failed') })
+    await assert.rejects(selectGeometricPoint({ ...control, scenario: 'point-geometric-diamond', sequence: 2,
+      requireUnselected: true }), (error) => error === primary)
+    assert.equal(control.current.closeActions, 1)
+    assert.equal(control.calls.some(Array.isArray), false)
+    assert.ok(control.calls.includes('cleanup'))
+    assert.equal(control.observations.at(-1).primary.message, primary.message)
+    assert.ok(control.secondaryErrors.some((message) => message.includes('evidence failed')))
+    assert.ok(control.secondaryErrors.some((message) => message.includes('cleanup failed')))
+  })
+}
+test('synthetic falsely successful detach cannot hide a remaining drawer', async () => {
+  const control = selectionDeliveryControl({ drawerOpen: true, detachReportedSuccess: true })
+  await assert.rejects(selectGeometricPoint({ ...control, scenario: 'point-geometric-diamond', sequence: 2,
+    requireUnselected: true }), /Inspector drawer is detached before selection/)
+  assert.equal(control.current.closeActions, 1)
+  assert.equal(control.calls.some(Array.isArray), false)
+  const preparation = control.observations.find(({ boundary }) => boundary === 'selection-prepared').observation.preparation
+  assert.equal(preparation.closedDrawerCount, 1); assert.equal(preparation.closed.inspector.open, true)
+})
+for (const stage of ['inherited', 'closed']) {
+  for (const primaryKind of ['assertion', 'native']) {
+    test(`synthetic ${stage} preparation observation failure preserves later ${primaryKind} primary`, async () => {
+      const primary = new Error('controlled native mouse failure'), control = selectionDeliveryControl({ drawerOpen: true,
+        preparationObservationFailure: stage, selectionFailure: true,
+        ...(primaryKind === 'native' ? { mouseFailure: primary } : {}) })
+      await assert.rejects(selectGeometricPoint({ ...control, scenario: 'point-geometric-diamond', sequence: 2,
+        requireUnselected: true }), (error) => {
+        if (primaryKind === 'native') return error === primary
+        assert.equal(error.expected, 'app-point'); assert.match(error.message, /^Native contour click selects its point/); return true
+      })
+      assert.equal(control.current.closeActions, 1); assert.equal(control.calls.filter(Array.isArray).length, 1)
+      assert.equal(control.current.drawerOpen, false); assert.equal(control.current.installed, false)
+      assert.ok(control.secondaryErrors.some((message) => message.includes(`controlled ${stage} observation failure`)))
+      assert.match(control.observations.at(-1).primary.message, primaryKind === 'native' ? /controlled native mouse failure/ : /^Native contour click selects its point/)
+    })
+  }
+}
+for (const fault of ['drawerCount', 'closeCount', 'openerCount', 'openerExpanded']) {
+  test(`synthetic drawer preparation rejects invalid ${fault} without canvas input`, async () => {
+    const control = selectionDeliveryControl({ drawerOpen: fault === 'closeCount', [fault]: fault === 'openerExpanded' ? 'true' : 2 })
+    await assert.rejects(selectGeometricPoint({ ...control, scenario: 'point-geometric-diamond', sequence: 2, requireUnselected: true }))
+    assert.equal(control.calls.some(Array.isArray), false)
+    assert.ok(control.observations.some(({ boundary }) => boundary === 'selection-prepared'))
+  })
+}
+for (const field of ['json', 'runtimeDiagramJson', 'history', 'labelDocumentRevision']) {
+  test(`synthetic native drawer close cannot mutate authoritative ${field}`, async () => {
+    const control = selectionDeliveryControl({ drawerOpen: true, mutateOnClose: (state) => {
+      state[field] = field === 'labelDocumentRevision' ? state[field] + 1 : `${state[field]} changed`
+    } })
+    await assert.rejects(selectGeometricPoint({ ...control, scenario: 'point-geometric-diamond', sequence: 2, requireUnselected: true }))
+    assert.equal(control.calls.some(Array.isArray), false)
+    assert.ok(control.observations.some(({ boundary }) => boundary === 'selection-prepared'))
+  })
+}
+for (const field of ['position', 'text', 'style']) {
+  test(`synthetic native drawer close rejects ${field} mutation in model JSON`, async () => {
+    const control = selectionDeliveryControl({ drawerOpen: true, mutateOnClose: (state) => {
+      const model = JSON.parse(state.runtimeDiagramJson), point = model.strata[0]
+      point[field] = field === 'position' ? { x: 4, y: 3, z: 0 } : field === 'text' ? 'normalized text' : { ...point.style, size: 9 }
+      state.runtimeDiagramJson = JSON.stringify(model)
+    } })
+    await assert.rejects(selectGeometricPoint({ ...control, scenario: 'point-geometric-diamond', sequence: 2, requireUnselected: true }))
+    assert.equal(control.calls.some(Array.isArray), false)
+  })
+}
+test('synthetic stale pre-close coordinates are rejected by the one native mouse boundary', async () => {
+  const control = selectionDeliveryControl({ drawerOpen: true, staleMeasurement: true })
+  await assert.rejects(selectGeometricPoint({ ...control, scenario: 'point-geometric-diamond', sequence: 2,
+    requireUnselected: true }), /post-preparation coordinates/)
+  assert.equal(control.calls.filter(Array.isArray).length, 1)
+})
+for (const fault of ['drawer', 'overlay', 'wrongPoint']) {
+  test(`synthetic current ${fault} target cannot establish success from trusted overlay events or selected state`, async () => {
+    const control = selectionDeliveryControl({ initialSelection: { id: 'app-point' }, targetKind: fault })
+    await assert.rejects(selectGeometricPoint({ ...control, scenario: 'point-geometric-native-contours-2d-3d', sequence: 12 }))
+    assert.equal(control.calls.filter(Array.isArray).length, 1)
+    assert.equal(control.current.selection.id, 'app-point')
+    const after = control.observations.find(({ boundary }) => boundary === 'after-native-click-before-assertion').observation.after
+    assert.equal(after.events.length, 3); assert.ok(after.events.every(({ trusted }) => trusted))
+  })
+}
+for (const fault of ['eventTargetKind', 'missingPath', 'untrustedType']) {
+  test(`synthetic selected result cannot hide incorrect actual ${fault} delivery`, async () => {
+    const control = selectionDeliveryControl({ [fault]: fault === 'eventTargetKind' ? 'overlay' : fault === 'untrustedType' ? 'pointerdown' : true })
+    await assert.rejects(selectGeometricPoint({ ...control, scenario: 'point-geometric-ellipse', sequence: 1, requireUnselected: true }))
+    assert.equal(control.current.selection.id, 'app-point')
+    assert.equal(control.calls.filter(Array.isArray).length, 1)
+  })
+}
+test('synthetic initial circle setup rejects preexisting selection even with a point-target click', async () => {
+  const control = selectionDeliveryControl({ initialSelection: { id: 'app-point' } })
+  await assert.rejects(selectGeometricPoint({ ...control, scenario: 'point-geometric-diamond', sequence: 2, requireUnselected: true }))
+})
+test('synthetic later selected-point handle uses its production target and composed path', async () => {
+  const control = selectionDeliveryControl({ initialSelection: { id: 'app-point' }, targetKind: 'handle', boundary: true })
+  assert.equal(await selectGeometricPoint({ ...control, scenario: 'point-geometric-native-contours-2d-3d', sequence: 12,
+    boundary: true }), control.rendered)
+  assert.deepEqual(control.calls.find(Array.isArray), ['native click', 1190, 280])
+  const after = control.observations.find(({ boundary }) => boundary === 'after-native-click-before-assertion').observation.after
+  assert.equal(after.events[0].target.pointId, null); assert.equal(after.events[0].target.pointHandle, true)
+  assert.ok(after.events[0].path.some(({ ariaLabel }) => ariaLabel === 'Selected point drag handles'))
+})
+test('synthetic selected-point handle accepts owned pointer capture to the canvas root', async () => {
+  const control = selectionDeliveryControl({ initialSelection: { id: 'app-point' }, targetKind: 'handle', handleCapture: true })
+  assert.equal(await selectGeometricPoint({ ...control, scenario: 'point-geometric-native-contours-2d-3d', sequence: 12 }), control.rendered)
+  const after = control.observations.find(({ boundary }) => boundary === 'after-native-click-before-assertion').observation.after
+  assert.equal(after.events[0].target.pointHandle, true)
+  assert.equal(after.events[1].target.canvasRoot, true); assert.equal(after.events[1].canvasHasPointerCapture, true)
+  assert.equal(after.events[2].target.canvasRoot, true)
+  assert.ok(after.events.every(({ pointerId }) => pointerId === 7))
+})
+test('synthetic captured handle root click accepts native MouseEvent identity at matching coordinates', async () => {
+  const control = selectionDeliveryControl({ initialSelection: { id: 'app-point' }, targetKind: 'handle',
+    handleCapture: true, mouseEventClick: true })
+  assert.equal(await selectGeometricPoint({ ...control, scenario: 'point-geometric-native-contours-2d-3d', sequence: 12 }), control.rendered)
+  const after = control.observations.find(({ boundary }) => boundary === 'after-native-click-before-assertion').observation.after
+  assert.equal(after.events[1].canvasHasPointerCapture, true); assert.equal(after.events[2].pointerId, null)
+  assert.deepEqual(after.events[2].client, after.events[0].client)
+})
+test('synthetic captured handle MouseEvent cannot borrow capture from distant coordinates', async () => {
+  const control = selectionDeliveryControl({ initialSelection: { id: 'app-point' }, targetKind: 'handle',
+    handleCapture: true, mouseEventClick: true, farClick: true })
+  await assert.rejects(selectGeometricPoint({ ...control, scenario: 'point-geometric-native-contours-2d-3d', sequence: 12 }))
+})
+for (const fault of ['missingCapture', 'wrongPointerId', 'wrongEventOrder', 'droppedEvents']) {
+  test(`synthetic handle root continuation rejects ${fault}`, async () => {
+    const control = selectionDeliveryControl({ initialSelection: { id: 'app-point' }, targetKind: 'handle', handleCapture: true,
+      [fault]: fault === 'droppedEvents' ? 1 : true })
+    await assert.rejects(selectGeometricPoint({ ...control, scenario: 'point-geometric-native-contours-2d-3d', sequence: 12 }))
+    assert.equal(control.calls.filter(Array.isArray).length, 1)
+  })
+}
+test('synthetic unrelated canvas root input cannot use point capture continuation rules', async () => {
+  const control = selectionDeliveryControl({ initialSelection: { id: 'app-point' }, targetKind: 'point', handleCapture: true })
+  await assert.rejects(selectGeometricPoint({ ...control, scenario: 'point-geometric-native-contours-2d-3d', sequence: 12 }))
+})
+test('synthetic selected handle for another point cannot borrow the intended point owner', async () => {
+  const control = selectionDeliveryControl({ initialSelection: { id: 'other-point' }, targetKind: 'handle', handleCapture: true })
+  await assert.rejects(selectGeometricPoint({ ...control, scenario: 'point-geometric-native-contours-2d-3d', sequence: 12 }))
+})
+test('synthetic handle cannot select an initially unselected circle', async () => {
+  const control = selectionDeliveryControl({ targetKind: 'handle' })
+  await assert.rejects(selectGeometricPoint({ ...control, scenario: 'point-geometric-diamond', sequence: 2, requireUnselected: true }))
 })
 for (const failure of ['observationFailure', 'evidenceFailure', 'cleanupFailure']) {
   test(`failed native selection retains its assertion through ${failure}`, async () => {
-    const control = selectionDeliveryControl({ [failure]: new Error(`controlled ${failure}`) })
+    const control = selectionDeliveryControl({ selectionFailure: true, [failure]: new Error(`controlled ${failure}`) })
     await assert.rejects(selectGeometricPoint({ ...control, scenario: 'point-geometric-diamond', sequence: 2 }), (error) => {
       assert.equal(error.expected, 'app-point'); assert.match(error.message, /^Native contour click selects its point/); return true
     })
@@ -76,14 +341,14 @@ for (const failure of ['observationFailure', 'evidenceFailure', 'cleanupFailure'
     assert.ok(control.secondaryErrors.some((message) => message.includes(failure)))
   })
   test(`successful selection cannot hide ${failure}`, async () => {
-    const control = selectionDeliveryControl({ selection: { id: 'app-point' }, [failure]: new Error(`controlled ${failure}`) })
+    const control = selectionDeliveryControl({ [failure]: new Error(`controlled ${failure}`) })
     await assert.rejects(selectGeometricPoint({ ...control, scenario: 'point-geometric-ellipse', sequence: 1 }))
     assert.ok(control.secondaryErrors.some((message) => message.includes(failure)))
   })
 }
 test('boundary selection keeps measured boundary input and native action failure ownership', async () => {
   const primary = new Error('native mouse action failed'), control = selectionDeliveryControl({ mouseFailure: primary,
-    observationFailure: new Error('observation failed'), cleanupFailure: new Error('cleanup failed') })
+    boundary: true, observationFailure: new Error('observation failed'), cleanupFailure: new Error('cleanup failed') })
   await assert.rejects(selectGeometricPoint({ ...control, scenario: 'point-geometric-native-contours-2d-3d', sequence: 12,
     boundary: true }), (error) => error === primary)
   assert.deepEqual(control.calls.find(Array.isArray), ['native click', 1190, 280])

@@ -7,13 +7,22 @@ combined verification are present on the current compatible checkout.
 fresh strict native acceptance and independent review are still unaccepted;
 implementation presence does not close that prerequisite or the final gate.
 32D now requires `point-node-layout-anchors-combined` cumulatively with every
-31F/32A–32C group. The browser-capable parent completed 14 of 18 groups, then
-failed a stale imported-style Clear expectation that retained layout provenance
-after detachment. Both expected clones are corrected without changing explicit
-layout or production geometry. The historical child startup `EPERM` is separate
-from that native assertion failure. Fresh cumulative native browser and
+31F/32A–32C group. The latest browser-capable parent (`zYGQzv`) passed 5,373
+tests/build/diff/label-assets and completed 15 of 18 groups, including the full
+paint/import group and corrected Clear. It then failed circle selection during
+diamond setup: the reused page's open/no-selection Inspector received the native
+click instead of the SVG point. The shared harness now owns one real drawer
+close and verified detachment before fresh Select/scroll measurements; native
+target/path assertions and Inspector reopening remain. Production geometry and
+the completed Clear provenance correction are preserved. Child startup `EPERM`
+is separate from that retained native failure. Fresh cumulative native browser and
 downloaded/reopened SVG acceptance and independent review remain pending.
 Phase 32 is **not complete**. See [32D implementation and combined audit](PHASE_32D_IMPLEMENTATION.md).
+The Inspector preparation fix's child checks passed 133 focused and 5,411 full
+tests, build, syntax and diff. Configured native/browser attempts stopped before
+Chrome at fresh-server `listen EPERM`; no new native/download acceptance or
+independent review was obtained. Exact tree/logs are retained in
+`/private/tmp/stz-32d-inspector-fix-20261009/HANDOFF.md` for the browser-capable parent.
 The execution records that follow are historical and retain their original
 stage/deferral dispositions.
 

@@ -7,7 +7,7 @@ import { geometricShapeGroup as group, geometricShapeManifest, geometricBodyVari
 import { createOwnedAppPage } from './ownedAppPage.mjs'
 import { ownPageEvent } from './ownedPageEvent.mjs'
 import { resolvePointInspectorField } from './pointInspectorFields.mjs'
-import { createPointDiagnostics } from './pointCheckDiagnostics.mjs'
+import { boundedPointDiagnostic, createPointDiagnostics } from './pointCheckDiagnostics.mjs'
 import { selectGeometricPoint } from './pointGeometricSelection.mjs'
 
 const paint = { text: { color: '#000000', opacity: 1 }, fill: { enabled: true, color: '#e0f0ff', opacity: 1 },
@@ -83,11 +83,18 @@ export async function runPointNodeGeometricShapeChecks({ browser, origin, artifa
   async function select(id = 'app-point', boundary = false) {
     const rendered = await selectGeometricPoint({ page, readState: state, observePoint: observeGeometricPoint,
       diagnose: (details) => selectionDiagnostic(group, scenario, details), secondaryErrors: pageErrors,
-      scenario, sequence: ++selectionSequence, id, boundary })
+      scenario, sequence: ++selectionSequence, id, boundary, requireUnselected: !boundary })
+    const beforeInspector = await state()
     const open = page.getByRole('button', { name: 'Open inspector drawer', exact: true })
     if (await open.count()) await open.click()
     const expand = page.locator('#preview-inspector-drawer').getByRole('button', { name: 'Expand', exact: true })
     if (await expand.count()) await expand.click()
+    const afterInspector = await state()
+    await boundedPointDiagnostic(() => selectionDiagnostic(group, scenario, { boundary: 'inspector-reopened',
+      sequence: selectionSequence, beforeInspector, afterInspector }), 'Geometric Inspector reopening evidence')
+    for (const field of ['json', 'runtimeDiagramJson', 'history', 'labelDocumentRevision']) {
+      assert.equal(afterInspector[field], beforeInspector[field], `Native Inspector reopening preserves ${field}`)
+    }
     return rendered
   }
   async function colorParameter(key, value, label) {

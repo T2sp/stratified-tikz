@@ -1,18 +1,18 @@
-# Phase 32D Fix for Inspector interception of native point selection
+# Phase 32D Fix for native point drag preparation and evidence
 
 ## Objective and preserved implementation
 
-Continue from the implemented Phase 32D checkout and the completed Clear
-provenance fix. Repair the geometric-shape acceptance workflow's reused-page
-selection preparation, then obtain fresh cumulative verification and matching
-independent review. The retained native evidence shows the open Inspector
-intercepting the second selection click before it reaches the SVG.
+Continue from the implemented Phase 32D checkout, the completed Clear
+provenance correction, and the shared native Inspector selection preparation
+fix. Repair the next concrete acceptance failure: the first geometric contour
+interaction selects its point successfully, but its subsequent native handle
+drag leaves the model position unchanged.
 
 Read `AGENTS.md`, `prompts/phase-32d-implement.md`,
 `prompts/phase-32d-review.md`, `docs/PHASE_32D_IMPLEMENTATION.md`, and
 `docs/PHASE_32_PLAN.md`. Inspect the actual tree before editing and preserve
 all existing implementation, regressions, PGF references, and documentation.
-Do not restart Phase 32D or repeat the resolved Clear repair.
+Do not restart Phase 32D or repeat the resolved Clear/selection repairs.
 
 Keep strict cumulative 32D verification and the parent workflow's
 verification-before-review/commit contract. Historical 32C-only deferrals cannot
@@ -21,188 +21,257 @@ accepted complete evidence and passing independent review.
 
 ## Latest evidence and checkout identity
 
-The completed provenance-fix handoff is
-`/private/tmp/stz-32d-provenance-fix-20261009/HANDOFF.md`.
+The completed Inspector-fix handoff is
+`/private/tmp/stz-32d-inspector-fix-20261009/HANDOFF.md`.
 Its six-file inventory, complete diff, logs, and final identity are retained in
 the same directory. The latest browser-capable parent records are:
 
 - Worker response:
-  `/var/folders/vk/7kf940pd4bx8f6cg3rzlmtc80000gn/T/stz-phase-verifier-mQPFwa/response.json`.
+  `/var/folders/vk/7kf940pd4bx8f6cg3rzlmtc80000gn/T/stz-phase-verifier-ZZ6j0L/response.json`.
 - Verification report:
-  `/var/folders/vk/7kf940pd4bx8f6cg3rzlmtc80000gn/T/stz-phase32d-before-review-zYGQzv/verification.json`.
+  `/var/folders/vk/7kf940pd4bx8f6cg3rzlmtc80000gn/T/stz-phase32d-before-review-tfTYBh/verification.json`.
 - Primary browser log:
-  `/var/folders/vk/7kf940pd4bx8f6cg3rzlmtc80000gn/T/stz-phase32d-before-review-zYGQzv/05-check-free-labels/command.log`.
+  `/var/folders/vk/7kf940pd4bx8f6cg3rzlmtc80000gn/T/stz-phase32d-before-review-tfTYBh/05-check-free-labels/command.log`.
 - Native observations and failure artifacts:
-  `/var/folders/vk/7kf940pd4bx8f6cg3rzlmtc80000gn/T/stz-phase32d-before-review-zYGQzv/05-check-free-labels/artifacts/`.
+  `/var/folders/vk/7kf940pd4bx8f6cg3rzlmtc80000gn/T/stz-phase32d-before-review-tfTYBh/05-check-free-labels/artifacts/`.
 
 At this prompt update, the branch is `phase/32d-margin-minsize-anchor`, HEAD
-`caf7d4ef9a259fad6017bc187269d6ee8bd9068b`. The pre-update tree matches both
+`375cd56b33f5f03357562d359be85c501da15b3f`. The pre-update tree matches both
 before/after identities of the latest parent report:
 
 ```text
-52d9fd09cd7bf6d3bb0bc8a6edcbb186503cc2325d6b6f89af78e55e9a42cdf1
+7e377338711f78089b72a53b36ea7eb6df0216ae5ab5a427ef37812239678741
 ```
 
 There are six modified tracked files and no nonignored untracked files before
-this prompt update. Preserve those six changes: the imported-paint observer,
-independent parent validator, policy and UI Clear regression suites, and
-`docs/PHASE_32D_IMPLEMENTATION.md` / `docs/PHASE_32_PLAN.md`.
-Earlier 32D implementation and reference fixtures are already tracked.
-Updating this prompt changes the tree identity again. Capture the actual
-current tracked/untracked identity; do not hard-code an old fingerprint as an
-acceptance constant.
+this prompt update:
+
+- `scripts/pointGeometricSelection.mjs`
+- `scripts/checkPointNodeGeometricShapes.mjs`
+- `scripts/checkPointLayoutAnchors.mjs`
+- `tests/scripts/phase32cVerification.test.mjs`
+- `docs/PHASE_32D_IMPLEMENTATION.md`
+- `docs/PHASE_32_PLAN.md`
+
+Preserve those changes. Earlier 32D implementation, Clear corrections, and
+reference fixtures are already tracked. Updating this prompt changes the tree
+identity again. Capture the actual current tracked/untracked identity; do not
+hard-code an old fingerprint as an acceptance constant.
 
 | Retained run | Actual result |
 | --- | --- |
-| Provenance-fix child | 122 policy and 9 UI focused tests passed; 5,373/5,373 full tests passed without failures/skips. Build, diff, strict TypeScript, TS lint, and script syntax passed. Script lint retains the reproduced baseline unused `_role` error. Both browser commands stopped before Chrome launch at `listen EPERM`. |
-| Latest browser-capable parent | 5,373/5,373 tests, build, diff, and full `check:label-assets` passed. Chrome 154.0.8037.98 ran native scenarios. `check:free-labels` passed the complete paint/import group, then failed during geometric-shape selection. |
+| Inspector-fix child | 133 focused tests and 5,411/5,411 full tests passed without failures/skips. Build, diff, syntax, and applicable focused checks passed. No new lint errors; reproduced script baseline debt is documented. Both browser commands stopped before Chrome launch at fresh-server `listen EPERM`. |
+| Latest browser-capable parent | 5,411/5,411 tests, build, diff, and full `check:label-assets` passed. Chrome 154.0.8037.98 ran native scenarios. `check:free-labels` completed the paint/import group and all eleven named geometric-shape cases, then failed on the first contour interaction's drag. |
 
-The parent completed 15 of 18 cumulative groups. `point-geometric-ellipse`
-passed; `point-geometric-diamond` failed during its initial selection setup.
-The geometric group remains incomplete. The layout/anchor group and final
-standalone-export group did not execute. The retained page-error list is empty,
-but missing scenarios, downloads, and review still block acceptance.
-This real parent failure is distinct from the child's startup `EPERM`.
+The parent completed 15 of 18 cumulative groups. All eleven
+`point-geometric-{shape}` cases, including diamond and cylinder, passed.
+That does not complete `point-node-geometric-shapes`: its later interaction,
+visibility/lifecycle, and export cases remain pending. The layout/anchor group
+and final standalone-export group did not execute. The retained page-error list
+is empty. This real parent drag failure is distinct from the child's startup
+`EPERM` and from the earlier failed selection setup.
 
-## Preserve the completed Clear correction
+## Preserve the completed Clear and selection corrections
 
-The prior stale expectations are fixed in
-`scripts/checkPointImportedPaint.mjs` and
-`scripts/automation/phase-verification.mjs`. The parent now records
+Keep the corrected expectations in `scripts/checkPointImportedPaint.mjs` and
+`scripts/automation/phase-verification.mjs`. The parent records
 `point-paint-clear-imported-style` as passed and completes
 `point-node-paint-import-persistence`.
 
-Keep exact comparisons and rejection controls for detached imported
+Preserve exact comparisons and rejection controls for detached imported
 paint/shape/layout provenance, explicit layout and per-axis units/contexts,
 unselected controls, raw source, one effective history commit, no-op repetition,
-undo/redo, history capacity, and JSON reload. Preserve the nine UI regressions
-and the new synthetic policy fixtures. Synthetic records remain policy tests,
-not native evidence. Do not strip layout fields from persistence comparisons
-or restore orphaned provenance in production.
+undo/redo, history capacity, and JSON reload. Keep the policy/UI regressions.
+Do not strip layout fields from persistence comparisons or restore orphaned
+provenance in production.
 
-## Diagnose the native selection failure
+The shared `selectGeometricPoint` now closes a unique open Inspector through
+its real native control, verifies bounded detachment and the closed opener,
+then performs Select/scroll/fresh measurement before one native click.
+It records intended targets/composed paths, verifies authoritative state/history
+invariance, rejects false initial selection, and supports legitimate later
+selected-handle pointer-capture continuation. Both callers preserve native
+Inspector reopening for actual controls; the layout caller's duplicate
+selection close was removed.
 
-The current primary assertion is:
+Keep this completed behavior and its 38 additional synthetic regressions.
+The latest parent demonstrates successful reused-page selection through all
+eleven shapes and the next diamond boundary. Synthetic records remain policy
+tests, not native evidence.
+
+## Diagnose the separate native drag failure
+
+The latest primary assertion is:
 
 ```text
-AssertionError [ERR_ASSERTION]: Native contour click selects its point
-actual: undefined
-expected: 'app-point'
+AssertionError [ERR_ASSERTION]:
+Expected "actual" not to be strictly deep-equal to:
+{ x: 3, y: 3, z: 0 }
 
-selectGeometricPoint
-  scripts/pointGeometricSelection.mjs:141
-select
-  scripts/checkPointNodeGeometricShapes.mjs:84
+actual:   { x: 3, y: 3, z: 0 }
+expected: { x: 3, y: 3, z: 0 }
+
 runPointNodeGeometricShapeChecks
-  scripts/checkPointNodeGeometricShapes.mjs:183
+  scripts/checkPointNodeGeometricShapes.mjs:226
+scripts/checkFreeLabels.mjs:482
 ```
 
 Read `free-labels-evidence.json`, `point-geometric-failure.json`,
 `point-geometric-app-failure.json`, `point-geometric-app-lifecycle.json`,
-`point-geometric-app-failure.png`, and all six
-`point-geometric-selection-0001.json` through `0006.json` artifacts.
+`point-geometric-app-failure.png`, and the selection observations, especially
+`point-geometric-selection-0056.json` through `0060.json`.
 The final checkpoint is
-`point-node-geometric-shapes / point-geometric-diamond-observed`.
+`point-node-geometric-shapes / point-geometric-native-contours-2d-3d-observed`.
 
-The selection observations establish this comparison:
+The failure is the first interaction case: ambient dimension 2, diamond,
+codim 2, configured aspect 1.8, raw source `drag $x_i$`, owner/revision 100.
+Do not describe this as a demonstrated failure of every 2D/3D drag.
 
-| Native selection | Observation |
-| --- | --- |
-| Ellipse setup, sequence 1, records 0001–0003 | Inspector closed. Center click `(1296.4, 268.975)` reaches the SVG circle owned by `app-point`; trusted pointerdown/up/click are recorded and selection succeeds. |
-| Diamond setup, sequence 2, records 0004–0006 | Inspector open with `No selection`. The same center is covered by the drawer. `elementFromPoint` and all trusted pointerdown/up/click targets are `div.empty-inspector`; selection stays `null`. |
+The retained observations establish the following sequence:
 
-The open drawer has screen bounds `x=1227, y=130.375, width=430, height=1170`,
-`pointer-events:auto`, and `z-index:40`. The PNG confirms that it covers the
-point center. Before/after snapshots have viewport `1700×1300`, `scrollY=129`,
-and unchanged point screen CTM scale `3.1` / translation
-`(1296.4, 268.975)`. The layout is `ready`; owner, body request, point request,
-and document revision `10` agree and remain unchanged.
+1. Selection sequence 12 closes the inherited open/no-selection Inspector.
+   The diamond layout is ready and the boundary is freshly measured.
+2. The boundary click at approximately `(1307.1869, 200.1844)` reaches the
+   intended `app-point` SVG path. Trusted pointerdown/up/click are recorded;
+   selection becomes `{ kind: 'stratum', id: 'app-point' }`.
+3. Before reopening, the selected handle group has screen bounds
+   `x=1279.040, y=251.615, width=34.720, height=34.720`, centered near
+   `(1296.4, 268.975)`.
+4. Record 0060 and the caller show the wrapper reopening/expanding the
+   Inspector. Selection, model position, history, and revision are preserved.
+   The failure PNG shows that open drawer covering the selected point center.
+5. The caller then measures the handle and sends one native
+   move/down/move/up with displacement `(+28, -16)`, four move steps.
+   Its before/after model positions remain `(3, 3, 0)`.
 
-Both setup selections operate on the loaded `circle` with text `native shape`.
-The diamond Shape control is applied only after selection succeeds.
-Therefore this retained failure is not evidence of a diamond solver defect.
-The lifecycle retains the original App page/API without a new navigation,
-crash, or page error. The evidence confirms drawer interception; confirm the
-bounded harness correction below through focused native reproduction.
+The current drag collector stores only event type/trust, starts before
+selection, and is read/removed only after the failed position assertion.
+The retained evidence therefore does not establish the drag's actual event
+target, composed path, pointer capture, or handle CTM at pointerdown.
+Inspector interception is a strong candidate supported by the source and PNG;
+confirm the actual drag delivery rather than treating the preceding successful
+selection trace as a drag trace.
 
-## Correct selection preparation through native UI
+Inspect the production handle/pointer-controller route in
+`src/rendering/SvgDiagram.tsx` when interpreting events. The selected point
+handle initiates geometry dragging; captured continuation can legitimately
+target the canvas root. A ready node and successful boundary selection are not
+proof that the subsequent handle received pointerdown.
 
-Inspect `scripts/pointGeometricSelection.mjs` and its callers in
-`scripts/checkPointNodeGeometricShapes.mjs` and
-`scripts/checkPointLayoutAnchors.mjs`.
+## Prepare and observe the native drag
 
-The geometric wrapper opens/expands the Inspector after selection but does not
-close it before the next document's selection. The shared helper currently
-clicks Select, scrolls the canvas into view, measures, and clicks without
-resolving a previously open drawer. Its observer was deliberately diagnostic
-when the interception cause was unconfirmed. The layout/anchor caller already
-uses the real `Close inspector drawer` button before selection.
+Inspect the interaction block in
+`scripts/checkPointNodeGeometricShapes.mjs`, the shared selection helper, and
+the related native interaction block in `scripts/checkPointLayoutAnchors.mjs`.
+The geometric wrapper deliberately reopens the Inspector before returning;
+the caller currently performs no separate drawer/hit-target preparation for
+the following drag. Audit the layout caller's analogous handle drag and
+owner-cycling clicks for the same boundary and stale-measurement issue.
 
-Implement one small, clearly owned native preparation sequence:
+Implement a small, explicitly owned preparation/observation path for canvas
+dragging after successful selection:
 
-1. Retain an observation of the inherited obstructing drawer state.
-2. If the drawer is open, operate the unique real
-   `Close inspector drawer` button once and verify the drawer is closed/detached
-   through a bounded DOM condition. A closed drawer requires no close action.
-3. Finish the Select/scroll preparation and then obtain fresh body/contour
-   measurements and screen CTMs. Recompute the requested center or boundary
-   from that current geometry after all UI actions that can affect layout.
-4. Check and record the current click target and hit stack before one native
-   canvas click. Preserve the expected `app-point` selection assertion and
-   trusted event observations. The measured boundary input must stay a boundary
-   input in the later interaction scenarios.
-5. After selection succeeds, keep the wrapper's native Inspector reopening and
-   expansion so actual Shape and parameter controls still exercise production
-   handlers.
+1. Retain the inherited drawer, selected owner, model/history, viewport,
+   work-plane/camera, and rendered handle state. Install an owned observer
+   early enough to retain the first failing preparation/action evidence.
+2. If the Inspector is open, operate its unique real
+   `Close inspector drawer` button once and verify bounded detachment/closed
+   state. A closed drawer needs no close action. Preserve the selected owner
+   and exact saved/runtime JSON, history, and document revision across this
+   preparation.
+3. Complete any necessary native mode/scroll preparation, then freshly measure
+   the selected handle's connected SVG geometry, bounding box, and screen CTM.
+   Read `elementFromPoint` and the hit stack at its current start center.
+   Require the intended selected point-position handle before pointerdown.
+   Do not reuse measurements from before drawer/scroll changes.
+4. Perform one native handle drag through the production path. Preserve the
+   original geometric scenario's `(+28, -16)` displacement/four steps, and the
+   layout scenario's existing displacement, unless concrete evidence requires
+   a documented correction. Record the actual coordinates and result.
+5. Before the movement assertion, retain after-action model/selection/history
+   and native events, including actual targets/composed paths, pointer IDs,
+   buttons, client coordinates, and pointer-capture state/transitions.
+   Distinguish the drag from earlier selection, drawer, and setup events.
+6. Require delivery of trusted handle pointerdown and matching movement/up
+   through the production drag/capture route, a real model coordinate change,
+   one effective history commit, and exact Undo/Redo restoration.
+   Retain relevant JSON/history states before each assertion and clean up the
+   observer on every exit.
 
-Place this preparation in the shared helper or a small caller-level path after
-checking both callers. Avoid conflicting duplicate close actions. Verify that
-native drawer operations leave authoritative model coordinates, raw text,
-style, diagram JSON, and history unchanged; UI drawer state is not diagram data.
+Allow legitimate captured movement/up on the owned SVG canvas root; rejecting
+all root targets would reject valid production dragging. Reject unrelated
+canvas/background/Inspector events, wrong owner/pointer IDs, cancellation,
+no movement, camera-only changes, movement of another point, and preexisting
+selection used as false evidence of a drag. The handle is outside the point's
+`data-point-id` group; establish its selected owner and intended handle path
+without requiring that attribute on the handle itself.
+Observe capture transitions or post-handler capture state at the appropriate
+boundary; a document capture-phase pointerdown can precede the handler's
+`setPointerCapture` call. Do not assert capture at an impossible event phase.
 
-Preserve observations before assertions, bounded diagnostics, observer cleanup,
-owned events, and primary-error precedence. Record actual event targets and
-composed paths in addition to event type/trust. For initial unselected circle
-setup, require delivery to the intended SVG point rather than accepting an
-already-selected point plus an intercepted click. Later tests may legitimately
-use existing point drag handles; verify their intended production path rather
-than indiscriminately rejecting every target without a point-id attribute.
+Keep diagnostics bounded, retain the first action/assertion failure, and attach
+secondary observation/evidence/cleanup failures without replacing it.
+The observer must be removed even when the unchanged-position assertion fails.
+Avoid duplicate listeners and a page-global collector that mixes separate
+interactions. Reuse a narrow shared preparation utility if it improves both
+callers; do not add an unconditional global drawer-closing behavior.
 
-Do not repair this by changing overlay pointer-events/z-index/event propagation,
-forcing clicks through the drawer, relocating the model point, nudging the
-viewport until a stale coordinate works, selecting through fixture API state,
-dispatching synthetic events, retrying blindly, or adding arbitrary sleeps.
-Keep the actual native contour/owner assertion. Existing overlay interception
-is intentional UI behavior; the demonstrated issue is test preparation.
+Update the relevant native-interaction contracts in
+`scripts/pointGeometricShapesContract.mjs` and
+`scripts/pointLayoutAnchorsContract.mjs`, which the parent verifier imports.
+Validate retained raw drag delivery, model, and history records independently
+of summary booleans such as `dragged`, `trustedDown`, or `trustedDrag`.
+Add rejection controls for fabricated booleans and contaminated selection
+events; preserve all other shape/layout/reference/export requirements.
 
-If a fresh unobstructed click still fails, retain that new before/after trace
-and diagnose its concrete production selection path before changing geometry,
-hit tolerance, or renderer logic. Do not assume every later failure has the
-same cause.
+Preserve native Inspector reopening where Shape/parameter controls are needed.
+The drag preparation should preserve the already-selected point rather than
+reselecting it through fixture state or repeatedly calling a wrapper that
+reopens the drawer. Native owner cycling must use fresh geometry after its
+preparation and retain its actual owner assertions.
+
+Do not fix this by changing overlay pointer-events/z-index/event propagation,
+forcing inputs through the drawer, relocating the model point, changing camera
+or work plane to make a stale coordinate work, mutating fixture selection/model
+state, dispatching synthetic events, retrying blindly, adding arbitrary sleeps,
+or weakening the movement/history assertions.
+
+If fresh, unobstructed native handle delivery still leaves coordinates
+unchanged, retain that new trace and diagnose the actual pointer controller,
+projection/work-plane, and commit path. Change production behavior only for a
+demonstrated production defect, with an appropriate regression. The retained
+failure alone does not justify changing shape geometry or hit tolerances.
 
 ## Regressions and full native coverage
 
-Extend the existing registered selection controls in
-`tests/scripts/phase32cVerification.test.mjs`; there is no need to invent a
-separate unregistered selection test file. Cover reused-page success followed
-by a JSON load that leaves an expanded/no-selection Inspector, one real close
-action, a verified closed state, fresh measurement after closing/scrolling,
-and one native click. Include the already-closed no-op path, failed close or
-detach confirmation, remaining non-drawer obstruction, and primary native/
-assertion errors surviving observation/evidence/cleanup failures.
+Extend the relevant registered script controls, including
+`tests/scripts/phase32cVerification.test.mjs`, with synthetic drag-preparation
+and delivery regressions. Preserve all existing selection controls. Cover:
 
-Use controls that reject stale pre-close coordinates and false success from
-preexisting selection or trusted events delivered only to an overlay. Update
-controlled event records to include intended target/path information. Keep
-these tests explicitly synthetic; they cannot establish browser acceptance.
+- Successful boundary selection followed by native Inspector reopening, one
+  close action, preserved selection/data/history, and fresh handle measurement
+  after drawer/scroll changes.
+- Already-closed no-op preparation, stale coordinates, missing/detached/wrong
+  handle, failed close/detachment, and a remaining non-drawer obstruction.
+- Trusted intended handle input and legitimate captured canvas continuation;
+  overlay-only events, unrelated earlier selection events, wrong pointer/
+  owner, untrusted/cancelled input, and unchanged-position false successes.
+- Exact one-commit history and Undo/Redo behavior, plus primary action/assertion
+  errors surviving observation, artifact, and cleanup failures.
 
-The real native reproduction must reuse the same App page through ellipse
-success, open Inspector, later JSON loads, and diamond setup. Do not replace
-the cumulative loop with fresh pages that erase the inherited drawer state.
-Then retain every supported shape's default/configured body cases, native
-parameter and cylinder color controls, 2D/3D contour-boundary interactions,
-owner cycling, visibility/lifecycle cases, and actual pending downloads and
-standalone reopening. Keep the complete layout/anchor matrix required as well.
+Keep synthetic controls explicitly separate from native browser acceptance.
+Reuse the actual cumulative App page; fresh pages cannot substitute for the
+inherited drawer sequence. First reproduce the first 2D diamond selection,
+reopened Inspector, and handle drag; then complete all eight original contour
+interactions across 2D/3D and diamond/star/semicircle/dart with trusted drag and
+Undo/Redo evidence.
+
+Retain every supported shape's default/configured body cases, native parameter
+and cylinder color controls, owner cycling, visibility/lifecycle cases, actual
+pending downloads, and standalone reopening. Keep the complete 32D layout/
+anchor matrix and its native interactions. Use model coordinates and the
+active work plane correctly; keep 2D cursor results at z=0 and do not confuse
+geometric kind with codimension.
 
 Preserve strict TypeScript without `any`, register any new test file in the
 explicit `npm test` list, and add no dependency for this correction.
@@ -216,16 +285,17 @@ overflow-body picking, distinct painted/anchor-clearance bounds, 2D/3D
 projection, and immutable click-time export placement.
 
 Retain the independent 172-box / 4,925-anchor / 11-failure reference inventory,
-its raw inputs/artifacts, and established tolerances. No reference regeneration
-or geometry change is justified by this intercepted setup click. The documented
-diamond outer-separation exception still requires independent PGF review.
-Preserve both TikZ modes, external source and exact saved text, existing
-typography/paragraph/TeX-program limitations, free labels, and path inline nodes.
+its raw inputs/artifacts, and established tolerances. Do not regenerate
+references or alter geometry to conceal an unverified drag-delivery problem.
+The documented diamond outer-separation exception still requires independent
+PGF review. Preserve both TikZ modes, external source and exact saved text,
+existing typography/paragraph/TeX-program limitations, free labels, and path
+inline nodes.
 
 ## Fresh verification and parent handoff
 
-Use Node >=22.12.0 through Homebrew. Run focused selection/preparation and
-ownership regressions first, then all required commands:
+Use Node >=22.12.0 through Homebrew. Run focused drag-preparation/delivery,
+selection, and ownership regressions first, then all required commands:
 
 ```bash
 PATH=/opt/homebrew/bin:$PATH npm test
@@ -235,10 +305,11 @@ PATH=/opt/homebrew/bin:$PATH npm run check:label-assets
 PATH=/opt/homebrew/bin:$PATH npm run check:free-labels
 ```
 
-Run focused TypeScript/lint for changed TypeScript and syntax checks for changed
-JavaScript. Report the reproduced baseline script `_role` lint debt separately
-from new errors; avoid unrelated cleanup. Required checks that fail or cannot
-execute remain failed/unavailable.
+Run applicable focused TypeScript/lint and syntax checks for changed scripts.
+Report reproduced baseline lint debt separately from new errors: the unchanged
+geometric caller's four `no-unsafe-finally` errors and the independent
+verifier's unused `_role` error are already documented. Avoid unrelated cleanup.
+Required checks that fail or cannot execute remain failed/unavailable.
 
 Run browsers in the browser-capable parent with a fresh owned server and
 supported Playwright/Chrome configuration. Focused diagnostics cannot establish
@@ -246,7 +317,7 @@ cumulative acceptance. `check:point-native-focused` does not cover this complete
 geometric-shape workflow; the 32C scoped profile cannot close 32D.
 If the child hits `listen EPERM`, retain that startup failure and hand the exact
 tree to the parent without weakening sandbox or acceptance rules. Do not use
-the old startup restriction to describe the latest native failure.
+the startup restriction to describe the latest native drag failure.
 
 The parent must load updated policy in a fresh verifier process. The manual
 route checks the preserved dirty tree without committing:
@@ -281,8 +352,8 @@ Keep Phase 32 incomplete while any required native/download/reference or review
 gate remains open. Preserve stop-before-review/commit on failed verification
 and the parent's checkout identity guard after review.
 
-Report the bounded preparation fix, changed files, focused/full checks, fresh
-parent evidence and identity, native target/delivery and download coverage,
-review result, and any remaining concrete failure. Leave commit/push to the
-existing parent workflow after verification and review pass. Do not claim
-completion from child-only or historical results.
+Report the drag preparation/evidence fix, changed files, focused/full checks,
+fresh parent evidence and identity, native handle/capture/history and download
+coverage, review result, and any remaining concrete failure. Leave commit/push
+to the existing parent workflow after verification and review pass. Do not
+claim completion from child-only or historical results.

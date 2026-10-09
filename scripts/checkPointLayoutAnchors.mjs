@@ -9,7 +9,7 @@ import { createOwnedAppPage } from './ownedAppPage.mjs'
 import { ownPageEvent } from './ownedPageEvent.mjs'
 import { resolvePointInspectorField } from './pointInspectorFields.mjs'
 import { selectGeometricPoint } from './pointGeometricSelection.mjs'
-import { createPointDiagnostics } from './pointCheckDiagnostics.mjs'
+import { boundedPointDiagnostic, createPointDiagnostics } from './pointCheckDiagnostics.mjs'
 import { saveAppJson } from './appJsonPersistence.mjs'
 import { observePointLiteral, assertPositionedLiteral } from './pointLiteralOracle.mjs'
 import { withOwnedFontFace, observeOwnedFontFace } from './ownedFontFace.mjs'
@@ -95,8 +95,6 @@ export async function runPointLayoutAnchorChecks({ browser, origin, artifactDir,
     return input
   }
   async function select(id = 'app-point', observePoint = observeLayoutPoint) {
-    const close = page.getByRole('button', { name: 'Close inspector drawer', exact: true })
-    if (await close.count()) await close.click()
     let nativeSelection
     const rendered = await selectGeometricPoint({ page, readState: state, observePoint, diagnose: async (details) => {
       if (details.observation?.after) nativeSelection = details.observation
@@ -104,10 +102,17 @@ export async function runPointLayoutAnchorChecks({ browser, origin, artifactDir,
     },
       secondaryErrors: pageErrors, scenario, sequence: ++selectionSequence, id, boundary: true })
     rendered.nativeSelection = { id, selected: nativeSelection.selected, requestedClick: nativeSelection.requestedClick, events: nativeSelection.after.events }
+    const beforeInspector = await state()
     const open = page.getByRole('button', { name: 'Open inspector drawer', exact: true })
     if (await open.count()) await open.click()
     const expand = inspector.getByRole('button', { name: 'Expand', exact: true })
     if (await expand.count()) await expand.click()
+    const afterInspector = await state()
+    await boundedPointDiagnostic(() => diagnostic(group, scenario, { boundary: 'inspector-reopened',
+      sequence: selectionSequence, beforeInspector, afterInspector }), 'Layout Inspector reopening evidence')
+    for (const field of ['json', 'runtimeDiagramJson', 'history', 'labelDocumentRevision']) {
+      assert.equal(afterInspector[field], beforeInspector[field], `Native Inspector reopening preserves ${field}`)
+    }
     return rendered
   }
   async function observeEntry(input, extra = {}, id = 'app-point') {

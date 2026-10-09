@@ -7,16 +7,18 @@ later 32B have historical accepted evidence. The plan still records unaccepted
 fresh strict native/review gates for the merged 32C checkout; implementation
 presence does not close that prerequisite or the final gate.
 
-The browser-capable parent's retained `stz-phase32d-before-review-CFirlz`
-report passed 5,328 tests, build, diff and label-assets, then failed the native
-imported-style Clear expectation after 14 of 18 groups. The production point
-was valid: detachment removed imported paint, shape and layout provenance.
-Both verifier expectations omitted layout provenance from their expected
-detachment. The bounded correction removes that field from the expected clones
-while retaining exact comparisons of every other point field and native preview.
-Explicit layout values, units and contexts remain authoritative after Clear.
-The old failed report is diagnostic evidence only; fresh strict parent
-verification and subsequent independent review remain open.
+The latest browser-capable parent's retained `stz-phase32d-before-review-zYGQzv`
+report passed 5,373 tests, build, diff and label-assets, then failed initial
+circle selection while preparing diamond after 15 of 18 groups. The full
+paint/import group, including corrected Clear provenance, passed. Its six
+selection traces show ellipse receiving native SVG point events with the
+Inspector closed, followed by the reused page's open/no-selection Inspector
+intercepting diamond setup at the same screen coordinate. No diamond Shape
+edit had occurred. The bounded harness correction closes that inherited drawer
+through its real control before fresh measurement and one native canvas click.
+This failed parent report diagnoses preparation only; complete current-tree
+native/download verification and subsequent independent review remain open.
+The prior Clear correction and its exact layout/unit/context comparisons remain.
 
 ## Model, grammar, and compatibility
 
@@ -292,3 +294,66 @@ These startup failures are separate from the earlier parent's real Clear
 assertion. Fresh complete strict parent evidence must precede independent review.
 Logs, diagnostic observations, final tracked/untracked identity and handoff are
 under `/private/tmp/stz-32d-provenance-fix-20261009/`. No commit or push was made.
+
+## 2026-10-09 bounded Inspector selection preparation
+
+The inspected checkout is `375cd56b33f5f03357562d359be85c501da15b3f` on
+`phase/32d-margin-minsize-anchor`, with a clean starting tree. It already tracks
+the six Clear corrections and the updated fix prompt; none was restored or
+reimplemented. The actual starting identity is retained with this fix's handoff.
+
+`pointGeometricSelection.mjs` observes the inherited Inspector and authoritative
+state, then uses the unique real Close button once if the drawer exists. It
+requires bounded detachment and the closed Open control before Select/scroll
+and fresh point/body/contour measurements and screen CTMs. Closed drawers
+receive no close action. The layout caller's duplicate preparation close is
+removed. Both callers retain native Open/Expand after successful selection and
+record exact JSON/runtime/history/revision equality across those UI actions.
+
+Before/after click observations still precede the native selection assertion.
+One actual canvas click must select its intended point and deliver trusted,
+ordered pointerdown/up/click through the recorded intended SVG target/path.
+Initial setup must be unselected; preexisting selection and overlay-only events
+cannot establish success. Existing selected-point handles are accepted only
+through their actual handle path and intended selection. Captured continuation
+to the owning SVG requires matching pointer identity and observed capture;
+native MouseEvent clicks additionally require matching coordinates. Measured
+boundary requests remain boundary requests. Bounded diagnostics, observer
+cleanup and primary-error precedence remain.
+
+The registered `phase32cVerification.test.mjs` contains 46 explicitly synthetic
+selection/preparation controls (38 added), preserving its other controls. They
+cover the reused ellipse/open/JSON-load/diamond sequence, one close, closed
+no-op, failed/false detachment and control uniqueness, unchanged coordinates/
+raw text/styles/history, stale coordinates, remaining obstruction, intended
+targets/paths/capture, and primary errors surviving diagnostics/cleanup. These
+controls cannot establish native acceptance. The eleven-shape reused-page loop,
+all cumulative groups, layout/anchor matrix and actual download/reopen gates
+remain required. No geometry, reference, persistence, overlay or dependency
+change is included.
+
+Executed child checks used Homebrew-first Node v26.9.0. The registered selection
+suite passed 93/93; selection plus existing event/page/diagnostic ownership
+regressions passed 133/133; full `npm test` passed 5,411/5,411 without failures
+or skips. Build (strict TypeScript) and diff checks passed; all four changed
+JavaScript files passed syntax checks. There are no changed TypeScript files.
+Recommended script lint found no new errors: helper/layout caller/tests are
+clean, while the geometric caller's four `no-unsafe-finally` errors reproduce
+exactly from HEAD. The unchanged verifier separately retains its reproduced
+unused `_role` error. These failing baseline lint checks are not lint passes.
+
+The focused native attempt and both required configured browser commands failed
+at fresh owned-server `listen EPERM 127.0.0.1` before Chrome launch. Label-assets
+passed its static graph only. Free-labels kept strict mode with zero complete
+groups and all eighteen unexecuted. Fresh intended-target delivery, native
+history/JSON persistence, actual pending transparent/white downloads and
+standalone reopening remain unobserved here. These startup failures are distinct
+from the latest parent's confirmed native Inspector interception. Independent
+acceptance review did not start because complete fresh verification is missing.
+
+Logs, raw startup failures, retained-parent diagnosis, the complete six-file
+diff, inventory preservation and final tracked/untracked identity are under
+`/private/tmp/stz-32d-inspector-fix-20261009/`. Failed browser snapshots precede
+this final documentation update and are diagnostic only. The handoff identifies
+the exact final tree for fresh parent verification via `32D verify`, then
+matching read-only review. Phase 32 remains incomplete; no commit/push occurred.
