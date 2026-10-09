@@ -1,11 +1,22 @@
 # Phase 32D spacing, minima, anchors, and combined audit
 
-Status (2026-10-08): implementation and focused Node verification are present.
+Status (2026-10-09): implementation and focused Node verification are present.
 Phase 32 is **not complete**. Fresh accepted required commands, strict native
 browser/download evidence and independent review remain required. 32A and main's
 later 32B have historical accepted evidence. The plan still records unaccepted
 fresh strict native/review gates for the merged 32C checkout; implementation
 presence does not close that prerequisite or the final gate.
+
+The browser-capable parent's retained `stz-phase32d-before-review-CFirlz`
+report passed 5,328 tests, build, diff and label-assets, then failed the native
+imported-style Clear expectation after 14 of 18 groups. The production point
+was valid: detachment removed imported paint, shape and layout provenance.
+Both verifier expectations omitted layout provenance from their expected
+detachment. The bounded correction removes that field from the expected clones
+while retaining exact comparisons of every other point field and native preview.
+Explicit layout values, units and contexts remain authoritative after Clear.
+The old failed report is diagnostic evidence only; fresh strict parent
+verification and subsequent independent review remain open.
 
 ## Model, grammar, and compatibility
 
@@ -245,3 +256,39 @@ PATH=/opt/homebrew/bin:$PATH npm run check:free-labels
 Independent read-only review must inspect the matching complete strict report
 and artifacts. Missing evidence/failed review keeps Phase 32 incomplete. No new
 dependency, sandbox change, profile waiver, commit or publication is included.
+
+## 2026-10-09 bounded Clear provenance correction
+
+The native observer and independent parent validator now detach imported layout
+provenance in their expected clones, alongside paint/shape provenance and style
+associations. Their full point equality, native contour/body/shape/leaves checks,
+unselected controls, preset/source/reference definitions, validity and exact undo
+requirements remain. JSON persistence comparisons retain all non-view fields.
+No production model, geometry, PGF reference input or tolerance changed.
+
+The existing registered Clear UI suite adds a nonempty imported baseline with a
+deliberate local `em` axis override and independently inherited `ex` context.
+It checks exact axes, minima, anchor and source/context metadata through Clear,
+undo/redo and save/load, deep clone isolation and frozen prior snapshots,
+detached reimport stability, and standalone/inline TikZ axis precedence.
+Synthetic policy fixtures now carry nonempty layout/provenance on selected
+points and an unselected control. Their negative controls cover retained layout
+provenance after Clear/redo/reload, changed or dropped layout, altered units or
+contexts, changed control layout/provenance, and lost undo provenance. Duplicate
+point/diagram/state JSON records stay consistent so the intended semantic checks
+reject the faults. Existing bounded-history controls remain required.
+
+Focused checks passed: 9/9 UI tests and 122/122 synthetic policy tests, without
+failures or skips; strict focused TypeScript, configured TS lint, changed script
+syntax, build and diff checks passed. Recommended script lint retains one
+unchanged unused `_role` error, reproduced from this checkout's HEAD.
+The required full suite is recorded separately in the fix handoff.
+
+Both configured child browser commands failed at `listen EPERM 127.0.0.1`
+before Chrome launch. Label-assets passed its static graph check only;
+free-labels retained strict mode with zero completed and all eighteen unexecuted
+groups. No fresh native scenarios, downloads or standalone reopen were obtained.
+These startup failures are separate from the earlier parent's real Clear
+assertion. Fresh complete strict parent evidence must precede independent review.
+Logs, diagnostic observations, final tracked/untracked identity and handoff are
+under `/private/tmp/stz-32d-provenance-fix-20261009/`. No commit or push was made.

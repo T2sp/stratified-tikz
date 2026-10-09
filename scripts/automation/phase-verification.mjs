@@ -715,10 +715,13 @@ function validateDetachedPaintEvidence(artifactDir, name, group) {
         const expected = structuredClone(prior.current), actual = after.points.find((point) => point.current.id === expected.id);
         if (ids.includes(expected.id)) {
           const key = entry.before.diagram.importedTikzStyleReferences.find((ref) => ref.id === expected.importedTikzStyleReferenceId).key;
-          delete expected.stylePresetId; delete expected.importedTikzStyleReferenceId; delete expected.style.importedPaint; delete expected.style.importedShape;
+          delete expected.stylePresetId; delete expected.importedTikzStyleReferenceId;
+          delete expected.style.importedPaint; delete expected.style.importedShape; delete expected.style.importedLayout;
           assert.equal(Object.hasOwn(actual.current, "stylePresetId"), false);
           assert.equal(Object.hasOwn(actual.current, "importedTikzStyleReferenceId"), false);
           assert.equal(Object.hasOwn(actual.current.style, "importedPaint"), false);
+          assert.equal(Object.hasOwn(actual.current.style, "importedShape"), false, "Clear removes imported shape provenance");
+          assert.equal(Object.hasOwn(actual.current.style, "importedLayout"), false, "Clear removes imported layout provenance");
           for (const code of Object.values(after.output)) {
             const paint = observeLiteralPointPaint(code, expected.text);
             assert.equal(paint.options.includes(key), false, "Target point external invocation is detached");

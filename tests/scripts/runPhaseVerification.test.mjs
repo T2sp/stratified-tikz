@@ -647,6 +647,8 @@ function importRegressionEvidence(name) {
   return result
 }
 function clearRegressionEvidence() {
+  // Synthetic policy fixtures only: these records exercise parent acceptance
+  // assertions and do not claim native browser, model, or download observations.
   const basePaint = { text: { color: '#000000', opacity: 1 }, fill: { enabled: true, color: '#ff0000', opacity: 1 },
     stroke: { enabled: true, color: '#000000', opacity: 1, width: .4, lineStyle: 'solid', dashPhase: 0, lineCap: 'butt', lineJoin: 'miter' } }
   const mixedPaint = { text: { color: '#654321', opacity: .5 }, fill: { enabled: true, color: '#123456', opacity: .25 },
@@ -658,19 +660,40 @@ function clearRegressionEvidence() {
       dashOffset: paint.stroke.dashPhase * 1.2, cap: paint.stroke.lineCap, join: paint.stroke.lineJoin },
     leaves: [{ fill: rgb(paint.text.color), fillAlpha: paint.text.opacity }], bodyBounds: { width: 2 }, shapeBounds: { width: 5 } }
   }
+  const layoutForPoint = (index) => {
+    const xContext = { fontSizePt: 12 + index, xHeightPt: 5 + index }
+    const yContext = { fontSizePt: 10 + index, xHeightPt: 4 + index }
+    const baseline = { innerXSep: xContext.fontSizePt, innerYSep: yContext.xHeightPt,
+      outerXSep: 1 + index / 10, outerYSep: .5 + index / 10,
+      minimumWidth: 36 + index, minimumHeight: 18 + index,
+      anchor: ['base east', 'north west', 'south'][index], fontContext: xContext,
+      units: {
+        innerXSep: { source: '1em', unit: 'em', texPoints: xContext.fontSizePt, fontContext: xContext },
+        innerYSep: { source: '1ex', unit: 'ex', texPoints: yContext.xHeightPt, fontContext: yContext },
+        outerXSep: { source: `${1 + index / 10}pt`, unit: 'pt', texPoints: 1 + index / 10 },
+        outerYSep: { source: `${.5 + index / 10}pt`, unit: 'pt', texPoints: .5 + index / 10 },
+        minimumWidth: { source: `${36 + index}pt`, unit: 'pt', texPoints: 36 + index },
+        minimumHeight: { source: `${18 + index}pt`, unit: 'pt', texPoints: 18 + index },
+      } }
+    const layout = structuredClone(baseline)
+    layout.innerXSep = 1.5 * xContext.fontSizePt
+    layout.units.innerXSep = { source: '1.5em', unit: 'em', texPoints: layout.innerXSep, fontContext: structuredClone(xContext) }
+    return { layout, importedLayout: { referenceId: 'reference', baseline: structuredClone(baseline), overriddenFields: ['innerXSep'] } }
+  }
   const makeCase = (ids) => {
     const multiple = ids.length === 2, key = multiple ? 'independent point' : 'redpoint'
     const secondPaint = { text: { color: '#ff0000', opacity: .6 }, fill: { enabled: true, color: '#0000ff', opacity: .35 },
       stroke: { enabled: true, color: '#00ff00', opacity: .7, width: 2, lineStyle: 'solid', dashPattern: [3, 2], dashPhase: 1, lineCap: 'round', lineJoin: 'bevel' } }
     const points = ['app-point', 'bulk-point', 'copy-point'].map((id, index) => ({
       current: { id, text: ['Clear target', 'Clear second', 'Control point'][index], stylePresetId: 'preset', importedTikzStyleReferenceId: 'reference',
-        style: { opacity: 1, paint: structuredClone(multiple ? index === 0 ? mixedPaint : secondPaint : basePaint), importedPaint: { referenceId: 'reference' } } },
+        style: { opacity: 1, paint: structuredClone(multiple ? index === 0 ? mixedPaint : secondPaint : basePaint),
+          importedPaint: { referenceId: 'reference' }, ...layoutForPoint(index) } },
       observation: expectedObservation(multiple ? index === 0 ? mixedPaint : secondPaint : basePaint),
     }))
     const snapshot = (detached) => {
       const current = structuredClone(points)
       if (detached) for (const { current: point } of current) if (ids.includes(point.id)) {
-        delete point.stylePresetId; delete point.importedTikzStyleReferenceId; delete point.style.importedPaint; delete point.style.importedShape
+        delete point.stylePresetId; delete point.importedTikzStyleReferenceId; delete point.style.importedPaint; delete point.style.importedShape; delete point.style.importedLayout
       }
       const diagram = { strata: current.map((point) => point.current), userStylePresets: [{ id: 'preset' }],
         externalTikzStyleSources: [{ id: 'source', rawSource: 'preserved source' }], importedTikzStyleReferences: [{ id: 'reference', key }] }
@@ -688,14 +711,23 @@ function clearRegressionEvidence() {
           present: detached ? afterPresent : beforePresent, future: [],
         }) } }
     }
-    const entry = { ids, nativeAction: { selector: 'TikZ style selector', action: 'Clear TikZ style' },
+    const entry = { evidenceKind: 'synthetic-policy', ids, nativeAction: { selector: 'TikZ style selector', action: 'Clear TikZ style' },
       before: snapshot(false), cleared: snapshot(true), undone: snapshot(false), redone: snapshot(true), reloaded: snapshot(true),
       download: { boundary: 'download', differencePaths: [] }, reload: { boundary: 'reload', differencePaths: [] },
       standalone: { pageErrors: [], observation: points[0].observation,
         points: multiple ? [{ id: 'bulk-point', observation: points[1].observation }] : [] } }
     return entry
   }
-  return { single: makeCase(['app-point']), multiple: makeCase(['app-point', 'bulk-point']) }
+  return { evidenceKind: 'synthetic-policy', single: makeCase(['app-point']), multiple: makeCase(['app-point', 'bulk-point']) }
+}
+
+// Faults must agree across all duplicate representations before the acceptance
+// policy checks their semantics. This deliberately leaves history unchanged.
+function synchronizeClearSnapshot(entry) {
+  entry.diagram.strata = entry.points.map((point) => structuredClone(point.current))
+  const saved = JSON.parse(entry.state.json)
+  saved.diagram = structuredClone(entry.diagram)
+  entry.state.json = JSON.stringify(saved)
 }
 function appContinuityEvidence() {
   // Policy fixtures only; native App transitions and negative controls run in
@@ -1077,29 +1109,72 @@ for (const boundary of ['mutation', 'away', 'back', 'undone', 'redone', 'reloade
     })
   }
 }
+test('32B synthetic Clear policy preserves explicit layout and restores imported provenance on undo', (t) => {
+  const fixture = checkoutFixture(t)
+  completePointEvidence(fixture)
+  const clear = JSON.parse(fixture.env.STZ_TEST_POINT_ARTIFACT_VALUES)['point-paint-clear-imported-style.json']
+  assert.equal(clear.evidenceKind, 'synthetic-policy')
+  for (const kind of ['single', 'multiple']) {
+    const entry = clear[kind]
+    assert.equal(entry.evidenceKind, 'synthetic-policy')
+    for (const { current: original } of entry.before.points) {
+      const { layout, importedLayout } = original.style
+      assert.ok(layout.innerXSep > importedLayout.baseline.innerXSep, 'Fixture contains a deliberate local axis override')
+      assert.deepEqual(importedLayout.overriddenFields, ['innerXSep'])
+      assert.equal(importedLayout.referenceId, original.importedTikzStyleReferenceId)
+      assert.equal(layout.units.innerXSep.unit, 'em')
+      assert.equal(layout.units.innerYSep.unit, 'ex')
+      assert.notDeepEqual(layout.units.innerXSep.fontContext, layout.units.innerYSep.fontContext)
+      for (const boundary of ['cleared', 'redone', 'reloaded']) {
+        const actual = entry[boundary].points.find((point) => point.current.id === original.id).current
+        assert.deepEqual(actual.style.layout, layout, `Explicit layout survives ${kind} ${boundary}`)
+        if (entry.ids.includes(original.id)) assert.equal(Object.hasOwn(actual.style, 'importedLayout'), false)
+        else assert.deepEqual(actual, original, 'Unselected layout and provenance remain exact')
+      }
+      assert.deepEqual(entry.undone.points.find((point) => point.current.id === original.id).current, original,
+        'Undo restores the exact original layout baseline and override metadata')
+    }
+  }
+  assert.equal(verify(t, fixture, '32B').status, 'passed')
+})
+
 for (const kind of ['single', 'multiple']) for (const boundary of ['cleared', 'redone', 'reloaded']) {
-  for (const fault of ['retained-reference', 'retained-provenance', 'retained-preset', 'changed-paint', 'changed-control', 'false-validity', 'missing-preview', 'wrong-target-output']) {
-    test(`32B requires explicit detached native state: ${kind} ${boundary} ${fault}`, (t) => {
+  for (const fault of ['retained-reference', 'retained-provenance', 'retained-layout-provenance', 'retained-preset',
+    'changed-paint', 'changed-control', 'changed-layout', 'dropped-layout', 'changed-layout-units', 'changed-layout-context',
+    'changed-control-layout', 'changed-control-layout-provenance', 'false-validity', 'missing-preview', 'wrong-target-output']) {
+    test(`32B synthetic policy requires explicit detached state: ${kind} ${boundary} ${fault}`, (t) => {
       const fixture = checkoutFixture(t)
       completePointEvidence(fixture)
       const artifacts = JSON.parse(fixture.env.STZ_TEST_POINT_ARTIFACT_VALUES)
-      const entry = artifacts['point-paint-clear-imported-style.json'][kind][boundary], target = entry.points[0]
+      const regression = artifacts['point-paint-clear-imported-style.json'][kind]
+      const entry = regression[boundary], target = entry.points[0]
       if (fault === 'retained-reference') target.current.importedTikzStyleReferenceId = 'reference'
       if (fault === 'retained-provenance') target.current.style.importedPaint = { referenceId: 'reference' }
+      if (fault === 'retained-layout-provenance') target.current.style.importedLayout = structuredClone(regression.before.points[0].current.style.importedLayout)
       if (fault === 'retained-preset') target.current.stylePresetId = 'preset'
       if (fault === 'changed-paint') target.current.style.paint.stroke.dashPhase = 8
       if (fault === 'changed-control') entry.points[2].current.style.paint.text.color = '#0000ff'
+      if (fault === 'changed-layout') target.current.style.layout.innerXSep += 1
+      if (fault === 'dropped-layout') delete target.current.style.layout
+      if (fault === 'changed-layout-units') target.current.style.layout.units.innerXSep.source = '2em'
+      if (fault === 'changed-layout-context') target.current.style.layout.units.innerYSep.fontContext.xHeightPt += 1
+      if (fault === 'changed-control-layout') entry.points[2].current.style.layout.anchor = 'north east'
+      if (fault === 'changed-control-layout-provenance') entry.points[2].current.style.importedLayout.overriddenFields = []
       if (fault === 'false-validity') entry.modelDiagnostics.validation.valid = false
       if (fault === 'missing-preview') delete target.observation
       if (fault === 'wrong-target-output') entry.output.inlineMath = entry.output.inlineMath.replace('text=text0', 'text=fill0')
+      synchronizeClearSnapshot(entry)
       fixture.env.STZ_TEST_POINT_ARTIFACT_VALUES = JSON.stringify(artifacts)
-      assert.throws(() => verify(t, fixture, '32B'), /evidence is incomplete or invalid/)
+      const expectedFailure = fault === 'retained-layout-provenance' ? /Clear removes imported layout provenance/
+        : fault.includes('layout') ? /Clear preserves explicit point data and unselected controls/
+          : /evidence is incomplete or invalid/
+      assert.throws(() => verify(t, fixture, '32B'), expectedFailure)
     })
   }
 }
 for (const fault of ['missing-single', 'missing-multi', 'missing-action', 'missing-history', 'extra-history', 'changed-earlier-history', 'undo-lost-reference',
-  'missing-reload', 'missing-svg', 'missing-second-svg', 'svg-paint', 'svg-error']) {
-  test(`32B rejects incomplete clear workflow evidence: ${fault}`, (t) => {
+  'undo-lost-layout-provenance', 'missing-reload', 'missing-svg', 'missing-second-svg', 'svg-paint', 'svg-error']) {
+  test(`32B synthetic policy rejects incomplete clear workflow evidence: ${fault}`, (t) => {
     const fixture = checkoutFixture(t)
     completePointEvidence(fixture)
     const artifacts = JSON.parse(fixture.env.STZ_TEST_POINT_ARTIFACT_VALUES)
@@ -1111,13 +1186,16 @@ for (const fault of ['missing-single', 'missing-multi', 'missing-action', 'missi
     if (fault === 'extra-history') entry.cleared.state.history = JSON.stringify({ past: [{}, {}, {}] })
     if (fault === 'changed-earlier-history') entry.cleared.state.history = JSON.stringify({ past: [{ changed: true }, {}] })
     if (fault === 'undo-lost-reference') delete entry.undone.points[0].current.importedTikzStyleReferenceId
+    if (fault === 'undo-lost-layout-provenance') delete entry.undone.points[0].current.style.importedLayout
+    if (fault.startsWith('undo-')) synchronizeClearSnapshot(entry.undone)
     if (fault === 'missing-reload') delete entry.reload
     if (fault === 'missing-svg') delete entry.standalone
     if (fault === 'missing-second-svg') entry.standalone.points = []
     if (fault === 'svg-paint') entry.standalone.observation.contour.strokeWidth = .4
     if (fault === 'svg-error') entry.standalone.pageErrors.push('page error')
     fixture.env.STZ_TEST_POINT_ARTIFACT_VALUES = JSON.stringify(artifacts)
-    assert.throws(() => verify(t, fixture, '32B'), /evidence is incomplete or invalid/)
+    assert.throws(() => verify(t, fixture, '32B'), fault === 'undo-lost-layout-provenance'
+      ? /Native undo restores imported points/ : /evidence is incomplete or invalid/)
   })
 }
 

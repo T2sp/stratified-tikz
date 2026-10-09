@@ -1,182 +1,231 @@
-# Phase 32D Fix for imported layout provenance and native acceptance
+# Phase 32D Fix for Inspector interception of native point selection
 
 ## Objective and preserved implementation
 
-Continue from the implemented Phase 32D checkout. Fix the imported-style Clear
-verification failure below, add regressions for the new layout metadata, and
-obtain fresh cumulative verification before independent review. Preserve the
-spacing, minima, PGF anchors, persistence, Inspector controls, and shared live
-and exported placement already implemented. Do not restart Phase 32D.
+Continue from the implemented Phase 32D checkout and the completed Clear
+provenance fix. Repair the geometric-shape acceptance workflow's reused-page
+selection preparation, then obtain fresh cumulative verification and matching
+independent review. The retained native evidence shows the open Inspector
+intercepting the second selection click before it reaches the SVG.
 
 Read `AGENTS.md`, `prompts/phase-32d-implement.md`,
 `prompts/phase-32d-review.md`, `docs/PHASE_32D_IMPLEMENTATION.md`, and
-`docs/PHASE_32_PLAN.md`. Inspect the actual working tree before editing.
-Preserve all existing tracked changes and untracked implementation, tests,
-reference fixtures, and documentation. Do not reset, discard, stash, commit,
-or push the unfinished implementation to get past a runner guard.
+`docs/PHASE_32_PLAN.md`. Inspect the actual tree before editing and preserve
+all existing implementation, regressions, PGF references, and documentation.
+Do not restart Phase 32D or repeat the resolved Clear repair.
 
-The current request continues the existing 32D implementation. Historical
-32C-only deferrals do not authorize a scoped 32D pass. Keep strict cumulative
-32D verification and the runner's verification-before-review/commit contract.
-Phase 32 remains incomplete until the current tree has accepted evidence and
-passing independent review.
+Keep strict cumulative 32D verification and the parent workflow's
+verification-before-review/commit contract. Historical 32C-only deferrals cannot
+establish a 32D pass. Phase 32 remains incomplete until the current tree has
+accepted complete evidence and passing independent review.
 
-## Retained evidence and checkout identity
+## Latest evidence and checkout identity
 
-The implementation handoff is `/private/tmp/stz-32d-handoff/HANDOFF.md`;
-its changed-file inventory is `/private/tmp/stz-32d-handoff/changed-files.txt`.
-The latest supplied browser-capable parent records are:
+The completed provenance-fix handoff is
+`/private/tmp/stz-32d-provenance-fix-20261009/HANDOFF.md`.
+Its six-file inventory, complete diff, logs, and final identity are retained in
+the same directory. The latest browser-capable parent records are:
 
 - Worker response:
-  `/var/folders/vk/7kf940pd4bx8f6cg3rzlmtc80000gn/T/stz-phase-verifier-edFhng/response.json`.
+  `/var/folders/vk/7kf940pd4bx8f6cg3rzlmtc80000gn/T/stz-phase-verifier-mQPFwa/response.json`.
 - Verification report:
-  `/var/folders/vk/7kf940pd4bx8f6cg3rzlmtc80000gn/T/stz-phase32d-before-review-CFirlz/verification.json`.
-- Primary failure log:
-  `/var/folders/vk/7kf940pd4bx8f6cg3rzlmtc80000gn/T/stz-phase32d-before-review-CFirlz/05-check-free-labels/command.log`.
-- Native observations, failure screenshots, and scenario records:
-  `/var/folders/vk/7kf940pd4bx8f6cg3rzlmtc80000gn/T/stz-phase32d-before-review-CFirlz/05-check-free-labels/artifacts/`.
+  `/var/folders/vk/7kf940pd4bx8f6cg3rzlmtc80000gn/T/stz-phase32d-before-review-zYGQzv/verification.json`.
+- Primary browser log:
+  `/var/folders/vk/7kf940pd4bx8f6cg3rzlmtc80000gn/T/stz-phase32d-before-review-zYGQzv/05-check-free-labels/command.log`.
+- Native observations and failure artifacts:
+  `/var/folders/vk/7kf940pd4bx8f6cg3rzlmtc80000gn/T/stz-phase32d-before-review-zYGQzv/05-check-free-labels/artifacts/`.
 
-At prompt preparation the branch was `phase/32d-margin-minsize-anchor`, HEAD
-`721c2655bb97e8479d8a4caf913915e5a46672ab`. The supplied parent report records
-fingerprint `038040d249a87bbf2e6fb4040157e684221ae767de99b378bb449268b15a9754`.
-The actual tree before adding this prompt instead had fingerprint
-`6cd3c4fff15a3b582dc44c20259c34d7e3cdffe08962660da0a873c829475835`, with
-53 nonignored untracked files. The prompt addition changes that identity again.
-Capture the actual current identity, including untracked files; these historical
-hashes are diagnostic context and must not become acceptance constants.
-
-Distinguish the child startup restriction from the later real parent failure:
-
-| Retained run | Result |
-| --- | --- |
-| Implementation child | 5,328 tests passed without failures or skips; build, diff, focused TypeScript, changed-TypeScript lint, and script syntax checks passed. Browser commands stopped before launch at `listen EPERM`. |
-| Independent PGF references | The handoff records 172 fixed boxes, 4,925 anchors, 11 authentic failure controls, and 406 passing geometry tests. Preserve their inputs, artifacts, and established tolerances. |
-| Browser-capable parent | 5,328 tests, build, diff, and `check:label-assets` passed. Chrome executed native scenarios; `check:free-labels` then failed at the Clear assertion below. |
-
-The parent's free-label report completed 14 of 18 groups. The paint/import group
-started but did not complete. The geometric-shapes group, layout/anchor group,
-and final standalone-export group did not execute. The retained page-error list
-is empty, but unfinished scenarios and downloads still block acceptance.
-Neither this report nor the older child `EPERM` run is a complete 32D pass.
-
-## Diagnose the Clear assertion first
-
-The primary failure is:
+At this prompt update, the branch is `phase/32d-margin-minsize-anchor`, HEAD
+`caf7d4ef9a259fad6017bc187269d6ee8bd9068b`. The pre-update tree matches both
+before/after identities of the latest parent report:
 
 ```text
-AssertionError [ERR_ASSERTION]: Clear changes only references/provenance on app-point
-scripts/checkPointImportedPaint.mjs:313
-runPointImportedPaintChecks -> clearCase -> clearCheck
-
-actual:   style.importedLayout is absent
-expected: style.importedLayout = {
-  referenceId: 'imported-style-redpoint',
-  baseline: {},
-  overriddenFields: []
-}
+52d9fd09cd7bf6d3bb0bc8a6edcbb186503cc2325d6b6f89af78e55e9a42cdf1
 ```
 
-Inspect `free-labels-evidence.json` and the retained
-`point-paint-clear-imported-style` observations before changing an assertion.
-The last recorded checkpoint is
-`point-node-paint-import-persistence / paint-point-paint-clear-imported-style-observed`.
-This failure occurred after browser launch and many real native transitions.
-Do not describe it as a localhost-permission failure.
+There are six modified tracked files and no nonignored untracked files before
+this prompt update. Preserve those six changes: the imported-paint observer,
+independent parent validator, policy and UI Clear regression suites, and
+`docs/PHASE_32D_IMPLEMENTATION.md` / `docs/PHASE_32_PLAN.md`.
+Earlier 32D implementation and reference fixtures are already tracked.
+Updating this prompt changes the tree identity again. Capture the actual
+current tracked/untracked identity; do not hard-code an old fingerprint as an
+acceptance constant.
 
-The current production path supports the observed result:
+| Retained run | Actual result |
+| --- | --- |
+| Provenance-fix child | 122 policy and 9 UI focused tests passed; 5,373/5,373 full tests passed without failures/skips. Build, diff, strict TypeScript, TS lint, and script syntax passed. Script lint retains the reproduced baseline unused `_role` error. Both browser commands stopped before Chrome launch at `listen EPERM`. |
+| Latest browser-capable parent | 5,373/5,373 tests, build, diff, and full `check:label-assets` passed. Chrome 154.0.8037.98 ran native scenarios. `check:free-labels` passed the complete paint/import group, then failed during geometric-shape selection. |
 
-- `createImportedPointPaintSnapshot` in `src/model/styles.ts` now records
-  `importedLayout`, even when the imported style has an empty layout baseline.
-- `pointStyleForImportedReference` removes `importedPaint`, `importedShape`,
-  and `importedLayout` when their reference is detached or replaced. The explicit
-  `style.layout` and its unit/context values are retained.
-- `src/model/validation.ts` requires imported layout provenance to match the
-  active `importedTikzStyleReferenceId`. Retaining that provenance after Clear
-  would create an invalid point.
-- `tests/ui/pointStyleClear.test.ts` already removes all three provenance fields
-  from its expected cleared point.
+The parent completed 15 of 18 cumulative groups. `point-geometric-ellipse`
+passed; `point-geometric-diamond` failed during its initial selection setup.
+The geometric group remains incomplete. The layout/anchor group and final
+standalone-export group did not execute. The retained page-error list is empty,
+but missing scenarios, downloads, and review still block acceptance.
+This real parent failure is distinct from the child's startup `EPERM`.
 
-Confirm these contracts against the actual code. The expected correction is to
-update the two stale verification expectations, not to retain orphaned metadata
-in production or to remove explicit layout settings.
+## Preserve the completed Clear correction
 
-## Correct both verification expectations
+The prior stale expectations are fixed in
+`scripts/checkPointImportedPaint.mjs` and
+`scripts/automation/phase-verification.mjs`. The parent now records
+`point-paint-clear-imported-style` as passed and completes
+`point-node-paint-import-persistence`.
 
-1. In `scripts/checkPointImportedPaint.mjs`, the expected clone in `clearCheck`
-   deletes `stylePresetId`, `importedTikzStyleReferenceId`, `importedPaint`, and
-   `importedShape`, but omits `importedLayout`. Remove imported layout provenance
-   from the expected selected point as well. Preserve the full exact comparison
-   of every other field and the native contour/body/shape/leaves comparisons.
-2. In `scripts/automation/phase-verification.mjs`,
-   `validateDetachedPaintEvidence` has the same omission in its expected clone.
-   Correct that independent evidence validator too. Check that cleared, redone,
-   and reloaded targets have no preset/external association or imported
-   paint/shape/layout provenance. Keep explicit layout values and unselected
-   controls unchanged; undo must restore the exact original imported point.
+Keep exact comparisons and rejection controls for detached imported
+paint/shape/layout provenance, explicit layout and per-axis units/contexts,
+unselected controls, raw source, one effective history commit, no-op repetition,
+undo/redo, history capacity, and JSON reload. Preserve the nine UI regressions
+and the new synthetic policy fixtures. Synthetic records remain policy tests,
+not native evidence. Do not strip layout fields from persistence comparisons
+or restore orphaned provenance in production.
 
-Keep the browser observer and independent parent acceptance assertions effective.
-Do not strip layout from both sides, normalize away the difference, accept
-partial objects, replace exact comparisons with selected-field checks, or
-waive model validity. Preserve raw text, positions, paint, shape parameters,
-presets, external source, reference definitions, and all retained history.
-Legacy points without layout metadata must retain their existing meaning.
+## Diagnose the native selection failure
 
-`appJsonPersistence.mjs` and the JSON persistence oracle already compare saved
-non-view fields strictly. Do not exclude layout/provenance fields from those
-comparisons to obtain a pass.
+The current primary assertion is:
 
-## Add regressions that expose this omission
+```text
+AssertionError [ERR_ASSERTION]: Native contour click selects its point
+actual: undefined
+expected: 'app-point'
 
-Extend `clearRegressionEvidence` and the existing clear fault matrices in
-`tests/scripts/runPhaseVerification.test.mjs`. The synthetic policy fixtures
-currently exercise imported paint but do not carry imported layout provenance.
-Add nonempty explicit layout and matching imported baseline/override metadata
-to selected points and an unselected control. The selected provenance disappears
-only at clear/redo/reload; the explicit layout remains identical, and undo
-restores provenance. Label these records as synthetic policy tests; they are
-not native browser evidence.
+selectGeometricPoint
+  scripts/pointGeometricSelection.mjs:141
+select
+  scripts/checkPointNodeGeometricShapes.mjs:84
+runPointNodeGeometricShapeChecks
+  scripts/checkPointNodeGeometricShapes.mjs:183
+```
 
-Require rejection controls for retained layout provenance after clear, redo,
-or reload; changed or dropped explicit layout; changed unselected layout; and
-undo losing the original layout provenance. Keep duplicate snapshot/state JSON
-representations consistent in fault fixtures so a test reaches the intended
-semantic check instead of failing only because redundant records disagree.
-Preserve the existing one-commit, no-op repeat, redo-discard, and 100-entry
-history-capacity controls.
+Read `free-labels-evidence.json`, `point-geometric-failure.json`,
+`point-geometric-app-failure.json`, `point-geometric-app-lifecycle.json`,
+`point-geometric-app-failure.png`, and all six
+`point-geometric-selection-0001.json` through `0006.json` artifacts.
+The final checkpoint is
+`point-node-geometric-shapes / point-geometric-diamond-observed`.
 
-Add a model/UI regression in `tests/ui/pointStyleClear.test.ts` with a nonempty
-imported layout and a deliberate local axis override, including contextual
-`em`/`ex` metadata. Check explicit axes, minima, anchor, units, and conversion
-contexts survive Clear, undo/redo, and serialization/reload; provenance is
-removed on detach and restored on undo; old snapshots and nested objects stay
-immutable. Reimporting the old style must not modify the detached point.
-Exercise standalone and inline TikZ options without assuming the legacy Size/2
-defaults for a point that has explicit layout axes.
+The selection observations establish this comparison:
 
-Use strict TypeScript without `any` for TypeScript changes. Prefer small,
-testable corrections. Register any new test file in the explicit `npm test`
-list. Add no dependencies for this fix.
+| Native selection | Observation |
+| --- | --- |
+| Ellipse setup, sequence 1, records 0001–0003 | Inspector closed. Center click `(1296.4, 268.975)` reaches the SVG circle owned by `app-point`; trusted pointerdown/up/click are recorded and selection succeeds. |
+| Diamond setup, sequence 2, records 0004–0006 | Inspector open with `No selection`. The same center is covered by the drawer. `elementFromPoint` and all trusted pointerdown/up/click targets are `div.empty-inspector`; selection stays `null`. |
 
-## Preserve the full Phase 32D contract
+The open drawer has screen bounds `x=1227, y=130.375, width=430, height=1170`,
+`pointer-events:auto`, and `z-index:40`. The PNG confirms that it covers the
+point center. Before/after snapshots have viewport `1700×1300`, `scrollY=129`,
+and unchanged point screen CTM scale `3.1` / translation
+`(1296.4, 268.975)`. The layout is `ready`; owner, body request, point request,
+and document revision `10` agree and remain unchanged.
 
-Retain saved envelope version 2, additive optional layout, legacy Size/2
-precedence, ordered shorthand/axis resolution, and per-axis em/ex context.
-Preserve the recorded PGF solvers and anchors, actual body/baseline/depth,
-unsupported-anchor diagnostics, overflow-body picking, separate painted and
-anchor-clearance bounds, authoritative model coordinates, 2D/3D projection,
-and immutable click-time export placement.
+Both setup selections operate on the loaded `circle` with text `native shape`.
+The diamond Shape control is applied only after selection succeeds.
+Therefore this retained failure is not evidence of a diamond solver defect.
+The lifecycle retains the original App page/API without a new navigation,
+crash, or page error. The evidence confirms drawer interception; confirm the
+bounded harness correction below through focused native reproduction.
 
-Do not relax PGF reference tolerances or change geometry to repair a stale
-metadata expectation. The documented diamond outer-separation exception remains
-subject to independent review against its PGF evidence. Preserve both TikZ
-modes, external-source semantics, exact saved text, and the existing font/
-paragraph/TeX-program limitations. Free labels and path inline nodes retain
-their established behavior.
+## Correct selection preparation through native UI
+
+Inspect `scripts/pointGeometricSelection.mjs` and its callers in
+`scripts/checkPointNodeGeometricShapes.mjs` and
+`scripts/checkPointLayoutAnchors.mjs`.
+
+The geometric wrapper opens/expands the Inspector after selection but does not
+close it before the next document's selection. The shared helper currently
+clicks Select, scrolls the canvas into view, measures, and clicks without
+resolving a previously open drawer. Its observer was deliberately diagnostic
+when the interception cause was unconfirmed. The layout/anchor caller already
+uses the real `Close inspector drawer` button before selection.
+
+Implement one small, clearly owned native preparation sequence:
+
+1. Retain an observation of the inherited obstructing drawer state.
+2. If the drawer is open, operate the unique real
+   `Close inspector drawer` button once and verify the drawer is closed/detached
+   through a bounded DOM condition. A closed drawer requires no close action.
+3. Finish the Select/scroll preparation and then obtain fresh body/contour
+   measurements and screen CTMs. Recompute the requested center or boundary
+   from that current geometry after all UI actions that can affect layout.
+4. Check and record the current click target and hit stack before one native
+   canvas click. Preserve the expected `app-point` selection assertion and
+   trusted event observations. The measured boundary input must stay a boundary
+   input in the later interaction scenarios.
+5. After selection succeeds, keep the wrapper's native Inspector reopening and
+   expansion so actual Shape and parameter controls still exercise production
+   handlers.
+
+Place this preparation in the shared helper or a small caller-level path after
+checking both callers. Avoid conflicting duplicate close actions. Verify that
+native drawer operations leave authoritative model coordinates, raw text,
+style, diagram JSON, and history unchanged; UI drawer state is not diagram data.
+
+Preserve observations before assertions, bounded diagnostics, observer cleanup,
+owned events, and primary-error precedence. Record actual event targets and
+composed paths in addition to event type/trust. For initial unselected circle
+setup, require delivery to the intended SVG point rather than accepting an
+already-selected point plus an intercepted click. Later tests may legitimately
+use existing point drag handles; verify their intended production path rather
+than indiscriminately rejecting every target without a point-id attribute.
+
+Do not repair this by changing overlay pointer-events/z-index/event propagation,
+forcing clicks through the drawer, relocating the model point, nudging the
+viewport until a stale coordinate works, selecting through fixture API state,
+dispatching synthetic events, retrying blindly, or adding arbitrary sleeps.
+Keep the actual native contour/owner assertion. Existing overlay interception
+is intentional UI behavior; the demonstrated issue is test preparation.
+
+If a fresh unobstructed click still fails, retain that new before/after trace
+and diagnose its concrete production selection path before changing geometry,
+hit tolerance, or renderer logic. Do not assume every later failure has the
+same cause.
+
+## Regressions and full native coverage
+
+Extend the existing registered selection controls in
+`tests/scripts/phase32cVerification.test.mjs`; there is no need to invent a
+separate unregistered selection test file. Cover reused-page success followed
+by a JSON load that leaves an expanded/no-selection Inspector, one real close
+action, a verified closed state, fresh measurement after closing/scrolling,
+and one native click. Include the already-closed no-op path, failed close or
+detach confirmation, remaining non-drawer obstruction, and primary native/
+assertion errors surviving observation/evidence/cleanup failures.
+
+Use controls that reject stale pre-close coordinates and false success from
+preexisting selection or trusted events delivered only to an overlay. Update
+controlled event records to include intended target/path information. Keep
+these tests explicitly synthetic; they cannot establish browser acceptance.
+
+The real native reproduction must reuse the same App page through ellipse
+success, open Inspector, later JSON loads, and diamond setup. Do not replace
+the cumulative loop with fresh pages that erase the inherited drawer state.
+Then retain every supported shape's default/configured body cases, native
+parameter and cylinder color controls, 2D/3D contour-boundary interactions,
+owner cycling, visibility/lifecycle cases, and actual pending downloads and
+standalone reopening. Keep the complete layout/anchor matrix required as well.
+
+Preserve strict TypeScript without `any`, register any new test file in the
+explicit `npm test` list, and add no dependency for this correction.
+
+## Preserve the Phase 32D geometry and persistence contract
+
+Keep saved envelope version 2, additive layout, legacy Size/2 precedence,
+ordered shorthand/axis resolution, and per-axis em/ex context. Preserve the
+PGF solvers, anchors, body/baseline/depth inputs, unsupported-anchor diagnostics,
+overflow-body picking, distinct painted/anchor-clearance bounds, 2D/3D
+projection, and immutable click-time export placement.
+
+Retain the independent 172-box / 4,925-anchor / 11-failure reference inventory,
+its raw inputs/artifacts, and established tolerances. No reference regeneration
+or geometry change is justified by this intercepted setup click. The documented
+diamond outer-separation exception still requires independent PGF review.
+Preserve both TikZ modes, external source and exact saved text, existing
+typography/paragraph/TeX-program limitations, free labels, and path inline nodes.
 
 ## Fresh verification and parent handoff
 
-Use Node >=22.12.0 through Homebrew. Run focused clear/provenance and policy
-regressions first, then all required commands:
+Use Node >=22.12.0 through Homebrew. Run focused selection/preparation and
+ownership regressions first, then all required commands:
 
 ```bash
 PATH=/opt/homebrew/bin:$PATH npm test
@@ -186,57 +235,54 @@ PATH=/opt/homebrew/bin:$PATH npm run check:label-assets
 PATH=/opt/homebrew/bin:$PATH npm run check:free-labels
 ```
 
-Run focused TypeScript/lint checks for changed TypeScript and syntax checks for
-changed JavaScript. Keep documented baseline lint debt separate from new errors.
-Avoid unrelated cleanup. Required checks that fail or cannot execute remain
-failed/unavailable; do not report them as passed.
+Run focused TypeScript/lint for changed TypeScript and syntax checks for changed
+JavaScript. Report the reproduced baseline script `_role` lint debt separately
+from new errors; avoid unrelated cleanup. Required checks that fail or cannot
+execute remain failed/unavailable.
 
-Run browser acceptance in the browser-capable parent with a fresh owned server
-and supported Playwright/Chrome configuration. A focused reproduction can help
-diagnosis but cannot establish cumulative acceptance. `check:point-native-focused`
-does not run this imported paint workflow; the 32C scoped profile cannot close
-32D. If the child encounters `listen EPERM`, retain that startup failure and hand
-the exact current tree to the parent instead of weakening the sandbox or checks.
+Run browsers in the browser-capable parent with a fresh owned server and
+supported Playwright/Chrome configuration. Focused diagnostics cannot establish
+cumulative acceptance. `check:point-native-focused` does not cover this complete
+geometric-shape workflow; the 32C scoped profile cannot close 32D.
+If the child hits `listen EPERM`, retain that startup failure and hand the exact
+tree to the parent without weakening sandbox or acceptance rules. Do not use
+the old startup restriction to describe the latest native failure.
 
-The parent must load updated policy in a fresh verifier process. Its manual
-verification route can check the preserved dirty tree without committing:
+The parent must load updated policy in a fresh verifier process. The manual
+route checks the preserved dirty tree without committing:
 
 ```bash
 PATH=/opt/homebrew/bin:$PATH node scripts/automation/run-phase.mjs 32D verify
 ```
 
-Do not bypass the ordinary implementation/fix runner's clean-tree guard or
-discard unfinished work to satisfy it. The parent's strict report must require
-all twelve 31F groups, all three 32A groups, the complete 32B paint/import group,
-the 32C shapes group, and `point-node-layout-anchors-combined`.
-Require named terminal scenarios, actual artifacts, no page errors, native
-single/multiple Clear and history/persistence, both TikZ modes, pending
-transparent/white downloads, and downloaded SVG reopening outside the App.
-Keep raw failure evidence and primary errors through bounded diagnostics and
-resource cleanup.
+Preserve the ordinary implementation/fix runner's clean-tree guard. Do not
+reset, discard, stash, commit, or push unfinished work to bypass it. Require all
+twelve 31F groups, three 32A groups, the full 32B paint/import group, 32C shapes,
+and `point-node-layout-anchors-combined`. Require named terminal successes,
+valid artifacts, no page errors, native history/JSON persistence, both TikZ
+modes, actual pending transparent/white downloads, and reopened standalone SVG.
+Keep raw failures through bounded diagnostics and resource cleanup.
 
-If a later assertion fails after this correction, preserve its first failure
-and diagnose that concrete defect before changing production or acceptance.
-Do not skip predecessors, reuse historical/scoped reports, introduce a new
-deferred profile, or relabel unexpected failures as the earlier 32B backlog.
-A new concrete failure keeps strict 32D verification incomplete.
+If a subsequent assertion fails, retain its first evidence and diagnose that
+specific defect. Do not skip predecessors, reuse historical/scoped reports,
+create a deferred 32D profile, or reclassify an unexpected failure as the older
+32B backlog.
 
 ## Independent review and completion
 
-After fresh complete strict parent verification, review the exact matching
-tracked/untracked checkout read-only using `prompts/phase-32d-review.md`.
-Check the actual report and artifacts. Reviewer startup restrictions do not
-require repeating a successful matching parent browser run; missing, stale,
-partial, or failed evidence cannot substitute for it.
+After complete fresh strict parent verification, obtain read-only independent
+review of the exact matching tracked/untracked tree using
+`prompts/phase-32d-review.md`. Inspect the actual report/artifacts.
+A sandboxed reviewer can use genuinely matching accepted parent browser evidence;
+stale, partial, or failed evidence cannot substitute for it.
 
-Update implementation/plan/roadmap status only to the actual verified state.
-Keep Phase 32 incomplete while any required acceptance or independent-review
-gate remains open. Preserve the parent's stop-before-review/commit behavior
-on failed verification and its checkout identity guard after review.
+Update implementation/plan/roadmap status only to observed accepted results.
+Keep Phase 32 incomplete while any required native/download/reference or review
+gate remains open. Preserve stop-before-review/commit on failed verification
+and the parent's checkout identity guard after review.
 
-Report the bounded fix, changed files, focused/full checks, fresh parent evidence
-path and checkout identity, native/download coverage, independent review result,
-and any remaining concrete failure. The implementation child must leave commit
-and push to the existing parent workflow after its verification and review gates
-pass. Do not bypass review or claim completion from child-only or historical
-results.
+Report the bounded preparation fix, changed files, focused/full checks, fresh
+parent evidence and identity, native target/delivery and download coverage,
+review result, and any remaining concrete failure. Leave commit/push to the
+existing parent workflow after verification and review pass. Do not claim
+completion from child-only or historical results.
