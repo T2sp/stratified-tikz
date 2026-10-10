@@ -1,6 +1,38 @@
 # Phase 32 Plan: Point-node math, paint, geometric shapes, and layout
 
-Current 32D implementation (2026-10-09): explicit spacing/minimum/anchor model,
+Current native drag correction (2026-10-09): the inspected checkout starts clean
+at `5021a1d8af30f55fa48b67744f6af77de0f2047d`, with the Clear and shared
+Inspector selection corrections already tracked. The retained `tfTYBh` parent
+passed 5,411 tests/build/diff/label-assets and completed 15 of 18 strict groups.
+All eleven named geometric-shape cases passed. Its first contour interaction
+(2D diamond, source `drag $x_i$`, revision 100) selected correctly, then failed
+with unchanged coordinates after the wrapper reopened the Inspector. The PNG
+shows the drawer over the selected handle; the old collector does not establish
+actual drag target/capture. This is separate from the resolved selection failure.
+
+A scoped native canvas preparation/drag observer now closes an inherited drawer
+once, preserves selected owner/data/history/camera/work plane, freshly verifies
+the connected handle/CTM/hit stack, and retains actual drag delivery/model/history
+before assertions. Both contracts validate raw records, one commit and exact
+Undo/Redo. Layout owner cycling measures after preparation and explicitly checks
+initial-overlap then app-point continuation, matching the production stable-ID
+ordering. Native controls still reopen the Inspector. No production geometry,
+schema, reference, overlay, dependency or acceptance profile changed.
+
+The synthetic controls are separate from native acceptance. Child browser
+attempts again stop before Chrome at fresh-server `listen EPERM`; all eight
+native geometric interactions, complete layout matrix, pending downloads and
+standalone reopening require fresh strict parent verification. Independent
+acceptance review has not started. Phase 32 is **not complete**. Final child
+results, failed attempts and exact tracked/untracked identity are retained in
+`/private/tmp/stz-32d-native-drag-fix-20261009/HANDOFF.md` and the
+[implementation audit](PHASE_32D_IMPLEMENTATION.md).
+The final child full suite passed 5,507/5,507 without failures/skips; focused
+drag/selection/ownership passed 297/297 and runner controls passed 37/37.
+Build, diff and ten changed-script syntax checks passed. No new lint errors;
+the documented four geometric caller errors and verifier `_role` debt remain.
+
+Earlier Inspector-fix record (2026-10-09): explicit spacing/minimum/anchor model,
 ordered unit-aware import and controls, per-shape anchor placement, and strict
 combined verification are present on the current compatible checkout.
 32A and main's later 32B acceptance remain recorded below. This checkout's 32C

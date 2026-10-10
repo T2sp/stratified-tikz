@@ -1,4 +1,5 @@
 import assert from 'node:assert/strict'
+import { assertPointNativeDragEvidence, assertPointCanvasPreparation } from './pointNativeDrag.mjs'
 
 export const layoutAnchorGroup = 'point-node-layout-anchors-combined'
 export const layoutShapes = ['circle', 'rectangle', 'square', 'triangle', 'ellipse', 'diamond', 'regular polygon',
@@ -81,6 +82,45 @@ export function assertObservedPointPlacement(entry) {
   assert.ok(Math.abs(entry.rendered.placedAnchor.x - entry.rendered.placement.x) < .001)
   assert.ok(Math.abs(entry.rendered.placedAnchor.y - entry.rendered.placement.y) < .001)
   assert.equal(entry.modelPositionUnchanged, true)
+}
+export function assertPointOwnerCycleEvidence(entry, selectedId, expectedId) {
+  assert.equal(entry.selectedId, selectedId); assert.equal(entry.expectedId, expectedId)
+  assertPointCanvasPreparation(entry.preparation, selectedId)
+  for (const field of ['json', 'runtimeDiagramJson', 'history', 'selection', 'labelDocumentRevision', 'uiSettings']) {
+    assert.deepEqual(entry.stateBefore[field], entry.preparation.statePrepared[field], `Owner cycling starts from preserved ${field}`)
+  }
+  assert.equal(entry.stateBefore.selection?.kind, 'stratum'); assert.equal(entry.stateBefore.selection.id, selectedId)
+  assert.equal(entry.stateAfter.selection?.kind, 'stratum'); assert.equal(entry.stateAfter.selection.id, expectedId)
+  const runtime = JSON.parse(entry.stateBefore.runtimeDiagramJson)
+  for (const id of [selectedId, expectedId]) assert.ok(runtime.strata.some((point) => point.id === id && point.geometricKind === 'point'))
+  for (const field of ['json', 'runtimeDiagramJson', 'history', 'labelDocumentRevision', 'uiSettings']) {
+    assert.deepEqual(entry.stateAfter[field], entry.stateBefore[field], `Owner cycling preserves raw ${field}`)
+  }
+  assert.deepEqual(entry.secondaryErrors, []); assert.deepEqual(entry.before.errors, [])
+  assert.equal(entry.before.inspector.open, false); assert.equal(entry.droppedEvents, 0)
+  assert.deepEqual(entry.before.selection, entry.stateBefore.selection)
+  assert.deepEqual(entry.before.model, runtime.strata.find((point) => point.id === selectedId))
+  assert.equal(entry.before.labelDocumentRevision, entry.stateBefore.labelDocumentRevision)
+  assert.deepEqual(entry.requestedClick, entry.rendered.boundary)
+  assert.deepEqual(entry.before.requestedClick, entry.requestedClick)
+  const intended = (target) => target?.pointId === selectedId && target.svg === true && target.canvas === true && target.drawer === false
+  assert.ok(intended(entry.before.elementFromPoint), 'Fresh owner-cycle target belongs to the intended point')
+  let previous = -1, pointerId
+  for (const type of ['pointerdown', 'pointerup', 'click']) {
+    const index = entry.events.findIndex((event, index) => index > previous && event.type === type
+      && event.phase === 'owner-cycle' && event.selectedId === selectedId && event.trusted === true && event.altKey === true
+      && event.button === 0 && event.buttons === (type === 'pointerdown' ? 1 : 0)
+      && intended(event.target) && event.path.some((element) => element?.pointId === selectedId)
+      && event.path.some((element) => element?.canvasRoot === true)
+      && Math.abs(event.client.x - entry.requestedClick.x) < 1 && Math.abs(event.client.y - entry.requestedClick.y) < 1
+      && (pointerId === undefined || event.pointerId === pointerId || (type === 'click' && event.pointerId === null)))
+    assert.ok(index >= 0, `Raw trusted owner-cycle ${type} reaches the intended path`)
+    if (type === 'pointerdown') {
+      pointerId = entry.events[index].pointerId; assert.ok(Number.isInteger(pointerId))
+      assert.deepEqual(entry.events[index].selection, entry.stateBefore.selection)
+    }
+    previous = index
+  }
 }
 export function assertLayoutAnchorEvidence(evidence, name) {
   assert.equal(evidence.scenario, name); assert.equal(evidence.group, layoutAnchorGroup); assert.equal(evidence.result, 'passed')
@@ -196,6 +236,22 @@ export function assertLayoutAnchorEvidence(evidence, name) {
     for (const ambientDimension of [2, 3]) for (const shape of ['rectangle', 'circular sector']) {
       const found = evidence.cases.filter((entry) => entry.ambientDimension === ambientDimension && entry.shape === shape)
       assert.equal(found.length, 1); assert.equal(found[0].codim, ambientDimension)
+      const entry = found[0]
+      assertPointNativeDragEvidence(entry.nativeDrag)
+      assert.equal(entry.nativeDrag.id, 'overlap-point'); assert.equal(entry.nativeDrag.scenario, name)
+      assert.deepEqual(entry.nativeDrag.displacement, { x: 22, y: -14 }); assert.equal(entry.nativeDrag.steps, 4)
+      const before = JSON.parse(entry.nativeDrag.stateBefore.runtimeDiagramJson)
+      const after = JSON.parse(entry.nativeDrag.afterAction.state.runtimeDiagramJson)
+      assert.equal(before.ambientDimension, ambientDimension); assert.equal(after.ambientDimension, ambientDimension)
+      assert.deepEqual(entry.before, before.strata.find(({ id }) => id === entry.nativeDrag.id))
+      assert.deepEqual(entry.after, after.strata.find(({ id }) => id === entry.nativeDrag.id))
+      assert.equal(entry.before.style.shape, shape)
+      assert.deepEqual(entry.events, entry.nativeDrag.afterAction.observation.events.filter(({ phase }) => phase === 'drag'))
+      assertPointOwnerCycleEvidence(entry.ownerCycleStart, 'overlap-point', 'overlap-point')
+      assertPointOwnerCycleEvidence(entry.ownerCycle, 'overlap-point', 'app-point')
+      for (const field of ['json', 'runtimeDiagramJson', 'history', 'selection', 'labelDocumentRevision', 'uiSettings']) {
+        assert.deepEqual(entry.ownerCycle.stateBefore[field], entry.ownerCycleStart.stateAfter[field], `Owner-cycle continuation preserves ${field}`)
+      }
       for (const key of ['trustedBoundaryClick', 'trustedDrag', 'anchorStayedAtModel', 'undoRestored', 'redoRestored', 'altCycling', 'lockedUnchanged', 'hiddenAbsent', 'cameraPlacement', 'referenceUnchanged']) assert.equal(found[0][key], true, key)
       const selection = found[0].observed.nativeSelection
       assert.equal(selection.selected.id, selection.id)
@@ -219,6 +275,12 @@ export function assertLayoutAnchorEvidence(evidence, name) {
       assert.ok(Number.isFinite(ring.radius) && Number.isFinite(ring.inkRadius) && ring.inkRadius > 6 && ring.radius >= ring.inkRadius)
       assert.deepEqual(entry.rendered.nativeSelection.requestedClick, entry.rendered.boundary)
       assert.equal(entry.rendered.nativeSelection.selected.id, 'overflow-overlap'); assert.equal(entry.altSelection.id, 'app-point')
+      assertPointOwnerCycleEvidence(entry.ownerCycleStart, 'overflow-overlap', 'overflow-overlap')
+      assertPointOwnerCycleEvidence(entry.ownerCycle, 'overflow-overlap', 'app-point')
+      for (const field of ['json', 'runtimeDiagramJson', 'history', 'selection', 'labelDocumentRevision', 'uiSettings']) {
+        assert.deepEqual(entry.ownerCycle.stateBefore[field], entry.ownerCycleStart.stateAfter[field], `Body owner-cycle continuation preserves ${field}`)
+      }
+      assert.deepEqual(entry.altSelection.events, entry.ownerCycle.events)
       for (const type of ['pointerdown', 'pointerup', 'click']) {
         assert.ok(entry.rendered.nativeSelection.events.some((event) => event.type === type && event.trusted === true))
         assert.ok(entry.altSelection.events.some((event) => event.type === type && event.trusted === true && event.altKey === true))

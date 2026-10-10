@@ -7,18 +7,18 @@ later 32B have historical accepted evidence. The plan still records unaccepted
 fresh strict native/review gates for the merged 32C checkout; implementation
 presence does not close that prerequisite or the final gate.
 
-The latest browser-capable parent's retained `stz-phase32d-before-review-zYGQzv`
-report passed 5,373 tests, build, diff and label-assets, then failed initial
-circle selection while preparing diamond after 15 of 18 groups. The full
-paint/import group, including corrected Clear provenance, passed. Its six
-selection traces show ellipse receiving native SVG point events with the
-Inspector closed, followed by the reused page's open/no-selection Inspector
-intercepting diamond setup at the same screen coordinate. No diamond Shape
-edit had occurred. The bounded harness correction closes that inherited drawer
-through its real control before fresh measurement and one native canvas click.
-This failed parent report diagnoses preparation only; complete current-tree
-native/download verification and subsequent independent review remain open.
-The prior Clear correction and its exact layout/unit/context comparisons remain.
+The latest browser-capable parent's retained `stz-phase32d-before-review-tfTYBh`
+report passed 5,411 tests, build, diff and label-assets, then failed the first
+2D diamond contour drag after 15 of 18 groups. The full paint/import group,
+including corrected Clear provenance, and all eleven named geometric-shape
+cases passed. Contour selection succeeded; the wrapper then reopened the
+Inspector over the selected handle center. Its old type/trust-only collector
+does not establish actual drag delivery. The new scoped preparation closes the
+drawer, verifies fresh handle geometry/hits and retains drag/capture/history
+records before assertions. This retained failure cannot establish complete
+current-tree native/download acceptance or justify a production geometry change.
+The completed Clear/selection corrections and exact layout/unit/context
+comparisons remain. Earlier failure/fix records are retained below.
 
 ## Model, grammar, and compatibility
 
@@ -357,3 +357,98 @@ diff, inventory preservation and final tracked/untracked identity are under
 this final documentation update and are diagnostic only. The handoff identifies
 the exact final tree for fresh parent verification via `32D verify`, then
 matching read-only review. Phase 32 remains incomplete; no commit/push occurred.
+
+## Native handle drag preparation and evidence correction (2026-10-09)
+
+The actual clean starting checkout is `5021a1d8af30f55fa48b67744f6af77de0f2047d`
+on `phase/32d-margin-minsize-anchor`, fingerprint
+`aede7a853e745cf873b97a6d8ff3fd035c5786c55ae28c9f50906e342a9c2bcb`.
+It already tracks the previous six-file Inspector handoff and completed Clear
+correction. The actual initial/final identities are retained externally; no old
+fingerprint is used as an acceptance constant.
+
+The latest retained browser-capable parent `tfTYBh` passed 5,411 tests,
+build/diff/label-assets, the full paint/import group and all eleven named shape
+cases. It completed 15/18 cumulative groups and failed the first contour drag:
+2D diamond, codim 2, aspect 1.8, exact source `drag $x_i$`, owner/revision 100.
+Selection observations 0056–0060 show trusted intended contour selection and
+exact state preservation across Inspector reopening. The handle center near
+`(1296.4,268.975)` is covered by the reopened drawer in the failure PNG. The old
+drag collector mixes selection/setup events, retains only type/trust, and is
+read/removed after the movement assertion. Actual drag target/path/capture is
+unproven. This diagnoses a harness preparation gap, not a demonstrated production
+pointer-controller defect or failure of every 2D/3D drag.
+
+`scripts/pointNativeDrag.mjs` owns a bounded observer before preparation. It uses
+one unique real Inspector Close control if open, verifies detachment and the
+closed opener, preserves exact saved/runtime JSON, selection, history, revision
+and UI settings, then performs native Select/scroll. It measures connected
+selected point-position handle bounds/local center/screen CTM and current hit
+stack afterwards. The handle is outside `data-point-id`; selected owner, its
+actual handle group/path and model name establish ownership. Pointerdown retains
+its current CTM/local bounds/center/hit target. Preparation retains viewport,
+scroll, camera and active work-plane controls/status.
+
+The geometric and layout callers keep their original `(+28,-16)` and `(+22,-14)`
+four-step native drags. Scoped phases distinguish setup, drag, Undo/Redo and
+cleanup. Raw targets/composed paths, trust, pointer IDs/buttons/client positions,
+capture transitions and post-handler capture states precede movement assertions.
+Capture-phase down need not show capture before the handler. Matching captured
+move/up on the owned SVG root is valid; unrelated targets/owners/pointers,
+cancellation, untrusted input and unchanged coordinates fail. Event coordinates
+permit only .05 CSS px browser quantization; requested coordinates and CTM-derived
+geometry remain exact. This does not change PGF reference tolerances.
+
+Both independently loaded contracts validate the raw delivery, actual selected
+position delta, unchanged other data/camera, exact one bounded history commit,
+and native Undo/Redo JSON/history restoration. Summary booleans cannot supply
+missing records. Observations/artifact/cleanup failures remain secondary to the
+first action/assertion failure; every owned observer is removed on exit, and
+duplicate installation cannot remove another owner's observer.
+
+Layout contour/body owner cycling now closes/prepares before fresh measurements
+and retains actual owner events/selection/data/history. Production sorts identical
+equal-distance point candidates by stable ID; a null cycle starts at index 1.
+The explicitly planned first Alt action therefore asserts the overlap owner,
+then the continuation asserts `app-point`, freshly measuring each action and
+aborting on the first failure. The pure production ordering regression and raw
+owner-cycle rejection controls document this correction; no blind retry or
+production selection change is included. Shape/parameter Inspector reopening
+remains native. Locked clicks also measure after Select/scroll.
+
+The registered 64-case helper suite and extended 32C/32D policy suites are
+explicitly synthetic. Existing 46 selection controls are preserved. Controls
+cover inherited reopening/one close/closed no-op, stale/missing/detached/wrong
+geometry and obstructions, trusted handle plus captured root continuation,
+contaminated selection/fabricated flags, pointer/owner/capture/cancellation errors,
+unchanged/camera-only/other-point changes, history capacity and exact Undo/Redo,
+and primary-error precedence. The isolated runner fixture copies the new
+transitive validator dependency; its initial missing-module failure is retained.
+
+No model, solver, rendering, overlay behavior, saved schema, PGF input/artifact,
+TikZ generation, dependency or verification profile changes. The independent
+172-box / 4,925-anchor / 11-failure inventory is preserved. The diamond
+outer-separation exception still needs independent PGF review. Final checks and
+complete diff/inventory are retained under
+`/private/tmp/stz-32d-native-drag-fix-20261009/`.
+
+Final child checks used Homebrew-first Node v26.9.0: full `npm test` passed
+5,507/5,507 with no failures/skips, combined drag/selection/ownership controls
+passed 297/297 and isolated runner controls passed 37/37. The first full run's
+37 missing-module fixture failures remain in `npm-test-initial.log`; the
+corrected fixture copy list passed the complete rerun. Build and diff checks
+passed. Ten changed scripts passed syntax; recommended script lint has no new
+errors. The geometric caller's four `no-unsafe-finally` errors and unchanged
+verifier's unused `_role` error reproduce from HEAD. Overall lint attempts
+including that baseline debt remain failed, not lint passes.
+
+Both required child browser commands failed at fresh owned-server `listen EPERM`
+before Chrome; label-assets passed its static graph only. Free-labels retained
+strict mode and zero completed groups. These startup failures are distinct from
+the parent's real first diamond drag failure. Fresh handle/capture/history
+observations, all eight contour interactions, full layout/anchor matrix, native
+JSON/TikZ persistence, actual pending transparent/white downloads and standalone
+reopening remain required in the browser-capable parent. No independent
+acceptance review began. Use a fresh `32D verify` process on the exact final
+dirty tree, then matching read-only review only after complete accepted evidence.
+Phase 32 remains incomplete; commit/push remain with the parent workflow.

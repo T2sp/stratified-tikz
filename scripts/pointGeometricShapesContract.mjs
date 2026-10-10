@@ -1,4 +1,5 @@
 import assert from 'node:assert/strict'
+import { assertPointNativeDragEvidence } from './pointNativeDrag.mjs'
 
 export const geometricShapeGroup = 'point-node-geometric-shapes'
 export const geometricShapeManifest = [
@@ -78,8 +79,21 @@ export function assertGeometricShapeEvidence(evidence, name) {
   } else if (name === 'point-geometric-native-contours-2d-3d') {
     assert.equal(evidence.cases.length, 8)
     for (const dimension of [2, 3]) for (const shape of ['diamond', 'star', 'semicircle', 'dart']) {
-      const entry = evidence.cases.find((item) => item.ambientDimension === dimension && item.shape === shape)
-      assert.ok(entry); assert.equal(entry.codim, dimension); assert.equal(entry.selected, true)
+      const found = evidence.cases.filter((item) => item.ambientDimension === dimension && item.shape === shape)
+      assert.equal(found.length, 1, `Unique native geometric interaction ${dimension}/${shape}`)
+      const entry = found[0]
+      assert.equal(entry.codim, dimension); assert.equal(entry.selected, true)
+      assertPointNativeDragEvidence(entry.nativeDrag)
+      assert.equal(entry.nativeDrag.id, 'app-point')
+      assert.equal(entry.nativeDrag.scenario, name)
+      assert.deepEqual(entry.nativeDrag.displacement, { x: 28, y: -16 }); assert.equal(entry.nativeDrag.steps, 4)
+      const before = JSON.parse(entry.nativeDrag.stateBefore.runtimeDiagramJson)
+      const after = JSON.parse(entry.nativeDrag.afterAction.state.runtimeDiagramJson)
+      assert.equal(before.ambientDimension, dimension); assert.equal(after.ambientDimension, dimension)
+      assert.deepEqual(entry.before, before.strata.find(({ id }) => id === entry.nativeDrag.id))
+      assert.deepEqual(entry.after, after.strata.find(({ id }) => id === entry.nativeDrag.id))
+      assert.equal(entry.before.style.shape, shape); assert.equal(entry.observed.shape, shape)
+      assert.deepEqual(entry.events, entry.nativeDrag.afterAction.observation.events.filter(({ phase }) => phase === 'drag'))
       assert.equal(entry.trustedDown, true); assert.equal(entry.trustedMove, true); assert.equal(entry.dragged, true)
       assert.equal(entry.undoRestored, true); assert.equal(entry.redoRestored, true)
     }

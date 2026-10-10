@@ -9,6 +9,7 @@ import { ownPageEvent } from './ownedPageEvent.mjs'
 import { resolvePointInspectorField } from './pointInspectorFields.mjs'
 import { boundedPointDiagnostic, createPointDiagnostics } from './pointCheckDiagnostics.mjs'
 import { selectGeometricPoint } from './pointGeometricSelection.mjs'
+import { dragSelectedPoint } from './pointNativeDrag.mjs'
 
 const paint = { text: { color: '#000000', opacity: 1 }, fill: { enabled: true, color: '#e0f0ff', opacity: 1 },
   stroke: { enabled: true, color: '#203040', opacity: 1, width: .4, lineStyle: 'solid', dashPhase: 0, lineCap: 'butt', lineJoin: 'miter' } }
@@ -60,6 +61,7 @@ export async function runPointNodeGeometricShapeChecks({ browser, origin, artifa
   let scenario = 'point-geometric-ellipse', primary
   let selectionSequence = 0
   const selectionDiagnostic = createPointDiagnostics({ artifactDir, observe, artifactPrefix: 'point-geometric-selection' })
+  const dragDiagnostic = createPointDiagnostics({ artifactDir, observe, artifactPrefix: 'point-geometric-drag' })
   const waits = [], held = new Set()
   const state = () => app.readState()
   const settle = () => page.waitForFunction(() => !document.querySelector('[data-label-state="pending"]'), undefined, { timeout: 30_000 })
@@ -212,26 +214,15 @@ export async function runPointNodeGeometricShapeChecks({ browser, origin, artifa
     for (const ambientDimension of [2, 3]) for (const shape of ['diamond', 'star', 'semicircle', 'dart']) {
       const spec = geometricShapeManifest.find((entry) => entry.shape === shape)
       await load(JSON.stringify(await document(spec, 'drag $x_i$', ambientDimension, true))); await settle()
-      await page.evaluate(() => {
-        window.__stzGeometricPointer = []
-        window.__stzGeometricListener = (event) => window.__stzGeometricPointer.push({ type: event.type, trusted: event.isTrusted })
-        for (const type of ['pointerdown', 'pointermove']) document.addEventListener(type, window.__stzGeometricListener, true)
-      })
       const observed = await select('app-point', true), before = (await model()).strata[0]
-      const handle = await page.locator('[aria-label="Selected point drag handles"] circle').first().boundingBox()
-      assert.ok(handle, 'Native point drag handle exists')
-      const x = handle.x + handle.width / 2, y = handle.y + handle.height / 2
-      await page.mouse.move(x, y); await page.mouse.down(); await page.mouse.move(x + 28, y - 16, { steps: 4 }); await page.mouse.up()
+      const nativeDrag = await dragSelectedPoint({ page, readState: state,
+        diagnose: (details) => dragDiagnostic(group, scenario, details), secondaryErrors: pageErrors,
+        scenario, sequence: selectionSequence, id: 'app-point', displacement: { x: 28, y: -16 }, steps: 4 })
       const after = (await model()).strata[0]
-      assert.notDeepEqual(after.position, before.position)
-      await page.getByRole('button', { name: 'Undo last diagram change', exact: true }).click()
-      const undoRestored = JSON.stringify((await model()).strata[0].position) === JSON.stringify(before.position)
-      await page.getByRole('button', { name: 'Redo last undone diagram change', exact: true }).click()
-      const redoRestored = JSON.stringify((await model()).strata[0].position) === JSON.stringify(after.position)
-      const events = await page.evaluate(() => { for (const type of ['pointerdown', 'pointermove']) document.removeEventListener(type, window.__stzGeometricListener, true); return window.__stzGeometricPointer })
-      interactions.push({ ambientDimension, shape, codim: before.codim, selected: true, observed, before, after, events,
+      const events = nativeDrag.afterAction.observation.events.filter(({ phase }) => phase === 'drag')
+      interactions.push({ ambientDimension, shape, codim: before.codim, selected: true, observed, before, after, events, nativeDrag,
         trustedDown: events.some(({ type, trusted }) => type === 'pointerdown' && trusted), trustedMove: events.some(({ type, trusted }) => type === 'pointermove' && trusted),
-        dragged: true, undoRestored, redoRestored })
+        dragged: true, undoRestored: true, redoRestored: true })
     }
     await save({ cases: interactions })
 

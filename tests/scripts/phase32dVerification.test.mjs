@@ -9,6 +9,8 @@ import { layoutAnchorGroup, layoutAnchorScenarios, layoutAnchorArtifacts, layout
 import { pointNodeAnchorSupport } from '../../src/geometry/pointNodeShapes/index.ts'
 import { createEmptyDiagram, createPointStratum } from '../../src/model/constructors.ts'
 import { generateTikz } from '../../src/tikz/generateTikz.ts'
+import { syntheticPointNativeDragEvidence } from './pointNativeDragFixture.mjs'
+import { compareSvgPreviewSelectionCandidates, nextSvgPreviewSelectionCycle } from '../../src/rendering/svgHitTesting.ts'
 
 function placement(shape = 'rectangle', anchor = 'base east', extra = {}) {
   return { result: 'passed', source: '$x_i$', shape, anchor, modelPositionUnchanged: true, rendered: {
@@ -29,6 +31,34 @@ function unsupportedNativeCases() {
         events: ['pointerdown', 'pointerup', 'click'].map((type) => ({ type, trusted: true, x: rendered[`${kind}Click`].screen.x, y: rendered[`${kind}Click`].screen.y })) })) }
   }))
 }
+function syntheticOwnerCycle(selectedId, expectedId, initial = false) {
+  const raw = syntheticPointNativeDragEvidence({ id: selectedId })
+  const target = { tag: 'path', pointId: selectedId, drawer: false, svg: true, canvas: true }, client = { x: 200, y: 300 }
+  const selection = { kind: 'stratum', id: selectedId }, stateBefore = structuredClone(raw.stateBefore)
+  const runtime = JSON.parse(stateBefore.runtimeDiagramJson)
+  runtime.strata.push({ ...structuredClone(runtime.strata[0]), id: 'app-point' })
+  stateBefore.runtimeDiagramJson = JSON.stringify(runtime)
+  stateBefore.json = JSON.stringify({ version: 2, diagram: runtime })
+  stateBefore.history = JSON.stringify({ past: [], present: runtime, future: [] })
+  const preparation = structuredClone(raw.preparation)
+  for (const key of ['stateBefore', 'stateAfter', 'statePrepared']) preparation[key] = stateBefore
+  return { selectedId, expectedId, preparation, stateBefore, stateAfter: { ...stateBefore, selection: { kind: 'stratum', id: initial ? selectedId : expectedId } },
+    secondaryErrors: [], droppedEvents: 0, requestedClick: client, rendered: { boundary: client },
+    before: { errors: [], inspector: { open: false }, selection, elementFromPoint: target,
+      model: runtime.strata[0], labelDocumentRevision: stateBefore.labelDocumentRevision, requestedClick: client },
+    events: ['pointerdown', 'pointerup', 'click'].map((type) => ({ phase: 'owner-cycle', selectedId, type, trusted: true,
+      altKey: true, pointerId: 1, button: 0, buttons: type === 'pointerdown' ? 1 : 0, client, target, selection,
+      path: [target, { canvasRoot: true }] })) }
+}
+test('synthetic equal-distance point owner cycling records initial overlap then app-point continuation', () => {
+  for (const overlap of ['overlap-point', 'overflow-overlap']) {
+    const candidates = [overlap, 'app-point'].map((id) => ({ kind: 'point', id, stableId: `point:${id}`, distance: 0,
+      selection: { kind: 'stratum', id }, description: id })).sort(compareSvgPreviewSelectionCandidates)
+    const first = nextSvgPreviewSelectionCycle(null, { x: 3, y: 3 }, candidates)
+    assert.equal(first.candidate.id, overlap)
+    assert.equal(nextSvgPreviewSelectionCycle(first.state, { x: 3, y: 3 }, candidates).candidate.id, 'app-point')
+  }
+})
 function evidence(name) {
   const common = { scenario: name, group: layoutAnchorGroup, result: 'passed', pageErrors: [] }
   if (name === 'point-layout-per-shape-spacing-minima') return { ...common,
@@ -52,13 +82,21 @@ function evidence(name) {
       events: [{ type: 'input', trusted: true, value: key === 'anchor' ? 'base east' : '2' }], value: key === 'anchor' ? 'base east' : '2', expected: key === 'anchor' ? 'base east' : '2',
       modelValue: key === 'anchor' ? 'base east' : 2, expectedModel: key === 'anchor' ? 'base east' : 2, requestsUnchanged: true })) }
   if (name === 'point-layout-native-interaction-2d-3d') return { ...common,
-    cases: [2, 3].flatMap((ambientDimension) => ['rectangle', 'circular sector'].map((shape) => ({ ambientDimension, shape, codim: ambientDimension,
+    cases: [2, 3].flatMap((ambientDimension) => ['rectangle', 'circular sector'].map((shape) => {
+      const nativeDrag = syntheticPointNativeDragEvidence({ scenario: name, ambientDimension, shape,
+        id: 'overlap-point', displacement: { x: 22, y: -14 }, steps: 4 })
+      return { ambientDimension, shape, codim: ambientDimension, nativeDrag,
+      ownerCycleStart: syntheticOwnerCycle('overlap-point', 'overlap-point', true), ownerCycle: syntheticOwnerCycle('overlap-point', 'app-point'),
+      before: JSON.parse(nativeDrag.stateBefore.runtimeDiagramJson).strata[0],
+      after: JSON.parse(nativeDrag.afterAction.state.runtimeDiagramJson).strata[0],
       trustedBoundaryClick: true, trustedDrag: true, anchorStayedAtModel: true, undoRestored: true, redoRestored: true, altCycling: true, lockedUnchanged: true, hiddenAbsent: true, cameraPlacement: true, referenceUnchanged: true,
       observed: { boundary: { x: 200, y: 300 }, nativeSelection: { id: 'overlap-point', selected: { id: 'overlap-point' }, requestedClick: { x: 200, y: 300 }, events: ['pointerdown', 'pointerup', 'click'].map((type) => ({ type, trusted: true })) } },
-      events: ['pointerdown', 'pointermove'].map((type) => ({ type, trusted: true })), referenceCode: String.raw`\node at (LayoutReference) {$x_i$};` }))),
+      events: nativeDrag.afterAction.observation.events.filter(({ phase }) => phase === 'drag'), referenceCode: String.raw`\node at (LayoutReference) {$x_i$};` } })),
     bodyOverflowCases: [2, 3].map((ambientDimension) => {
-      const entry = placement('rectangle', 'base east', { ambientDimension, layout: { innerXSep: -15 }, diagramUnchanged: true,
-        altSelection: { id: 'app-point', events: ['pointerdown', 'pointerup', 'click'].map((type) => ({ type, trusted: true, altKey: true })) } })
+      const ownerCycle = syntheticOwnerCycle('overflow-overlap', 'app-point')
+      const entry = placement('rectangle', 'base east', { ambientDimension, layout: { innerXSep: -15 }, diagramUnchanged: true, ownerCycle,
+        ownerCycleStart: syntheticOwnerCycle('overflow-overlap', 'overflow-overlap', true),
+        altSelection: { id: 'app-point', events: ownerCycle.events } })
       Object.assign(entry.rendered, { boundary: { x: 200, y: 300 }, nativeSelection: { id: 'overflow-overlap', selected: { id: 'overflow-overlap' }, requestedClick: { x: 200, y: 300 }, events: ['pointerdown', 'pointerup', 'click'].map((type) => ({ type, trusted: true })) },
         bodyOverflow: { localBodyClick: { x: 2, y: 3 }, characterBounds: { x: 0, y: 0, width: 5, height: 6 }, clickInContour: { x: -30, y: 0 }, contourBounds: { x: -20, y: -10, width: 40, height: 20 }, distance: 10, selectionRing: { radius: 50, inkRadius: 45 } } })
       return entry
@@ -171,6 +209,32 @@ for (const fault of ['untrusted-boundary', 'untrusted-drag', 'wrong-boundary', '
     if (fault === 'untrusted-drag') first.events[0].trusted = false
     if (fault === 'wrong-boundary') first.observed.nativeSelection.requestedClick.x += 1
     if (fault === 'reference-detached') first.referenceCode = String.raw`\node at (3,3) {$x_i$};`
+    assert.throws(() => assertLayoutAnchorEvidence(current, name))
+  })
+}
+for (const fault of ['flags-only', 'earlier-selection', 'overlay-input', 'wrong-drag-owner', 'unchanged-position', 'bad-drag-history', 'bad-drag-undo']) {
+  test(`synthetic 32D raw drag policy rejects ${fault} despite trustedDrag flag`, () => {
+    const name = 'point-layout-native-interaction-2d-3d', current = evidence(name), first = current.cases[0], raw = first.nativeDrag
+    if (fault === 'flags-only') delete first.nativeDrag
+    if (fault === 'earlier-selection') raw.afterAction.observation.events.forEach((event) => { event.phase = 'selection' })
+    if (fault === 'overlay-input') raw.afterAction.observation.events.find(({ type }) => type === 'pointerdown').target = { drawer: true, svg: false }
+    if (fault === 'wrong-drag-owner') raw.id = 'app-point'
+    if (fault === 'unchanged-position') raw.afterAction.state.runtimeDiagramJson = raw.stateBefore.runtimeDiagramJson
+    if (fault === 'bad-drag-history') raw.afterAction.state.history = raw.stateBefore.history
+    if (fault === 'bad-drag-undo') raw.undo.stateAfter.runtimeDiagramJson = raw.afterAction.state.runtimeDiagramJson
+    assert.throws(() => assertLayoutAnchorEvidence(current, name))
+  })
+}
+for (const fault of ['stale-coordinate', 'wrong-next-owner', 'earlier-selection', 'overlay-only', 'wrong-pointer', 'model-edit', 'unclosed-drawer']) {
+  test(`synthetic 32D owner-cycle policy rejects ${fault}`, () => {
+    const name = 'point-layout-native-interaction-2d-3d', current = evidence(name), cycle = current.cases[0].ownerCycle
+    if (fault === 'stale-coordinate') cycle.requestedClick = { x: 199, y: 300 }
+    if (fault === 'wrong-next-owner') cycle.stateAfter.selection.id = 'overlap-point'
+    if (fault === 'earlier-selection') cycle.events.forEach((event) => { event.phase = 'selection' })
+    if (fault === 'overlay-only') cycle.events.forEach((event) => { event.target = { drawer: true, svg: false } })
+    if (fault === 'wrong-pointer') cycle.events[1].pointerId = 2
+    if (fault === 'model-edit') cycle.stateAfter.json += 'changed'
+    if (fault === 'unclosed-drawer') cycle.preparation.closed.inspector.open = true
     assert.throws(() => assertLayoutAnchorEvidence(current, name))
   })
 }

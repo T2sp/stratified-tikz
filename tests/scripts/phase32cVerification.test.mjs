@@ -14,6 +14,7 @@ import { geometricShapeManifest, geometricBodyVariants, geometricShapeScenarios,
 import { syntheticMechanismEvidence } from './pointDashCapMechanismFixture.mjs'
 import { selectGeometricPoint, installGeometricSelectionObserver, observeGeometricSelection,
   removeGeometricSelectionObserver } from '../../scripts/pointGeometricSelection.mjs'
+import { syntheticPointNativeDragEvidence } from './pointNativeDragFixture.mjs'
 
 // These preparation and event-delivery controls are explicitly synthetic. They
 // exercise ordering/error ownership; the reused native App shape loop is the
@@ -404,6 +405,62 @@ function shapeEvidence(spec) {
       rendered: { shape: spec.shape, parameters: mode === 'configured' ? spec.parameters : {}, source, state: 'ready', contourLength: 20,
         bounds: { x: -10, y: -10, width: 20, height: 20 }, math: ['math', 'mixed'].includes(key) ? 1 : 0, bodyUpright: true,
         bodyCorners: source ? Array.from({ length: 4 }, () => ({ x: 0, y: 0, inside: true })) : [] } }))) }
+}
+
+// Policy controls are fabricated records, separate from cumulative native App
+// acceptance. A success flag cannot supply missing handle delivery/history.
+function geometricInteractionEvidence() {
+  const scenario = 'point-geometric-native-contours-2d-3d'
+  return { scenario, group: geometricShapeGroup, result: 'passed', pageErrors: [],
+    cases: [2, 3].flatMap((ambientDimension) => ['diamond', 'star', 'semicircle', 'dart'].map((shape) => {
+      const nativeDrag = syntheticPointNativeDragEvidence({ scenario, ambientDimension, shape,
+        id: 'app-point', displacement: { x: 28, y: -16 }, steps: 4 })
+      return { ambientDimension, shape, codim: ambientDimension, nativeDrag,
+        observed: { shape }, before: JSON.parse(nativeDrag.stateBefore.runtimeDiagramJson).strata[0],
+        after: JSON.parse(nativeDrag.afterAction.state.runtimeDiagramJson).strata[0],
+        events: nativeDrag.afterAction.observation.events.filter(({ phase }) => phase === 'drag'),
+        selected: true, trustedDown: true, trustedMove: true, dragged: true, undoRestored: true, redoRestored: true }
+    })) }
+}
+test('synthetic 32C policy requires eight raw handle drags and exact history restorations', () => {
+  const evidence = geometricInteractionEvidence()
+  assertGeometricShapeEvidence(evidence, evidence.scenario)
+})
+for (const fault of ['flags-only', 'selection-events', 'overlay-down', 'wrong-owner', 'wrong-pointer',
+  'untrusted-down', 'cancelled', 'no-model-movement', 'camera-only', 'extra-history-commit',
+  'bad-undo', 'bad-redo', 'wrong-displacement', 'wrong-steps', 'different-summary', 'duplicate-case']) {
+  test(`synthetic 32C raw drag policy rejects ${fault} despite fabricated success booleans`, () => {
+    const evidence = geometricInteractionEvidence(), entry = evidence.cases[0], raw = entry.nativeDrag
+    const events = raw.afterAction.observation.events
+    const down = events.find(({ type, phase }) => type === 'pointerdown' && phase === 'drag')
+    const up = events.find(({ type, phase }) => type === 'pointerup' && phase === 'drag')
+    if (fault === 'flags-only') delete entry.nativeDrag
+    if (fault === 'selection-events') events.forEach((event) => { event.phase = 'selection' })
+    if (fault === 'overlay-down') down.target = { drawer: true, svg: false, canvas: false }
+    if (fault === 'wrong-owner') raw.id = 'another-point'
+    if (fault === 'wrong-pointer') up.pointerId += 1
+    if (fault === 'untrusted-down') down.trusted = false
+    if (fault === 'cancelled') events.push({ ...up, type: 'pointercancel' })
+    if (fault === 'no-model-movement' || fault === 'camera-only') {
+      raw.afterAction.state.runtimeDiagramJson = raw.stateBefore.runtimeDiagramJson
+      raw.afterAction.state.json = raw.stateBefore.json
+      if (fault === 'camera-only') {
+        const model = JSON.parse(raw.afterAction.state.runtimeDiagramJson); model.camera = { mode: '2d', zoom: 99 }
+        raw.afterAction.state.runtimeDiagramJson = JSON.stringify(model)
+      }
+    }
+    if (fault === 'extra-history-commit') {
+      const history = JSON.parse(raw.afterAction.state.history); history.past.push(history.present)
+      raw.afterAction.state.history = JSON.stringify(history)
+    }
+    if (fault === 'bad-undo') raw.undo.stateAfter.json = raw.afterAction.state.json
+    if (fault === 'bad-redo') raw.redo.stateAfter.json = raw.stateBefore.json
+    if (fault === 'wrong-displacement') raw.displacement.x += 1
+    if (fault === 'wrong-steps') raw.steps = 1
+    if (fault === 'different-summary') entry.before.position.x += 1
+    if (fault === 'duplicate-case') evidence.cases[1] = structuredClone(entry)
+    assert.throws(() => assertGeometricShapeEvidence(evidence, evidence.scenario))
+  })
 }
 
 test('32C profile is explicit, phase-specific, and never an alias for strict', () => {

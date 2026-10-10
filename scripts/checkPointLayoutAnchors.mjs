@@ -8,7 +8,8 @@ import { layoutImportCases as importCases } from './pointLayoutAnchorsContract.m
 import { createOwnedAppPage } from './ownedAppPage.mjs'
 import { ownPageEvent } from './ownedPageEvent.mjs'
 import { resolvePointInspectorField } from './pointInspectorFields.mjs'
-import { selectGeometricPoint } from './pointGeometricSelection.mjs'
+import { observeGeometricSelection, selectGeometricPoint } from './pointGeometricSelection.mjs'
+import { dragSelectedPoint, prepareSelectedPointCanvas } from './pointNativeDrag.mjs'
 import { boundedPointDiagnostic, createPointDiagnostics } from './pointCheckDiagnostics.mjs'
 import { saveAppJson } from './appJsonPersistence.mjs'
 import { observePointLiteral, assertPositionedLiteral } from './pointLiteralOracle.mjs'
@@ -114,6 +115,101 @@ export async function runPointLayoutAnchorChecks({ browser, origin, artifactDir,
       assert.equal(afterInspector[field], beforeInspector[field], `Native Inspector reopening preserves ${field}`)
     }
     return rendered
+  }
+  async function cycleOwner(selectedId, expectedId, observePoint = observeLayoutPoint) {
+    const sequence = ++selectionSequence, token = `${scenario}:owner-cycle:${sequence}:${selectedId}`
+    const entry = { selectedId, expectedId, sequence, secondaryErrors: [] }
+    let cyclePrimary, installed = false
+    const retain = async (name, operation) => {
+      try { return await boundedPointDiagnostic(operation, `Layout owner cycling ${name}`) }
+      catch (error) {
+        entry.secondaryErrors.push({ name, message: error.message })
+        pageErrors.push(`Layout owner cycling ${name}: ${error.message}`)
+      }
+    }
+    try {
+      entry.preparation = await prepareSelectedPointCanvas({ page, readState: state,
+        diagnose: (details) => diagnostic(group, scenario, details), secondaryErrors: pageErrors,
+        scenario, sequence, id: selectedId })
+      await page.evaluate(({ token, selectedId }) => {
+        const registry = window.__stzLayoutOwnerCycles ??= new Map()
+        if (registry.has(token)) throw new Error(`Owner-cycle observer already owned: ${token}`)
+        const describe = (element) => element instanceof Element ? {
+          tag: element.localName, pointId: element.closest('[data-point-id]')?.getAttribute('data-point-id') ?? null,
+          drawer: !!element.closest('#preview-inspector-drawer'), svg: element instanceof SVGElement,
+          canvas: !!element.closest('svg.svg-diagram'), canvasRoot: element.matches('svg.svg-diagram'),
+          pointHandle: element.matches('circle.svg-geometry-handle') && !!element.closest('[aria-label="Selected point drag handles"]'),
+        } : null
+        const owned = { events: [], droppedEvents: 0 }
+        owned.listener = (event) => {
+          if (owned.events.length === 16) { owned.droppedEvents++; return }
+          owned.events.push({ phase: 'owner-cycle', selectedId, type: event.type, trusted: event.isTrusted,
+            altKey: event.altKey, pointerId: event.pointerId ?? null, button: event.button, buttons: event.buttons,
+            client: { x: event.clientX, y: event.clientY }, target: describe(event.target),
+            path: event.composedPath().slice(0, 16).map(describe), selection: window.stzAppLabels.state().selection })
+        }
+        registry.set(token, owned)
+        for (const type of ['pointerdown', 'pointerup', 'click']) document.addEventListener(type, owned.listener, true)
+      }, { token, selectedId })
+      installed = true
+      entry.stateBefore = await state()
+      // The selection wrapper has reopened the Inspector. Preparation above
+      // closes it and completes native mode/scroll changes before this measure.
+      entry.rendered = await observePoint(page, selectedId)
+      assert.ok(entry.rendered, 'Owner cycling has connected freshly measured point geometry')
+      entry.requestedClick = entry.rendered.boundary
+      entry.before = await page.evaluate(observeGeometricSelection, { id: selectedId, click: entry.requestedClick, token: null })
+      await retain('before evidence', () => diagnostic(group, scenario, { boundary: 'before-native-owner-cycle', ownerCycle: entry }))
+      assert.deepEqual(entry.before.errors, [], 'Owner-cycle geometry observation is complete')
+      assert.equal(entry.before.inspector.open, false, 'Owner cycling starts with a closed Inspector')
+      assert.equal(entry.stateBefore.selection?.id, selectedId, 'Owner cycling begins with the selected owner')
+      const intended = (target) => target?.pointId === selectedId && target.svg === true && target.canvas === true && target.drawer === false
+      assert.ok(intended(entry.before.elementFromPoint), 'Fresh owner-cycle click reaches the intended SVG point')
+      try {
+        await page.keyboard.down('Alt')
+        await page.mouse.click(entry.requestedClick.x, entry.requestedClick.y)
+      } catch (error) { cyclePrimary = error }
+      entry.stateAfter = await retain('after state', state)
+      const retained = await retain('after events', () => page.evaluate((token) => {
+        const owned = window.__stzLayoutOwnerCycles?.get(token)
+        return owned ? { events: [...owned.events], droppedEvents: owned.droppedEvents } : null
+      }, token))
+      if (retained) Object.assign(entry, retained)
+      await retain('after evidence', () => diagnostic(group, scenario, { boundary: 'after-native-owner-cycle-before-assertion', ownerCycle: entry }))
+      if (cyclePrimary) throw cyclePrimary
+      assert.equal(entry.stateAfter?.selection?.id, expectedId, 'Alt cycles to the actual next owner')
+      for (const field of ['json', 'runtimeDiagramJson', 'history', 'labelDocumentRevision']) {
+        assert.deepEqual(entry.stateAfter[field], entry.stateBefore[field], `Owner cycling preserves ${field}`)
+      }
+      assert.equal(entry.droppedEvents, 0, 'All native owner-cycle events were retained')
+      let previous = -1, pointerId
+      for (const type of ['pointerdown', 'pointerup', 'click']) {
+        const index = entry.events.findIndex((event, index) => index > previous && event.type === type && event.phase === 'owner-cycle'
+          && event.trusted === true && event.altKey === true && intended(event.target)
+          && event.path.some((element) => element?.pointId === selectedId) && event.path.some((element) => element?.canvasRoot === true)
+          && Math.abs(event.client.x - entry.requestedClick.x) < 1 && Math.abs(event.client.y - entry.requestedClick.y) < 1
+          && (pointerId === undefined || event.pointerId === pointerId || (type === 'click' && event.pointerId === null)))
+        assert.ok(index >= 0, `Native owner-cycle ${type} reached the intended point path`)
+        if (type === 'pointerdown') pointerId = entry.events[index].pointerId
+        previous = index
+      }
+      assert.ok(Number.isInteger(pointerId), 'Native owner cycling retains its pointer identity')
+      assert.deepEqual(entry.secondaryErrors, [], 'Owner-cycle observations completed')
+    } catch (error) { cyclePrimary ??= error }
+    finally {
+      await retain('Alt release', () => page.keyboard.up('Alt'))
+      if (installed) await retain('observer cleanup', () => page.evaluate((token) => {
+        const registry = window.__stzLayoutOwnerCycles, owned = registry?.get(token)
+        if (owned) for (const type of ['pointerdown', 'pointerup', 'click']) document.removeEventListener(type, owned.listener, true)
+        registry?.delete(token)
+        if (registry?.size === 0) delete window.__stzLayoutOwnerCycles
+      }, token))
+      await retain('final evidence', () => diagnostic(group, scenario, { boundary: 'native-owner-cycle-finished', ownerCycle: entry,
+        ...(cyclePrimary ? { primary: { message: cyclePrimary.message, stack: cyclePrimary.stack } } : {}) }))
+    }
+    if (cyclePrimary) throw cyclePrimary
+    assert.deepEqual(entry.secondaryErrors, [], 'Owner-cycle observation and cleanup completed')
+    return entry
   }
   async function observeEntry(input, extra = {}, id = 'app-point') {
     const point = input.diagram.strata.find((point) => point.id === id), rendered = await observeLayoutPoint(page, id)
@@ -424,23 +520,26 @@ export async function runPointLayoutAnchorChecks({ browser, origin, artifactDir,
       delete interactionInput.diagram.strata[1].position.symbolic
       await load(interactionInput); await settle()
       const observed = await select('overlap-point'), before = (await model()).strata.find(({ id }) => id === 'overlap-point')
-      const close = page.getByRole('button', { name: 'Close inspector drawer', exact: true }); if (await close.count()) await close.click()
-      await page.keyboard.down('Alt'); await page.mouse.click(observed.boundary.x, observed.boundary.y); await page.keyboard.up('Alt')
-      assert.equal((await state()).selection.id, 'app-point')
+      // compareSvgPreviewSelectionCandidates breaks this position tie by
+      // stableId, putting app-point first. A null cycle state uses
+      // initialCycleIndex(count) = 1; the observed continuation reaches
+      // app-point. Both actions prepare/measure anew; an initial failure aborts.
+      const ownerCycleStart = await cycleOwner('overlap-point', 'overlap-point')
+      const ownerCycle = await cycleOwner('overlap-point', 'app-point')
       await select('overlap-point')
-      const handle = await page.locator('[aria-label="Selected point drag handles"] circle').first().boundingBox(); assert.ok(handle)
-      await page.evaluate(() => { window.__stzLayoutPointer = []; window.__stzLayoutPointerListener = (event) => window.__stzLayoutPointer.push({ type: event.type, trusted: event.isTrusted }); for (const type of ['pointerdown', 'pointermove']) document.addEventListener(type, window.__stzLayoutPointerListener, true) })
-      const x = handle.x + handle.width / 2, y = handle.y + handle.height / 2
-      await page.mouse.move(x, y); await page.mouse.down(); await page.mouse.move(x + 22, y - 14, { steps: 4 }); await page.mouse.up()
-      const after = (await model()).strata.find(({ id }) => id === 'overlap-point'); assert.notDeepEqual(after.position, before.position)
-      const events = await page.evaluate(() => { for (const type of ['pointerdown', 'pointermove']) document.removeEventListener(type, window.__stzLayoutPointerListener, true); return window.__stzLayoutPointer })
+      const nativeDrag = await dragSelectedPoint({ page, readState: state,
+        diagnose: (details) => diagnostic(group, scenario, details), secondaryErrors: pageErrors,
+        scenario, sequence: ++selectionSequence, id: 'overlap-point', displacement: { x: 22, y: -14 }, steps: 4 })
+      const after = JSON.parse(nativeDrag.afterAction.state.runtimeDiagramJson).strata.find(({ id }) => id === 'overlap-point')
+      const events = nativeDrag.afterAction.observation.events.filter(({ phase }) => phase === 'drag')
+      assert.notDeepEqual(after.position, before.position)
       const dragged = await observeLayoutPoint(page, 'overlap-point')
       assert.ok(Math.hypot(dragged.placedAnchor.x - dragged.placement.x, dragged.placedAnchor.y - dragged.placement.y) < .001)
-      await page.getByRole('button', { name: 'Undo last diagram change', exact: true }).click(); assert.deepEqual((await model()).strata.find(({ id }) => id === 'overlap-point').position, before.position)
-      await page.getByRole('button', { name: 'Redo last undone diagram change', exact: true }).click(); assert.deepEqual((await model()).strata.find(({ id }) => id === 'overlap-point').position, after.position)
       const lockedInput = structuredClone(interactionInput); lockedInput.diagram.layers = [{ value: 0, name: 'Locked', visible: true, locked: true }]
-      await load(lockedInput); await settle(); const lockedBefore = await state(), locked = await observeLayoutPoint(page)
-      await page.getByRole('button', { name: 'Select', exact: true }).click(); await page.mouse.click(locked.boundary.x, locked.boundary.y)
+      await load(lockedInput); await settle(); const lockedBefore = await state()
+      await page.getByRole('button', { name: 'Select', exact: true }).click(); await page.locator('svg.svg-diagram').scrollIntoViewIfNeeded()
+      const locked = await observeLayoutPoint(page)
+      await page.mouse.click(locked.boundary.x, locked.boundary.y)
       assert.equal((await state()).json, lockedBefore.json); assert.notEqual((await state()).selection?.id, 'app-point')
       const hidden = structuredClone(lockedInput); hidden.diagram.layers[0] = { value: 0, name: 'Hidden', visible: false }
       await load(hidden); await settle(); assert.equal(await observeLayoutPoint(page), null)
@@ -462,7 +561,7 @@ export async function runPointLayoutAnchorChecks({ browser, origin, artifactDir,
       assert.deepEqual((await model()).strata[0].position, interactionInput.diagram.strata[0].position)
       const referenceCode = await page.getByRole('textbox', { name: 'Generated TikZ source', exact: true }).inputValue()
       assert.ok(referenceCode.includes('at (LayoutReference)'))
-      interactions.push({ ambientDimension, shape, codim: before.codim, observed, dragged, before, after, events,
+      interactions.push({ ambientDimension, shape, codim: before.codim, observed, dragged, before, after, events, nativeDrag, ownerCycleStart, ownerCycle,
         trustedBoundaryClick: true, trustedDrag: events.some(({ type, trusted }) => type === 'pointerdown' && trusted) && events.some(({ type, trusted }) => type === 'pointermove' && trusted),
         anchorStayedAtModel: true, undoRestored: true, redoRestored: true, altCycling: true, lockedUnchanged: true, hiddenAbsent: true, cameraPlacement: true,
         referenceUnchanged: JSON.stringify((await model()).strata[0].position) === JSON.stringify(interactionInput.diagram.strata[0].position), referenceCode, cameraBefore, cameraAfter })
@@ -470,7 +569,7 @@ export async function runPointLayoutAnchorChecks({ browser, origin, artifactDir,
         const overflowInput = await document('rectangle', { innerXSep: -15, innerYSep: 0, outerXSep: 0, outerYSep: 0, anchor: 'base east' }, 'WWWWWWWWWWWWWWWWWWWW', ambientDimension)
         overflowInput.diagram.strata.push({ ...structuredClone(overflowInput.diagram.strata[0]), id: 'overflow-overlap' })
         await load(overflowInput); await settle()
-        const overflowObserved = await select('overflow-overlap', async (page, id) => {
+        const observeOverflow = async (page, id) => {
           const rendered = await observeLayoutPoint(page, id)
           const ink = await page.evaluate((id) => {
             const node = document.querySelector(`[data-point-id="${CSS.escape(id)}"] [data-point-node]`)
@@ -485,7 +584,8 @@ export async function runPointLayoutAnchorChecks({ browser, origin, artifactDir,
           }, id)
           assert.ok(ink.distance > 6, 'Native text click is beyond the contour picking tolerance')
           return { ...rendered, boundary: ink.click, bodyOverflow: ink }
-        })
+        }
+        const overflowObserved = await select('overflow-overlap', observeOverflow)
         overflowObserved.bodyOverflow.selectionRing = await page.evaluate(() => {
           const node = document.querySelector('[data-point-id="overflow-overlap"] [data-point-node]'), text = node.querySelector('[data-label-state] text')
           const ring = node.querySelector(':scope > circle[data-svg-export-exclude]'), box = text.getBBox(), inverse = ring.getScreenCTM().inverse()
@@ -497,31 +597,14 @@ export async function runPointLayoutAnchorChecks({ browser, origin, artifactDir,
           return { radius, inkRadius }
         })
         assert.ok(overflowObserved.bodyOverflow.selectionRing.radius >= overflowObserved.bodyOverflow.selectionRing.inkRadius, 'Selection ring encloses the actual overflowing text ink')
-        const closeOverflow = page.getByRole('button', { name: 'Close inspector drawer', exact: true }); if (await closeOverflow.count()) await closeOverflow.click()
-        const beforeCycle = await state()
-        await page.evaluate(() => {
-          window.__stzLayoutOverflowEvents = []
-          window.__stzLayoutOverflowListener = (event) => window.__stzLayoutOverflowEvents.push({ type: event.type, trusted: event.isTrusted, altKey: event.altKey })
-          for (const type of ['pointerdown', 'pointerup', 'click']) document.addEventListener(type, window.__stzLayoutOverflowListener, true)
-        })
-        let cyclePrimary, cycleEvents
-        try {
-          await page.keyboard.down('Alt'); await page.mouse.click(overflowObserved.boundary.x, overflowObserved.boundary.y)
-          assert.equal((await state()).selection.id, 'app-point', 'Alt cycles the outside-contour body owner')
-          assert.equal((await state()).json, beforeCycle.json, 'Body picking leaves the diagram unchanged')
-        } catch (error) { cyclePrimary = error }
-        finally {
-          try { await page.keyboard.up('Alt') } catch (error) { cyclePrimary ??= error }
-          try { cycleEvents = await page.evaluate(() => {
-            for (const type of ['pointerdown', 'pointerup', 'click']) document.removeEventListener(type, window.__stzLayoutOverflowListener, true)
-            const events = window.__stzLayoutOverflowEvents; delete window.__stzLayoutOverflowListener; delete window.__stzLayoutOverflowEvents; return events
-          }) } catch (error) { cyclePrimary ??= error }
-        }
-        if (cyclePrimary) throw cyclePrimary
+        // The same stableId ordering and initial index 1 apply to the two
+        // overlapping body owners; retain both planned native cycle actions.
+        const ownerCycleStart = await cycleOwner('overflow-overlap', 'overflow-overlap', observeOverflow)
+        const ownerCycle = await cycleOwner('overflow-overlap', 'app-point', observeOverflow)
         assert.deepEqual((await model()).strata[0].position, overflowInput.diagram.strata[0].position)
         const entry = { result: 'passed', ambientDimension, shape: 'rectangle', anchor: 'base east', source: overflowInput.diagram.strata[0].text,
           layout: overflowInput.diagram.strata[0].style.layout, rendered: overflowObserved, modelPositionUnchanged: true,
-          altSelection: { id: 'app-point', events: cycleEvents }, diagramUnchanged: true }
+          altSelection: { id: ownerCycle.stateAfter.selection.id, events: ownerCycle.events }, ownerCycleStart, ownerCycle, diagramUnchanged: true }
         bodyOverflowCases.push(entry); await observe(scenario + `-body-overflow-${ambientDimension}d`, { group, entry })
       }
     }
