@@ -28,6 +28,227 @@ export function geometricShapeArtifacts(name) {
   return [`${name}.json`, ...(name.startsWith('point-geometric-download-')
     ? [`${name}.svg`, `${name}.png`, `${name}-standalone.json`] : [])]
 }
+const selectionStateFields = ['json', 'runtimeDiagramJson', 'history', 'labelDocumentRevision', 'selection', 'uiSettings']
+function assertSelectionRevision(state, message) {
+  assert.ok(Number.isInteger(state?.labelDocumentRevision) && state.labelDocumentRevision >= 0,
+    `${message}: labelDocumentRevision must be a nonnegative integer`)
+}
+function assertSelectionStateUnchanged(before, after, message, includeSelection = true) {
+  assertSelectionRevision(before, message); assertSelectionRevision(after, message)
+  for (const field of selectionStateFields) {
+    if (field === 'selection' && !includeSelection) continue
+    assert.ok(Object.hasOwn(before, field) && Object.hasOwn(after, field), `${message}: raw ${field} is retained`)
+    assert.deepEqual(after[field], before[field], `${message}: preserves ${field}`)
+  }
+}
+function assertSelectionSnapshot(snapshot, state, id, message) {
+  assert.ok(snapshot && state, `${message}: raw observation and authoritative state exist`)
+  assert.deepEqual(snapshot.errors, [], `${message}: observations completed`)
+  assertSelectionRevision(snapshot, message); assertSelectionRevision(state, message)
+  assert.equal(snapshot.labelDocumentRevision, state.labelDocumentRevision, `${message}: observed document epoch matches authoritative state`)
+  assert.deepEqual(snapshot.selection, state.selection, `${message}: observed selected owner matches authoritative state`)
+  const runtime = JSON.parse(state.runtimeDiagramJson), model = runtime.strata.find((point) => point.id === id)
+  assert.ok(model && model.geometricKind === 'point', `${message}: expected geometric point exists`)
+  assert.deepEqual(snapshot.model, model, `${message}: observed point matches authoritative model`)
+  assert.deepEqual(snapshot.camera, runtime.camera ?? null, `${message}: camera matches authoritative model`)
+  assert.ok(Array.isArray(snapshot.workPlaneControls), `${message}: raw work plane controls exist`)
+  assert.ok(Array.isArray(snapshot.workPlaneStatus), `${message}: raw work plane status exists`)
+  assert.ok(snapshot.layout?.owner && snapshot.layout.request, `${message}: connected layout owner and request exist`)
+  assert.deepEqual(JSON.parse(snapshot.layout.owner), ['point-node', state.labelDocumentRevision, id], `${message}: layout belongs to current document and point`)
+  assert.equal(snapshot.layout.request, snapshot.layout.bodyRequest, `${message}: body and contour share one request`)
+  assert.equal(snapshot.layout.source, model.text ?? '', `${message}: source agrees with the raw point`)
+}
+function assertToolbarSnapshot(snapshot, message) {
+  const toolbar = snapshot?.toolbar
+  assert.ok(toolbar && typeof toolbar.collapsed === 'boolean', `${message}: raw toolbar state exists`)
+  assert.equal(toolbar.overlayCount, 1, `${message}: unique toolbar overlay`)
+  assert.equal(toolbar.historyCount, 1, `${message}: History remains mounted`)
+  assert.equal(toolbar.floatingCount, Number(!toolbar.collapsed), `${message}: bounded Creation toolbar state`)
+  assert.equal(toolbar.expandCount, Number(toolbar.collapsed), `${message}: unique native expand control`)
+  assert.equal(toolbar.collapseCount, Number(!toolbar.collapsed), `${message}: unique native collapse control`)
+  assert.ok(toolbar.quickStyleCount === 0 || toolbar.quickStyleCount === 1, `${message}: bounded quick style state`)
+  if (toolbar.collapsed) assert.equal(toolbar.quickStyleCount, 0, `${message}: quick style controls detach`)
+}
+function transformedSelectionPoint(point, matrix, message) {
+  assert.ok(point && Number.isFinite(point.x) && Number.isFinite(point.y), `${message}: finite local coordinates`)
+  assert.ok(matrix && ['a', 'b', 'c', 'd', 'e', 'f'].every((key) => Number.isFinite(matrix[key])), `${message}: finite screen CTM`)
+  assert.ok(Math.abs(matrix.a * matrix.d - matrix.b * matrix.c) > 1e-12, `${message}: nonsingular screen CTM`)
+  return { x: matrix.a * point.x + matrix.c * point.y + matrix.e,
+    y: matrix.b * point.x + matrix.d * point.y + matrix.f }
+}
+function assertClickMeasurement(rendered, snapshot, requestedClick, clickKind, message) {
+  assert.ok(rendered && snapshot?.geometry?.contour, `${message}: connected fresh geometry exists`)
+  const contour = snapshot.geometry.contour
+  assert.equal(contour.connected, true, `${message}: measured contour is connected`)
+  assert.ok(Number.isFinite(contour.length) && contour.length > 0, `${message}: positive native contour length`)
+  assert.equal(contour.fraction, .23, `${message}: original contour arclength is retained`)
+  const boundary = transformedSelectionPoint(contour.localBoundary, contour.screenCTM, message)
+  // Native SVGPoint projection may return the exact binary32 representation.
+  // This permits that machine conversion, without widening geometry tolerances.
+  for (const axis of ['x', 'y']) assert.ok(Math.abs(boundary[axis] - contour.boundary[axis]) < 1e-7
+    || contour.boundary[axis] === Math.fround(boundary[axis]),
+    `${message}: contour boundary follows current CTM`)
+  assert.deepEqual(requestedClick, snapshot.requestedClick, `${message}: raw hit observation uses requested coordinates`)
+  if (clickKind === 'body') {
+    assert.ok(rendered.bodyOverflow, `${message}: body input retains independent ink measurement`)
+    const bodyClick = transformedSelectionPoint(rendered.bodyOverflow.clickInContour, contour.screenCTM, message)
+    for (const axis of ['x', 'y']) assert.ok(Math.abs(bodyClick[axis] - requestedClick[axis]) < 1e-7,
+      `${message}: body input follows current contour CTM`)
+    assert.deepEqual(requestedClick, rendered.boundary, `${message}: native body coordinates stay authoritative`)
+  } else if (clickKind === 'boundary') {
+    assert.deepEqual(requestedClick, rendered.boundary, `${message}: requested original boundary is freshly measured`)
+    assert.deepEqual(requestedClick, contour.boundary, `${message}: requested original boundary equals the native CTM projection`)
+  } else {
+    assert.equal(clickKind, 'center', `${message}: known native input kind`)
+    assert.deepEqual(requestedClick, rendered.center, `${message}: requested center is freshly measured`)
+    assert.deepEqual(requestedClick, snapshot.geometry.point.center, `${message}: center uses current connected point geometry`)
+  }
+}
+function intendedSelectionTarget(target, selection, id, requireUnselected) {
+  return target?.svg === true && target.canvas === true && target.drawer === false
+    && (target.pointId === id || (!requireUnselected && selection?.id === id && target.pointHandle === true))
+}
+function intendedSelectionPath(event, selection, id, requireUnselected) {
+  return intendedSelectionTarget(event.target, selection, id, requireUnselected)
+    && event.path.some((element) => element?.canvasRoot === true)
+    && (event.target.pointId === id ? event.path.some((element) => element?.pointId === id)
+      : event.path.some((element) => element?.ariaLabel === 'Selected point drag handles'))
+}
+
+// This raw contract is shared by contour selection and the layout owner cycle.
+// Toolbar action counts alone cannot establish preparation or restoration.
+export function assertPointToolbarPreparation(preparation, restoration, id) {
+  assert.ok(preparation && restoration, 'Native selection retains owned toolbar preparation and restoration')
+  assertSelectionSnapshot(preparation.inherited, preparation.stateBefore, id, 'Inherited toolbar')
+  assertToolbarSnapshot(preparation.inherited, 'Inherited toolbar')
+  assert.ok(Array.isArray(preparation.actions), 'Raw toolbar UI actions are retained')
+  const selects = preparation.actions.filter(({ name }) => name === 'Select')
+  assert.equal(selects.length, 1, 'Exactly one real native Select action is retained')
+  let selected = false, collapsedForObstruction = false, previousState = preparation.stateBefore
+  let previousSnapshot = preparation.inherited
+  for (const action of preparation.actions) {
+    assert.equal(action.error, undefined, 'Owned native toolbar action succeeded')
+    assert.ok(['Select', 'expand', 'collapse'].includes(action.name), 'Known native toolbar action')
+    assert.equal(action.controlCount, 1, 'Native toolbar action has one actual control')
+    assertSelectionSnapshot(action.before, action.stateBefore, id, `Before ${action.name}`)
+    assertSelectionSnapshot(action.after, action.stateAfter, id, `After ${action.name}`)
+    assertToolbarSnapshot(action.before, `Before ${action.name}`); assertToolbarSnapshot(action.after, `After ${action.name}`)
+    assertSelectionStateUnchanged(action.stateBefore, action.stateAfter, `Native toolbar ${action.name}`)
+    for (const field of ['camera', 'workPlaneControls', 'workPlaneStatus', 'layout']) {
+      assert.deepEqual(action.after[field], action.before[field], `Native toolbar ${action.name} preserves ${field}`)
+    }
+    if (action.purpose !== 'restore') {
+      assertSelectionStateUnchanged(previousState, action.stateBefore, 'Toolbar preparation action continuity')
+      assert.equal(action.before.toolbar.collapsed, previousSnapshot.toolbar.collapsed, 'Toolbar preparation state continuity')
+      previousState = action.stateAfter; previousSnapshot = action.after
+    }
+    if (action.name === 'Select') {
+      assert.equal(action.purpose, 'select', 'Select is an explicit native mode action')
+      assert.equal(action.before.toolbar.collapsed, false, 'Native Select runs while Creation controls are available')
+      assert.equal(action.after.toolbar.collapsed, false, 'Native Select retains Creation controls')
+      assert.equal(action.after.tool.selectPressed, 'true', 'Actual native Select mode is observed pressed')
+      selected = true
+    } else {
+      assert.equal(action.oppositeCount, 1, 'Native toolbar transition confirms one opposite control')
+      assert.equal(action.after.toolbar.collapsed, action.name === 'collapse', 'Native toolbar action reaches the requested state')
+      assert.notEqual(action.after.toolbar.collapsed, action.before.toolbar.collapsed, 'Owned toolbar action changes its inherited state once')
+      if (action.purpose === 'select-access') {
+        assert.equal(selected, false, 'Select access precedes native Select')
+        assert.equal(action.name, 'expand', 'Collapsed Select access uses the native expand control')
+        assert.equal(preparation.inherited.toolbar.collapsed, true, 'Expansion is owned only for inherited collapse')
+      } else if (action.purpose === 'obstruction') {
+        assert.equal(selected, true, 'Obstruction collapse follows native Select')
+        assert.equal(action.name, 'collapse', 'Creation obstruction uses one native collapse action')
+        assert.equal(collapsedForObstruction, false, 'Creation obstruction is collapsed only once')
+        collapsedForObstruction = true
+        const obstructed = preparation.obstructed
+        assert.ok(obstructed?.observation?.elementFromPoint?.creationToolbar === true
+          || obstructed?.observation?.elementFromPoint?.quickStyle === true,
+        'Retained raw first hit establishes expanded Creation toolbar obstruction')
+        assert.equal(obstructed.observation.toolbar.collapsed, false, 'Obstruction was observed with Creation controls expanded')
+        assertClickMeasurement(obstructed.rendered, obstructed.observation, obstructed.observation.requestedClick,
+          obstructed.rendered.bodyOverflow ? 'body' : preparation.clickKind ?? 'boundary', 'Obstructed toolbar geometry')
+      } else assert.equal(action.purpose, 'restore', 'Toolbar action has an explicitly owned restoration purpose')
+    }
+  }
+  assertSelectionStateUnchanged(preparation.stateBefore, preparation.statePrepared, 'Completed toolbar preparation')
+  assertSelectionSnapshot(preparation.prepared, preparation.statePrepared, id, 'Prepared toolbar')
+  assertToolbarSnapshot(preparation.prepared, 'Prepared toolbar')
+  const clickKind = preparation.rendered?.bodyOverflow ? 'body' : preparation.clickKind ?? 'boundary'
+  assertClickMeasurement(preparation.rendered, preparation.prepared, preparation.requestedClick, clickKind, 'Prepared native geometry')
+  assert.ok(intendedSelectionTarget(preparation.prepared.elementFromPoint, preparation.statePrepared.selection, id, false),
+    'Prepared raw first hit reaches the intended SVG owner/path')
+  assert.deepEqual(preparation.prepared.elementsFromPoint[0], preparation.prepared.elementFromPoint, 'Prepared raw hit stack retains first target')
+  assertSelectionStateUnchanged(previousState, preparation.statePrepared, 'Toolbar preparation terminal continuity')
+  assert.equal(previousSnapshot.toolbar.collapsed, preparation.prepared.toolbar.collapsed, 'Prepared toolbar uses final owned state')
+  assertSelectionSnapshot(restoration.before, restoration.stateBefore, id, 'Before toolbar restoration')
+  assertSelectionSnapshot(restoration.after, restoration.stateAfter, id, 'After toolbar restoration')
+  assertSelectionStateUnchanged(restoration.stateBefore, restoration.stateAfter, 'Native toolbar restoration')
+  assertToolbarSnapshot(restoration.before, 'Before toolbar restoration'); assertToolbarSnapshot(restoration.after, 'After toolbar restoration')
+  assert.equal(restoration.after.toolbar.collapsed, preparation.inherited.toolbar.collapsed, 'Toolbar restoration returns caller inherited state')
+  assert.equal(restoration.error, undefined, 'Native toolbar restoration succeeded')
+  for (const field of ['camera', 'workPlaneControls', 'workPlaneStatus', 'layout']) {
+    assert.deepEqual(restoration.after[field], restoration.before[field], `Native toolbar restoration preserves ${field}`)
+  }
+  const restores = preparation.actions.filter(({ purpose }) => purpose === 'restore')
+  assert.equal(restores.length, Number(restoration.before.toolbar.collapsed !== preparation.inherited.toolbar.collapsed),
+    'Only a toolbar change owned by this preparation is restored')
+  if (restores.length) {
+    assertSelectionStateUnchanged(restoration.stateBefore, restores[0].stateBefore, 'Restoration action starts from post-canvas state')
+    assertSelectionStateUnchanged(restores[0].stateAfter, restoration.stateAfter, 'Restoration action terminal continuity')
+  }
+}
+export function assertGeometricSelectionEvidence(selection, id, expectedClickKind = 'boundary') {
+  assert.ok(selection && typeof selection === 'object', 'Raw native point selection is retained')
+  assert.equal(selection.id, id); assert.equal(selection.clickKind, expectedClickKind)
+  assert.equal(selection.primary, undefined); assert.equal(selection.actionError, undefined)
+  assert.deepEqual(selection.secondaryErrors, [], 'Native selection diagnostics completed')
+  const preparation = selection.preparation
+  assert.ok(preparation, 'Native selection drawer preparation is retained')
+  assertSelectionStateUnchanged(preparation.stateBefore, preparation.stateAfter, 'Inspector preparation')
+  assert.equal(preparation.closeActions, Number(preparation.inherited.inspector.open), 'Inspector close action is owned')
+  assert.equal(preparation.closedDrawerCount, 0); assert.equal(preparation.openerCount, 1); assert.equal(preparation.openerExpanded, 'false')
+  assert.equal(preparation.closed.inspector.open, false)
+  assertPointToolbarPreparation(selection.toolbarPreparation, selection.toolbarRestoration, id)
+  assertSelectionStateUnchanged(selection.toolbarPreparation.statePrepared, selection.stateBefore, 'Canvas click begins after preserved toolbar preparation')
+  assertSelectionSnapshot(selection.before, selection.stateBefore, id, 'Before native point input')
+  assertSelectionSnapshot(selection.after, selection.stateAfter, id, 'After native point input')
+  assertSelectionStateUnchanged(selection.stateBefore, selection.stateAfter, 'Native point selection', false)
+  assert.deepEqual(selection.selected, selection.stateAfter.selection)
+  assert.equal(selection.selected?.kind, 'stratum'); assert.equal(selection.selected.id, id)
+  if (selection.requireUnselected) assert.equal(selection.before.selection, null, 'Native initial point input starts unselected')
+  assert.equal(selection.before.inspector.open, false, 'Inspector is detached before native point input')
+  assertClickMeasurement(selection.rendered, selection.before, selection.requestedClick, expectedClickKind, 'Fresh native point input')
+  assert.ok(intendedSelectionTarget(selection.before.elementFromPoint, selection.before.selection, id, selection.requireUnselected),
+    'Fresh pre-input first hit belongs to the intended SVG owner/path')
+  assert.deepEqual(selection.before.elementsFromPoint[0], selection.before.elementFromPoint, 'Raw hit stack starts with intended first target')
+  assert.equal(selection.before.events.length, 0, 'Canvas observer excludes preparation actions')
+  assert.equal(selection.after.droppedEvents, 0, 'Native point input retains all scoped events')
+  assert.deepEqual(selection.events, selection.after.events, 'Published native point events retain raw after-input records')
+  const events = selection.after.events
+  assert.equal(events.length, 3, 'Exactly one native down/up/click gesture is retained')
+  let previous = -1, down, capturedUp = false
+  for (const type of ['pointerdown', 'pointerup', 'click']) {
+    const index = events.findIndex((event, index) => index > previous && event.type === type && event.trusted === true
+      && event.button === 0 && Math.abs(event.client?.x - selection.requestedClick.x) < 1
+      && Math.abs(event.client?.y - selection.requestedClick.y) < 1
+      && (intendedSelectionPath(event, selection.before.selection, id, selection.requireUnselected)
+        || (down?.target.pointHandle === true && Number.isInteger(down.pointerId)
+          && (event.pointerId === down.pointerId || (type === 'click' && event.pointerId === null))
+          && event.target?.canvasRoot === true && event.target.drawer === false && event.path.some((element) => element?.canvasRoot === true)
+          && (type === 'pointerup' ? event.canvasHasPointerCapture === true : capturedUp))))
+    assert.ok(index >= 0, `Raw trusted point selection ${type} reaches the intended SVG production path in order`)
+    const event = events[index]
+    assertSelectionRevision(event.App, `Native ${type}`)
+    assert.equal(event.App.labelDocumentRevision, selection.stateBefore.labelDocumentRevision, `Native ${type} retains current document epoch`)
+    assert.equal(event.layout.owner, selection.before.layout.owner); assert.equal(event.layout.request, selection.before.layout.request)
+    assert.equal(event.layout.source, selection.before.layout.source); assert.equal(event.layout.shape, selection.before.layout.shape)
+    if (type === 'pointerdown') { down = event; assert.ok(Number.isInteger(event.pointerId)); assert.deepEqual(event.App.selection, selection.before.selection) }
+    else assert.ok(event.pointerId === down.pointerId || (type === 'click' && event.pointerId === null), 'Native selection retains pointer identity')
+    capturedUp = event.canvasHasPointerCapture === true; previous = index
+  }
+  assertSelectionStateUnchanged(selection.stateAfter, selection.toolbarRestoration.stateBefore, 'Toolbar restoration follows expected selected owner')
+}
 export function assertGeometricShapeEvidence(evidence, name) {
   assert.equal(evidence.scenario, name); assert.equal(evidence.group, geometricShapeGroup); assert.equal(evidence.result, 'passed')
   assert.deepEqual(evidence.pageErrors, [])
@@ -83,6 +304,9 @@ export function assertGeometricShapeEvidence(evidence, name) {
       assert.equal(found.length, 1, `Unique native geometric interaction ${dimension}/${shape}`)
       const entry = found[0]
       assert.equal(entry.codim, dimension); assert.equal(entry.selected, true)
+      assertGeometricSelectionEvidence(entry.observed.nativeSelection, 'app-point')
+      assert.equal(entry.observed.nativeSelection.scenario, name, 'Raw contour selection belongs to the named cumulative scenario')
+      assert.deepEqual(entry.observed.boundary, entry.observed.nativeSelection.requestedClick, 'Geometric interaction retains the prepared native boundary')
       assertPointNativeDragEvidence(entry.nativeDrag)
       assert.equal(entry.nativeDrag.id, 'app-point')
       assert.equal(entry.nativeDrag.scenario, name)

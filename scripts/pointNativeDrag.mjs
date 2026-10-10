@@ -1,5 +1,6 @@
 import assert from 'node:assert/strict'
 import { boundedPointDiagnostic } from './pointCheckDiagnostics.mjs'
+import { assertGeometricToolbarPreparation, ensureGeometricSelectAccess, restoreGeometricCanvasToolbar } from './pointGeometricSelection.mjs'
 
 // These functions execute in the owned App document. The registry contains only
 // scoped observations; all model changes still go through native production UI.
@@ -321,6 +322,10 @@ export function assertPointNativeDragEvidence(observation) {
   assert.deepEqual(observation.afterAction.observation.camera, observation.before.camera)
   assert.deepEqual(observation.afterAction.observation.workPlaneControls, observation.before.workPlaneControls)
   assert.deepEqual(observation.afterAction.observation.workPlaneStatus, observation.before.workPlaneStatus)
+  assertGeometricToolbarPreparation(observation.toolbarPreparation, observation.toolbarRestoration)
+  assertUnchangedState(observation.preparation.stateAfter, observation.toolbarPreparation.stateBefore, 'Before toolbar Select access')
+  assertUnchangedState(observation.toolbarPreparation.statePrepared, observation.stateBefore, 'After toolbar Select access')
+  assertUnchangedState(observation.redo.stateAfter, observation.toolbarRestoration.stateBefore, 'Before toolbar restoration')
 }
 
 function diagnosticOwner({ diagnose, secondaryErrors, observation }) {
@@ -359,7 +364,7 @@ async function prepareCanvas({ page, readState, id, token, observation, diagnost
   if (primary) throw primary
   assert.equal(preparation.closedDrawerCount, 0); assert.equal(preparation.openerCount, 1); assert.equal(preparation.openerExpanded, 'false')
   assertUnchangedState(preparation.stateBefore, preparation.stateAfter, 'Inspector close'); assertSelected(preparation.stateAfter, id)
-  await page.getByRole('button', { name: 'Select', exact: true }).click({ timeout: 5000 })
+  await ensureGeometricSelectAccess({ page, readState, id, preparation: observation.toolbarPreparation, diagnostic, evidence })
   await page.locator('svg.svg-diagram').scrollIntoViewIfNeeded({ timeout: 5000 })
   preparation.prepared = await diagnostic('fresh prepared canvas', () => page.evaluate(observePointNativeDrag, { token, id }))
   preparation.statePrepared = await diagnostic('state after Select/scroll', readState)
@@ -371,7 +376,8 @@ async function prepareCanvas({ page, readState, id, token, observation, diagnost
 export async function prepareSelectedPointCanvas({ page, readState, diagnose, secondaryErrors,
   scenario, sequence, id = 'app-point' }) {
   const token = `point-canvas:${scenario}:${sequence}:${id}`
-  const observation = { scenario, sequence, id, preparation: { closeActions: 0 }, secondaryErrors: [] }
+  const observation = { scenario, sequence, id, preparation: { closeActions: 0 },
+    toolbarPreparation: { actions: [] }, toolbarRestoration: {}, secondaryErrors: [] }
   const owner = diagnosticOwner({ diagnose, secondaryErrors, observation })
   let primary, installed = false
   try {
@@ -385,6 +391,19 @@ export async function prepareSelectedPointCanvas({ page, readState, diagnose, se
         observation.final = await page.evaluate(observePointNativeDrag, { token, id })
       })
       await owner.diagnostic('preparation observer cleanup', () => page.evaluate(removePointNativeDragObserver, token))
+    }
+    try {
+      await restoreGeometricCanvasToolbar({ page, readState, id,
+        preparation: observation.toolbarPreparation, restoration: observation.toolbarRestoration, ...owner })
+    } catch (error) {
+      if (primary) await owner.diagnostic('toolbar restoration', () => { throw error })
+      else primary = error
+    }
+    if (!primary && owner.failures.length === 0) {
+      try {
+        assertGeometricToolbarPreparation(observation.toolbarPreparation, observation.toolbarRestoration)
+        assertUnchangedState(observation.preparation.statePrepared, observation.toolbarRestoration.stateBefore, 'Before preparation toolbar restoration')
+      } catch (error) { primary = error }
     }
     if (primary) observation.primary = { message: primary.message, stack: primary.stack }
     await owner.evidence('canvas-preparation-finished')
@@ -400,7 +419,7 @@ export async function dragSelectedPoint({ page, readState, diagnose, secondaryEr
   scenario, sequence, id = 'app-point', displacement, steps = 4 }) {
   const token = `point-drag:${scenario}:${sequence}:${id}`
   const observation = { kind: 'point-native-drag', scenario, sequence, id, displacement, steps,
-    preparation: { closeActions: 0 }, secondaryErrors: [] }
+    preparation: { closeActions: 0 }, toolbarPreparation: { actions: [] }, toolbarRestoration: {}, secondaryErrors: [] }
   const owner = diagnosticOwner({ diagnose, secondaryErrors, observation })
   let primary, pointerPressed = false, installed = false
   try {
@@ -441,7 +460,6 @@ export async function dragSelectedPoint({ page, readState, diagnose, secondaryEr
       assert.equal(observation[phase].stateAfter.json, phase === 'undo' ? observation.stateBefore.json : observation.afterAction.state.json, `${phase} restores exact saved JSON`)
       assert.equal(observation[phase].stateAfter.runtimeDiagramJson, phase === 'undo' ? observation.stateBefore.runtimeDiagramJson : observation.afterAction.state.runtimeDiagramJson, `${phase} restores exact runtime JSON`)
     }
-    assertPointNativeDragEvidence(observation)
   } catch (error) { primary ??= error }
   finally {
     if (pointerPressed) await owner.diagnostic('release held native pointer', async () => {
@@ -452,6 +470,16 @@ export async function dragSelectedPoint({ page, readState, diagnose, secondaryEr
         observation.final = await page.evaluate(observePointNativeDrag, { token, id })
       })
       await owner.diagnostic('observer cleanup', () => page.evaluate(removePointNativeDragObserver, token))
+    }
+    try {
+      await restoreGeometricCanvasToolbar({ page, readState, id,
+        preparation: observation.toolbarPreparation, restoration: observation.toolbarRestoration, ...owner })
+    } catch (error) {
+      if (primary) await owner.diagnostic('toolbar restoration', () => { throw error })
+      else primary = error
+    }
+    if (!primary && owner.failures.length === 0) {
+      try { assertPointNativeDragEvidence(observation) } catch (error) { primary = error }
     }
     if (primary) observation.primary = { message: primary.message, stack: primary.stack }
     await owner.evidence('native-drag-finished')

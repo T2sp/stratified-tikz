@@ -9,7 +9,9 @@ import { layoutAnchorGroup, layoutAnchorScenarios, layoutAnchorArtifacts, layout
 import { pointNodeAnchorSupport } from '../../src/geometry/pointNodeShapes/index.ts'
 import { createEmptyDiagram, createPointStratum } from '../../src/model/constructors.ts'
 import { generateTikz } from '../../src/tikz/generateTikz.ts'
-import { syntheticPointNativeDragEvidence } from './pointNativeDragFixture.mjs'
+import { syntheticPointNativeDragEvidence, syntheticPointToolbarRevisionRecords } from './pointNativeDragFixture.mjs'
+import { syntheticGeometricSelectionEvidence } from './pointGeometricSelectionFixture.mjs'
+import { assertGeometricSelectionEvidence } from '../../scripts/pointGeometricShapesContract.mjs'
 import { compareSvgPreviewSelectionCandidates, nextSvgPreviewSelectionCycle } from '../../src/rendering/svgHitTesting.ts'
 
 function placement(shape = 'rectangle', anchor = 'base east', extra = {}) {
@@ -33,7 +35,7 @@ function unsupportedNativeCases() {
 }
 function syntheticOwnerCycle(selectedId, expectedId, initial = false) {
   const raw = syntheticPointNativeDragEvidence({ id: selectedId })
-  const target = { tag: 'path', pointId: selectedId, drawer: false, svg: true, canvas: true }, client = { x: 200, y: 300 }
+  const target = { tag: 'path', pointId: selectedId, drawer: false, svg: true, canvas: true }
   const selection = { kind: 'stratum', id: selectedId }, stateBefore = structuredClone(raw.stateBefore)
   const runtime = JSON.parse(stateBefore.runtimeDiagramJson)
   runtime.strata.push({ ...structuredClone(runtime.strata[0]), id: 'app-point' })
@@ -42,12 +44,23 @@ function syntheticOwnerCycle(selectedId, expectedId, initial = false) {
   stateBefore.history = JSON.stringify({ past: [], present: runtime, future: [] })
   const preparation = structuredClone(raw.preparation)
   for (const key of ['stateBefore', 'stateAfter', 'statePrepared']) preparation[key] = stateBefore
-  return { selectedId, expectedId, preparation, stateBefore, stateAfter: { ...stateBefore, selection: { kind: 'stratum', id: initial ? selectedId : expectedId } },
-    secondaryErrors: [], droppedEvents: 0, requestedClick: client, rendered: { boundary: client },
-    before: { errors: [], inspector: { open: false }, selection, elementFromPoint: target,
-      model: runtime.strata[0], labelDocumentRevision: stateBefore.labelDocumentRevision, requestedClick: client },
+  const stateAfter = { ...stateBefore, selection: { kind: 'stratum', id: initial ? selectedId : expectedId } }
+  const selectionRaw = syntheticGeometricSelectionEvidence({ id: selectedId, state: stateBefore, initialSelection: selection })
+  const requestedClick = selectionRaw.requestedClick
+  const toolbarRestoration = selectionRaw.toolbarRestoration
+  for (const key of ['stateBefore', 'stateAfter']) toolbarRestoration[key] = stateAfter
+  for (const key of ['before', 'after']) toolbarRestoration[key].selection = stateAfter.selection
+  for (const action of selectionRaw.toolbarPreparation.actions.filter(({ purpose }) => purpose === 'restore')) {
+    action.stateBefore = stateAfter; action.stateAfter = stateAfter
+    action.before.selection = stateAfter.selection; action.after.selection = stateAfter.selection
+  }
+  return { selectedId, expectedId, preparation, stateBefore, stateAfter,
+    toolbarPreparation: selectionRaw.toolbarPreparation, toolbarRestoration,
+    secondaryErrors: [], droppedEvents: 0, requestedClick, rendered: selectionRaw.rendered,
+    before: { ...selectionRaw.before, elementFromPoint: target, elementsFromPoint: [target, { canvasRoot: true }] },
     events: ['pointerdown', 'pointerup', 'click'].map((type) => ({ phase: 'owner-cycle', selectedId, type, trusted: true,
-      altKey: true, pointerId: 1, button: 0, buttons: type === 'pointerdown' ? 1 : 0, client, target, selection,
+      altKey: true, pointerId: 1, button: 0, buttons: type === 'pointerdown' ? 1 : 0, client: requestedClick, target, selection,
+      labelDocumentRevision: stateBefore.labelDocumentRevision,
       path: [target, { canvasRoot: true }] })) }
 }
 test('synthetic equal-distance point owner cycling records initial overlap then app-point continuation', () => {
@@ -85,19 +98,22 @@ function evidence(name) {
     cases: [2, 3].flatMap((ambientDimension) => ['rectangle', 'circular sector'].map((shape) => {
       const nativeDrag = syntheticPointNativeDragEvidence({ scenario: name, ambientDimension, shape,
         id: 'overlap-point', displacement: { x: 22, y: -14 }, steps: 4 })
+      const nativeSelection = syntheticGeometricSelectionEvidence({ scenario: name, ambientDimension, shape,
+        id: 'overlap-point', state: nativeDrag.stateBefore })
       return { ambientDimension, shape, codim: ambientDimension, nativeDrag,
       ownerCycleStart: syntheticOwnerCycle('overlap-point', 'overlap-point', true), ownerCycle: syntheticOwnerCycle('overlap-point', 'app-point'),
       before: JSON.parse(nativeDrag.stateBefore.runtimeDiagramJson).strata[0],
       after: JSON.parse(nativeDrag.afterAction.state.runtimeDiagramJson).strata[0],
       trustedBoundaryClick: true, trustedDrag: true, anchorStayedAtModel: true, undoRestored: true, redoRestored: true, altCycling: true, lockedUnchanged: true, hiddenAbsent: true, cameraPlacement: true, referenceUnchanged: true,
-      observed: { boundary: { x: 200, y: 300 }, nativeSelection: { id: 'overlap-point', selected: { id: 'overlap-point' }, requestedClick: { x: 200, y: 300 }, events: ['pointerdown', 'pointerup', 'click'].map((type) => ({ type, trusted: true })) } },
+      observed: { boundary: nativeSelection.requestedClick, nativeSelection },
       events: nativeDrag.afterAction.observation.events.filter(({ phase }) => phase === 'drag'), referenceCode: String.raw`\node at (LayoutReference) {$x_i$};` } })),
     bodyOverflowCases: [2, 3].map((ambientDimension) => {
       const ownerCycle = syntheticOwnerCycle('overflow-overlap', 'app-point')
       const entry = placement('rectangle', 'base east', { ambientDimension, layout: { innerXSep: -15 }, diagramUnchanged: true, ownerCycle,
         ownerCycleStart: syntheticOwnerCycle('overflow-overlap', 'overflow-overlap', true),
         altSelection: { id: 'app-point', events: ownerCycle.events } })
-      Object.assign(entry.rendered, { boundary: { x: 200, y: 300 }, nativeSelection: { id: 'overflow-overlap', selected: { id: 'overflow-overlap' }, requestedClick: { x: 200, y: 300 }, events: ['pointerdown', 'pointerup', 'click'].map((type) => ({ type, trusted: true })) },
+      const nativeSelection = syntheticGeometricSelectionEvidence({ scenario: name, ambientDimension, shape: 'rectangle', id: 'overflow-overlap', body: true })
+      Object.assign(entry.rendered, { boundary: nativeSelection.requestedClick, nativeSelection,
         bodyOverflow: { localBodyClick: { x: 2, y: 3 }, characterBounds: { x: 0, y: 0, width: 5, height: 6 }, clickInContour: { x: -30, y: 0 }, contourBounds: { x: -20, y: -10, width: 40, height: 20 }, distance: 10, selectionRing: { radius: 50, inkRadius: 45 } } })
       return entry
     }) }
@@ -119,6 +135,117 @@ test('32D named group and every artifact are registered cumulatively', () => {
     assertLayoutAnchorEvidence(evidence(name), name)
   }
 })
+for (const options of [{}, { collapsed: true }, { obstructed: true }, { collapsed: true, obstructed: true }]) {
+  test(`synthetic 32D toolbar policy accepts owned preparation/restoration ${JSON.stringify(options)}`, () => {
+    const raw = syntheticGeometricSelectionEvidence(options)
+    assertGeometricSelectionEvidence(raw, raw.id)
+    assert.equal(raw.rendered.shape, 'semicircle')
+    assert.equal(raw.before.model.codim, 2)
+    assert.equal(raw.before.geometry.contour.fraction, .23)
+    assert.equal(raw.toolbarPreparation.actions.filter(({ purpose }) => purpose === 'obstruction').length, Number(!!options.obstructed))
+    assert.equal(raw.toolbarRestoration.after.toolbar.collapsed, !!options.collapsed)
+  })
+}
+for (const nativeProjection of ['double', 'binary32']) for (const body of [false, true]) {
+  test(`synthetic 32D raw CTM policy accepts exact ${nativeProjection} native contour projection with ${body ? 'body' : 'boundary'} input`, () => {
+    const raw = syntheticGeometricSelectionEvidence({ nativeProjection, body, obstructed: true })
+    const contour = raw.before.geometry.contour, matrix = contour.screenCTM, local = contour.localBoundary
+    const algebra = { x: matrix.a * local.x + matrix.c * local.y + matrix.e,
+      y: matrix.b * local.x + matrix.d * local.y + matrix.f }
+    if (nativeProjection === 'binary32') {
+      assert.ok(Math.abs(algebra.x - contour.boundary.x) > 1e-7, 'Control reaches native binary32 handling beyond double rounding')
+      assert.equal(contour.boundary.x, Math.fround(algebra.x)); assert.equal(contour.boundary.y, Math.fround(algebra.y))
+    }
+    if (body) assert.deepEqual(raw.requestedClick, algebra, 'Body input retains its original double transform')
+    else assert.deepEqual(raw.requestedClick, contour.boundary, 'Boundary input retains exact native screen coordinates')
+    assertGeometricSelectionEvidence(raw, raw.id, body ? 'body' : 'boundary')
+  })
+  for (const fault of ['stale-CTM', 'stale-native-boundary', 'different-requested-native-boundary', 'rounded-body-input']) {
+    if (fault === 'rounded-body-input' && (!body || nativeProjection !== 'binary32')) continue
+    test(`synthetic 32D raw ${nativeProjection} projection rejects ${fault} with ${body ? 'body' : 'boundary'} input`, () => {
+      const raw = syntheticGeometricSelectionEvidence({ nativeProjection, body, obstructed: true })
+      if (fault === 'stale-CTM') raw.before.geometry.contour.screenCTM.e += 20
+      if (fault === 'stale-native-boundary') raw.before.geometry.contour.boundary = { ...raw.before.geometry.contour.boundary, x: raw.before.geometry.contour.boundary.x + .000001 }
+      if (fault === 'different-requested-native-boundary') raw.requestedClick = { ...raw.requestedClick, x: raw.requestedClick.x + .000001 }
+      if (fault === 'rounded-body-input') {
+        raw.requestedClick = { x: Math.fround(raw.requestedClick.x), y: Math.fround(raw.requestedClick.y) }
+        // Keep the raw coordinate records coherent to reach the double body rule.
+        raw.before.requestedClick = raw.requestedClick; raw.rendered.boundary = raw.requestedClick
+      }
+      assert.throws(() => assertGeometricSelectionEvidence(raw, raw.id, body ? 'body' : 'boundary'))
+    })
+  }
+}
+const rawToolbarFaults = [
+  ['missing-preparation', (raw) => { delete raw.toolbarPreparation }],
+  ['missing-restoration', (raw) => { delete raw.toolbarRestoration }],
+  ['toolbar-flags-only', (raw) => { raw.toolbarPreparation = { collapsed: true, restored: true } }],
+  ['missing-Select', (raw) => { raw.toolbarPreparation.actions.splice(0, 1) }],
+  ['ambiguous-Select', (raw) => { raw.toolbarPreparation.actions[0].controlCount = 2 }],
+  ['collapsed-Select', (raw) => { raw.toolbarPreparation.actions[0].before.toolbar.collapsed = true }],
+  ['Select-not-active', (raw) => { raw.toolbarPreparation.actions[0].after.tool.selectPressed = 'false' }],
+  ['unowned-collapse', (raw) => { raw.toolbarPreparation.obstructed.observation.elementFromPoint.creationToolbar = false }],
+  ['missing-obstructed-hit', (raw) => { delete raw.toolbarPreparation.obstructed }],
+  ['missing-collapse-control', (raw) => { raw.toolbarPreparation.actions[1].controlCount = 0 }],
+  ['collapse-before-Select', (raw) => { raw.toolbarPreparation.actions.reverse() }],
+  ['failed-collapse', (raw) => { raw.toolbarPreparation.actions[1].error = { message: 'controlled native collapse failure' } }],
+  ['Creation-not-detached', (raw) => { raw.toolbarPreparation.actions[1].after.toolbar.floatingCount = 1 }],
+  ['quick-style-not-detached', (raw) => { raw.toolbarPreparation.actions[1].after.toolbar.quickStyleCount = 1 }],
+  ['missing-native-expand', (raw) => { raw.toolbarPreparation.actions[1].after.toolbar.expandCount = 0 }],
+  ['History-unmounted', (raw) => { raw.toolbarPreparation.prepared.toolbar.historyCount = 0 }],
+  ['failed-restoration', (raw) => { raw.toolbarPreparation.actions.at(-1).error = { message: 'controlled native expand failure' } }],
+  ['restored-caller-state-wrong', (raw) => { raw.toolbarRestoration.after.toolbar.collapsed = true }],
+  ['restoration-before-selection', (raw) => { raw.toolbarRestoration.stateBefore.selection = null }],
+  ['stale-boundary', (raw) => { raw.requestedClick = { x: raw.requestedClick.x + 1, y: raw.requestedClick.y } }],
+  ['stale-prepared-CTM', (raw) => { raw.toolbarPreparation.prepared.geometry.contour.screenCTM.e += 20 }],
+  ['stale-before-CTM', (raw) => { raw.before.geometry.contour.screenCTM.e += 20 }],
+  ['singular-CTM', (raw) => { raw.before.geometry.contour.screenCTM.a = 0 }],
+  ['different-arclength', (raw) => { raw.before.geometry.contour.fraction = .5 }],
+  ['disconnected-contour', (raw) => { raw.before.geometry.contour.connected = false }],
+  ['remaining-Creation-obstruction', (raw) => { raw.before.elementFromPoint = raw.toolbarPreparation.obstructed.observation.elementFromPoint }],
+  ['remaining-History-obstruction', (raw) => { raw.before.elementFromPoint = { history: true, svg: false, canvas: false, drawer: false } }],
+  ['remaining-other-obstruction', (raw) => { raw.before.elementFromPoint = { class: 'other-overlay', svg: false, canvas: false, drawer: false } }],
+  ['wrong-preclick-owner', (raw) => { raw.before.elementFromPoint.pointId = 'other-point' }],
+  ['toolbar-only-trusted-events', (raw) => { raw.events.forEach((event) => { event.target = raw.toolbarPreparation.obstructed.observation.elementFromPoint }) }],
+  ['preexisting-selection-toolbar-input', (raw) => { raw.selected = raw.stateBefore.selection = { kind: 'stratum', id: raw.id }; raw.events.forEach((event) => { event.target = { svg: false, creationToolbar: true } }) }],
+  ['preparation-event-contamination', (raw) => { raw.before.events = raw.events }],
+  ['restoration-event-contamination', (raw) => { raw.after.events.push({ type: 'click', trusted: true, target: { creationToolbar: true } }) }],
+  ['missing-event-path', (raw) => { raw.events[0].path = [] }],
+  ['wrong-event-order', (raw) => { raw.events.reverse() }],
+  ['missing-event', (raw) => { raw.events.pop() }],
+  ['dropped-event', (raw) => { raw.after.droppedEvents = 1 }],
+  ['wrong-event-owner', (raw) => { raw.events[0].layout.owner = 'obsolete-point' }],
+  ['wrong-event-epoch', (raw) => { raw.events[0].App.labelDocumentRevision += 1 }],
+  ['untrusted-native-click', (raw) => { raw.events.at(-1).trusted = false }],
+  ['missing-raw-after-events', (raw) => { raw.after.events = [] }],
+  ['observer-error', (raw) => { raw.after.errors.push({ message: 'controlled observer failure' }) }],
+  ['secondary-cleanup-failure', (raw) => { raw.secondaryErrors.push({ message: 'controlled cleanup failure' }) }],
+]
+for (const [fault, mutate] of rawToolbarFaults) {
+  test(`synthetic 32D raw toolbar selection policy rejects ${fault}`, () => {
+    const raw = syntheticGeometricSelectionEvidence({ obstructed: true })
+    mutate(raw)
+    assert.throws(() => assertGeometricSelectionEvidence(raw, raw.id))
+  })
+}
+for (const actionName of ['Select', 'collapse', 'expand']) for (const field of ['json', 'runtimeDiagramJson', 'history', 'labelDocumentRevision', 'selection', 'uiSettings']) {
+  test(`synthetic 32D raw native ${actionName} policy rejects changed ${field}`, () => {
+    const raw = syntheticGeometricSelectionEvidence({ obstructed: true })
+    const action = raw.toolbarPreparation.actions.find(({ name }) => name === actionName)
+    if (field === 'selection') action.stateAfter.selection = { kind: 'stratum', id: 'other-point' }
+    else if (field === 'labelDocumentRevision') action.stateAfter[field] += 1
+    else action.stateAfter[field] += 'changed'
+    assert.throws(() => assertGeometricSelectionEvidence(raw, raw.id))
+  })
+}
+for (const actionName of ['Select', 'collapse', 'expand']) for (const field of ['camera', 'workPlaneControls', 'workPlaneStatus']) {
+  test(`synthetic 32D raw native ${actionName} policy rejects changed ${field}`, () => {
+    const raw = syntheticGeometricSelectionEvidence({ obstructed: true, ambientDimension: 3 })
+    const action = raw.toolbarPreparation.actions.find(({ name }) => name === actionName)
+    action.after[field] = field === 'workPlaneStatus' ? 'yz at x=20' : field === 'camera' ? { mode: '3d', scale: 10 } : [{ value: 'yz' }, { value: '20' }]
+    assert.throws(() => assertGeometricSelectionEvidence(raw, raw.id))
+  })
+}
 test('32D native anchor matrix matches independently recorded PGF categories', () => {
   for (const shape of layoutShapes) {
     const spec = pointNodeAnchorSupport[shape], anchors = pointAnchorsForShape(shape)
@@ -229,6 +356,7 @@ function setSyntheticRevision(records, revision) {
   for (const record of records) {
     if (revision === undefined) delete record.labelDocumentRevision
     else record.labelDocumentRevision = revision
+    if (record.layout?.owner && record.model?.id) record.layout.owner = JSON.stringify(['point-node', revision, record.model.id])
   }
 }
 function syntheticRevisionRecords(raw) {
@@ -236,7 +364,8 @@ function syntheticRevisionRecords(raw) {
     raw.preparation.inherited, raw.preparation.closed, raw.preparation.prepared, raw.stateBefore, raw.before,
     raw.afterAction.state, raw.afterAction.observation, raw.undo.stateBefore, raw.undo.stateAfter, raw.undo.observation,
     raw.redo.stateBefore, raw.redo.stateAfter, raw.redo.observation,
-    ...raw.afterAction.observation.events, ...raw.undo.observation.events, ...raw.redo.observation.events]
+    ...raw.afterAction.observation.events, ...raw.undo.observation.events, ...raw.redo.observation.events,
+    ...syntheticPointToolbarRevisionRecords(raw)]
 }
 function setSyntheticActionRevision(raw, action, revision) {
   const records = action === 'drag' ? [raw.afterAction.state, raw.afterAction.observation, raw.undo.stateBefore]
@@ -284,7 +413,9 @@ for (const boundary of ['before', 'after', 'undo', 'redo']) {
     assert.throws(() => assertLayoutAnchorEvidence(current, name), /observed revision matches authoritative state/u)
   })
 }
-for (const fault of ['stale-coordinate', 'wrong-next-owner', 'earlier-selection', 'overlay-only', 'wrong-pointer', 'model-edit', 'unclosed-drawer']) {
+for (const fault of ['stale-coordinate', 'wrong-next-owner', 'earlier-selection', 'overlay-only', 'wrong-pointer', 'model-edit', 'unclosed-drawer',
+  'missing-toolbar-preparation', 'missing-toolbar-restoration', 'stale-prepared-CTM', 'History-overlap', 'wrong-hit-stack',
+  'toolbar-event-contamination', 'obsolete-event-epoch', 'restoration-wrong-owner']) {
   test(`synthetic 32D owner-cycle policy rejects ${fault}`, () => {
     const name = 'point-layout-native-interaction-2d-3d', current = evidence(name), cycle = current.cases[0].ownerCycle
     if (fault === 'stale-coordinate') cycle.requestedClick = { x: 199, y: 300 }
@@ -294,6 +425,14 @@ for (const fault of ['stale-coordinate', 'wrong-next-owner', 'earlier-selection'
     if (fault === 'wrong-pointer') cycle.events[1].pointerId = 2
     if (fault === 'model-edit') cycle.stateAfter.json += 'changed'
     if (fault === 'unclosed-drawer') cycle.preparation.closed.inspector.open = true
+    if (fault === 'missing-toolbar-preparation') delete cycle.toolbarPreparation
+    if (fault === 'missing-toolbar-restoration') delete cycle.toolbarRestoration
+    if (fault === 'stale-prepared-CTM') cycle.toolbarPreparation.prepared.geometry.contour.screenCTM.e += 20
+    if (fault === 'History-overlap') cycle.before.elementFromPoint = { history: true, svg: false, canvas: false }
+    if (fault === 'wrong-hit-stack') cycle.before.elementsFromPoint[0] = { creationToolbar: true, svg: false, canvas: false }
+    if (fault === 'toolbar-event-contamination') cycle.events.push({ type: 'click', trusted: true, target: { creationToolbar: true } })
+    if (fault === 'obsolete-event-epoch') cycle.events[0].labelDocumentRevision += 1
+    if (fault === 'restoration-wrong-owner') cycle.toolbarRestoration.stateBefore.selection = { kind: 'stratum', id: 'overlap-point' }
     assert.throws(() => assertLayoutAnchorEvidence(current, name))
   })
 }

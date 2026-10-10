@@ -2,7 +2,8 @@ import assert from 'node:assert/strict'
 import test from 'node:test'
 import { assertPointNativeDragEvidence, assertPointCanvasPreparation, dragSelectedPoint, prepareSelectedPointCanvas,
   installPointNativeDragObserver, observePointNativeDrag, removePointNativeDragObserver, setPointNativeDragPhase } from '../../scripts/pointNativeDrag.mjs'
-import { syntheticPointNativeDragEvidence } from './pointNativeDragFixture.mjs'
+import { syntheticPointNativeDragEvidence, syntheticPointToolbarRevisionRecords } from './pointNativeDragFixture.mjs'
+import { observeGeometricSelection } from '../../scripts/pointGeometricSelection.mjs'
 
 // Policy/orchestration doubles. Native Chrome acceptance is retained separately
 // by the cumulative App runner; these records make no native-browser claim.
@@ -30,7 +31,10 @@ test('synthetic raw evidence supports drag history at its bounded capacity', () 
   after.past = [...before.past, before.present].slice(-100)
   const undo = { past: after.past.slice(0, -1), present: before.present, future: [after.present] }
   for (const state of [evidence.stateBefore, evidence.preparation.stateBefore, evidence.preparation.stateAfter, evidence.preparation.statePrepared]) state.history = JSON.stringify(before)
+  for (const state of [evidence.toolbarPreparation.stateBefore, evidence.toolbarPreparation.statePrepared,
+    ...evidence.toolbarPreparation.actions.flatMap((action) => [action.stateBefore, action.stateAfter])]) state.history = JSON.stringify(before)
   for (const state of [evidence.afterAction.state, evidence.undo.stateBefore, evidence.redo.stateAfter]) state.history = JSON.stringify(after)
+  for (const state of [evidence.toolbarRestoration.stateBefore, evidence.toolbarRestoration.stateAfter]) state.history = JSON.stringify(after)
   for (const state of [evidence.undo.stateAfter, evidence.redo.stateBefore]) state.history = JSON.stringify(undo)
   assertPointNativeDragEvidence(evidence)
 })
@@ -39,6 +43,7 @@ function setRevision(records, revision) {
   for (const record of records) {
     if (revision === undefined) delete record.labelDocumentRevision
     else record.labelDocumentRevision = revision
+    if (record.layout?.owner && record.model?.id) record.layout.owner = JSON.stringify(['point-node', revision, record.model.id])
   }
 }
 function epochRecords(evidence) {
@@ -47,7 +52,8 @@ function epochRecords(evidence) {
     evidence.stateBefore, evidence.before, evidence.afterAction.state, evidence.afterAction.observation,
     evidence.undo.stateBefore, evidence.undo.stateAfter, evidence.undo.observation,
     evidence.redo.stateBefore, evidence.redo.stateAfter, evidence.redo.observation,
-    ...evidence.afterAction.observation.events, ...evidence.undo.observation.events, ...evidence.redo.observation.events]
+    ...evidence.afterAction.observation.events, ...evidence.undo.observation.events, ...evidence.redo.observation.events,
+    ...syntheticPointToolbarRevisionRecords(evidence)]
 }
 function actionRevisionRecords(evidence, action) {
   // Keep the redundant authoritative, observed and successor records consistent
@@ -150,16 +156,52 @@ for (const [name, alter] of rejectionControls) test(`synthetic raw drag policy r
   const evidence = syntheticPointNativeDragEvidence(); alter(evidence)
   assert.throws(() => assertPointNativeDragEvidence(evidence))
 })
+for (const field of ['toolbarPreparation', 'toolbarRestoration']) test(`synthetic raw drag policy rejects missing ${field}`, () => {
+  const evidence = syntheticPointNativeDragEvidence()
+  delete evidence[field]
+  assert.throws(() => assertPointNativeDragEvidence(evidence))
+})
+test('synthetic raw drag policy rejects duplicate native Select records', () => {
+  const evidence = syntheticPointNativeDragEvidence()
+  evidence.toolbarPreparation.actions.push(structuredClone(evidence.toolbarPreparation.actions[0]))
+  assert.throws(() => assertPointNativeDragEvidence(evidence), /One native Select action/u)
+})
+for (const boundary of ['Select', 'restoration']) for (const field of ['json', 'runtimeDiagramJson', 'history', 'selection', 'labelDocumentRevision', 'uiSettings']) {
+  test(`synthetic raw drag policy rejects ${field} mutation during toolbar ${boundary}`, () => {
+    const evidence = syntheticPointNativeDragEvidence()
+    const record = boundary === 'Select' ? evidence.toolbarPreparation.actions[0] : evidence.toolbarRestoration
+    if (field === 'selection') {
+      record.stateAfter.selection = { kind: 'stratum', id: 'other-point' }
+      record.after.selection = record.stateAfter.selection
+    } else if (field === 'labelDocumentRevision') {
+      record.stateAfter.labelDocumentRevision++
+      record.after.labelDocumentRevision++
+      record.after.layout.owner = JSON.stringify(['point-node', record.after.labelDocumentRevision, record.after.model.id])
+    } else record.stateAfter[field] += ' '
+    assert.throws(() => assertPointNativeDragEvidence(evidence), new RegExp(`preserves ${field}`, 'u'))
+  })
+}
+for (const [name, record] of [['inherited', (e) => e.toolbarPreparation.inherited],
+  ['prepared', (e) => e.toolbarPreparation.prepared], ['Select before', (e) => e.toolbarPreparation.actions[0].before],
+  ['Select after', (e) => e.toolbarPreparation.actions[0].after], ['restoration before', (e) => e.toolbarRestoration.before],
+  ['restoration after', (e) => e.toolbarRestoration.after]]) {
+  test(`synthetic raw drag policy rejects toolbar ${name} observed-authoritative epoch disagreement`, () => {
+    const evidence = syntheticPointNativeDragEvidence()
+    record(evidence).labelDocumentRevision++
+    assert.throws(() => assertPointNativeDragEvidence(evidence), /Observed epoch matches authoritative state/u)
+  })
+}
 
 function orchestration(options = {}) {
   const evidence = syntheticPointNativeDragEvidence(), calls = [], records = [], secondaryErrors = []
   let open = options.closed ? false : true, phase = 'preparation', selected = false, scrolled = false, dragged = false, undone = false, redone = false
-  let install = false, cleanup = 0, stateReads = 0, observations = 0, mousePosition
+  let install = false, cleanup = 0, stateReads = 0, observations = 0, mousePosition, moveAttempted = false
+  let toolbarCollapsed = options.toolbarCollapsed ?? false
   const copy = (value) => structuredClone(value)
   const state = () => copy(redone ? evidence.redo.stateAfter : undone ? evidence.undo.stateAfter : dragged && !options.noMovement ? evidence.afterAction.state : evidence.stateBefore)
   const readState = async () => {
     calls.push('state'); stateReads++
-    if (options.readErrorAt === stateReads) throw options.readError
+    if (options.readErrorAt === stateReads || options.readAfterMoveError && moveAttempted) throw options.readError
     return state()
   }
   const page = {
@@ -171,6 +213,18 @@ function orchestration(options = {}) {
       }
       if (operation === removePointNativeDragObserver) { cleanup++; install = false; if (options.cleanupError) throw options.cleanupError; return }
       if (operation === setPointNativeDragPhase) { phase = argument.phase; return }
+      if (operation === observeGeometricSelection) {
+        const currentState = state(), runtime = JSON.parse(currentState.runtimeDiagramJson)
+        return { errors: [], selection: currentState.selection, labelDocumentRevision: currentState.labelDocumentRevision,
+          model: runtime.strata.find(({ id }) => id === argument.id), camera: runtime.camera,
+          workPlaneControls: [], workPlaneStatus: ['xy-plane at z=0'],
+          layout: { owner: JSON.stringify(['point-node', currentState.labelDocumentRevision, argument.id]),
+            source: runtime.strata.find(({ id }) => id === argument.id).text, request: 'point-request', bodyRequest: 'point-request' },
+          inspector: { open }, tool: { selectPressed: toolbarCollapsed ? null : selected ? 'true' : 'false' },
+          toolbar: { overlayCount: 1, collapsed: toolbarCollapsed, floatingCount: toolbarCollapsed ? 0 : 1,
+            expandCount: toolbarCollapsed ? 1 : 0, collapseCount: toolbarCollapsed ? 0 : 1,
+            quickStyleCount: toolbarCollapsed ? 0 : 1, historyCount: 1 } }
+      }
       assert.equal(operation, observePointNativeDrag)
       observations++
       if (options.observeErrorAt === observations || options.observeAfterDragError && dragged) throw options.observeError
@@ -189,17 +243,37 @@ function orchestration(options = {}) {
     locator(selector) {
       if (selector === '#preview-inspector-drawer') return { count: async () => open ? 1 : 0,
         waitFor: async ({ state: expected, timeout }) => { calls.push('detach'); assert.equal(expected, 'detached'); assert.equal(timeout, 5000); if (options.detachError) throw options.detachError } }
+      if (selector.startsWith('.preview-') || selector === 'section.preview-floating-toolbar') return {
+        count: async () => selector.endsWith('.preview-floating-toolbar') ? Number(!toolbarCollapsed) : 1,
+        waitFor: async ({ state: expected, timeout }) => {
+          calls.push(`toolbar wait ${selector} ${expected}`); assert.equal(timeout, 5000)
+          if (options.toolbarWaitError) throw options.toolbarWaitError
+          if (selector.endsWith('.preview-floating-toolbar')) assert.equal(expected, toolbarCollapsed ? 'detached' : 'visible')
+          else if (selector.includes(':not')) assert.equal(toolbarCollapsed, false)
+          else if (selector.includes('.is-collapsed')) assert.equal(toolbarCollapsed, true)
+        },
+      }
       assert.equal(selector, 'svg.svg-diagram')
       return { scrollIntoViewIfNeeded: async ({ timeout }) => { assert.equal(timeout, 5000); calls.push('scroll'); scrolled = true; if (options.scrollError) throw options.scrollError } }
     },
     getByRole(role, { name, exact }) {
       assert.equal(role, 'button'); assert.equal(exact, true)
-      return { count: async () => name === 'Close inspector drawer' ? options.closeCount ?? (open ? 1 : 0) : 1,
-        getAttribute: async () => options.openerExpanded ?? (open ? 'true' : 'false'),
+      return { count: async () => name === 'Close inspector drawer' ? options.closeCount ?? (open ? 1 : 0)
+        : name === 'Select' ? options.selectCount ?? Number(!toolbarCollapsed)
+        : name === 'Expand preview toolbar' ? options.expandCount ?? Number(toolbarCollapsed)
+        : name === 'Collapse preview toolbar' ? options.collapseCount ?? Number(!toolbarCollapsed) : 1,
+        getAttribute: async (attribute) => attribute === 'aria-pressed' ? selected ? 'true' : 'false'
+          : options.openerExpanded ?? (open ? 'true' : 'false'),
+        waitFor: async ({ state: expected, timeout }) => {
+          calls.push(`toolbar wait ${name} ${expected}`); assert.equal(timeout, 5000); assert.equal(expected, 'visible')
+          assert.equal(name, toolbarCollapsed ? 'Expand preview toolbar' : 'Collapse preview toolbar')
+        },
         click: async ({ timeout } = {}) => {
           assert.equal(timeout, 5000); calls.push(name)
           if (name === 'Close inspector drawer') { if (options.closeError) throw options.closeError; if (!options.keepOpen) open = false }
           else if (name === 'Select') selected = true
+          else if (name === 'Expand preview toolbar') { if (options.expandError) throw options.expandError; toolbarCollapsed = false }
+          else if (name === 'Collapse preview toolbar') { if (options.collapseError) throw options.collapseError; toolbarCollapsed = true }
           else if (name === 'Undo last diagram change') undone = true
           else if (name === 'Redo last undone diagram change') redone = true
           else assert.fail(`Unexpected button: ${name}`)
@@ -208,19 +282,21 @@ function orchestration(options = {}) {
     mouse: {
       async move(x, y, moveOptions) {
         calls.push(moveOptions ? 'drag-move' : 'start-move'); mousePosition = { x, y }
-        if (moveOptions) { assert.deepEqual(moveOptions, { steps: 4 }); if (options.moveError) throw options.moveError }
+        if (moveOptions) { moveAttempted = true; assert.deepEqual(moveOptions, { steps: 4 }); if (options.moveError) throw options.moveError }
       },
       async down() { calls.push('mouse-down'); assert.deepEqual(mousePosition, evidence.requested.start); if (options.downError) throw options.downError },
       async up() { calls.push('mouse-up'); if (phase === 'drag') dragged = true },
     },
   }
   const diagnose = async ({ boundary, observation }) => {
+    if (boundary === 'toolbar-restored-before-assertion') options.mutateAfterRestore?.(observation)
     records.push({ boundary, observation: copy(observation) })
     if (options.artifactError) throw options.artifactError
   }
   const arguments_ = { page, readState, diagnose, secondaryErrors, scenario: evidence.scenario, sequence: 1,
     id: evidence.id, displacement: evidence.displacement, steps: evidence.steps }
-  return { arguments_, evidence, calls, records, secondaryErrors, get cleanup() { return cleanup }, get installed() { return install } }
+  return { arguments_, evidence, calls, records, secondaryErrors, get cleanup() { return cleanup },
+    get installed() { return install }, get toolbarCollapsed() { return toolbarCollapsed } }
 }
 
 test('synthetic orchestration closes a reopened Inspector once and freshly measures after Select/scroll', async () => {
@@ -244,6 +320,86 @@ test('synthetic standalone preparation returns preserved selected owner and fres
   const fixture = orchestration(), preparation = await prepareSelectedPointCanvas(fixture.arguments_)
   assertPointCanvasPreparation(preparation, 'app-point')
   assert.equal(fixture.calls.includes('mouse-down'), false); assert.equal(fixture.cleanup, 1)
+})
+for (const operation of [dragSelectedPoint, prepareSelectedPointCanvas]) {
+  test(`synthetic ${operation.name} expands inherited collapsed toolbar for native Select and restores its owned state`, async () => {
+    const fixture = orchestration({ toolbarCollapsed: true })
+    await operation(fixture.arguments_)
+    assert.equal(fixture.toolbarCollapsed, true)
+    assert.equal(fixture.calls.filter((call) => call === 'Expand preview toolbar').length, 1)
+    assert.equal(fixture.calls.filter((call) => call === 'Collapse preview toolbar').length, 1)
+    assert.equal(fixture.calls.filter((call) => call === 'Select').length, 1)
+    assert.ok(fixture.calls.indexOf('Expand preview toolbar') < fixture.calls.indexOf('Select'))
+    assert.ok(fixture.calls.indexOf('Select') < fixture.calls.indexOf('scroll'))
+    assert.ok(fixture.calls.indexOf('removePointNativeDragObserver') < fixture.calls.indexOf('Collapse preview toolbar'))
+    assert.equal(fixture.cleanup, 1)
+  })
+  test(`synthetic ${operation.name} keeps inherited expanded toolbar available without toggling`, async () => {
+    const fixture = orchestration()
+    await operation(fixture.arguments_)
+    assert.equal(fixture.toolbarCollapsed, false)
+    assert.equal(fixture.calls.includes('Expand preview toolbar'), false)
+    assert.equal(fixture.calls.includes('Collapse preview toolbar'), false)
+    assert.equal(fixture.calls.filter((call) => call === 'Select').length, 1)
+  })
+  test(`synthetic ${operation.name} retains failed native toolbar expansion before canvas input`, async () => {
+    const primary = new Error('native toolbar expansion failed'), fixture = orchestration({ toolbarCollapsed: true, expandError: primary })
+    await assert.rejects(operation(fixture.arguments_), (error) => error === primary)
+    assert.equal(fixture.calls.includes('Select'), false)
+    assert.equal(fixture.calls.includes('mouse-down'), false)
+    assert.equal(fixture.cleanup, 1)
+  })
+  test(`synthetic ${operation.name} retains first native restoration error after observer cleanup`, async () => {
+    const primary = new Error('native toolbar restoration failed'), fixture = orchestration({ toolbarCollapsed: true, collapseError: primary })
+    await assert.rejects(operation(fixture.arguments_), (error) => error === primary)
+    assert.equal(fixture.cleanup, 1)
+    assert.equal(fixture.calls.filter((call) => call === 'Collapse preview toolbar').length, 1)
+    assert.equal(fixture.records.at(-1).observation.primary.message, primary.message)
+  })
+}
+test('synthetic native drag primary action survives owned toolbar restoration failure', async () => {
+  const primary = new Error('native movement failed'), fixture = orchestration({ toolbarCollapsed: true,
+    moveError: primary, collapseError: new Error('native toolbar restoration failed') })
+  await assert.rejects(dragSelectedPoint(fixture.arguments_), (error) => error === primary)
+  assert.equal(fixture.cleanup, 1)
+  assert.equal(fixture.calls.filter((call) => call === 'Collapse preview toolbar').length, 1)
+  assert.ok(fixture.secondaryErrors.some((message) => message.includes('native toolbar restoration failed')))
+})
+test('synthetic restored inherited toolbar permits the next native drag preparation to access Select', async () => {
+  const fixture = orchestration({ toolbarCollapsed: true })
+  await prepareSelectedPointCanvas(fixture.arguments_)
+  assert.equal(fixture.toolbarCollapsed, true)
+  const drag = await dragSelectedPoint(fixture.arguments_)
+  assertPointNativeDragEvidence(drag)
+  assert.equal(fixture.toolbarCollapsed, true)
+  assert.equal(fixture.calls.filter((call) => call === 'Select').length, 2)
+  assert.equal(fixture.calls.filter((call) => call === 'Expand preview toolbar').length, 2)
+  assert.equal(fixture.calls.filter((call) => call === 'Collapse preview toolbar').length, 2)
+  assert.equal(fixture.cleanup, 2)
+})
+test('synthetic completed native drag retains its post-restoration raw history validator failure as final primary evidence', async () => {
+  const fixture = orchestration({ toolbarCollapsed: true, mutateAfterRestore: (observation) => {
+    observation.undo.stateAfter.history = '{}'
+  } })
+  await assert.rejects(dragSelectedPoint(fixture.arguments_), /Undo reverses precisely the drag history commit/u)
+  const final = fixture.records.at(-1)
+  assert.equal(final.boundary, 'native-drag-finished')
+  assert.match(final.observation.primary.message, /Undo reverses precisely the drag history commit/u)
+  assert.equal(final.observation.undo.stateAfter.history, '{}')
+  assert.equal(fixture.toolbarCollapsed, true)
+  assert.equal(fixture.cleanup, 1)
+})
+test('synthetic standalone preparation retains its completed raw toolbar validator failure as final primary evidence', async () => {
+  const fixture = orchestration({ toolbarCollapsed: true, mutateAfterRestore: (observation) => {
+    observation.toolbarPreparation.actions.find(({ name }) => name === 'Select').pressed = 'false'
+  } })
+  await assert.rejects(prepareSelectedPointCanvas(fixture.arguments_))
+  const final = fixture.records.at(-1)
+  assert.equal(final.boundary, 'canvas-preparation-finished')
+  assert.ok(final.observation.primary.message)
+  assert.equal(final.observation.toolbarPreparation.actions.find(({ name }) => name === 'Select').pressed, 'false')
+  assert.equal(fixture.toolbarCollapsed, true)
+  assert.equal(fixture.cleanup, 1)
 })
 for (const [name, options] of [
   ['failed native close', { closeError: new Error('native close failed') }],
@@ -269,7 +425,7 @@ test('synthetic unchanged model assertion is retained before cleanup even with a
 })
 test('synthetic primary native action error survives state/observation/artifact/cleanup failures', async () => {
   const primary = new Error('native movement failed'), fixture = orchestration({ moveError: primary,
-    readErrorAt: 5, readError: new Error('read failed'), observeAfterDragError: true, observeError: new Error('observation failed'),
+    readAfterMoveError: true, readError: new Error('read failed'), observeAfterDragError: true, observeError: new Error('observation failed'),
     artifactError: new Error('artifact failed'), cleanupError: new Error('cleanup failed') })
   await assert.rejects(dragSelectedPoint(fixture.arguments_), (error) => error === primary)
   assert.equal(fixture.calls.filter((call) => call === 'mouse-up').length, 1, 'Held native input released on failure')

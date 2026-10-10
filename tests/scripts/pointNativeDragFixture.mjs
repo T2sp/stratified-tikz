@@ -1,5 +1,12 @@
 // Synthetic policy fixture only. This does not execute native browser input and
 // must never be used as native acceptance evidence.
+export function syntheticPointToolbarRevisionRecords(raw) {
+  return [raw.toolbarPreparation.stateBefore, raw.toolbarPreparation.inherited,
+    raw.toolbarPreparation.statePrepared, raw.toolbarPreparation.prepared,
+    ...raw.toolbarPreparation.actions.flatMap((action) => [action.stateBefore, action.before, action.stateAfter, action.after]),
+    raw.toolbarRestoration.stateBefore, raw.toolbarRestoration.before, raw.toolbarRestoration.stateAfter, raw.toolbarRestoration.after]
+}
+
 export function syntheticPointNativeDragEvidence({ id = 'app-point', ambientDimension = 2, shape = 'diamond',
   scenario = 'point-geometric-native-contours-2d-3d', displacement = { x: 28, y: -16 }, steps = 4 } = {}) {
   const point = { id, codim: ambientDimension, geometricKind: 'point', name: 'Point', text: 'drag $x_i$',
@@ -44,10 +51,25 @@ export function syntheticPointNativeDragEvidence({ id = 'app-point', ambientDime
       CTM: { a: 1, b: 0, c: 0, d: 1, e: 0, f: 0 }, start },
     elementFromPoint: element, elementsFromPoint: [element, root], events: observedEvents, droppedEvents: 0, errors: [],
     captureStates: observedEvents.length ? [{ pointerId: 1, captured: false }] : [] })
+  const toolbarSnapshot = (currentState) => {
+    const model = JSON.parse(currentState.runtimeDiagramJson)
+    return { at: 10, selection: currentState.selection, labelDocumentRevision: currentState.labelDocumentRevision,
+      model: model.strata.find((entry) => entry.id === id), camera: model.camera ?? null,
+      workPlaneControls: [], workPlaneStatus: ['xy-plane at z=0'], inspector: { open: false },
+      layout: { shape, owner: JSON.stringify(['point-node', currentState.labelDocumentRevision, id]), source: point.text,
+        request: 'synthetic-point-request', bodyRequest: 'synthetic-point-request', state: 'ready' },
+      tool: { selectPressed: 'true' }, toolbar: { overlayCount: 1, collapsed: false, floatingCount: 1,
+        expandCount: 0, collapseCount: 1, quickStyleCount: 1, historyCount: 1 }, errors: [] }
+  }
+  const toolbarBefore = toolbarSnapshot(stateBefore), toolbarAfter = toolbarSnapshot(stateRedo)
   return JSON.parse(JSON.stringify({ kind: 'point-native-drag', scenario, sequence: 1, id, displacement, steps,
     preparation: { stateBefore, inherited: snapshot(true), closeActions: 1, drawerCount: 1,
       closedDrawerCount: 0, openerCount: 1, openerExpanded: 'false', closed: snapshot(), stateAfter: stateBefore,
       prepared: snapshot(), statePrepared: stateBefore },
+    toolbarPreparation: { stateBefore, inherited: toolbarBefore, statePrepared: stateBefore, prepared: toolbarBefore,
+      actions: [{ name: 'Select', purpose: 'select', stateBefore, before: toolbarBefore, stateAfter: stateBefore, after: toolbarBefore,
+        controlCount: 1, pressed: 'true' }] },
+    toolbarRestoration: { stateBefore: stateRedo, before: toolbarAfter, stateAfter: stateRedo, after: toolbarAfter },
     before: snapshot(), stateBefore, requested: { start, end },
     afterAction: { state: stateAfter, observation: snapshot(false, events, after.strata[0]) },
     undo: { stateBefore: stateAfter, stateAfter: stateUndo, observation: snapshot(false, events, point) },

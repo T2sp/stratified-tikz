@@ -14,7 +14,8 @@ import { geometricShapeManifest, geometricBodyVariants, geometricShapeScenarios,
 import { syntheticMechanismEvidence } from './pointDashCapMechanismFixture.mjs'
 import { selectGeometricPoint, installGeometricSelectionObserver, observeGeometricSelection,
   removeGeometricSelectionObserver } from '../../scripts/pointGeometricSelection.mjs'
-import { syntheticPointNativeDragEvidence } from './pointNativeDragFixture.mjs'
+import { syntheticPointNativeDragEvidence, syntheticPointToolbarRevisionRecords } from './pointNativeDragFixture.mjs'
+import { syntheticGeometricSelectionEvidence } from './pointGeometricSelectionFixture.mjs'
 
 // These preparation and event-delivery controls are explicitly synthetic. They
 // exercise ordering/error ownership; the reused native App shape loop is the
@@ -22,27 +23,51 @@ import { syntheticPointNativeDragEvidence } from './pointNativeDragFixture.mjs'
 function selectionDeliveryControl(options = {}) {
   const { observationFailure, evidenceFailure, cleanupFailure, mouseFailure } = options
   const calls = [], observations = [], secondaryErrors = []
-  const rendered = { shape: 'circle', source: 'native shape', center: { x: 1250, y: 270 }, boundary: { x: 1190, y: 280 } }
+  const screenOrigin = options.semicircle ? { x: 1296.4, y: 268.975 } : { x: 1250, y: 270 }
+  const nativeLocalBoundary = { x: 5.418630123138428, y: -35.62142562866211 }
+  const rendered = { shape: options.semicircle ? 'semicircle' : 'circle', source: options.semicircle ? 'drag $x_i$' : '  native shape\t\n',
+    center: screenOrigin,
+    boundary: options.nativeBoundaryFloat32 ? { x: Math.fround(3.1 * nativeLocalBoundary.x + screenOrigin.x),
+      y: Math.fround(3.1 * nativeLocalBoundary.y + screenOrigin.y) }
+      : options.semicircle ? { x: 1313.197754, y: 158.548584 } : { x: 1190, y: 280 } }
   const staleRendered = { ...rendered, center: { x: 1510, y: 140 }, boundary: { x: 1450, y: 150 } }
-  const diagram = { ambientDimension: 2, strata: [{ id: 'app-point', geometricKind: 'point', codim: 2,
-    position: { x: 3, y: 3, z: 0 }, text: '  native shape\t\n',
-    style: { shape: 'circle', size: 8, opacity: 1, layout: { anchor: 'center', innerXSep: 2,
+  const diagram = { ambientDimension: 2, camera: { mode: '2d', scale: 1, origin: { x: 0, y: 0 } }, strata: [{ id: 'app-point', geometricKind: 'point', codim: 2,
+    position: { x: 3, y: 3, z: 0 }, text: rendered.source,
+    style: { shape: options.semicircle ? 'semicircle' : 'circle', size: 8, opacity: 1,
+      ...(options.semicircle ? { shapeParameters: { borderUsesIncircle: true, borderRotate: 33 } } : {}), layout: { anchor: 'center', innerXSep: 2,
       units: { innerXSep: { source: '2pt', unit: 'pt', texPoints: 2 } } } } }] }
   const authoritative = { json: JSON.stringify({ version: 2, diagram }), runtimeDiagramJson: JSON.stringify(diagram),
-    history: JSON.stringify({ past: [], present: diagram, future: [] }), labelDocumentRevision: 10 }
+    history: JSON.stringify({ past: [], present: diagram, future: [] }), labelDocumentRevision: options.semicircle ? 102 : 10,
+    uiSettings: JSON.stringify({ exportMode: 'standalone', includeCoordinateAxesInTikz: false }) }
   const current = { selection: options.initialSelection ?? null, drawerOpen: options.drawerOpen ?? false,
-    scrolled: false, closeActions: 0, installed: false, events: [], preparationSnapshots: 0 }
+    scrolled: false, closeActions: 0, installed: false, events: [], preparationSnapshots: 0,
+    toolbarExpanded: options.toolbarExpanded ?? true, collapseActions: 0, expandActions: 0, selectPressed: options.selectPressed ?? 'true',
+    workPlaneControls: [], workPlaneStatus: [], measurementCount: 0, mouseActions: 0 }
   const pointTarget = { tag: 'circle', pointId: 'app-point', drawer: false, svg: true, canvas: true, canvasRoot: false, pointHandle: false }
   const handleTarget = { tag: 'circle', class: 'svg-geometry-handle', pointId: null, drawer: false,
     svg: true, canvas: true, canvasRoot: false, pointHandle: true }
   const overlayTarget = { tag: 'div', class: 'empty-inspector', pointId: null, drawer: true,
     svg: false, canvas: false, canvasRoot: false, pointHandle: false }
   const otherOverlayTarget = { ...overlayTarget, class: 'other-overlay', drawer: false }
+  const toolbarTarget = { ...otherOverlayTarget, tag: 'span', class: 'preview-toolbar-status', creationToolbar: true,
+    toolbarOverlay: true, toolbar: true, history: false, quickStyle: false }
+  const historyTarget = { ...otherOverlayTarget, class: 'preview-history-toolbar', history: true, creationToolbar: false,
+    toolbarOverlay: true, toolbar: false, quickStyle: false }
+  const quickStyleTarget = { ...otherOverlayTarget, tag: 'button', class: 'context-quick-style-bar', history: false,
+    creationToolbar: false, toolbarOverlay: true, toolbar: false, quickStyle: true }
   const canvasTarget = { tag: 'svg', class: 'svg-diagram', drawer: false, svg: true, canvas: true, canvasRoot: true, pointHandle: false }
-  const target = () => ({ point: pointTarget, handle: handleTarget, drawer: overlayTarget, overlay: otherOverlayTarget,
-    wrongPoint: { ...pointTarget, pointId: 'other-point' } }[options.targetKind ?? 'point'])
+  const target = () => {
+    if (current.toolbarExpanded && options.quickStyleCovered) return quickStyleTarget
+    if (current.toolbarExpanded && options.toolbarCovered) return toolbarTarget
+    if (!current.toolbarExpanded && options.remainingObstruction) return { toolbar: toolbarTarget, history: historyTarget,
+      other: otherOverlayTarget }[options.remainingObstruction]
+    return ({ point: pointTarget, handle: handleTarget, drawer: overlayTarget, overlay: otherOverlayTarget,
+      wrongPoint: { ...pointTarget, pointId: 'other-point' } }[options.targetKind ?? 'point'])
+  }
   const pathFor = (eventTarget) => {
-    if (options.missingPath) return []
+    if (eventTarget.creationToolbar) return [eventTarget, { ...toolbarTarget, tag: 'div', class: 'preview-fill-path-control' },
+      { ...toolbarTarget, tag: 'section', class: 'preview-floating-toolbar', ariaLabel: 'Creation toolbar' },
+      { ...toolbarTarget, tag: 'div', class: 'preview-toolbar-overlay-stack' }]
     if (!eventTarget.svg) return [eventTarget]
     return [eventTarget, ...(eventTarget.pointHandle ? [{ tag: 'g', pointId: null, drawer: false,
       svg: true, canvas: true, canvasRoot: false, pointHandle: false, ariaLabel: 'Selected point drag handles' }] : [
@@ -51,7 +76,34 @@ function selectionDeliveryControl(options = {}) {
   const page = {
     getByRole: (role, { name, exact }) => {
       assert.equal(role, 'button'); assert.equal(exact, true)
-      if (name === 'Select') return { click: async () => { calls.push('Select') } }
+      if (name === 'Select') return {
+        count: async () => { calls.push('Select count'); return options.selectCount ?? Number(current.toolbarExpanded) },
+        getAttribute: async (attribute) => { assert.equal(attribute, 'aria-pressed'); return current.selectPressed },
+        click: async () => { calls.push('Select'); assert.equal(current.toolbarExpanded, true, 'Select is exposed by native toolbar expansion')
+          if (options.selectFailure) throw options.selectFailure
+          current.selectPressed = options.selectPressedAfter ?? 'true'; if (options.mutateOnSelect) options.mutateOnSelect(authoritative, current)
+        },
+      }
+      if (name === 'Collapse preview toolbar' || name === 'Expand preview toolbar') {
+        const collapsing = name === 'Collapse preview toolbar', action = collapsing ? 'collapse' : 'expand'
+        return {
+          count: async () => { calls.push(`${action} count`); return options[`${action}Count`] ?? Number(current.toolbarExpanded === collapsing) },
+          getAttribute: async (attribute) => { assert.equal(attribute, 'aria-expanded'); return current.toolbarExpanded ? 'true' : 'false' },
+          click: async (settings) => {
+            assert.deepEqual(settings, { timeout: 5000 }); calls.push(action); current[`${action}Actions`]++
+            if (options[`${action}Failure`]) throw options[`${action}Failure`]
+            if (!options[`${action}DetachedFailure`] && !options[`${action}ReportedSuccess`]) current.toolbarExpanded = !collapsing
+            if (collapsing && options.collapseFailureAfterToggle) throw options.collapseFailureAfterToggle
+            if (options[`mutateOn${collapsing ? 'Collapse' : 'Expand'}`]) options[`mutateOn${collapsing ? 'Collapse' : 'Expand'}`](authoritative, current)
+            if (current.installed) current.events.push(...['pointerdown', 'pointerup', 'click'].map((type) => ({ type, trusted: true,
+              target: toolbarTarget, path: pathFor(toolbarTarget), client: { x: 1300, y: 150 }, pointerId: 7 })))
+          },
+          waitFor: async (settings) => { calls.push(`${action} control wait`); assert.equal(settings.timeout, 5000)
+            if (options[`${action}ControlFailure`]) throw options[`${action}ControlFailure`]
+            assert.equal(current.toolbarExpanded === collapsing, settings.state !== 'detached')
+          },
+        }
+      }
       if (name === 'Close inspector drawer') return {
         count: async () => { calls.push('close count'); return options.closeCount ?? Number(current.drawerOpen) },
         click: async (settings) => {
@@ -70,6 +122,22 @@ function selectionDeliveryControl(options = {}) {
     },
     locator: (selector) => {
       if (selector === 'svg.svg-diagram') return { scrollIntoViewIfNeeded: async () => { calls.push('scroll'); current.scrolled = true } }
+      if (['.preview-floating-toolbar', 'section.preview-floating-toolbar', '.preview-toolbar-overlay-stack',
+        '.preview-toolbar-overlay-stack.is-collapsed', '.preview-toolbar-overlay-stack:not(.is-collapsed)',
+        '.preview-context-quick-style', '.preview-quick-style-bar'].includes(selector)) {
+        const overlay = selector === '.preview-toolbar-overlay-stack', collapsed = selector === '.preview-toolbar-overlay-stack.is-collapsed'
+        return {
+          count: async () => { calls.push(`${selector} count`); return options.floatingCount ?? Number(overlay || (collapsed ? !current.toolbarExpanded : current.toolbarExpanded)) },
+          getAttribute: async (attribute) => { assert.equal(attribute, 'class'); return `preview-toolbar-overlay-stack${current.toolbarExpanded ? '' : ' is-collapsed'}` },
+          waitFor: async (settings) => { calls.push(`toolbar ${settings.state}`); assert.equal(settings.timeout, 5000)
+            if (selector === 'section.preview-floating-toolbar') {
+              if (options[`${settings.state === 'detached' ? 'collapse' : 'expand'}DetachedFailure`]) throw options[`${settings.state === 'detached' ? 'collapse' : 'expand'}DetachedFailure`]
+              if (options[`${settings.state === 'detached' ? 'collapse' : 'expand'}ReportedSuccess`]) return
+            }
+            assert.equal(overlay || (collapsed ? !current.toolbarExpanded : current.toolbarExpanded), settings.state !== 'detached')
+          },
+        }
+      }
       assert.equal(selector, '#preview-inspector-drawer')
       return { count: async () => { calls.push('drawer count'); return options.drawerCount ?? Number(current.drawerOpen) },
         waitFor: async (settings) => {
@@ -81,20 +149,23 @@ function selectionDeliveryControl(options = {}) {
     },
     mouse: { click: async (x, y) => {
       calls.push(['native click', x, y])
+      current.mouseActions++
       if (mouseFailure) throw mouseFailure
       assert.equal(current.drawerOpen, false, 'synthetic canvas input follows verified drawer closure')
       assert.equal(current.scrolled, true, 'synthetic canvas input follows canvas scrolling')
       const expected = options.boundary ? rendered.boundary : rendered.center
       assert.deepEqual({ x, y }, expected, 'synthetic canvas input uses post-preparation coordinates')
-      const eventTarget = options.eventTargetKind ? { ...target(), ...({ drawer: overlayTarget, overlay: otherOverlayTarget }[options.eventTargetKind]) } : target()
+      const eventTarget = options.eventTargetKind ? { ...target(), ...({ drawer: overlayTarget, overlay: otherOverlayTarget,
+        toolbar: toolbarTarget, history: historyTarget }[options.eventTargetKind]) } : target()
       current.events = ['pointerdown', 'pointerup', 'click'].map((type) => {
         const capturedContinuation = options.handleCapture && type !== 'pointerdown'
         const deliveredTarget = capturedContinuation ? canvasTarget : eventTarget
-        return { type, trusted: options.untrustedType !== type, target: deliveredTarget,
-          path: capturedContinuation ? [canvasTarget] : pathFor(deliveredTarget),
+        return { type, trusted: options.untrustedType !== type, target: deliveredTarget, button: 0,
+          path: options.missingPath ? [] : capturedContinuation ? [canvasTarget] : pathFor(deliveredTarget),
           client: options.farClick && type === 'click' ? { x: x + 20, y: y + 20 } : { x, y },
           pointerId: options.mouseEventClick && type === 'click' ? null : options.wrongPointerId && type !== 'pointerdown' ? 8 : 7,
-          canvasHasPointerCapture: capturedContinuation && type === 'pointerup' && !options.missingCapture }
+          canvasHasPointerCapture: capturedContinuation && type === 'pointerup' && !options.missingCapture,
+          App: { labelDocumentRevision: authoritative.labelDocumentRevision } }
       })
       if (options.wrongEventOrder) current.events.reverse()
       if (!options.selectionFailure) current.selection = { id: 'app-point' }
@@ -103,33 +174,67 @@ function selectionDeliveryControl(options = {}) {
       if (operation === installGeometricSelectionObserver) { calls.push('install'); current.installed = true; current.events = []; return }
       if (operation === removeGeometricSelectionObserver) { calls.push('cleanup'); current.installed = false; if (cleanupFailure) throw cleanupFailure; return }
       assert.equal(operation, observeGeometricSelection)
-      const preparationStage = current.preparationSnapshots % 2 === 0 ? 'inherited' : 'closed'
+      const preparationStage = current.preparationSnapshots === 0 ? 'inherited' : current.preparationSnapshots === 1 ? 'closed' : 'toolbar'
       calls.push(argument.click ? 'snapshot' : `${preparationStage} snapshot`)
       if (!argument.click) {
         current.preparationSnapshots++
         if (options.preparationObservationFailure === preparationStage) throw new Error(`controlled ${preparationStage} observation failure`)
       }
-      if (observationFailure && argument.click) throw observationFailure
-      return { errors: [], layout: { shape: 'circle', source: 'native shape' }, requestedClick: argument.click,
+      if ((observationFailure && current.mouseActions > 0 || options.beforeObservationFailure && argument.click
+        || options.beforeObservationFailureAfterCollapse && argument.click && current.collapseActions > 0
+        || options.observationFailureAfterCollapse && current.collapseActions > 0 && !current.toolbarExpanded)) {
+        throw observationFailure ?? options.beforeObservationFailure ?? options.beforeObservationFailureAfterCollapse ?? options.observationFailureAfterCollapse
+      }
+      return { errors: [], layout: { shape: rendered.shape, source: options.layoutSource ?? rendered.source,
+        owner: Object.hasOwn(options, 'layoutOwner') ? options.layoutOwner : JSON.stringify(['point-node', authoritative.labelDocumentRevision, 'app-point']),
+        request: options.layoutRequest ?? 'point-request', bodyRequest: options.layoutBodyRequest ?? 'point-request', state: 'ready' }, requestedClick: argument.click,
         selection: structuredClone(current.selection), inspector: { open: current.drawerOpen, noSelection: !current.selection,
           expansionControls: current.drawerOpen ? [{ text: 'Collapse', expanded: 'true' }] : [] },
-        geometry: { point: { screenCTM: { a: 3.1, b: 0, c: 0, d: 3.1,
+        toolbar: { overlayCount: options.overlayCount ?? 1, count: 1, expanded: current.toolbarExpanded, collapsed: !current.toolbarExpanded,
+          floatingCount: Number(current.toolbarExpanded), creationCount: Number(current.toolbarExpanded),
+          expandCount: Number(!current.toolbarExpanded), collapseCount: Number(current.toolbarExpanded),
+          expandControls: current.toolbarExpanded ? [] : [{ ariaLabel: 'Expand preview toolbar' }],
+          collapseControls: current.toolbarExpanded ? [{ ariaLabel: 'Collapse preview toolbar' }] : [],
+          quickStyleCount: Number(current.toolbarExpanded && options.quickStyleCovered), historyCount: 1 },
+        model: structuredClone(JSON.parse(authoritative.runtimeDiagramJson).strata[0]),
+        camera: structuredClone(JSON.parse(authoritative.runtimeDiagramJson).camera), labelDocumentRevision: authoritative.labelDocumentRevision,
+        workPlaneControls: structuredClone(current.workPlaneControls), workPlaneStatus: structuredClone(current.workPlaneStatus),
+        tool: { selectPressed: current.toolbarExpanded ? current.selectPressed : null },
+        geometry: { contour: { connected: true, length: 400, fraction: .23,
+          localBoundary: options.nativeBoundaryFloat32 ? nativeLocalBoundary
+            : { x: (rendered.boundary.x - rendered.center.x) / 3.1, y: (rendered.boundary.y - rendered.center.y) / 3.1 },
+          boundary: options.staleContourBoundary || options.staleContourBoundaryAfterCollapse && current.collapseActions > 0
+            ? staleRendered.boundary : rendered.boundary,
+          screenCTM: { a: 3.1, b: 0, c: 0, d: 3.1,
+            e: options.staleContourCTM || options.staleContourCTMAfterCollapse && current.collapseActions > 0
+              ? staleRendered.center.x : rendered.center.x,
+            f: options.staleContourCTM || options.staleContourCTMAfterCollapse && current.collapseActions > 0
+              ? staleRendered.center.y : rendered.center.y } },
+          point: { center: rendered.center, screenCTM: { a: 3.1, b: 0, c: 0, d: 3.1,
           e: current.scrolled ? rendered.center.x : staleRendered.center.x,
           f: current.scrolled ? rendered.center.y : staleRendered.center.y } } },
         elementFromPoint: argument.click ? target() : null, elementsFromPoint: argument.click ? pathFor(target()) : [],
-        events: [...current.events], droppedEvents: options.droppedEvents ?? 0 }
+        events: argument.token && current.installed ? [...current.events] : [], droppedEvents: options.droppedEvents ?? 0 }
     },
   }
   return { calls, observations, secondaryErrors, rendered, staleRendered, page, current, authoritative,
-    readState: async () => { calls.push('state'); return structuredClone({ ...authoritative, selection: current.selection }) },
+    readState: async () => {
+      calls.push('state')
+      if (options.stateFailureAfterClick && current.mouseActions > 0) throw options.stateFailureAfterClick
+      if (options.stateFailureAfterCollapse && current.collapseActions > 0 && !current.toolbarExpanded) throw options.stateFailureAfterCollapse
+      return structuredClone({ ...authoritative, selection: current.selection })
+    },
     observePoint: async () => {
       calls.push('rendered after scroll')
+      current.measurementCount++
       assert.equal(current.drawerOpen, false); assert.equal(current.scrolled, true)
-      return options.staleMeasurement ? staleRendered : rendered
+      if (options.inexactRequestedBoundary) return { ...rendered, boundary: { x: rendered.boundary.x + 5e-8, y: rendered.boundary.y } }
+      return options.staleMeasurement || options.staleMeasurementAfterCollapse && current.collapseActions > 0 ? staleRendered : rendered
     },
     diagnose: async (details) => {
       calls.push(details.boundary)
       observations.push(structuredClone(details))
+      if (details.boundary === 'selection-finished') current.preparationSnapshots = 0
       if (evidenceFailure) throw evidenceFailure
     } }
 }
@@ -190,10 +295,10 @@ for (const fault of ['closeFailure', 'detachFailure']) {
       requireUnselected: true }), (error) => error === primary)
     assert.equal(control.current.closeActions, 1)
     assert.equal(control.calls.some(Array.isArray), false)
-    assert.ok(control.calls.includes('cleanup'))
+    assert.equal(control.calls.includes('cleanup'), false, 'A failed drawer action never owned a canvas observer')
+    assert.equal(control.current.installed, false)
     assert.equal(control.observations.at(-1).primary.message, primary.message)
     assert.ok(control.secondaryErrors.some((message) => message.includes('evidence failed')))
-    assert.ok(control.secondaryErrors.some((message) => message.includes('cleanup failed')))
   })
 }
 test('synthetic falsely successful detach cannot hide a remaining drawer', async () => {
@@ -252,20 +357,21 @@ for (const field of ['position', 'text', 'style']) {
     assert.equal(control.calls.some(Array.isArray), false)
   })
 }
-test('synthetic stale pre-close coordinates are rejected by the one native mouse boundary', async () => {
+test('synthetic stale pre-close coordinates are rejected before the native mouse boundary', async () => {
   const control = selectionDeliveryControl({ drawerOpen: true, staleMeasurement: true })
   await assert.rejects(selectGeometricPoint({ ...control, scenario: 'point-geometric-diamond', sequence: 2,
-    requireUnselected: true }), /post-preparation coordinates/)
-  assert.equal(control.calls.filter(Array.isArray).length, 1)
+    requireUnselected: true }), /freshly measured connected geometry/)
+  assert.equal(control.calls.filter(Array.isArray).length, 0)
 })
 for (const fault of ['drawer', 'overlay', 'wrongPoint']) {
   test(`synthetic current ${fault} target cannot establish success from trusted overlay events or selected state`, async () => {
     const control = selectionDeliveryControl({ initialSelection: { id: 'app-point' }, targetKind: fault })
     await assert.rejects(selectGeometricPoint({ ...control, scenario: 'point-geometric-native-contours-2d-3d', sequence: 12 }))
-    assert.equal(control.calls.filter(Array.isArray).length, 1)
+    assert.equal(control.calls.filter(Array.isArray).length, 0)
     assert.equal(control.current.selection.id, 'app-point')
-    const after = control.observations.find(({ boundary }) => boundary === 'after-native-click-before-assertion').observation.after
-    assert.equal(after.events.length, 3); assert.ok(after.events.every(({ trusted }) => trusted))
+    const prepared = control.observations.at(-1).observation.toolbarPreparation.prepared
+    assert.equal(prepared.elementFromPoint.pointId, fault === 'wrongPoint' ? 'other-point' : null)
+    assert.equal(prepared.events.length, 0)
   })
 }
 for (const fault of ['eventTargetKind', 'missingPath', 'untrustedType']) {
@@ -357,6 +463,301 @@ test('boundary selection keeps measured boundary input and native action failure
   assert.equal(control.observations.at(-1).primary.message, primary.message)
 })
 
+test('synthetic configured semicircle preserves the .23 boundary through owned native toolbar preparation and restoration', async () => {
+  const control = selectionDeliveryControl({ semicircle: true, toolbarCovered: true, boundary: true })
+  const before = structuredClone(control.authoritative)
+  assert.equal(await selectGeometricPoint({ ...control, scenario: 'point-geometric-native-contours-2d-3d', sequence: 14,
+    boundary: true }), control.rendered)
+  assert.equal(control.current.collapseActions, 1); assert.equal(control.current.expandActions, 1)
+  assert.equal(control.current.toolbarExpanded, true); assert.equal(control.current.measurementCount, 2)
+  assert.deepEqual(control.authoritative, before)
+  assert.equal(control.calls.filter(Array.isArray).length, 1)
+  assert.deepEqual(control.calls.find(Array.isArray), ['native click', 1313.197754, 158.548584])
+  const at = (value) => control.calls.findIndex((call) => Array.isArray(call) ? call[0] === value : call === value)
+  for (const [earlier, later] of [['Select', 'collapse'], ['collapse', 'toolbar detached'], ['toolbar detached', 'install'],
+    ['install', 'native click'], ['native click', 'cleanup'], ['cleanup', 'expand']]) {
+    assert.ok(at(earlier) >= 0 && at(earlier) < at(later), `${earlier} precedes ${later}`)
+  }
+  const raw = control.rendered.nativeSelection, preparation = raw.toolbarPreparation
+  assert.equal(preparation.inherited.toolbar.collapsed, false)
+  assert.deepEqual(preparation.actions.map(({ name, purpose }) => ({ name, purpose })), [
+    { name: 'Select', purpose: 'select' }, { name: 'collapse', purpose: 'obstruction' }, { name: 'expand', purpose: 'restore' }])
+  const obstructed = preparation.obstructed.observation
+  assert.equal(obstructed.elementFromPoint.class, 'preview-toolbar-status')
+  assert.ok(obstructed.elementsFromPoint.some(({ class: className }) => className === 'preview-floating-toolbar'))
+  assert.equal(raw.before.geometry.contour.fraction, .23)
+  assert.deepEqual(raw.before.geometry.contour.screenCTM, { a: 3.1, b: 0, c: 0, d: 3.1, e: 1296.4, f: 268.975 })
+  assert.deepEqual(raw.before.requestedClick, control.rendered.boundary)
+  assert.equal(raw.before.elementFromPoint.pointId, 'app-point')
+  assert.ok(raw.after.events.every(({ target: delivered }) => delivered.pointId === 'app-point'))
+  assert.equal(raw.toolbarRestoration.before.selection.id, 'app-point')
+  assert.equal(raw.toolbarRestoration.after.selection.id, 'app-point')
+  assert.equal(raw.toolbarRestoration.after.toolbar.collapsed, false)
+  assert.equal(control.current.installed, false)
+})
+
+test('synthetic native SVGPoint binary32 boundary projection preserves the exact current requested contour input', async () => {
+  const control = selectionDeliveryControl({ semicircle: true, nativeBoundaryFloat32: true, toolbarCovered: true, boundary: true })
+  await selectGeometricPoint({ ...control, scenario: 'point-geometric-native-contours-2d-3d', sequence: 14, boundary: true })
+  const raw = control.rendered.nativeSelection, contour = raw.before.geometry.contour
+  const projected = { x: contour.screenCTM.a * contour.localBoundary.x + contour.screenCTM.e,
+    y: contour.screenCTM.d * contour.localBoundary.y + contour.screenCTM.f }
+  assert.ok(Math.abs(projected.x - contour.boundary.x) > 1e-7)
+  assert.deepEqual(contour.boundary, { x: Math.fround(projected.x), y: Math.fround(projected.y) })
+  assert.deepEqual(raw.requestedClick, contour.boundary)
+  assert.deepEqual(contour.localBoundary, { x: 5.418630123138428, y: -35.62142562866211 })
+  assert.equal(contour.fraction, .23)
+  assert.equal(control.calls.filter(Array.isArray).length, 1)
+  assert.equal(control.current.collapseActions, 1); assert.equal(control.current.expandActions, 1)
+})
+
+for (const fault of ['staleContourCTMAfterCollapse', 'staleContourBoundaryAfterCollapse', 'inexactRequestedBoundary']) {
+  test(`synthetic native binary32 ${fault} cannot borrow the fresh contour input`, async () => {
+    const control = selectionDeliveryControl({ semicircle: true, nativeBoundaryFloat32: true, toolbarCovered: true, boundary: true,
+      [fault]: true })
+    await assert.rejects(selectGeometricPoint({ ...control, scenario: 'point-geometric-native-contours-2d-3d', sequence: 14, boundary: true }))
+    assert.equal(control.calls.filter(Array.isArray).length, 0)
+    assert.equal(control.current.toolbarExpanded, true)
+    if (fault !== 'inexactRequestedBoundary') {
+      assert.equal(control.current.collapseActions, 1); assert.equal(control.current.expandActions, 1)
+    }
+  })
+}
+
+test('synthetic quick style hit owned by the expanded toolbar uses the same bounded temporary collapse', async () => {
+  const control = selectionDeliveryControl({ boundary: true, quickStyleCovered: true })
+  await selectGeometricPoint({ ...control, scenario: 'point-geometric-native-contours-2d-3d', sequence: 14, boundary: true })
+  assert.equal(control.current.collapseActions, 1); assert.equal(control.current.expandActions, 1)
+  assert.equal(control.calls.filter(Array.isArray).length, 1)
+  assert.equal(control.current.toolbarExpanded, true)
+  const obstructed = control.rendered.nativeSelection.toolbarPreparation.obstructed.observation
+  assert.equal(obstructed.elementFromPoint.creationToolbar, false)
+  assert.equal(obstructed.elementFromPoint.quickStyle, true)
+  assert.equal(obstructed.elementFromPoint.toolbarOverlay, true)
+  assert.equal(control.rendered.nativeSelection.before.elementFromPoint.pointId, 'app-point')
+})
+
+test('synthetic expanded unobstructed toolbar remains untouched and supplies the next native Select', async () => {
+  const control = selectionDeliveryControl({ boundary: true })
+  await selectGeometricPoint({ ...control, scenario: 'point-geometric-native-contours-2d-3d', sequence: 12, boundary: true })
+  assert.equal(control.current.collapseActions, 0); assert.equal(control.current.expandActions, 0)
+  assert.equal(control.current.toolbarExpanded, true)
+  assert.deepEqual(control.rendered.nativeSelection.toolbarPreparation.actions.map(({ name }) => name), ['Select'])
+  await control.page.getByRole('button', { name: 'Select', exact: true }).click()
+  assert.equal(await control.page.getByRole('button', { name: 'Select', exact: true }).getAttribute('aria-pressed'), 'true')
+})
+
+test('synthetic inherited collapsed toolbar uses one native Select expansion and restores the caller state', async () => {
+  const control = selectionDeliveryControl({ toolbarExpanded: false, boundary: true })
+  await selectGeometricPoint({ ...control, scenario: 'point-geometric-native-contours-2d-3d', sequence: 13, boundary: true })
+  assert.equal(control.current.expandActions, 1); assert.equal(control.current.collapseActions, 1)
+  assert.equal(control.current.toolbarExpanded, false)
+  const actions = control.rendered.nativeSelection.toolbarPreparation.actions
+  assert.deepEqual(actions.map(({ name, purpose }) => ({ name, purpose })), [
+    { name: 'expand', purpose: 'select-access' }, { name: 'Select', purpose: 'select' }, { name: 'collapse', purpose: 'restore' }])
+  assert.ok(control.calls.indexOf('expand') < control.calls.indexOf('Select'))
+})
+
+test('synthetic inherited collapsed covered contour collapses only once and stays restored before the next selection', async () => {
+  const control = selectionDeliveryControl({ toolbarExpanded: false, toolbarCovered: true, boundary: true })
+  await selectGeometricPoint({ ...control, scenario: 'point-geometric-native-contours-2d-3d', sequence: 13, boundary: true })
+  assert.equal(control.current.expandActions, 1); assert.equal(control.current.collapseActions, 1)
+  assert.equal(control.current.toolbarExpanded, false)
+  control.current.selection = null; control.current.scrolled = false
+  await selectGeometricPoint({ ...control, scenario: 'point-geometric-native-contours-2d-3d', sequence: 14, boundary: true })
+  assert.equal(control.current.expandActions, 2); assert.equal(control.current.collapseActions, 2)
+  assert.equal(control.current.toolbarExpanded, false)
+})
+
+for (const controlName of ['collapse', 'expand', 'select']) for (const count of [0, 2]) {
+  test(`synthetic native toolbar ${controlName} rejects ${count} controls before a canvas click`, async () => {
+    const control = selectionDeliveryControl({ boundary: true, toolbarCovered: controlName === 'collapse',
+      toolbarExpanded: controlName !== 'expand', [`${controlName}Count`]: count })
+    await assert.rejects(selectGeometricPoint({ ...control, scenario: 'point-geometric-native-contours-2d-3d', sequence: 14,
+      boundary: true }))
+    assert.equal(control.calls.filter(Array.isArray).length, 0)
+    assert.ok(control.observations.some(({ boundary: stage }) => stage === 'selection-finished'))
+  })
+}
+
+for (const count of [0, 2]) {
+  test(`synthetic native toolbar rejects ${count} overlay owners before canvas input`, async () => {
+    const control = selectionDeliveryControl({ boundary: true, toolbarCovered: true, overlayCount: count })
+    await assert.rejects(selectGeometricPoint({ ...control, scenario: 'point-geometric-native-contours-2d-3d', sequence: 14, boundary: true }))
+    assert.equal(control.calls.filter(Array.isArray).length, 0)
+  })
+}
+
+test('synthetic native Select must report pressed before hiding its toolbar', async () => {
+  const control = selectionDeliveryControl({ boundary: true, toolbarCovered: true, selectPressedAfter: 'false' })
+  await assert.rejects(selectGeometricPoint({ ...control, scenario: 'point-geometric-native-contours-2d-3d', sequence: 14, boundary: true }))
+  assert.equal(control.current.collapseActions, 0); assert.equal(control.calls.filter(Array.isArray).length, 0)
+})
+
+test('synthetic trusted toolbar-only delivery cannot satisfy the scoped native canvas observer', async () => {
+  const control = selectionDeliveryControl({ boundary: true, toolbarCovered: true, eventTargetKind: 'toolbar' })
+  await assert.rejects(selectGeometricPoint({ ...control, scenario: 'point-geometric-native-contours-2d-3d', sequence: 14, boundary: true }))
+  assert.equal(control.calls.filter(Array.isArray).length, 1)
+  assert.equal(control.current.toolbarExpanded, true)
+  const after = control.observations.find(({ boundary: stage }) => stage === 'after-native-click-before-assertion').observation.after
+  assert.equal(after.events.length, 3)
+  assert.ok(after.events.every(({ trusted, target: delivered }) => trusted && delivered.creationToolbar))
+})
+
+for (const failure of ['collapseFailure', 'collapseDetachedFailure', 'selectFailure']) {
+  test(`synthetic native toolbar ${failure} retains its first action error through diagnostics and cleanup`, async () => {
+    const primary = new Error(`controlled ${failure}`), control = selectionDeliveryControl({ boundary: true, toolbarCovered: true,
+      [failure]: primary, observationFailure: new Error('late observation failure'), evidenceFailure: new Error('evidence failure'),
+      cleanupFailure: new Error('cleanup failure'), expandFailure: new Error('restoration failure') })
+    await assert.rejects(selectGeometricPoint({ ...control, scenario: 'point-geometric-native-contours-2d-3d', sequence: 14,
+      boundary: true }), (error) => error === primary)
+    assert.equal(control.calls.filter(Array.isArray).length, 0)
+    assert.equal(control.observations.at(-1).primary.message, primary.message)
+    assert.ok(control.secondaryErrors.some((message) => message.includes('evidence failure')))
+  })
+}
+
+test('synthetic falsely successful toolbar detachment retains expanded-state evidence and stops input', async () => {
+  const control = selectionDeliveryControl({ boundary: true, toolbarCovered: true, collapseReportedSuccess: true })
+  await assert.rejects(selectGeometricPoint({ ...control, scenario: 'point-geometric-native-contours-2d-3d', sequence: 14, boundary: true }))
+  assert.equal(control.current.collapseActions, 1); assert.equal(control.calls.filter(Array.isArray).length, 0)
+  const final = control.observations.at(-1).observation
+  assert.equal(final.toolbarPreparation.actions.find(({ name }) => name === 'collapse').after.toolbar.collapsed, false)
+})
+
+for (const obstruction of ['toolbar', 'history', 'other']) {
+  test(`synthetic remaining ${obstruction} obstruction retains its hit stack and performs no native click`, async () => {
+    const control = selectionDeliveryControl({ boundary: true, toolbarCovered: true, remainingObstruction: obstruction })
+    await assert.rejects(selectGeometricPoint({ ...control, scenario: 'point-geometric-native-contours-2d-3d', sequence: 14, boundary: true }))
+    assert.equal(control.current.collapseActions, 1); assert.equal(control.current.expandActions, 1)
+    assert.equal(control.calls.filter(Array.isArray).length, 0); assert.equal(control.current.toolbarExpanded, true)
+    const raw = control.observations.at(-1).observation.toolbarPreparation.finalMeasurement.observation
+    assert.equal(raw.elementFromPoint.pointId, null)
+    assert.ok(raw.elementsFromPoint.length > 0)
+  })
+}
+
+for (const failure of ['staleMeasurementAfterCollapse', 'staleContourBoundaryAfterCollapse',
+  'staleContourCTMAfterCollapse', 'beforeObservationFailureAfterCollapse']) {
+  test(`synthetic post-collapse ${failure} cannot reach a native boundary click`, async () => {
+    const control = selectionDeliveryControl({ boundary: true, toolbarCovered: true,
+      [failure]: failure === 'beforeObservationFailureAfterCollapse' ? new Error('before observation failure') : true })
+    await assert.rejects(selectGeometricPoint({ ...control, scenario: 'point-geometric-native-contours-2d-3d', sequence: 14, boundary: true }))
+    assert.equal(control.calls.filter(Array.isArray).length, 0)
+    assert.equal(control.current.collapseActions, 1); assert.equal(control.current.expandActions, 1)
+    assert.equal(control.current.toolbarExpanded, true)
+  })
+}
+
+for (const action of ['Collapse', 'Expand', 'Select']) for (const field of ['json', 'runtimeDiagramJson', 'history', 'labelDocumentRevision', 'selection', 'uiSettings']) {
+  test(`synthetic native toolbar ${action} preserves exact ${field} around its own UI action`, async () => {
+    const control = selectionDeliveryControl({ boundary: true, toolbarCovered: true,
+      [`mutateOn${action}`]: (state, current) => {
+        if (field === 'selection') current.selection = { id: 'other-point' }
+        else state[field] = field === 'labelDocumentRevision' ? state[field] + 1 : `${state[field]} changed`
+      } })
+    await assert.rejects(selectGeometricPoint({ ...control, scenario: 'point-geometric-native-contours-2d-3d', sequence: 14, boundary: true }))
+    assert.equal(control.calls.filter(Array.isArray).length, action === 'Expand' ? 1 : 0)
+    assert.equal(control.current.installed, false)
+  })
+}
+
+for (const action of ['Collapse', 'Expand', 'Select']) for (const field of ['camera', 'workPlaneControls', 'workPlaneStatus']) {
+  test(`synthetic native toolbar ${action} preserves observed ${field}`, async () => {
+    const control = selectionDeliveryControl({ boundary: true, toolbarCovered: true,
+      [`mutateOn${action}`]: (state, current) => {
+        if (field === 'camera') {
+          const runtime = JSON.parse(state.runtimeDiagramJson); runtime.camera.scale = 2; state.runtimeDiagramJson = JSON.stringify(runtime)
+        } else current[field] = field === 'workPlaneControls' ? [{ value: 'xz' }] : ['xz at y=1']
+      } })
+    await assert.rejects(selectGeometricPoint({ ...control, scenario: 'point-geometric-native-contours-2d-3d', sequence: 14, boundary: true }))
+    assert.equal(control.calls.filter(Array.isArray).length, action === 'Expand' ? 1 : 0)
+  })
+}
+
+for (const failure of ['expandFailure', 'expandDetachedFailure', 'expandReportedSuccess']) {
+  test(`synthetic owned toolbar restoration ${failure} prevents successful return after one valid click`, async () => {
+    const control = selectionDeliveryControl({ boundary: true, toolbarCovered: true,
+      [failure]: failure === 'expandReportedSuccess' ? true : new Error(`controlled ${failure}`) })
+    await assert.rejects(selectGeometricPoint({ ...control, scenario: 'point-geometric-native-contours-2d-3d', sequence: 14, boundary: true }))
+    assert.equal(control.calls.filter(Array.isArray).length, 1)
+    assert.equal(control.current.collapseActions, 1); assert.equal(control.current.expandActions, 1)
+    assert.equal(control.current.installed, false)
+  })
+}
+
+for (const primaryKind of ['native', 'assertion']) {
+  test(`synthetic ${primaryKind} selection failure survives owned toolbar restoration, artifacts and cleanup failure`, async () => {
+    const primary = new Error('first native selection failure'), control = selectionDeliveryControl({ boundary: true, toolbarCovered: true,
+      selectionFailure: true, ...(primaryKind === 'native' ? { mouseFailure: primary } : {}),
+      expandFailure: new Error('restoration failed'), evidenceFailure: new Error('artifact failed'), cleanupFailure: new Error('observer cleanup failed') })
+    await assert.rejects(selectGeometricPoint({ ...control, scenario: 'point-geometric-native-contours-2d-3d', sequence: 14, boundary: true }), (error) => {
+      if (primaryKind === 'native') return error === primary
+      assert.match(error.message, /^Native contour click selects its point/); return true
+    })
+    assert.equal(control.calls.filter(Array.isArray).length, 1)
+    assert.equal(control.current.expandActions, 1)
+    assert.ok(control.secondaryErrors.some((message) => message.includes('restoration failed')))
+    assert.ok(control.secondaryErrors.some((message) => message.includes('artifact failed')))
+    assert.ok(control.secondaryErrors.some((message) => message.includes('observer cleanup failed')))
+  })
+}
+
+for (const primaryKind of ['native', 'action', 'assertion']) for (const restorationFails of [false, true]) {
+  test(`synthetic first ${primaryKind} failure still attempts owned restoration after unavailable raw reads${restorationFails ? ' and failed expansion' : ''}`, async () => {
+    const primary = new Error(`first ${primaryKind} failure`), readFailure = new Error('after action raw read failure')
+    const control = selectionDeliveryControl({ boundary: true, toolbarCovered: true,
+      ...(primaryKind === 'action' ? { collapseFailureAfterToggle: primary, observationFailureAfterCollapse: readFailure,
+        stateFailureAfterCollapse: readFailure } : { observationFailure: readFailure,
+        ...(primaryKind === 'native' ? { mouseFailure: primary, stateFailureAfterClick: readFailure } : { selectionFailure: true }) }),
+      ...(restorationFails ? { expandFailure: new Error('owned expand failed') } : {}),
+      evidenceFailure: new Error('bounded evidence failure'), cleanupFailure: new Error('owned observer cleanup failure') })
+    await assert.rejects(selectGeometricPoint({ ...control, scenario: 'point-geometric-native-contours-2d-3d', sequence: 14,
+      boundary: true }), (error) => {
+      if (primaryKind === 'assertion') { assert.match(error.message, /^Native contour click selects its point/); return true }
+      return error === primary
+    })
+    assert.equal(control.current.collapseActions, 1); assert.equal(control.current.expandActions, 1)
+    assert.equal(control.current.toolbarExpanded, !restorationFails)
+    assert.equal(control.calls.filter(Array.isArray).length, primaryKind === 'action' ? 0 : 1)
+    assert.equal(control.current.installed, false)
+    if (primaryKind !== 'action') assert.ok(control.calls.indexOf('cleanup') < control.calls.indexOf('expand'))
+    const retained = control.observations.at(-1)
+    assert.match(retained.primary.message, primaryKind === 'assertion' ? /^Native contour click selects its point/ : new RegExp(`first ${primaryKind} failure`))
+    assert.equal(retained.observation.toolbarRestoration.before, undefined)
+    assert.equal(retained.observation.toolbarRestoration.expandCount, 1)
+    assert.equal(retained.observation.toolbarRestoration.collapseCount, 0)
+    assert.ok(control.secondaryErrors.some((message) => message.includes('after action raw read failure')))
+    assert.ok(control.secondaryErrors.some((message) => message.includes('bounded evidence failure')))
+    if (restorationFails) assert.ok(control.secondaryErrors.some((message) => message.includes('owned expand failed')))
+    if (primaryKind !== 'action') assert.ok(control.secondaryErrors.some((message) => message.includes('owned observer cleanup failure')))
+  })
+}
+
+for (const [fault, owner] of [['missing', undefined], ['null', null], ['malformed', '{broken'],
+  ['wrong-epoch', JSON.stringify(['point-node', 9, 'app-point'])], ['wrong-point', JSON.stringify(['point-node', 10, 'other-point'])],
+  ['wrong-kind', JSON.stringify(['free-label', 10, 'app-point'])]]) {
+  test(`synthetic ${fault} rendered layout owner cannot reach native canvas selection`, async () => {
+    const control = selectionDeliveryControl({ boundary: true, toolbarCovered: true, layoutOwner: owner })
+    await assert.rejects(selectGeometricPoint({ ...control, scenario: 'point-geometric-native-contours-2d-3d', sequence: 14, boundary: true }))
+    assert.equal(control.calls.filter(Array.isArray).length, 0)
+    assert.equal(control.current.collapseActions, 0)
+    assert.equal(control.current.toolbarExpanded, true)
+    assert.equal(control.observations.at(-1).observation.toolbarPreparation.inherited.layout.owner, owner)
+  })
+}
+
+for (const [fault, options] of [['body-request-mismatch', { layoutBodyRequest: 'obsolete-body-request' }],
+  ['point-request-missing', { layoutRequest: '' }], ['source-mismatch', { layoutSource: 'normalized source' }]]) {
+  test(`synthetic ${fault} is rejected before native toolbar collapse or canvas input`, async () => {
+    const control = selectionDeliveryControl({ boundary: true, toolbarCovered: true, ...options })
+    await assert.rejects(selectGeometricPoint({ ...control, scenario: 'point-geometric-native-contours-2d-3d', sequence: 14, boundary: true }))
+    assert.equal(control.calls.filter(Array.isArray).length, 0)
+    assert.equal(control.current.collapseActions, 0)
+    assert.equal(control.current.toolbarExpanded, true)
+  })
+}
+
 const mechanisms = syntheticMechanismEvidence()
 test('supplemental primary and independent cleanup failures remain structured and unclassifiable', async () => {
   const artifactDir = await mkdtemp(join(tmpdir(), 'stz-32c-secondary-control-'))
@@ -415,8 +816,10 @@ function geometricInteractionEvidence() {
     cases: [2, 3].flatMap((ambientDimension) => ['diamond', 'star', 'semicircle', 'dart'].map((shape) => {
       const nativeDrag = syntheticPointNativeDragEvidence({ scenario, ambientDimension, shape,
         id: 'app-point', displacement: { x: 28, y: -16 }, steps: 4 })
+      const nativeSelection = syntheticGeometricSelectionEvidence({ scenario, ambientDimension, shape, id: 'app-point',
+        state: nativeDrag.stateBefore })
       return { ambientDimension, shape, codim: ambientDimension, nativeDrag,
-        observed: { shape }, before: JSON.parse(nativeDrag.stateBefore.runtimeDiagramJson).strata[0],
+        observed: { shape, boundary: nativeSelection.requestedClick, nativeSelection }, before: JSON.parse(nativeDrag.stateBefore.runtimeDiagramJson).strata[0],
         after: JSON.parse(nativeDrag.afterAction.state.runtimeDiagramJson).strata[0],
         events: nativeDrag.afterAction.observation.events.filter(({ phase }) => phase === 'drag'),
         selected: true, trustedDown: true, trustedMove: true, dragged: true, undoRestored: true, redoRestored: true }
@@ -430,6 +833,7 @@ function setSyntheticRevision(records, revision) {
   for (const record of records) {
     if (revision === undefined) delete record.labelDocumentRevision
     else record.labelDocumentRevision = revision
+    if (record.layout && record.model) record.layout.owner = JSON.stringify(['point-node', revision, record.model.id])
   }
 }
 function syntheticRevisionRecords(raw) {
@@ -437,7 +841,8 @@ function syntheticRevisionRecords(raw) {
     raw.preparation.inherited, raw.preparation.closed, raw.preparation.prepared, raw.stateBefore, raw.before,
     raw.afterAction.state, raw.afterAction.observation, raw.undo.stateBefore, raw.undo.stateAfter, raw.undo.observation,
     raw.redo.stateBefore, raw.redo.stateAfter, raw.redo.observation,
-    ...raw.afterAction.observation.events, ...raw.undo.observation.events, ...raw.redo.observation.events]
+    ...raw.afterAction.observation.events, ...raw.undo.observation.events, ...raw.redo.observation.events,
+    ...syntheticPointToolbarRevisionRecords(raw)]
 }
 function setSyntheticActionRevision(raw, action, revision) {
   const records = action === 'drag' ? [raw.afterAction.state, raw.afterAction.observation, raw.undo.stateBefore]

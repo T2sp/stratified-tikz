@@ -8,7 +8,8 @@ import { layoutImportCases as importCases } from './pointLayoutAnchorsContract.m
 import { createOwnedAppPage } from './ownedAppPage.mjs'
 import { ownPageEvent } from './ownedPageEvent.mjs'
 import { resolvePointInspectorField } from './pointInspectorFields.mjs'
-import { observeGeometricSelection, selectGeometricPoint } from './pointGeometricSelection.mjs'
+import { observeGeometricSelection, selectGeometricPoint, prepareGeometricCanvasClick,
+  restoreGeometricCanvasToolbar, assertFreshGeometricClick } from './pointGeometricSelection.mjs'
 import { dragSelectedPoint, prepareSelectedPointCanvas } from './pointNativeDrag.mjs'
 import { boundedPointDiagnostic, createPointDiagnostics } from './pointCheckDiagnostics.mjs'
 import { saveAppJson } from './appJsonPersistence.mjs'
@@ -96,13 +97,10 @@ export async function runPointLayoutAnchorChecks({ browser, origin, artifactDir,
     return input
   }
   async function select(id = 'app-point', observePoint = observeLayoutPoint) {
-    let nativeSelection
     const rendered = await selectGeometricPoint({ page, readState: state, observePoint, diagnose: async (details) => {
-      if (details.observation?.after) nativeSelection = details.observation
       await diagnostic(group, scenario, details)
     },
       secondaryErrors: pageErrors, scenario, sequence: ++selectionSequence, id, boundary: true })
-    rendered.nativeSelection = { id, selected: nativeSelection.selected, requestedClick: nativeSelection.requestedClick, events: nativeSelection.after.events }
     const beforeInspector = await state()
     const open = page.getByRole('button', { name: 'Open inspector drawer', exact: true })
     if (await open.count()) await open.click()
@@ -118,7 +116,7 @@ export async function runPointLayoutAnchorChecks({ browser, origin, artifactDir,
   }
   async function cycleOwner(selectedId, expectedId, observePoint = observeLayoutPoint) {
     const sequence = ++selectionSequence, token = `${scenario}:owner-cycle:${sequence}:${selectedId}`
-    const entry = { selectedId, expectedId, sequence, secondaryErrors: [] }
+    const entry = { selectedId, expectedId, sequence, toolbarPreparation: { actions: [] }, toolbarRestoration: {}, secondaryErrors: [] }
     let cyclePrimary, installed = false
     const retain = async (name, operation) => {
       try { return await boundedPointDiagnostic(operation, `Layout owner cycling ${name}`) }
@@ -131,6 +129,10 @@ export async function runPointLayoutAnchorChecks({ browser, origin, artifactDir,
       entry.preparation = await prepareSelectedPointCanvas({ page, readState: state,
         diagnose: (details) => diagnostic(group, scenario, details), secondaryErrors: pageErrors,
         scenario, sequence, id: selectedId })
+      entry.rendered = await prepareGeometricCanvasClick({ page, readState: state, observePoint, id: selectedId, boundary: true,
+        preparation: entry.toolbarPreparation, diagnostic: retain,
+        evidence: (boundary) => retain(`${boundary} evidence`, () => diagnostic(group, scenario, { boundary, ownerCycle: entry })) })
+      entry.requestedClick = entry.rendered.boundary
       await page.evaluate(({ token, selectedId }) => {
         const registry = window.__stzLayoutOwnerCycles ??= new Map()
         if (registry.has(token)) throw new Error(`Owner-cycle observer already owned: ${token}`)
@@ -143,33 +145,33 @@ export async function runPointLayoutAnchorChecks({ browser, origin, artifactDir,
         const owned = { events: [], droppedEvents: 0 }
         owned.listener = (event) => {
           if (owned.events.length === 16) { owned.droppedEvents++; return }
+          const state = window.stzAppLabels.state()
           owned.events.push({ phase: 'owner-cycle', selectedId, type: event.type, trusted: event.isTrusted,
             altKey: event.altKey, pointerId: event.pointerId ?? null, button: event.button, buttons: event.buttons,
             client: { x: event.clientX, y: event.clientY }, target: describe(event.target),
-            path: event.composedPath().slice(0, 16).map(describe), selection: window.stzAppLabels.state().selection })
+            path: event.composedPath().slice(0, 16).map(describe), selection: state.selection,
+            labelDocumentRevision: state.labelDocumentRevision })
         }
         registry.set(token, owned)
         for (const type of ['pointerdown', 'pointerup', 'click']) document.addEventListener(type, owned.listener, true)
       }, { token, selectedId })
       installed = true
       entry.stateBefore = await state()
-      // The selection wrapper has reopened the Inspector. Preparation above
-      // closes it and completes native mode/scroll changes before this measure.
-      entry.rendered = await observePoint(page, selectedId)
-      assert.ok(entry.rendered, 'Owner cycling has connected freshly measured point geometry')
-      entry.requestedClick = entry.rendered.boundary
       entry.before = await page.evaluate(observeGeometricSelection, { id: selectedId, click: entry.requestedClick, token: null })
       await retain('before evidence', () => diagnostic(group, scenario, { boundary: 'before-native-owner-cycle', ownerCycle: entry }))
       assert.deepEqual(entry.before.errors, [], 'Owner-cycle geometry observation is complete')
+      assertFreshGeometricClick(entry.before, entry.rendered, entry.requestedClick, true)
       assert.equal(entry.before.inspector.open, false, 'Owner cycling starts with a closed Inspector')
       assert.equal(entry.stateBefore.selection?.id, selectedId, 'Owner cycling begins with the selected owner')
       const intended = (target) => target?.pointId === selectedId && target.svg === true && target.canvas === true && target.drawer === false
       assert.ok(intended(entry.before.elementFromPoint), 'Fresh owner-cycle click reaches the intended SVG point')
+      assert.ok(intended(entry.before.elementsFromPoint[0]), 'Fresh owner-cycle hit stack starts with the intended SVG point')
       try {
         await page.keyboard.down('Alt')
         await page.mouse.click(entry.requestedClick.x, entry.requestedClick.y)
       } catch (error) { cyclePrimary = error }
       entry.stateAfter = await retain('after state', state)
+      entry.after = await retain('after geometry', () => page.evaluate(observeGeometricSelection, { id: selectedId, click: entry.requestedClick, token: null }))
       const retained = await retain('after events', () => page.evaluate((token) => {
         const owned = window.__stzLayoutOwnerCycles?.get(token)
         return owned ? { events: [...owned.events], droppedEvents: owned.droppedEvents } : null
@@ -178,10 +180,11 @@ export async function runPointLayoutAnchorChecks({ browser, origin, artifactDir,
       await retain('after evidence', () => diagnostic(group, scenario, { boundary: 'after-native-owner-cycle-before-assertion', ownerCycle: entry }))
       if (cyclePrimary) throw cyclePrimary
       assert.equal(entry.stateAfter?.selection?.id, expectedId, 'Alt cycles to the actual next owner')
-      for (const field of ['json', 'runtimeDiagramJson', 'history', 'labelDocumentRevision']) {
+      for (const field of ['json', 'runtimeDiagramJson', 'history', 'labelDocumentRevision', 'uiSettings']) {
         assert.deepEqual(entry.stateAfter[field], entry.stateBefore[field], `Owner cycling preserves ${field}`)
       }
       assert.equal(entry.droppedEvents, 0, 'All native owner-cycle events were retained')
+      for (const event of entry.events) assert.equal(event.labelDocumentRevision, entry.stateBefore.labelDocumentRevision, 'Owner-cycle events preserve the document epoch')
       let previous = -1, pointerId
       for (const type of ['pointerdown', 'pointerup', 'click']) {
         const index = entry.events.findIndex((event, index) => index > previous && event.type === type && event.phase === 'owner-cycle'
@@ -204,6 +207,17 @@ export async function runPointLayoutAnchorChecks({ browser, origin, artifactDir,
         registry?.delete(token)
         if (registry?.size === 0) delete window.__stzLayoutOwnerCycles
       }, token))
+      try {
+        await restoreGeometricCanvasToolbar({ page, readState: state, id: selectedId, preparation: entry.toolbarPreparation,
+          restoration: entry.toolbarRestoration, diagnostic: retain,
+          evidence: (boundary) => retain(`${boundary} evidence`, () => diagnostic(group, scenario, { boundary, ownerCycle: entry })) })
+      } catch (error) {
+        if (!cyclePrimary) cyclePrimary = error
+        else {
+          entry.secondaryErrors.push({ name: 'toolbar restoration', message: error.message })
+          pageErrors.push(`Layout owner cycling toolbar restoration: ${error.message}`)
+        }
+      }
       await retain('final evidence', () => diagnostic(group, scenario, { boundary: 'native-owner-cycle-finished', ownerCycle: entry,
         ...(cyclePrimary ? { primary: { message: cyclePrimary.message, stack: cyclePrimary.stack } } : {}) }))
     }

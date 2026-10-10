@@ -7,7 +7,60 @@ later 32B have historical accepted evidence. The plan still records unaccepted
 fresh strict native/review gates for the merged 32C checkout; implementation
 presence does not close that prerequisite or the final gate.
 
-The latest browser-capable parent's retained `stz-phase32d-before-review-5waNKq`
+The latest browser-capable parent's retained `stz-phase32d-before-review-gn1o0M`
+report passed 5,621 tests, build, diff and label-assets with Chrome 154.0.8037.98.
+It completed 15 of 18 cumulative groups, including paint/import and all eleven
+named shapes. The 2D diamond and star each completed trusted native drag, one
+bounded history commit, and exact saved/runtime Undo/Redo at unchanged epochs
+100 and 101. The next configured 2D semicircle's fixed `.23` contour point was
+covered by the expanded Creation toolbar: all native events reached its status
+span, with Inspector closed and unchanged model/layout/epoch 102. Page errors
+were empty. This is the current retained native failure, distinct from the
+earlier revision assertion and child startup restrictions. Semicircle/dart and
+all four 3D contour interactions, later geometric cases, the layout/anchor matrix
+and final standalone-export group remain unaccepted.
+
+The toolbar correction starts from the actual clean tracked checkout
+`c2ddd167d5f0a6c99dc392368b02bc9d477ff629`, fingerprint
+`cee0ec21f6db9226c985ea5ae32ef1a81a595cd351cd9e3c81323af52978a696`.
+The prior seven-file revision fix and updated prompt are already tracked there.
+All prior implementation, regressions and reference files are preserved.
+Shared native preparation records toolbar/drawer state and exact authoritative
+data/history/epoch/selection/UI settings, camera and work plane. Native Select
+runs while visible; an inherited collapsed toolbar expands through its unique
+real control. Only a fresh Creation/owned quick-style hit causes one collapse.
+Bounded detachment/collapsed/expand-control checks precede final scrolling and
+remeasurement of the connected contour's same `.23` point and own screen CTM.
+The intended first SVG hit is required before one native click. History or other
+remaining obstructions stop with their actual hit stack. No geometry, viewport,
+overlay event behavior or fixture model coordinates are changed.
+
+Canvas observation excludes toolbar actions; raw after-input events/state are
+retained before assertions. Owned toolbar changes restore natively after observer
+cleanup, with exact local before/after state comparisons preserving the expected
+selected owner rather than comparing it to initial null selection. Restoration
+uses unique real controls even if a secondary diagnostic read fails, and cannot
+mask the first native/action/assertion failure. Inspector controls still reopen
+through the existing callers. Layout selection and owner cycling share the scoped
+input preparation. Native drag expands for Select when necessary and restores
+inherited toolbar state without changing its handle/capture/movement/history or
+same-document revision contract. The next selection and drag retain native
+Select access. Both parent policies require complete raw selection/toolbar
+records, CTM-derived input, owner/request/source identity, trusted delivery and
+restoration; counters or summary booleans cannot establish success. Runner
+fixtures include the added transitive selection helper import.
+
+Synthetic toolbar/selection, drag, ownership and both parent policy controls are
+registered in existing suites; the new selection fixture is an imported helper.
+They cover native action ordering, covered semicircle, collapsed/unobstructed
+paths, ambiguous/missing controls, failed transitions/restoration, stale geometry,
+remaining obstructions, exact UI-action invariance and primary-error ownership.
+They do not establish native acceptance. Current child check results and exact
+final handoff are retained under `/private/tmp/stz-32d-toolbar-fix-20261010/`.
+Fresh complete strict parent verification must precede independent review;
+Phase 32 remains incomplete and no commit or push is authorized by a partial run.
+
+The earlier browser-capable parent's retained `stz-phase32d-before-review-5waNKq`
 report passed 5,507 tests, build, diff and label-assets, then failed the harness's
 revision assertion after 15 of 18 groups. The full paint/import group, corrected
 Clear provenance and all eleven named geometric-shape cases passed. The first

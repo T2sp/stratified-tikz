@@ -1,6 +1,40 @@
 # Phase 32 Plan: Point-node math, paint, geometric shapes, and layout
 
-Current document-revision correction (2026-10-10): the inspected checkout starts
+Current toolbar-interception correction (2026-10-10): the actual checkout starts
+clean at `c2ddd167d5f0a6c99dc392368b02bc9d477ff629`, with all previous seven-file
+revision changes and the prompt update tracked. The latest `gn1o0M` parent passed
+5,621 tests/build/diff/label-assets and completed 15/18 strict groups. All eleven
+named shapes and 2D diamond/star native drag plus exact Undo/Redo passed at
+unchanged document epochs 100/101. The third native interaction, configured 2D
+semicircle at epoch 102, failed because expanded Creation controls covered the
+fixed `.23` contour boundary; its Inspector was closed and all trusted events
+targeted the toolbar status span. This is separate from the completed revision
+correction and child fresh-server `listen EPERM` failures.
+
+Selection now owns temporary native toolbar preparation/restoration around one
+freshly measured canvas input. Select runs before any collapse; inherited collapse
+expands through the unique real control. A measured Creation/owned quick-style
+obstruction triggers one bounded native collapse followed by final scroll/CTM/
+`.23` measurement and intended SVG first-hit checks before one click. History or
+other remaining obstructions fail without input retries. Raw scoped delivery and
+local UI-action invariance remain required. Toolbar restoration precedes the
+existing caller's Inspector/drag paths; native drag can expand for Select and
+restore inherited collapse. Layout owner cycles share the same contour scope.
+Both policies validate complete raw selection/preparation/restoration records,
+and runner fixtures copy the transitive helper. Production, geometry, model,
+references, export and overlay event behavior are preserved.
+
+Synthetic controls and child commands remain separate from native acceptance.
+All eight contour interactions, later geometric cases, full layout/anchor and
+owner-cycle matrix, actual pending transparent/white downloads, standalone SVG
+reopening and both TikZ modes require fresh cumulative parent evidence for the
+exact final tracked/untracked tree, followed by independent read-only review.
+Phase 32 is **not complete**. No review/commit/push follows failed verification.
+Current results and handoff are retained under
+`/private/tmp/stz-32d-toolbar-fix-20261010/` and the
+[implementation audit](PHASE_32D_IMPLEMENTATION.md).
+
+Earlier document-revision correction (2026-10-10): the inspected checkout starts
 clean at `8d0a3dab4bea1fd3baf7889ffcfdb16c4478bd20`; previous implementation,
 Clear, selection and scoped native drag corrections are tracked and preserved.
 The latest `5waNKq` browser-capable parent passed 5,507 tests/build/diff/label-assets,
