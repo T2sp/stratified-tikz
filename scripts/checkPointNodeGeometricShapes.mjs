@@ -3,13 +3,14 @@ import { readFile, writeFile } from 'node:fs/promises'
 import { resolve } from 'node:path'
 import { pathToFileURL } from 'node:url'
 import { geometricShapeGroup as group, geometricShapeManifest, geometricBodyVariants,
-  geometricShapeArtifacts, assertGeometricShapeEvidence } from './pointGeometricShapesContract.mjs'
+  geometricShapeArtifacts, assertGeometricShapeEvidence, assertVisibilityCameraPreparation } from './pointGeometricShapesContract.mjs'
 import { createOwnedAppPage } from './ownedAppPage.mjs'
 import { ownPageEvent } from './ownedPageEvent.mjs'
 import { resolvePointInspectorField } from './pointInspectorFields.mjs'
 import { boundedPointDiagnostic, createPointDiagnostics } from './pointCheckDiagnostics.mjs'
 import { selectGeometricPoint } from './pointGeometricSelection.mjs'
 import { dragSelectedPoint } from './pointNativeDrag.mjs'
+import { selectHiddenPointVisibility, inspectSourceHiddenPoints } from './pointSourceVisibility.mjs'
 
 const paint = { text: { color: '#000000', opacity: 1 }, fill: { enabled: true, color: '#e0f0ff', opacity: 1 },
   stroke: { enabled: true, color: '#203040', opacity: 1, width: .4, lineStyle: 'solid', dashPhase: 0, lineCap: 'butt', lineJoin: 'miter' } }
@@ -32,6 +33,12 @@ export async function observeGeometricPoint(page, id) {
     const bounds = contour.getBBox(), ink = body.getBBox(), matrix = contour.getScreenCTM(), local = node.getCTM().inverse().multiply(body.getCTM())
     const at = contour.getPointAtLength(contour.getTotalLength() * .23).matrixTransform(matrix)
     const center = new DOMPoint().matrixTransform(node.getScreenCTM())
+    const opacityAncestors = []
+    for (let element = contour; element; element = element.parentElement) {
+      opacityAncestors.push({ tag: element.localName, opacity: getComputedStyle(element).opacity,
+        attributeOpacity: element.getAttribute('opacity'), isPointOwner: element === outer,
+        pointId: element.getAttribute('data-point-id'), connected: element.isConnected })
+    }
     const clean = (element) => ({ tag: element.localName, attributes: Object.fromEntries([...element.attributes]
       .filter(({ name }) => !name.startsWith('data-') && name !== 'pointer-events').map(({ name, value }) => [name, value])) })
     const contained = []
@@ -39,14 +46,19 @@ export async function observeGeometricPoint(page, id) {
       const point = new DOMPoint(x, y).matrixTransform(local)
       contained.push({ x: point.x, y: point.y, inside: contour.isPointInFill(point) || contour.isPointInStroke(point) })
     }
-    return { source: body.getAttribute('data-label-source'), state: body.getAttribute('data-label-state'),
+    return { id: outer.getAttribute('data-point-id'), pointVisibility: outer.getAttribute('data-point-visibility'),
+      occludingSurfaceId: outer.getAttribute('data-occluding-surface-id'),
+      source: body.getAttribute('data-label-source'), state: body.getAttribute('data-label-state'),
       shape: node.getAttribute('data-point-shape'), parameters: JSON.parse(node.getAttribute('data-point-shape-parameters')),
       bounds: { x: bounds.x, y: bounds.y, width: bounds.width, height: bounds.height },
       contourLength: contour.getTotalLength(), contour: clean(contour),
       paintRegions: [...node.querySelectorAll('[data-point-paint-region]')].map((element) => ({ role: element.getAttribute('data-point-paint-region'), ...clean(element) })),
       math: body.querySelectorAll('[data-label-math]').length, bodyUpright: Math.abs(local.b) < 1e-10 && Math.abs(local.c) < 1e-10,
       bodyCorners: contained, center: { x: center.x, y: center.y }, boundary: { x: at.x, y: at.y }, outerOpacity: outer.getAttribute('opacity'),
-      effectiveFillOpacity: Number(getComputedStyle(contour).fillOpacity), request: node.getAttribute('data-point-request') }
+      effectiveFillOpacity: Number(getComputedStyle(contour).fillOpacity), opacityAncestors,
+      effectiveOpacity: Number(getComputedStyle(contour).fillOpacity)
+        * opacityAncestors.reduce((product, { opacity }) => product * Number(opacity), 1),
+      request: node.getAttribute('data-point-request') }
   }, id)
 }
 
@@ -62,6 +74,7 @@ export async function runPointNodeGeometricShapeChecks({ browser, origin, artifa
   let selectionSequence = 0
   const selectionDiagnostic = createPointDiagnostics({ artifactDir, observe, artifactPrefix: 'point-geometric-selection' })
   const dragDiagnostic = createPointDiagnostics({ artifactDir, observe, artifactPrefix: 'point-geometric-drag' })
+  const visibilityDiagnostic = createPointDiagnostics({ artifactDir, observe, artifactPrefix: 'point-geometric-visibility-control' })
   const waits = [], held = new Set()
   const state = () => app.readState()
   const settle = () => page.waitForFunction(() => !document.querySelector('[data-label-state="pending"]'), undefined, { timeout: 30_000 })
@@ -235,7 +248,8 @@ export async function runPointNodeGeometricShapeChecks({ browser, origin, artifa
     const lockedState = await state()
     visibilityDoc.diagram.layers[0] = { value: 0, name: 'hidden', visible: false }
     await load(JSON.stringify(visibilityDoc)); await settle()
-    const hiddenAbsent = await observeGeometricPoint(page, 'app-point') === null
+    const hidden = { state: await state(), rendered: await observeGeometricPoint(page, 'app-point') }
+    const hiddenAbsent = hidden.rendered === null
     const dim = await document(geometricShapeManifest.find(({ shape }) => shape === 'semicircle'), '$dimmed$', 3)
     dim.diagram.strata[0].position = { x: 0, y: -1, z: 0 }
     dim.diagram.camera = { mode: '3d', kind: 'orthographic', thetaDeg: 90, phiDeg: 0, zoom: 100, pan: { x: 450, y: 350 } }
@@ -243,12 +257,113 @@ export async function runPointNodeGeometricShapeChecks({ browser, origin, artifa
       corners: [{ x: -2, y: 0, z: -2 }, { x: 2, y: 0, z: -2 }, { x: 2, y: 0, z: 2 }, { x: -2, y: 0, z: 2 }],
       style: { kind: 'sheetStyle', fillColor: '#4D9DE0', fillOpacity: .35, strokeColor: '#4D9DE0', strokeOpacity: 1 } })
     await load(JSON.stringify(dim)); await settle()
-    await page.getByLabel('Enable approximate 3D visibility', { exact: true }).check()
-    await page.getByLabel('Hidden points:', { exact: true }).selectOption('dimHidden')
-    const dimmed = await observeGeometricPoint(page, 'app-point')
+    const cameraFields = [['theta value', '90'], ['phi value', '0']]
+    const cameraObservation = async (label) => {
+      const locator = page.locator('.camera-panel').getByRole('spinbutton', { name: label, exact: true })
+      const controls = await locator.evaluateAll((elements) => elements.map((element) => {
+        const bounds = element.getBoundingClientRect(), style = getComputedStyle(element)
+        return { tag: element.localName, type: element.type, value: element.value, connected: element.isConnected,
+          visible: bounds.width > 0 && bounds.height > 0 && style.display !== 'none' && style.visibility !== 'hidden',
+          enabled: !element.matches(':disabled') && element.getAttribute('aria-disabled') !== 'true',
+          ariaLabel: element.getAttribute('aria-label'), scope: element.closest('.camera-panel') ? '.camera-panel' : null }
+      }))
+      return { label, count: await locator.count(), ...controls[0], controls }
+    }
+    // Saved view.camera3d takes precedence over diagram.camera during native
+    // load. Apply the intended occlusion orientation through actual controls.
+    const cameraPreparation = { before: await state(),
+      controlsBefore: await Promise.all(cameraFields.map(([label]) => cameraObservation(label))),
+      renderedBefore: await observeGeometricPoint(page, 'app-point'), actions: [] }
+    await visibilityDiagnostic(group, scenario, { phase: 'visibility-camera-before', cameraPreparation })
+    if (cameraPreparation.controlsBefore.some(({ count }) => count === 0)) {
+      const toggle = page.locator('.camera-panel .camera-summary-toggle')
+      const expansion = { before: await state(), count: await toggle.count(), expandedBefore: await toggle.getAttribute('aria-expanded') }
+      cameraPreparation.expansion = expansion
+      assert.equal(expansion.count, 1, 'One camera details toggle')
+      assert.equal(expansion.expandedBefore, 'false', 'Absent camera fields belong to collapsed details')
+      await toggle.click({ timeout: 5000 })
+      expansion.stateAfter = await state(); expansion.expandedAfter = await toggle.getAttribute('aria-expanded')
+      await visibilityDiagnostic(group, scenario, { phase: 'visibility-camera-expanded', expansion })
+      assert.equal(expansion.expandedAfter, 'true', 'Native camera details opened')
+    }
+    for (const [label, value] of cameraFields) {
+      const action = { label, value, before: { state: await state(), control: await cameraObservation(label) } }
+      await visibilityDiagnostic(group, scenario, { phase: 'visibility-camera-field-before', action })
+      assert.equal(action.before.control.count, 1, `One native ${label}`)
+      for (const key of ['connected', 'visible', 'enabled']) assert.equal(action.before.control[key], true, `Usable ${label}: ${key}`)
+      let cameraError
+      try { await page.locator('.camera-panel').getByRole('spinbutton', { name: label, exact: true }).fill(value, { timeout: 5000 }) }
+      catch (error) { cameraError = error }
+      try {
+        action.after = { state: await boundedPointDiagnostic(state, 'Visibility camera authoritative state'),
+          control: await boundedPointDiagnostic(() => cameraObservation(label), 'Visibility camera native field') }
+        await boundedPointDiagnostic(() => visibilityDiagnostic(group, scenario, { phase: 'visibility-camera-field-after', action,
+          ...(cameraError ? { actionError: { message: cameraError.message, stack: cameraError.stack } } : {}) }),
+        'Visibility camera after-action evidence')
+      } catch (error) {
+        if (cameraError) pageErrors.push(`Visibility camera observation after primary failure: ${error.message}`)
+        throw cameraError ?? error
+      }
+      if (cameraError) throw cameraError
+      assert.equal(action.after.control.value, value, `Actual native ${label} value`)
+      cameraPreparation.actions.push(action)
+    }
+    cameraPreparation.after = await state()
+    cameraPreparation.controlsAfter = await Promise.all(cameraFields.map(([label]) => cameraObservation(label)))
+    cameraPreparation.renderedAfter = await observeGeometricPoint(page, 'app-point')
+    await visibilityDiagnostic(group, scenario, { phase: 'visibility-camera-after', cameraPreparation })
+    assertVisibilityCameraPreparation(cameraPreparation)
+    const actualCamera = JSON.parse(cameraPreparation.after.uiSettings).camera3d
+    assert.equal(actualCamera.thetaDeg, 90, 'Authoritative front-view theta')
+    assert.equal(actualCamera.phiDeg, 0, 'Authoritative front-view phi')
+    const approximate = page.locator('.source-panel').getByLabel('Enable approximate 3D visibility', { exact: true })
+    const checkboxObservation = async () => {
+      const controls = await approximate.evaluateAll((elements) => elements.map((element) => ({
+        tag: element.localName, type: element.type, checked: element.checked, connected: element.isConnected,
+        enabled: !element.matches(':disabled') && element.getAttribute('aria-disabled') !== 'true',
+        scope: element.closest('.source-panel') ? '.source-panel' : null,
+        labels: Array.from(element.labels ?? [], (label) => ({ text: label.textContent, outerHTML: label.outerHTML })),
+      })))
+      return { count: await approximate.count(), ...controls[0], controls }
+    }
+    const enable = { before: await state(), checkboxBefore: await checkboxObservation(),
+      controlBefore: await inspectSourceHiddenPoints(page) }
+    await visibilityDiagnostic(group, scenario, { phase: 'approximate-visibility-before', enable })
+    assert.equal(JSON.parse(enable.before.runtimeDiagramJson).ambientDimension, 3, 'Approximate visibility requires 3D')
+    assert.equal(enable.checkboxBefore.count, 1, 'One source-panel approximate visibility checkbox')
+    assert.equal(enable.checkboxBefore.connected, true, 'Connected approximate visibility checkbox')
+    assert.equal(enable.checkboxBefore.enabled, true, 'Enabled approximate visibility checkbox')
+    let enableError
+    try { await approximate.check({ timeout: 5000 }) } catch (error) { enableError = error }
+    try {
+      enable.after = await boundedPointDiagnostic(state, 'Visibility enabled authoritative state')
+      enable.checkbox = await boundedPointDiagnostic(checkboxObservation, 'Visibility enabled checkbox')
+      enable.controlAfter = await boundedPointDiagnostic(() => inspectSourceHiddenPoints(page), 'Visibility enabled native control')
+      await boundedPointDiagnostic(() => visibilityDiagnostic(group, scenario,
+        { phase: 'approximate-visibility-after', enable,
+          ...(enableError ? { actionError: { message: enableError.message, stack: enableError.stack } } : {}) }),
+      'Approximate visibility after-action evidence')
+    } catch (error) {
+      if (enableError) pageErrors.push(`Visibility enabled observation after primary failure: ${error.message}`)
+      throw enableError ?? error
+    }
+    if (enableError) throw enableError
+    assert.equal(enable.checkbox.checked, true, 'Real approximate visibility checkbox is checked')
+    assert.equal(JSON.parse(enable.after.uiSettings).visibility.enabled, true, 'Authoritative approximate visibility is enabled')
+    const actions = []
+    // The initial dimHidden selection may be a no-op. Exercise both values
+    // through the same native field, retaining each actual state and render.
+    for (const [index, value] of ['dimHidden', 'hideHidden', 'dimHidden'].entries()) {
+      actions.push(await selectHiddenPointVisibility({ page, readState: state, observePoint: observeGeometricPoint,
+        diagnose: (details) => visibilityDiagnostic(group, scenario, details), secondaryErrors: pageErrors,
+        scenario, sequence: index + 1, value, id: 'app-point' }))
+    }
+    const dimmed = actions.at(-1).afterAction.rendered
     await save({ hiddenAbsent, lockedUnchanged: beforeLocked.json === lockedState.json,
       lockedNotSelected: lockedState.selection?.id !== 'app-point', dimmedVisible: !!dimmed,
-      dimmedOpacity: dimmed?.effectiveFillOpacity > 0 && dimmed.effectiveFillOpacity < 1, locked, dimmed })
+      dimmedOpacity: dimmed?.effectiveFillOpacity > 0 && dimmed.effectiveFillOpacity < 1
+        && dimmed.effectiveOpacity > 0 && dimmed.effectiveOpacity < 1, locked, dimmed,
+      visibility: { locked: { before: beforeLocked, stateAfter: lockedState, rendered: locked }, hidden, cameraPreparation, enable, actions } })
 
     for (const background of ['transparent', 'white']) {
       scenario = `point-geometric-download-${background}`

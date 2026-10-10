@@ -11,7 +11,8 @@ import { createEmptyDiagram, createPointStratum } from '../../src/model/construc
 import { generateTikz } from '../../src/tikz/generateTikz.ts'
 import { syntheticPointNativeDragEvidence, syntheticPointToolbarRevisionRecords } from './pointNativeDragFixture.mjs'
 import { syntheticGeometricSelectionEvidence } from './pointGeometricSelectionFixture.mjs'
-import { assertGeometricSelectionEvidence } from '../../scripts/pointGeometricShapesContract.mjs'
+import { syntheticGeometricVisibilityEvidence } from './pointGeometricVisibilityFixture.mjs'
+import { assertGeometricSelectionEvidence, assertGeometricShapeEvidence } from '../../scripts/pointGeometricShapesContract.mjs'
 import { compareSvgPreviewSelectionCandidates, nextSvgPreviewSelectionCycle } from '../../src/rendering/svgHitTesting.ts'
 
 function placement(shape = 'rectangle', anchor = 'base east', extra = {}) {
@@ -144,6 +145,92 @@ for (const options of [{}, { collapsed: true }, { obstructed: true }, { collapse
     assert.equal(raw.before.geometry.contour.fraction, .23)
     assert.equal(raw.toolbarPreparation.actions.filter(({ purpose }) => purpose === 'obstruction').length, Number(!!options.obstructed))
     assert.equal(raw.toolbarRestoration.after.toolbar.collapsed, !!options.collapsed)
+  })
+}
+test('synthetic 32D geometric visibility parent policy accepts real raw same-value no-op plus both observed transitions', () => {
+  const evidence = syntheticGeometricVisibilityEvidence(), actions = evidence.visibility.actions
+  assertGeometricShapeEvidence(evidence, evidence.scenario)
+  assert.equal(actions[0].afterAction.transition.effective, false)
+  assert.equal(actions[0].before.state.uiSettings, actions[0].afterAction.state.uiSettings)
+  assert.equal(actions[1].afterAction.transition.effective, true)
+  assert.equal(actions[2].afterAction.transition.effective, true)
+  assert.deepEqual(actions.map(({ afterAction }) => afterAction.transition), [
+    { priorValue: 'dimHidden', finalValue: 'dimHidden', effective: false },
+    { priorValue: 'dimHidden', finalValue: 'hideHidden', effective: true },
+    { priorValue: 'hideHidden', finalValue: 'dimHidden', effective: true },
+  ])
+})
+test('synthetic 32D camera preparation accepts native same-value input without inventing a model edit', () => {
+  const evidence = syntheticGeometricVisibilityEvidence({ cameraAngles: { thetaDeg: 90, phiDeg: 0 } })
+  assertGeometricShapeEvidence(evidence, evidence.scenario)
+  for (const action of evidence.visibility.cameraPreparation.actions) assert.deepEqual(action.after.state, action.before.state)
+})
+for (const index of [0, 1, 2]) for (const field of ['json', 'runtimeDiagramJson', 'history', 'selection', 'labelDocumentRevision']) {
+  test(`synthetic 32D parent raw visibility action ${index} rejects changed ${field}`, () => {
+    const evidence = syntheticGeometricVisibilityEvidence(), state = evidence.visibility.actions[index].afterAction.state
+    if (field === 'selection') state.selection = { kind: 'stratum', id: 'occluder' }
+    else if (field === 'labelDocumentRevision') state[field] += 1
+    else state[field] += 'changed'
+    assert.throws(() => assertGeometricShapeEvidence(evidence, evidence.scenario))
+  })
+}
+for (const index of [0, 1]) for (const field of ['json', 'runtimeDiagramJson', 'history', 'selection', 'labelDocumentRevision']) {
+  test(`synthetic 32D parent native visibility camera action ${index} rejects changed ${field}`, () => {
+    const evidence = syntheticGeometricVisibilityEvidence(), state = evidence.visibility.cameraPreparation.actions[index].after.state
+    if (field === 'selection') state.selection = { kind: 'stratum', id: 'app-point' }
+    else if (field === 'labelDocumentRevision') state[field] += 1
+    else state[field] += 'changed'
+    assert.throws(() => assertGeometricShapeEvidence(evidence, evidence.scenario))
+  })
+}
+for (const fault of ['camera-ui-stale', 'camera-zoom-edit', 'camera-no-controls', 'checkbox-stale-camera', 'policy-camera-change',
+  'policy-work-plane-change', 'policy-disabled-visibility', 'policy-foreign-ui-setting', 'policy-fake-noop', 'policy-fake-transition',
+  'policy-preparation-work-plane-change', 'policy-source-edit', 'policy-style-edit', 'policy-coordinate-edit', 'policy-event-epoch',
+  'policy-foreign-scenario', 'policy-action-error', 'dimmed-owner-flags-only', 'dimmed-opacity-flags-only', 'dimmed-ancestor-only-opacity']) {
+  test(`synthetic 32D parent geometric visibility evidence rejects ${fault}`, () => {
+    const evidence = syntheticGeometricVisibilityEvidence(), { cameraPreparation, enable, actions } = evidence.visibility
+    const settings = JSON.parse(actions[0].afterAction.state.uiSettings)
+    if (fault === 'camera-ui-stale') {
+      const stale = JSON.parse(cameraPreparation.actions[0].after.state.uiSettings); stale.camera3d.thetaDeg = 13
+      cameraPreparation.actions[0].after.state.uiSettings = JSON.stringify(stale)
+    }
+    if (fault === 'camera-zoom-edit') {
+      const changed = JSON.parse(cameraPreparation.actions[0].after.state.uiSettings); changed.camera3d.zoom = 50
+      cameraPreparation.actions[0].after.state.uiSettings = JSON.stringify(changed)
+    }
+    if (fault === 'camera-no-controls') cameraPreparation.actions = []
+    if (fault === 'checkbox-stale-camera') enable.before.uiSettings = cameraPreparation.before.uiSettings
+    if (fault === 'policy-camera-change') settings.camera3d.thetaDeg = 25
+    if (fault === 'policy-work-plane-change') settings.workPlane = { kind: 'yz', value: 2 }
+    if (fault === 'policy-disabled-visibility') settings.visibility.enabled = false
+    if (fault === 'policy-foreign-ui-setting') settings.includeCoordinateAxesInTikz = true
+    if (['policy-camera-change', 'policy-work-plane-change', 'policy-disabled-visibility', 'policy-foreign-ui-setting'].includes(fault)) {
+      actions[0].afterAction.state.uiSettings = JSON.stringify(settings)
+    }
+    if (fault === 'policy-fake-noop') actions[1].afterAction.transition.effective = false
+    if (fault === 'policy-fake-transition') actions[0].afterAction.transition.effective = true
+    if (fault === 'policy-preparation-work-plane-change') actions[0].prepared.control.workPlaneStatus = ['yz-plane at x=4']
+    if (['policy-source-edit', 'policy-style-edit', 'policy-coordinate-edit'].includes(fault)) {
+      const state = actions[0].afterAction.state, runtime = JSON.parse(state.runtimeDiagramJson)
+      if (fault === 'policy-source-edit') runtime.strata[0].text = '$edited$'
+      if (fault === 'policy-style-edit') runtime.strata[0].style.paint.fill.color = '#123456'
+      if (fault === 'policy-coordinate-edit') runtime.strata[0].position.y = -2
+      const saved = JSON.parse(state.json); saved.diagram = runtime
+      const history = JSON.parse(state.history); history.present = runtime
+      state.runtimeDiagramJson = JSON.stringify(runtime); state.json = JSON.stringify(saved); state.history = JSON.stringify(history)
+      actions[0].afterAction.rendered.source = runtime.strata[0].text
+    }
+    if (fault === 'policy-event-epoch') actions[1].afterAction.events.events[0].labelDocumentRevision += 1
+    if (fault === 'policy-foreign-scenario') actions[0].scenario = 'point-geometric-ellipse'
+    if (fault === 'policy-action-error') actions[0].actionError = { message: 'controlled failed native select' }
+    if (fault === 'dimmed-owner-flags-only') delete actions[2].afterAction.rendered.id
+    if (fault === 'dimmed-opacity-flags-only') delete actions[2].afterAction.rendered.effectiveOpacity
+    if (fault === 'dimmed-ancestor-only-opacity') {
+      const rendered = actions[2].afterAction.rendered
+      rendered.effectiveFillOpacity = 1; rendered.opacityAncestors[0].opacity = '.25'
+      assert.equal(rendered.effectiveOpacity, .25, 'Effective opacity flag alone retains the fabricated plausible dimming')
+    }
+    assert.throws(() => assertGeometricShapeEvidence(evidence, evidence.scenario))
   })
 }
 for (const nativeProjection of ['double', 'binary32']) for (const body of [false, true]) {

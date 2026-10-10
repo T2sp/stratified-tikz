@@ -7,20 +7,65 @@ later 32B have historical accepted evidence. The plan still records unaccepted
 fresh strict native/review gates for the merged 32C checkout; implementation
 presence does not close that prerequisite or the final gate.
 
-The latest browser-capable parent's retained `stz-phase32d-before-review-gn1o0M`
-report passed 5,621 tests, build, diff and label-assets with Chrome 154.0.8037.98.
-It completed 15 of 18 cumulative groups, including paint/import and all eleven
-named shapes. The 2D diamond and star each completed trusted native drag, one
-bounded history commit, and exact saved/runtime Undo/Redo at unchanged epochs
-100 and 101. The next configured 2D semicircle's fixed `.23` contour point was
-covered by the expanded Creation toolbar: all native events reached its status
-span, with Inspector closed and unchanged model/layout/epoch 102. Page errors
-were empty. This is the current retained native failure, distinct from the
-earlier revision assertion and child startup restrictions. Semicircle/dart and
-all four 3D contour interactions, later geometric cases, the layout/anchor matrix
-and final standalone-export group remain unaccepted.
+The latest browser-capable parent, retained as `stz-phase32d-before-review-yYQ7Zh`,
+passed 5,830 tests, build, diff and full label-assets with Chrome 154.0.8037.98.
+It completed 15 of 18 cumulative groups: full paint/import, all eleven named
+shapes and all eight 2D/3D contour interactions passed, including trusted native
+selection/drag, one bounded history commit, exact saved/runtime Undo/Redo and
+unchanged document epochs 100 through 107. The next active scenario is
+`point-geometric-visibility`, which stopped at the caption-only exact
+`getByLabel('Hidden points:')` lookup. The source-panel wrapping label also
+contains its option text. Page errors are empty. Visibility and both geometric
+downloads, the full layout/anchor matrix and final standalone-export group
+remain unaccepted. This is separate from the resolved toolbar/drag/revision
+assertions and the child's startup restriction.
 
-The toolbar correction starts from the actual clean tracked checkout
+The current scoped correction starts from the actual clean tracked checkout
+`0c622432757e67d5a37c50a8aa84da969d67d670`, fingerprint
+`d0dfa54a1754b33aa96ceb46a3c339e9634251086876c1aaa4cd000db92f3bf2`.
+All prior corrections, including the former twelve modified files and selection
+fixture, are tracked here. The final identity is captured from the actual tree,
+including new untracked helpers/fixtures, rather than an older parent report.
+
+`pointSourceVisibility.mjs` scopes its exact caption span to `.source-panel`,
+requires the direct production label and unique associated native select,
+checks connected/visible/enabled state and exact `dimHidden`/`hideHidden`
+options, then scrolls the real field into the internal source header before a
+bounded native `selectOption`. Raw before/prepared/after records retain caption/
+label text, old/corrected locator counts, options/value, bounds/scroll ancestors,
+authoritative visibility settings, model/history/epoch/selection/camera/work
+plane and actual owned input/change events. The first dim selection may be a
+same-value observation; real hide then dim actions retain their resulting states
+and rendering. Pointer delivery or invented trusted flags do not establish a
+select action. Diagnostic/listener cleanup cannot replace the first failure.
+
+The retained failure DOM also shows an actual setup mismatch: camera theta 13,
+phi -23, zoom 1, with the point classified visible and fill opacity 1. Saved
+`view.camera3d` takes precedence over the overwritten `diagram.camera`.
+The intended theta 90 / phi 0 occlusion orientation now uses the real numeric
+camera controls, with exact before/after UI-only invariance and render records.
+The checkbox still runs natively. The dimmed fill-opacity assertion remains,
+with a retained cumulative opacity chain in addition. No production camera,
+visibility, geometry, model, revision, cache or saved-coordinate behavior changes.
+
+Both parent policies require raw visibility/control/setup/render evidence;
+summary success booleans cannot substitute. Registered synthetic controls test
+the scoped resolver, no-op/transition values, stale/ambiguous/disabled states,
+internal scrolling, exact return/final settings and primary-error ownership.
+Runner fixtures copy the new transitive helper dependency. Native visibility,
+downloads and standalone acceptance still require a fresh complete strict 32D
+parent process followed by independent review of the matching tree. Final child
+commands, preservation hashes, tracked/untracked diff and exact handoff are
+retained under `/private/tmp/stz-32d-visibility-fix-20261010/`. Failed browser
+startup is pending parent work, never accepted evidence. Phase 32 stays incomplete.
+
+Earlier toolbar-fix parent `stz-phase32d-before-review-gn1o0M` passed 5,621
+tests/build/diff/label-assets and all eleven shapes, then stopped at expanded
+Creation controls covering the configured 2D semicircle's fixed .23 boundary.
+Its 2D diamond/star epochs 100/101 were complete; the newer parent above
+supersedes that native failure while preserving its diagnostic history.
+
+The earlier toolbar correction starts from the actual clean tracked checkout
 `c2ddd167d5f0a6c99dc392368b02bc9d477ff629`, fingerprint
 `cee0ec21f6db9226c985ea5ae32ef1a81a595cd351cd9e3c81323af52978a696`.
 The prior seven-file revision fix and updated prompt are already tracked there.

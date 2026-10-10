@@ -1,5 +1,6 @@
 import assert from 'node:assert/strict'
 import { assertPointNativeDragEvidence } from './pointNativeDrag.mjs'
+import { assertHiddenPointVisibilityAction } from './pointSourceVisibility.mjs'
 
 export const geometricShapeGroup = 'point-node-geometric-shapes'
 export const geometricShapeManifest = [
@@ -249,6 +250,190 @@ export function assertGeometricSelectionEvidence(selection, id, expectedClickKin
   }
   assertSelectionStateUnchanged(selection.stateAfter, selection.toolbarRestoration.stateBefore, 'Toolbar restoration follows expected selected owner')
 }
+function geometricVisibilityState(state, message) {
+  assertSelectionRevision(state, message)
+  for (const field of selectionStateFields) assert.ok(Object.hasOwn(state, field), `${message}: raw ${field} is retained`)
+  const model = JSON.parse(state.runtimeDiagramJson), saved = JSON.parse(state.json)
+  assert.equal(saved.version, 2, `${message}: current saved envelope is retained`)
+  assert.ok(saved.diagram && Array.isArray(model.strata), `${message}: saved and runtime diagrams exist`)
+  const point = model.strata.find(({ id }) => id === 'app-point')
+  const savedPoint = saved.diagram.strata.find(({ id }) => id === 'app-point')
+  assert.ok(point && savedPoint, `${message}: the expected saved and runtime point exists`)
+  assert.equal(point.geometricKind, 'point'); assert.equal(point.codim, model.ambientDimension)
+  assert.equal(savedPoint.text, point.text, `${message}: raw saved/runtime point source agrees`)
+  assert.deepEqual(savedPoint.position, point.position, `${message}: saved/runtime point coordinates agree`)
+  assert.equal(savedPoint.style.shape, point.style.shape, `${message}: saved/runtime point shape agrees`)
+  return { model, point, settings: JSON.parse(state.uiSettings) }
+}
+function assertVisibilitySettingsChange(before, after, key, value, message) {
+  const previous = geometricVisibilityState(before, `${message} before`)
+  const current = geometricVisibilityState(after, `${message} after`)
+  for (const field of selectionStateFields.filter((field) => field !== 'uiSettings')) {
+    assert.deepEqual(after[field], before[field], `${message}: preserves ${field}`)
+  }
+  assert.ok(previous.settings.visibility && current.settings.visibility, `${message}: authoritative visibility settings exist`)
+  assert.deepEqual(current.settings, { ...previous.settings, visibility: { ...previous.settings.visibility, [key]: value } },
+    `${message}: changes only the intended visibility setting`)
+  return current
+}
+function assertGeometricVisibilityRender(rendered, state, message, dimmed = false) {
+  const { point } = geometricVisibilityState(state, message)
+  assert.ok(rendered && typeof rendered === 'object', `${message}: connected production point render exists`)
+  assert.equal(rendered.id, point.id, `${message}: rendering belongs to the actual expected point`)
+  assert.equal(rendered.source, point.text, `${message}: rendered raw source matches the model`)
+  assert.equal(rendered.shape, point.style.shape, `${message}: rendered shape matches the model`)
+  assert.equal(rendered.state, 'ready', `${message}: the actual body settled`)
+  assert.ok(Number.isFinite(rendered.contourLength) && rendered.contourLength > 0, `${message}: actual contour is nonempty`)
+  assert.equal(rendered.pointVisibility, dimmed ? 'dimmed' : 'visible', `${message}: actual visibility classification`)
+  if (dimmed) assert.equal(rendered.occludingSurfaceId, 'occluder', `${message}: actual occluding production sheet`)
+  assert.ok(Number.isFinite(rendered.effectiveFillOpacity) && rendered.effectiveFillOpacity > 0 && rendered.effectiveFillOpacity <= 1,
+    `${message}: raw computed contour fill opacity`)
+  if (dimmed) assert.ok(rendered.effectiveFillOpacity < 1, `${message}: the actual dimmed contour fill opacity remains below one`)
+  assert.ok(Array.isArray(rendered.opacityAncestors) && rendered.opacityAncestors.length > 0,
+    `${message}: actual cumulative ancestor opacity is retained`)
+  assert.equal(rendered.opacityAncestors.filter(({ isPointOwner }) => isPointOwner).length, 1,
+    `${message}: opacity measurement includes exactly one expected point owner`)
+  assert.equal(rendered.opacityAncestors.find(({ isPointOwner }) => isPointOwner).pointId, point.id,
+    `${message}: cumulative opacity belongs to the expected connected point owner`)
+  let opacity = rendered.effectiveFillOpacity
+  for (const ancestor of rendered.opacityAncestors) {
+    assert.equal(ancestor.connected, true, `${message}: opacity ancestor remains connected`)
+    assert.equal(typeof ancestor.tag, 'string', `${message}: raw opacity ancestor tag`)
+    assert.equal(typeof ancestor.opacity, 'string', `${message}: raw computed opacity text`)
+    assert.ok(Object.hasOwn(ancestor, 'attributeOpacity'), `${message}: raw opacity attribute exists`)
+    const value = Number(ancestor.opacity)
+    assert.ok(ancestor.opacity.length > 0 && Number.isFinite(value) && value >= 0 && value <= 1, `${message}: finite actual ancestor opacity`)
+    opacity *= value
+  }
+  assert.equal(rendered.effectiveOpacity, opacity, `${message}: effective opacity is computed from the retained actual ancestor chain`)
+  assert.ok(opacity > 0 && (dimmed ? opacity < 1 : opacity <= 1), `${message}: actual ${dimmed ? 'dimmed' : 'visible'} opacity`)
+}
+function assertVisibilityCameraControl(observation, label, state, available = true) {
+  assert.equal(observation?.label, label, 'Camera observation belongs to the exact native coordinate field')
+  assert.equal(observation.count, available ? 1 : observation.count, 'Unique actual camera field')
+  assert.ok(observation.count === 0 || observation.count === 1, 'Missing/unique camera field is explicitly observed')
+  assert.equal(observation.controls?.length, observation.count, 'Raw camera controls agree with actual lookup count')
+  if (observation.count === 0) return
+  const control = observation.controls[0]
+  assert.equal(control.scope, '.camera-panel'); assert.equal(control.ariaLabel, label)
+  assert.equal(control.tag, 'input'); assert.equal(control.type, 'number'); assert.equal(control.connected, true)
+  const settings = JSON.parse(state.uiSettings), axis = label === 'theta value' ? 'thetaDeg' : 'phiDeg'
+  assert.equal(Number(control.value), settings.camera3d?.[axis], 'Native camera value matches authoritative UI camera settings')
+  for (const field of ['tag', 'type', 'value', 'connected', 'visible', 'enabled', 'ariaLabel', 'scope']) {
+    assert.deepEqual(observation[field], control[field], `Published camera ${field} retains its actual control observation`)
+  }
+  if (available) {
+    assert.equal(control.visible, true, 'Native camera field is visible before real input')
+    assert.equal(control.enabled, true, 'Native camera field is enabled before real input')
+  }
+}
+export function assertVisibilityCameraPreparation(preparation) {
+  assert.ok(preparation && Array.isArray(preparation.actions), 'Native visibility camera preparation is retained')
+  const { before, after, controlsBefore, controlsAfter, expansion, actions } = preparation
+  const { settings } = geometricVisibilityState(before, 'Camera preparation')
+  assert.ok(settings.camera3d && Number.isFinite(settings.camera3d.thetaDeg) && Number.isFinite(settings.camera3d.phiDeg),
+    'Actual precondition camera angles exist')
+  for (const [controls, state, available] of [[controlsBefore, before, false], [controlsAfter, after, true]]) {
+    assert.equal(controls?.length, 2, 'Both exact native camera controls are retained')
+    for (const label of ['theta value', 'phi value']) {
+      const observations = controls.filter((control) => control.label === label)
+      assert.equal(observations.length, 1, 'Exact camera coordinate caption is unique')
+      assertVisibilityCameraControl(observations[0], label, state, available)
+    }
+  }
+  let previous = before
+  if (expansion) {
+    assertSelectionStateUnchanged(previous, expansion.before, 'Camera expansion starts from observed inherited state')
+    assertSelectionStateUnchanged(expansion.before, expansion.stateAfter, 'Native camera-details expansion')
+    assert.equal(expansion.count, 1); assert.equal(expansion.expandedBefore, 'false'); assert.equal(expansion.expandedAfter, 'true')
+    previous = expansion.stateAfter
+  }
+  assert.equal(actions.length, 2, 'Both actual camera angles are set through native controls')
+  for (const [index, [label, axis, value]] of [['theta value', 'thetaDeg', '90'], ['phi value', 'phiDeg', '0']].entries()) {
+    const action = actions[index]
+    assert.equal(action.label, label); assert.equal(action.value, value)
+    assertSelectionStateUnchanged(previous, action.before.state, 'Native camera action continuity')
+    assertVisibilityCameraControl(action.before.control, label, action.before.state)
+    assertVisibilityCameraControl(action.after.control, label, action.after.state)
+    for (const field of selectionStateFields.filter((field) => field !== 'uiSettings')) {
+      assert.deepEqual(action.after.state[field], action.before.state[field], `Native camera preparation preserves ${field}`)
+    }
+    const beforeSettings = JSON.parse(action.before.state.uiSettings), afterSettings = JSON.parse(action.after.state.uiSettings)
+    assert.deepEqual(afterSettings, { ...beforeSettings, camera3d: { ...beforeSettings.camera3d, [axis]: Number(value) } },
+      'Native camera angle action changes only its intended UI angle')
+    assert.equal(action.after.control.value, value, 'Native camera input retains its exact requested final value')
+    assert.equal(action.error, undefined, 'Native camera angle input succeeded')
+    previous = action.after.state
+  }
+  assertSelectionStateUnchanged(previous, after, 'Native camera preparation terminal continuity')
+  const finalSettings = JSON.parse(after.uiSettings)
+  assert.equal(finalSettings.camera3d.thetaDeg, 90); assert.equal(finalSettings.camera3d.phiDeg, 0)
+  assertGeometricVisibilityRender(preparation.renderedBefore, before, 'Precondition visibility camera rendering')
+  assertGeometricVisibilityRender(preparation.renderedAfter, after, 'Prepared visibility camera rendering')
+}
+export function assertGeometricVisibilityEvidence(evidence) {
+  const visibility = evidence.visibility
+  assert.ok(visibility?.locked && visibility.hidden && visibility.enable && Array.isArray(visibility.actions),
+    'Geometric visibility retains raw locked, hidden, enabled and control observations')
+  const { locked, hidden, cameraPreparation, enable, actions } = visibility
+  const lockedBefore = geometricVisibilityState(locked.before, 'Locked geometric point')
+  assert.equal(lockedBefore.model.ambientDimension, 2)
+  assert.equal(lockedBefore.point.text, '$locked$'); assert.equal(lockedBefore.point.style.shape, 'dart')
+  assert.equal(lockedBefore.model.layers.find(({ value }) => value === lockedBefore.point.layer)?.locked, true,
+    'Locked point belongs to the actual locked layer')
+  assert.equal(lockedBefore.model.layers.find(({ value }) => value === lockedBefore.point.layer)?.visible, true,
+    'Locked point layer remains visible')
+  assertSelectionStateUnchanged(locked.before, locked.stateAfter, 'Locked native point input')
+  assert.notEqual(locked.stateAfter.selection?.id, 'app-point', 'Actual locked point was not selected')
+  assertGeometricVisibilityRender(locked.rendered, locked.before, 'Locked geometric rendering')
+  const hiddenState = geometricVisibilityState(hidden.state, 'Hidden geometric point')
+  assert.equal(hidden.state.labelDocumentRevision, locked.stateAfter.labelDocumentRevision + 1,
+    'Native hidden JSON load advances the document epoch exactly once')
+  assert.deepEqual(hiddenState.point, lockedBefore.point, 'Layer hiding preserves exact source, coordinates and style')
+  assert.equal(hiddenState.model.layers.find(({ value }) => value === hiddenState.point.layer)?.visible, false,
+    'Hidden point belongs to the actual hidden layer')
+  assert.equal(hidden.rendered, null, 'Actual hidden-layer point has no rendered node')
+  assertVisibilityCameraPreparation(cameraPreparation)
+  const dimBefore = geometricVisibilityState(cameraPreparation.before, 'Approximate visibility prerequisite')
+  assert.equal(cameraPreparation.before.labelDocumentRevision, hidden.state.labelDocumentRevision + 1,
+    'Native occlusion JSON load advances the document epoch exactly once')
+  assert.equal(dimBefore.model.ambientDimension, 3); assert.equal(dimBefore.point.codim, 3)
+  assert.equal(dimBefore.point.text, '$dimmed$'); assert.equal(dimBefore.point.style.shape, 'semicircle')
+  assert.deepEqual(dimBefore.point.position, { x: 0, y: -1, z: 0 }, 'Occluded point retains actual 3D model coordinates')
+  const occluder = dimBefore.model.strata.find(({ id }) => id === 'occluder')
+  assert.ok(occluder && occluder.geometricKind === 'sheet' && occluder.codim === 1 && occluder.kind === 'quadSheet',
+    'Visibility setup contains the actual codimension-one sheet')
+  assert.deepEqual(occluder.corners, [{ x: -2, y: 0, z: -2 }, { x: 2, y: 0, z: -2 }, { x: 2, y: 0, z: 2 }, { x: -2, y: 0, z: 2 }],
+    'Visibility setup retains the actual occluding sheet coordinates')
+  assertSelectionStateUnchanged(cameraPreparation.after, enable.before, 'Visibility checkbox uses the actually prepared native camera')
+  assertVisibilitySettingsChange(enable.before, enable.after, 'enabled', true, 'Approximate visibility checkbox action')
+  const checkbox = enable.checkbox
+  assert.ok(checkbox, 'Actual approximate-visibility checkbox observation exists')
+  assert.equal(checkbox.scope, '.source-panel'); assert.equal(checkbox.tag, 'input'); assert.equal(checkbox.type, 'checkbox')
+  assert.equal(checkbox.count, 1); assert.equal(checkbox.connected, true); assert.equal(checkbox.enabled, true); assert.equal(checkbox.checked, true)
+  assert.equal(checkbox.labels?.length, 1, 'Actual checkbox has exactly one associated source-panel label')
+  assert.equal(checkbox.labels[0].text.trim(), 'Enable approximate 3D visibility', 'Actual checkbox is associated with the correct source-panel field')
+  assert.ok(typeof checkbox.labels[0].outerHTML === 'string' && checkbox.labels[0].outerHTML.startsWith('<label'),
+    'Actual checkbox associated wrapper markup is retained')
+  assert.equal(actions.length, 3, 'Same-value dim observation and both real policy transitions are retained')
+  let previous = enable.after, previousSequence
+  for (const [index, value] of ['dimHidden', 'hideHidden', 'dimHidden'].entries()) {
+    const action = actions[index]
+    assertHiddenPointVisibilityAction(action)
+    assert.equal(action.scenario, 'point-geometric-visibility'); assert.equal(action.id, 'app-point'); assert.equal(action.value, value)
+    assert.ok(Number.isInteger(action.sequence) && action.sequence >= 1, 'Visibility action sequence is explicit')
+    if (previousSequence !== undefined) assert.equal(action.sequence, previousSequence + 1, 'Visibility actions preserve actual sequential ownership')
+    assertSelectionStateUnchanged(previous, action.before.state, 'Visibility policy action continuity')
+    assertVisibilitySettingsChange(action.before.state, action.afterAction.state, 'pointVisibility', value, 'Hidden-points policy action')
+    if (value === 'hideHidden') assert.equal(action.afterAction.rendered, null, 'Actual hideHidden policy removes the occluded point render')
+    else assertGeometricVisibilityRender(action.afterAction.rendered, action.afterAction.state, 'Dimmed geometric rendering', true)
+    previous = action.afterAction.state; previousSequence = action.sequence
+  }
+  const finalRender = actions.at(-1).afterAction.rendered
+  assert.deepEqual(evidence.locked, locked.rendered, 'Published locked rendering is the retained actual raw rendering')
+  assert.deepEqual(evidence.dimmed, finalRender, 'Published dimmed rendering is the retained actual terminal rendering')
+  for (const key of ['hiddenAbsent', 'lockedUnchanged', 'lockedNotSelected', 'dimmedVisible', 'dimmedOpacity']) assert.equal(evidence[key], true)
+}
 export function assertGeometricShapeEvidence(evidence, name) {
   assert.equal(evidence.scenario, name); assert.equal(evidence.group, geometricShapeGroup); assert.equal(evidence.result, 'passed')
   assert.deepEqual(evidence.pageErrors, [])
@@ -322,7 +507,7 @@ export function assertGeometricShapeEvidence(evidence, name) {
       assert.equal(entry.undoRestored, true); assert.equal(entry.redoRestored, true)
     }
   } else if (name === 'point-geometric-visibility') {
-    for (const key of ['hiddenAbsent', 'lockedUnchanged', 'lockedNotSelected', 'dimmedVisible', 'dimmedOpacity']) assert.equal(evidence[key], true)
+    assertGeometricVisibilityEvidence(evidence)
   } else {
     assert.ok(name.startsWith('point-geometric-download-'))
     assert.equal(evidence.background, name.slice('point-geometric-download-'.length))

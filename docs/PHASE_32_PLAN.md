@@ -1,6 +1,37 @@
 # Phase 32 Plan: Point-node math, paint, geometric shapes, and layout
 
-Current toolbar-interception correction (2026-10-10): the actual checkout starts
+Current source-panel visibility correction (2026-10-10): the actual clean
+checkout is `0c622432757e67d5a37c50a8aa84da969d67d670`; previous corrections
+are tracked and preserved. The latest `yYQ7Zh` browser-capable parent passed
+5,830 tests/build/diff/label-assets, all eleven shapes and all eight native
+2D/3D contour interactions with epochs 100–107, bounded commits and exact
+Undo/Redo. Its 15/18 groups are partial: the next active visibility scenario
+failed the wrapping label's caption-only exact Hidden points locator.
+
+The source-panel resolver requires one exact caption, its direct production
+label, one associated connected/visible/enabled native select and exact options,
+then uses bounded native scrolling and selection. Raw before/after control,
+settings, model/history/epoch/selection/work-plane and render evidence is
+required by both parent policies. Real dim/hide/dim actions distinguish the
+initial same-value selection from actual transitions. Actual input/change
+observations retain their provenance without a pointer/trust requirement.
+The retained DOM also establishes that saved view.camera3d kept theta 13 / phi
+-23 instead of the intended front orientation. Native theta/phi controls now
+prepare 90/0 with raw UI-only invariance. Locked/hidden/dimmed and actual
+fill/cumulative opacity assertions remain. No production or PGF reference changes.
+
+Registered synthetic resolver and parent-policy regressions remain distinct
+from native acceptance. Fresh strict parent verification must finish visibility,
+both geometric downloads, the complete layout/anchor/owner-cycle matrix and
+final standalone export, including both TikZ modes and actual pending
+transparent/white downloads reopened outside the App. Matching accepted
+verification must precede read-only independent review. Phase 32 is **not
+complete**; no review/commit/push follows failed verification. Exact child
+results, identities and handoff are retained under
+`/private/tmp/stz-32d-visibility-fix-20261010/` and the
+[implementation audit](PHASE_32D_IMPLEMENTATION.md).
+
+Earlier toolbar-interception correction (2026-10-10): the actual checkout starts
 clean at `c2ddd167d5f0a6c99dc392368b02bc9d477ff629`, with all previous seven-file
 revision changes and the prompt update tracked. The latest `gn1o0M` parent passed
 5,621 tests/build/diff/label-assets and completed 15/18 strict groups. All eleven

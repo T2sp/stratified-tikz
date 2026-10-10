@@ -16,6 +16,7 @@ import { selectGeometricPoint, installGeometricSelectionObserver, observeGeometr
   removeGeometricSelectionObserver } from '../../scripts/pointGeometricSelection.mjs'
 import { syntheticPointNativeDragEvidence, syntheticPointToolbarRevisionRecords } from './pointNativeDragFixture.mjs'
 import { syntheticGeometricSelectionEvidence } from './pointGeometricSelectionFixture.mjs'
+import { syntheticGeometricVisibilityEvidence } from './pointGeometricVisibilityFixture.mjs'
 
 // These preparation and event-delivery controls are explicitly synthetic. They
 // exercise ordering/error ownership; the reused native App shape loop is the
@@ -829,6 +830,80 @@ test('synthetic 32C policy requires eight raw handle drags and exact history res
   const evidence = geometricInteractionEvidence()
   assertGeometricShapeEvidence(evidence, evidence.scenario)
 })
+for (const cameraExpanded of [false, true]) {
+  test(`synthetic 32C visibility policy requires exact wrapped native select and raw transitions with camera expanded=${cameraExpanded}`, () => {
+    const evidence = syntheticGeometricVisibilityEvidence({ cameraExpanded }), actions = evidence.visibility.actions
+    assertGeometricShapeEvidence(evidence, evidence.scenario)
+    const first = actions[0]
+    assert.equal(first.before.control.exactLabelCount, 0, 'Complete associated label contains option descendants')
+    assert.equal(first.before.control.captions[0].text, 'Hidden points:')
+    assert.notEqual(first.before.control.wrappers[0].text, 'Hidden points:')
+    assert.equal(first.before.control.correctedControlCount, 1)
+    assert.deepEqual(first.afterAction.selection, ['dimHidden'])
+    assert.equal(first.afterAction.state.uiSettings, first.before.state.uiSettings, 'Same-value selection creates no policy transition')
+    assert.equal(JSON.parse(actions[1].afterAction.state.uiSettings).visibility.pointVisibility, 'hideHidden')
+    assert.equal(actions[1].afterAction.rendered, null)
+    assert.equal(JSON.parse(actions[2].afterAction.state.uiSettings).visibility.pointVisibility, 'dimHidden')
+    assert.ok(actions[2].afterAction.rendered.effectiveFillOpacity > 0 && actions[2].afterAction.rendered.effectiveFillOpacity < 1)
+    assert.ok(actions[2].afterAction.rendered.effectiveOpacity > 0 && actions[2].afterAction.rendered.effectiveOpacity < 1)
+    assert.ok(first.afterAction.events.events.every(({ trusted }) => trusted === false), 'Actual event provenance does not invent trusted pointer delivery')
+  })
+}
+const visibilityPolicyFaults = [
+  ['flags-only', (evidence) => { delete evidence.visibility }],
+  ['missing-locked-state', (evidence) => { delete evidence.visibility.locked.before }],
+  ['locked-model-mutation', (evidence) => { evidence.visibility.locked.stateAfter.json += 'changed' }],
+  ['locked-selected', (evidence) => { evidence.visibility.locked.stateAfter.selection = { kind: 'stratum', id: 'app-point' } }],
+  ['missing-hidden-state', (evidence) => { delete evidence.visibility.hidden.state }],
+  ['hidden-rendered', (evidence) => { evidence.visibility.hidden.rendered = evidence.locked }],
+  ['hidden-load-no-epoch', (evidence) => { evidence.visibility.hidden.state.labelDocumentRevision -= 1 }],
+  ['missing-camera', (evidence) => { delete evidence.visibility.cameraPreparation }],
+  ['wrong-camera-control', (evidence) => { evidence.visibility.cameraPreparation.actions[0].before.control.controls[0].ariaLabel = 'zoom value' }],
+  ['wrong-camera-scope', (evidence) => { evidence.visibility.cameraPreparation.actions[0].after.control.controls[0].scope = '.preview-panel' }],
+  ['unobserved-camera-control', (evidence) => { evidence.visibility.cameraPreparation.controlsAfter[0].controls = [] }],
+  ['camera-disabled', (evidence) => { evidence.visibility.cameraPreparation.actions[0].before.control.enabled = false }],
+  ['camera-closed', (evidence) => { evidence.visibility.cameraPreparation.expansion.expandedAfter = 'false' }],
+  ['camera-history-edit', (evidence) => { evidence.visibility.cameraPreparation.actions[0].after.state.history += 'changed' }],
+  ['camera-moved-selection', (evidence) => { evidence.visibility.cameraPreparation.after.selection = { kind: 'stratum', id: 'occluder' } }],
+  ['missing-enable', (evidence) => { delete evidence.visibility.enable }],
+  ['wrong-checkbox', (evidence) => { evidence.visibility.enable.checkbox.labels[0].text = 'Enable some other visibility' }],
+  ['checkbox-unchecked', (evidence) => { evidence.visibility.enable.checkbox.checked = false }],
+  ['checkbox-disabled', (evidence) => { evidence.visibility.enable.checkbox.enabled = false }],
+  ['checkbox-unrelated-control', (evidence) => { evidence.visibility.enable.checkbox.scope = '#preview-inspector-drawer' }],
+  ['policy-no-authoritative-enable', (evidence) => { evidence.visibility.enable.after.uiSettings = evidence.visibility.enable.before.uiSettings }],
+  ['missing-policy-action', (evidence) => { evidence.visibility.actions.pop() }],
+  ['duplicate-policy-action', (evidence) => { evidence.visibility.actions[1] = structuredClone(evidence.visibility.actions[0]) }],
+  ['policy-reordered', (evidence) => { evidence.visibility.actions.reverse() }],
+  ['policy-sequence', (evidence) => { evidence.visibility.actions[1].sequence = 9 }],
+  ['policy-unrelated-caption', (evidence) => { evidence.visibility.actions[0].before.control.captions[0].text = 'Hidden curves:' }],
+  ['policy-unrelated-wrapper', (evidence) => { evidence.visibility.actions[0].before.control.wrappers[0].matchesProductionLabel = false }],
+  ['policy-unassociated-select', (evidence) => { evidence.visibility.actions[0].before.control.controls[0].associatedOwningLabel = false }],
+  ['policy-unavailable-option', (evidence) => { evidence.visibility.actions[1].before.control.controls[0].options.pop() }],
+  ['policy-disabled-option', (evidence) => { evidence.visibility.actions[1].before.control.controls[0].options[1].disabled = true }],
+  ['policy-unrelated-event', (evidence) => { evidence.visibility.actions[1].afterAction.events.events[0].target.sameOwnedControl = false }],
+  ['policy-stale-epoch', (evidence) => { evidence.visibility.actions[1].afterAction.state.labelDocumentRevision += 1 }],
+  ['policy-stale-settings', (evidence) => { evidence.visibility.actions[1].afterAction.state.uiSettings = evidence.visibility.actions[1].before.state.uiSettings }],
+  ['policy-wrong-returned-selection', (evidence) => { evidence.visibility.actions[1].afterAction.selection = ['dimHidden'] }],
+  ['hide-policy-render-present', (evidence) => { evidence.visibility.actions[1].afterAction.rendered = structuredClone(evidence.dimmed) }],
+  ['dim-policy-render-absent', (evidence) => { evidence.visibility.actions[2].afterAction.rendered = null }],
+  ['dimmed-wrong-owner', (evidence) => { evidence.visibility.actions[2].afterAction.rendered.id = 'another-point' }],
+  ['dimmed-wrong-occluder', (evidence) => { evidence.visibility.actions[2].afterAction.rendered.occludingSurfaceId = 'unrelated-sheet' }],
+  ['dimmed-classified-visible', (evidence) => { evidence.visibility.actions[2].afterAction.rendered.pointVisibility = 'visible' }],
+  ['dimmed-no-fill-opacity', (evidence) => { evidence.visibility.actions[2].afterAction.rendered.effectiveFillOpacity = 1 }],
+  ['dimmed-zero-opacity', (evidence) => { evidence.visibility.actions[2].afterAction.rendered.effectiveOpacity = 0 }],
+  ['dimmed-invented-opacity', (evidence) => { evidence.visibility.actions[2].afterAction.rendered.effectiveOpacity = .1 }],
+  ['dimmed-no-ancestor-observation', (evidence) => { delete evidence.visibility.actions[2].afterAction.rendered.opacityAncestors }],
+  ['dimmed-disconnected-ancestor', (evidence) => { evidence.visibility.actions[2].afterAction.rendered.opacityAncestors[0].connected = false }],
+  ['dimmed-unrelated-opacity-owner', (evidence) => { evidence.visibility.actions[2].afterAction.rendered.opacityAncestors.at(-1).pointId = 'another-point' }],
+  ['dimmed-fabricated-summary', (evidence) => { evidence.dimmed.source = '$stale$' }],
+]
+for (const [fault, mutate] of visibilityPolicyFaults) {
+  test(`synthetic 32C raw visibility evidence rejects ${fault} despite success flags`, () => {
+    const evidence = syntheticGeometricVisibilityEvidence()
+    mutate(evidence)
+    assert.throws(() => assertGeometricShapeEvidence(evidence, evidence.scenario))
+  })
+}
 function setSyntheticRevision(records, revision) {
   for (const record of records) {
     if (revision === undefined) delete record.labelDocumentRevision
