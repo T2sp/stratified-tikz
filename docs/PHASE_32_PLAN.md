@@ -1,6 +1,37 @@
 # Phase 32 Plan: Point-node math, paint, geometric shapes, and layout
 
-Current source-panel visibility correction (2026-10-10): the actual clean
+Current canonical-layer evidence correction (2026-10-10): the actual clean
+checkout is `1bcfcd5f06c1c12e92b744e0cb542c6dd8cb4a1d`, with all preceding
+source-panel/camera/native corrections tracked and preserved. The latest
+`IocgXz` browser-capable parent passed 5,987 tests/build/diff/full label-assets
+and 15/18 cumulative groups, including all eleven shapes and eight native
+contours. Camera preparation and dim/hide/dim controls ran at epoch 110; actual
+events retain `trusted: false`, dim opacity .28 and absent hide rendering.
+Visibility then failed the raw `visible === true` assertion against production's
+canonical omitted visible default. No terminal visibility, geometric downloads,
+layout/owner-cycle matrix or final standalone export was accepted. Page errors
+are empty. This failure is distinct from child startup `listen EPERM`.
+
+The evidence contract now requires valid explicit owned layer metadata and raw
+saved/runtime/history agreement before interpreting omitted/boolean true as
+visible. Lock remains true; hidden remains explicit false with exact point data,
+absent rendering and +1 native load epoch. Faithful synthetic fixtures and both
+parent policy suites reject missing/duplicate/unrelated/malformed metadata and
+raw disagreement. Bounded diagnostics save locked before/after, hidden and the
+complete candidate before rejection, with `result: observed`; only successful
+terminal validation can publish a pass. First failures survive diagnostics and
+cleanup. Production and independent PGF references are unchanged.
+
+Fresh complete strict 32D verification of the final tracked/untracked tree must
+finish visibility, both geometric downloads, the complete layout/anchor/owner
+matrix and final standalone export, including both TikZ modes, actual pending
+transparent/white downloads and reopening. Only then may independent read-only
+review begin. Phase 32 is **not complete**. Exact child results and handoff are
+retained under `/private/tmp/stz-32d-canonical-layer-fix-20261010/` and the
+[implementation audit](PHASE_32D_IMPLEMENTATION.md). Commit/push remain with the
+parent workflow after verification and review pass.
+
+Earlier source-panel visibility correction (2026-10-10): the actual clean
 checkout is `0c622432757e67d5a37c50a8aa84da969d67d670`; previous corrections
 are tracked and preserved. The latest `yYQ7Zh` browser-capable parent passed
 5,830 tests/build/diff/label-assets, all eleven shapes and all eight native

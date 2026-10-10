@@ -253,17 +253,41 @@ export function assertGeometricSelectionEvidence(selection, id, expectedClickKin
 function geometricVisibilityState(state, message) {
   assertSelectionRevision(state, message)
   for (const field of selectionStateFields) assert.ok(Object.hasOwn(state, field), `${message}: raw ${field} is retained`)
-  const model = JSON.parse(state.runtimeDiagramJson), saved = JSON.parse(state.json)
+  const model = JSON.parse(state.runtimeDiagramJson), saved = JSON.parse(state.json), history = JSON.parse(state.history)
   assert.equal(saved.version, 2, `${message}: current saved envelope is retained`)
-  assert.ok(saved.diagram && Array.isArray(model.strata), `${message}: saved and runtime diagrams exist`)
-  const point = model.strata.find(({ id }) => id === 'app-point')
-  const savedPoint = saved.diagram.strata.find(({ id }) => id === 'app-point')
-  assert.ok(point && savedPoint, `${message}: the expected saved and runtime point exists`)
+  assert.ok(saved.diagram && history.present, `${message}: saved and current history diagrams exist`)
+  const points = [model, saved.diagram, history.present].map((diagram) => {
+    assert.ok(Array.isArray(diagram.strata), `${message}: raw point collections exist`)
+    const matching = diagram.strata.filter((point) => point?.id === 'app-point')
+    assert.equal(matching.length, 1, `${message}: exactly one expected point exists in each raw model`)
+    assert.ok(Array.isArray(diagram.layers), `${message}: explicit raw layer metadata collections exist`)
+    return matching[0]
+  })
+  const [point, savedPoint, historyPoint] = points
   assert.equal(point.geometricKind, 'point'); assert.equal(point.codim, model.ambientDimension)
-  assert.equal(savedPoint.text, point.text, `${message}: raw saved/runtime point source agrees`)
-  assert.deepEqual(savedPoint.position, point.position, `${message}: saved/runtime point coordinates agree`)
-  assert.equal(savedPoint.style.shape, point.style.shape, `${message}: saved/runtime point shape agrees`)
+  assert.deepEqual(savedPoint, point, `${message}: exact raw saved/runtime point data agrees`)
+  assert.deepEqual(historyPoint, point, `${message}: exact raw current history/runtime point data agrees`)
+  assert.deepEqual(saved.diagram.layers, model.layers, `${message}: exact raw saved/runtime layer metadata agrees`)
+  assert.deepEqual(history.present.layers, model.layers, `${message}: exact raw current history/runtime layer metadata agrees`)
   return { model, point, settings: JSON.parse(state.uiSettings) }
+}
+function geometricVisibilityLayer({ model, point }, expectedName, message) {
+  assert.equal(point.layer, 0, `${message}: the expected point retains its configured layer identity`)
+  for (const layer of model.layers) {
+    assert.ok(layer && typeof layer === 'object' && !Array.isArray(layer), `${message}: raw layer metadata records are valid objects`)
+    assert.ok(Object.hasOwn(layer, 'value') && typeof layer.value === 'number' && Number.isFinite(layer.value),
+      `${message}: raw layer identity is a finite number`)
+    assert.ok(Object.hasOwn(layer, 'name') && typeof layer.name === 'string' && layer.name.trim().length > 0,
+      `${message}: raw layer name is retained`)
+    for (const field of ['visible', 'locked']) if (Object.hasOwn(layer, field)) {
+      assert.equal(typeof layer[field], 'boolean', `${message}: present raw layer ${field} is boolean`)
+    }
+  }
+  const matching = model.layers.filter(({ value }) => value === point.layer)
+  assert.equal(matching.length, 1, `${message}: exactly one actual layer record owns the expected point`)
+  const layer = matching[0]
+  assert.equal(layer.name, expectedName, `${message}: actual owned layer retains its configured name`)
+  return layer
 }
 function assertVisibilitySettingsChange(before, after, key, value, message) {
   const previous = geometricVisibilityState(before, `${message} before`)
@@ -379,18 +403,23 @@ export function assertGeometricVisibilityEvidence(evidence) {
   const lockedBefore = geometricVisibilityState(locked.before, 'Locked geometric point')
   assert.equal(lockedBefore.model.ambientDimension, 2)
   assert.equal(lockedBefore.point.text, '$locked$'); assert.equal(lockedBefore.point.style.shape, 'dart')
-  assert.equal(lockedBefore.model.layers.find(({ value }) => value === lockedBefore.point.layer)?.locked, true,
+  const lockedLayer = geometricVisibilityLayer(lockedBefore, 'locked', 'Locked geometric point')
+  assert.equal(lockedLayer.locked, true,
     'Locked point belongs to the actual locked layer')
-  assert.equal(lockedBefore.model.layers.find(({ value }) => value === lockedBefore.point.layer)?.visible, true,
+  // Production omits the visible default. Interpret only its effective state;
+  // the raw saved/runtime/history metadata above remains exact and unchanged.
+  assert.equal(!Object.hasOwn(lockedLayer, 'visible') || lockedLayer.visible === true, true,
     'Locked point layer remains visible')
   assertSelectionStateUnchanged(locked.before, locked.stateAfter, 'Locked native point input')
   assert.notEqual(locked.stateAfter.selection?.id, 'app-point', 'Actual locked point was not selected')
   assertGeometricVisibilityRender(locked.rendered, locked.before, 'Locked geometric rendering')
+  assertGeometricVisibilityRender(locked.renderedAfter, locked.stateAfter, 'After locked native point input')
   const hiddenState = geometricVisibilityState(hidden.state, 'Hidden geometric point')
   assert.equal(hidden.state.labelDocumentRevision, locked.stateAfter.labelDocumentRevision + 1,
     'Native hidden JSON load advances the document epoch exactly once')
   assert.deepEqual(hiddenState.point, lockedBefore.point, 'Layer hiding preserves exact source, coordinates and style')
-  assert.equal(hiddenState.model.layers.find(({ value }) => value === hiddenState.point.layer)?.visible, false,
+  const hiddenLayer = geometricVisibilityLayer(hiddenState, 'hidden', 'Hidden geometric point')
+  assert.equal(hiddenLayer.visible, false,
     'Hidden point belongs to the actual hidden layer')
   assert.equal(hidden.rendered, null, 'Actual hidden-layer point has no rendered node')
   assertVisibilityCameraPreparation(cameraPreparation)

@@ -7,7 +7,7 @@ import { geometricShapeGroup as group, geometricShapeManifest, geometricBodyVari
 import { createOwnedAppPage } from './ownedAppPage.mjs'
 import { ownPageEvent } from './ownedPageEvent.mjs'
 import { resolvePointInspectorField } from './pointInspectorFields.mjs'
-import { boundedPointDiagnostic, createPointDiagnostics } from './pointCheckDiagnostics.mjs'
+import { boundedPointDiagnostic, createPointDiagnostics, captureObservedPointCheck } from './pointCheckDiagnostics.mjs'
 import { selectGeometricPoint } from './pointGeometricSelection.mjs'
 import { dragSelectedPoint } from './pointNativeDrag.mjs'
 import { selectHiddenPointVisibility, inspectSourceHiddenPoints } from './pointSourceVisibility.mjs'
@@ -243,12 +243,28 @@ export async function runPointNodeGeometricShapeChecks({ browser, origin, artifa
     const visibilityDoc = await document(geometricShapeManifest.find(({ shape }) => shape === 'dart'), '$locked$')
     visibilityDoc.diagram.layers = [{ value: 0, name: 'locked', visible: true, locked: true }]
     await load(JSON.stringify(visibilityDoc)); await settle()
-    const locked = await observeGeometricPoint(page, 'app-point'), beforeLocked = await state()
-    await page.getByRole('button', { name: 'Select', exact: true }).click(); await page.mouse.click(locked.boundary.x, locked.boundary.y)
-    const lockedState = await state()
+    const observeVisibilityStage = (phase, capture, details = {}, actionError) => captureObservedPointCheck({ capture,
+      diagnose: (observation) => visibilityDiagnostic(group, scenario, observation), details: { phase, ...details },
+      primary: actionError, secondaryErrors: pageErrors, name: `Geometric ${phase}` })
+    const visibilityStageState = async (observation, stateField = 'state', renderField = 'rendered') => {
+      observation[stateField] = await state()
+      observation[renderField] = await observeGeometricPoint(page, 'app-point')
+      return { [stateField]: observation[stateField], [renderField]: observation[renderField] }
+    }
+    const lockedBefore = await observeVisibilityStage('visibility-locked-before', visibilityStageState)
+    const locked = lockedBefore.rendered, beforeLocked = lockedBefore.state
+    let lockedError
+    try {
+      await page.getByRole('button', { name: 'Select', exact: true }).click({ timeout: 5000 })
+      await page.mouse.click(locked.boundary.x, locked.boundary.y)
+    } catch (error) { lockedError = error }
+    const lockedAfter = await observeVisibilityStage('visibility-locked-after',
+      (observation) => visibilityStageState(observation, 'stateAfter', 'renderedAfter'),
+    { before: beforeLocked, rendered: locked }, lockedError)
+    const lockedState = lockedAfter.stateAfter
     visibilityDoc.diagram.layers[0] = { value: 0, name: 'hidden', visible: false }
     await load(JSON.stringify(visibilityDoc)); await settle()
-    const hidden = { state: await state(), rendered: await observeGeometricPoint(page, 'app-point') }
+    const hidden = await observeVisibilityStage('visibility-hidden', visibilityStageState)
     const hiddenAbsent = hidden.rendered === null
     const dim = await document(geometricShapeManifest.find(({ shape }) => shape === 'semicircle'), '$dimmed$', 3)
     dim.diagram.strata[0].position = { x: 0, y: -1, z: 0 }
@@ -359,11 +375,15 @@ export async function runPointNodeGeometricShapeChecks({ browser, origin, artifa
         scenario, sequence: index + 1, value, id: 'app-point' }))
     }
     const dimmed = actions.at(-1).afterAction.rendered
-    await save({ hiddenAbsent, lockedUnchanged: beforeLocked.json === lockedState.json,
+    const visibilityCandidate = { hiddenAbsent, lockedUnchanged: beforeLocked.json === lockedState.json,
       lockedNotSelected: lockedState.selection?.id !== 'app-point', dimmedVisible: !!dimmed,
       dimmedOpacity: dimmed?.effectiveFillOpacity > 0 && dimmed.effectiveFillOpacity < 1
         && dimmed.effectiveOpacity > 0 && dimmed.effectiveOpacity < 1, locked, dimmed,
-      visibility: { locked: { before: beforeLocked, stateAfter: lockedState, rendered: locked }, hidden, cameraPreparation, enable, actions } })
+      visibility: { locked: { before: beforeLocked, stateAfter: lockedState, rendered: locked,
+        renderedAfter: lockedAfter.renderedAfter }, hidden, cameraPreparation, enable, actions } }
+    await observeVisibilityStage('visibility-candidate', async () => ({
+      candidate: { scenario, group, result: 'observed', pageErrors: [...pageErrors], ...visibilityCandidate } }))
+    await save(visibilityCandidate)
 
     for (const background of ['transparent', 'white']) {
       scenario = `point-geometric-download-${background}`
@@ -439,19 +459,39 @@ export async function runPointNodeGeometricShapeChecks({ browser, origin, artifa
     assert.deepEqual(pageErrors, []); await completeGroup(group)
   } catch (error) {
     primary = error
-    await writeFile(resolve(artifactDir, 'point-geometric-failure.json'), JSON.stringify({ scenario, result: 'failed', pageErrors,
-      error: { message: error.message, stack: error.stack } }, null, 2) + '\n')
-    try { await app.failure(error, { scenario, pageErrors }) } catch (diagnosticError) {
-      await writeFile(resolve(artifactDir, 'point-geometric-diagnostic-failure.json'), JSON.stringify({ primary: error.message, diagnostic: diagnosticError.message }, null, 2) + '\n')
+    try {
+      await boundedPointDiagnostic(() => writeFile(resolve(artifactDir, 'point-geometric-failure.json'),
+        JSON.stringify({ scenario, result: 'failed', pageErrors, error: { message: error.message, stack: error.stack } }, null, 2) + '\n'),
+      'Geometric primary failure evidence')
+    } catch (diagnosticError) { pageErrors.push(`Geometric primary failure evidence: ${diagnosticError.message}`) }
+    try { await boundedPointDiagnostic(() => app.failure(error, { scenario, pageErrors }), 'Geometric App failure evidence') }
+    catch (diagnosticError) {
+      pageErrors.push(`Geometric App failure evidence: ${diagnosticError.message}`)
+      try {
+        await boundedPointDiagnostic(() => writeFile(resolve(artifactDir, 'point-geometric-diagnostic-failure.json'),
+          JSON.stringify({ primary: error.message, diagnostic: diagnosticError.message }, null, 2) + '\n'),
+        'Geometric secondary diagnostic failure evidence')
+      } catch (secondaryError) { pageErrors.push(`Geometric secondary diagnostic failure evidence: ${secondaryError.message}`) }
     }
     throw error
   } finally {
     let cleanupFailure
-    for (const wait of waits) wait.dispose()
-    for (const source of held) { try { await page.evaluate((source) => window.stzAppLabels.release(source), source) } catch (error) { cleanupFailure ??= error; pageErrors.push(`Held conversion cleanup: ${error.message}`) } }
-    try { await ownedContext.close() } catch (error) {
-      if (!primary) throw error
-      await writeFile(resolve(artifactDir, 'point-geometric-secondary-failure.json'), JSON.stringify({ primary: primary.message, cleanup: error.message, pageErrors }, null, 2) + '\n')
+    for (const wait of waits) {
+      try { wait.dispose() } catch (error) { cleanupFailure ??= error; pageErrors.push(`Geometric event listener cleanup: ${error.message}`) }
+    }
+    for (const source of held) {
+      try { await boundedPointDiagnostic(() => page.evaluate((source) => window.stzAppLabels.release(source), source), 'Geometric held conversion cleanup') }
+      catch (error) { cleanupFailure ??= error; pageErrors.push(`Held conversion cleanup: ${error.message}`) }
+    }
+    try { await boundedPointDiagnostic(() => ownedContext.close(), 'Geometric owned context cleanup') } catch (error) {
+      cleanupFailure ??= error; pageErrors.push(`Geometric owned context cleanup: ${error.message}`)
+      if (primary) {
+        try {
+          await boundedPointDiagnostic(() => writeFile(resolve(artifactDir, 'point-geometric-secondary-failure.json'),
+            JSON.stringify({ primary: primary.message, cleanup: error.message, pageErrors }, null, 2) + '\n'),
+          'Geometric secondary cleanup failure evidence')
+        } catch (secondaryError) { pageErrors.push(`Geometric secondary cleanup failure evidence: ${secondaryError.message}`) }
+      }
     }
     if (!primary && cleanupFailure) throw cleanupFailure
   }

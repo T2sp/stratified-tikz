@@ -16,7 +16,8 @@ import { selectGeometricPoint, installGeometricSelectionObserver, observeGeometr
   removeGeometricSelectionObserver } from '../../scripts/pointGeometricSelection.mjs'
 import { syntheticPointNativeDragEvidence, syntheticPointToolbarRevisionRecords } from './pointNativeDragFixture.mjs'
 import { syntheticGeometricSelectionEvidence } from './pointGeometricSelectionFixture.mjs'
-import { syntheticGeometricVisibilityEvidence } from './pointGeometricVisibilityFixture.mjs'
+import { syntheticGeometricVisibilityEvidence, mutateSyntheticVisibilityStageModels,
+  syntheticVisibilityLayerFaults } from './pointGeometricVisibilityFixture.mjs'
 
 // These preparation and event-delivery controls are explicitly synthetic. They
 // exercise ordering/error ownership; the reused native App shape loop is the
@@ -850,6 +851,7 @@ for (const cameraExpanded of [false, true]) {
   })
 }
 const visibilityPolicyFaults = [
+  ['observed-candidate', (evidence) => { evidence.result = 'observed' }],
   ['flags-only', (evidence) => { delete evidence.visibility }],
   ['missing-locked-state', (evidence) => { delete evidence.visibility.locked.before }],
   ['locked-model-mutation', (evidence) => { evidence.visibility.locked.stateAfter.json += 'changed' }],
@@ -897,6 +899,33 @@ const visibilityPolicyFaults = [
   ['dimmed-unrelated-opacity-owner', (evidence) => { evidence.visibility.actions[2].afterAction.rendered.opacityAncestors.at(-1).pointId = 'another-point' }],
   ['dimmed-fabricated-summary', (evidence) => { evidence.dimmed.source = '$stale$' }],
 ]
+test('synthetic 32C visibility policy accepts omitted canonical visibility and retains explicit hidden metadata', () => {
+  const evidence = syntheticGeometricVisibilityEvidence()
+  for (const state of [evidence.visibility.locked.before, evidence.visibility.locked.stateAfter,
+    evidence.visibility.cameraPreparation.before, evidence.visibility.actions.at(-1).afterAction.state]) {
+    const models = [JSON.parse(state.json).diagram, JSON.parse(state.runtimeDiagramJson), JSON.parse(state.history).present]
+    assert.ok(models.every((model) => !Object.hasOwn(model.layers[0], 'visible')), 'Visible defaults are omitted in all canonical model observations')
+  }
+  assert.equal(JSON.parse(evidence.visibility.locked.before.runtimeDiagramJson).layers[0].locked, true)
+  assert.equal(JSON.parse(evidence.visibility.hidden.state.runtimeDiagramJson).layers[0].visible, false)
+  const before = structuredClone(evidence)
+  assertGeometricShapeEvidence(evidence, evidence.scenario)
+  assert.deepEqual(evidence, before, 'The contract preserves the observed raw canonical representation')
+})
+test('synthetic 32C visibility policy permits valid explicit true without treating it as canonical production output', () => {
+  const evidence = syntheticGeometricVisibilityEvidence()
+  mutateSyntheticVisibilityStageModels(evidence, 'locked', (model) => { model.layers[0].visible = true })
+  const before = structuredClone(evidence)
+  assertGeometricShapeEvidence(evidence, evidence.scenario)
+  assert.deepEqual(evidence, before, 'The contract does not rewrite explicit raw visibility')
+})
+for (const [fault, mutate] of syntheticVisibilityLayerFaults) {
+  test(`synthetic 32C raw layer visibility policy rejects ${fault}`, () => {
+    const evidence = syntheticGeometricVisibilityEvidence()
+    mutate(evidence)
+    assert.throws(() => assertGeometricShapeEvidence(evidence, evidence.scenario))
+  })
+}
 for (const [fault, mutate] of visibilityPolicyFaults) {
   test(`synthetic 32C raw visibility evidence rejects ${fault} despite success flags`, () => {
     const evidence = syntheticGeometricVisibilityEvidence()

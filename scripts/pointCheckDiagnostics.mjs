@@ -29,6 +29,29 @@ export function createPointDiagnostics({ artifactDir, observe, artifactPrefix = 
   }
 }
 
+/** Retain a current native stage before replacing its document or validating a
+ * candidate. An existing action failure owns subsequent capture/write failures. */
+export async function captureObservedPointCheck({ capture, diagnose, details = {}, primary,
+  secondaryErrors, name, timeoutMs = 2000 }) {
+  const observation = { ...details }
+  let failure = primary, captured
+  if (primary) observation.actionError = { message: primary.message, stack: primary.stack }
+  try { captured = await boundedPointDiagnostic(() => capture(observation), `${name} capture`, timeoutMs) }
+  catch (error) {
+    observation.captureError = { message: error.message, stack: error.stack }
+    if (failure) secondaryErrors.push(`${name} capture after primary failure: ${error.message}`)
+    else failure = error
+  }
+  if (captured !== undefined) Object.assign(observation, captured)
+  try { await boundedPointDiagnostic(() => diagnose(observation), `${name} evidence`, timeoutMs) }
+  catch (error) {
+    if (failure) secondaryErrors.push(`${name} evidence after primary failure: ${error.message}`)
+    else failure = error
+  }
+  if (failure) throw failure
+  return captured
+}
+
 /** Collection can fail before an assertion (font/CTM/browser errors). Save that
  * failure too, and never let an evidence-write failure replace its cause. */
 export async function capturePointCheck(capture, diagnose) {

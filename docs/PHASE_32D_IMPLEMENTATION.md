@@ -7,7 +7,70 @@ later 32B have historical accepted evidence. The plan still records unaccepted
 fresh strict native/review gates for the merged 32C checkout; implementation
 presence does not close that prerequisite or the final gate.
 
-The latest browser-capable parent, retained as `stz-phase32d-before-review-yYQ7Zh`,
+## Canonical layer visibility evidence correction (2026-10-10)
+
+The actual starting checkout is clean at
+`1bcfcd5f06c1c12e92b744e0cb542c6dd8cb4a1d`, fingerprint
+`ab8f4425318cba5b7adc25dcefaca340389f29e898392fc2be687cadb68dc97c`.
+The previous source-panel and camera corrections are now tracked, including
+their helpers, fixtures, registrations and isolated-runner dependencies.
+
+The latest browser-capable parent `stz-phase32d-before-review-IocgXz` passed
+5,987/5,987 tests, build, diff and full label-assets with Chrome 154.0.8037.98.
+It completed 15/18 cumulative groups, all eleven shapes and all eight native
+contour interactions. Native camera preparation and all three dim/hide/dim
+actions completed at epoch 110, retaining actual input/change events with
+`trusted: false`. Dimmed fill and cumulative opacity are .28; hide removes the
+render. Its first failure is the visibility validator's raw `visible === true`
+assertion. Production normalizes the visible default by omitting that field.
+This is separate from the resolved locator/camera/toolbar/drag failures and the
+child's server-startup restriction. These observations have no terminal visibility
+pass; both geometric downloads, layout/owner-cycle matrix and final standalone
+export did not execute. Page errors are empty.
+
+The scoped contract requires explicit layer metadata, exactly one valid matching
+owned record, the configured point layer and name, and `locked === true`. Only
+the visibility assertion interprets omitted/boolean true as visible. False and
+malformed present values fail. Saved/runtime/current-history point and layer
+records must agree exactly; the validator preserves their raw representation.
+The hidden record retains explicit false, exact point data, absent rendering and
+the native load's exact +1 epoch. Synthetic policy fixtures now omit visible
+defaults, with production load/save normalization covered in the registered
+layer suite. Both parent suites distinguish valid explicit true input from
+canonical output and reject corrupt or unowned metadata and raw disagreement.
+
+Bounded observed diagnostics retain locked before/after state and rendering
+before hidden load, hidden state/render before occlusion load, and the complete
+raw candidate before its terminal assertions. Observed records cannot count as
+passed scenarios. Stage/candidate ordering and rejection regressions retain the
+first action/assertion failure through secondary capture, artifact and cleanup
+failures. Other scenario saving and all completed native helpers remain intact.
+
+Production, geometry, saved format, coordinates, references and tolerances are
+unchanged. The 172-box / 4,925-anchor / 11-failure inventory remains; the diamond
+outer-separation exception still requires independent PGF review. Fresh strict
+verification of the exact final tree must precede matching read-only review.
+Current results, preservation hashes, identities and handoff are retained under
+`/private/tmp/stz-32d-canonical-layer-fix-20261010/`. Phase 32 remains incomplete;
+no review, commit or push follows failed or incomplete verification.
+
+Executed local checks use Homebrew Node v26.9.0. Normalization and both parent
+policy suites passed 680/680; the diagnostics suite passed 18/18. Build and seven
+changed-script syntax checks passed. No new lint errors were introduced: HEAD
+has four geometric caller `no-unsafe-finally` errors and verifier unused `_role`;
+current primary-error cleanup leaves three of those caller errors. The existing
+layers suite also reproduces its unused `defaultCurveStyle` and eleven standalone
+strict TypeScript diagnostics, identical to HEAD after path/line shifts. These
+focused lint/type checks remain failed; application TypeScript/build passed.
+Both direct browser commands stopped before Chrome at fresh-server
+`listen EPERM 127.0.0.1`. Label-assets passed only its static graph; strict
+free-labels completed zero groups with all eighteen unexecuted. Final full/focused
+commands, fresh `32D verify` response/report and matching tree identity belong to
+the external handoff. Startup diagnostics do not establish native acceptance.
+
+## Earlier source-panel and camera correction
+
+The earlier browser-capable parent, retained as `stz-phase32d-before-review-yYQ7Zh`,
 passed 5,830 tests, build, diff and full label-assets with Chrome 154.0.8037.98.
 It completed 15 of 18 cumulative groups: full paint/import, all eleven named
 shapes and all eight 2D/3D contour interactions passed, including trusted native
