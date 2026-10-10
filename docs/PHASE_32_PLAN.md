@@ -1,5 +1,65 @@
 # Phase 32 Plan: Point-node math, paint, geometric shapes, and layout
 
+Current measured unsupported-anchor diagnostic correction (2026-10-10): the
+actual clean starting checkout is
+`d37c63f4e98c671f3a5f1ab359995ec04f0c2924`, fingerprint
+`9fa91def69c7a13a33dbb52d921f29f8db3f97e5a9916fa88e13740b8866ea94`.
+Earlier native/visibility/capture corrections and their formerly untracked files
+are tracked and preserved. The latest browser-capable parent `tIPiXu` passed
+6,119 tests/build/diff/full label-assets and 16/18 cumulative groups. Complete
+geometric coverage passed, including both actual transparent/white SVG
+downloads/reopening/PNG captures. Raw standalone candidates retain saved capture
+and separate terminal passed scenarios: one complete 520×360 root measurement,
+no body, stable coordinates and real 1700×1300 PNGs of 31,278/31,548 bytes.
+
+Layout sizing passed ninety cases across fifteen shapes. The supported
+cylinder/bottom checkpoint does not mean the anchor scenario passed: its first
+unsupported native case, 2D ellipse at epoch 397, failed the far canvas-hit
+assertion before any body/far/warning click. The fixed rightward candidate appears
+outside the SVG viewBox from retained source/DOM; native bounds/CTM/screen/hit
+records were absent, so no historical interception cause is claimed. Later layout
+controls/persistence/lifecycle/picking/imports, both pending layout downloads and
+final standalone export did not run. Page errors are empty. This is separate
+from child startup restrictions and the resolved full-page SVG capture failure.
+
+A narrowly scoped native diagnostic helper and pure raw contract now measure
+the original rightward candidate first, then left/below/above in fixed bounded
+order with 100-unit clearance. Local/root/screen matrices, requested/body/warning/
+paint/ring bounds, aspect-ratio/viewBox/client/viewport/scroll/clip conditions,
+actual canvas targets/hit stacks and rejection reasons must establish eligibility
+before input. One body → far → warning sequence remeasures before every action,
+including after selection adds its visible ring; trusted native delivery and
+exact owner/request/source/epoch/saved/runtime/history/UI/work-plane evidence are
+retained before assertions. No candidate changes model placement, source, minima,
+anchor, camera or production picking. Conditional native UI preparation owns its
+restoration and preserves terminal selection and the first failure. The completed
+painted-contour selection and standalone-capture helpers remain unchanged.
+
+The layout raw contract and strict parent policy retain all six unsupported
+cases and reject summary-only, stale, off-canvas, obstructed or misdelivered
+evidence. Registered synthetic candidate/input/policy/integration controls and
+isolated runner dependencies are present, distinct from native acceptance.
+Build, 346/346 diagnostic/policy checks and 37/37 runner controls passed; a broader
+focused geometry/helper/policy/capture checkpoint passed 1,356 checks. Immediate
+input measurements bind final CTM/hit/state, and actual background capture/root
+continuation requires owned pointer capture and release evidence. Final full and
+strict results belong to the external handoff.
+Both configured direct child browser commands stopped before Chrome at fresh-
+server `listen EPERM 127.0.0.1`; label-assets passed its static graph only, and
+strict free-labels retains startup/checkout evidence with no accepted native
+groups. Those restrictions do not replace the retained parent's actual native
+failure. Existing focused lint/layer-TypeScript debt
+remains failed and documented. Final observed checks and exact tracked/untracked
+identity are retained under `/private/tmp/stz-32d-diagnostic-fix-20261010/` and
+the [implementation audit](PHASE_32D_IMPLEMENTATION.md).
+
+Fresh strict parent verification must finish all eighteen cumulative groups,
+the complete layout/anchor/owner matrix, both pending transparent/white layout
+downloads and final standalone exports before independent read-only review of
+the exact matching tree. PGF reference inventory/tolerances and diamond review
+gate remain unchanged. Phase 32 is **not complete**; no review/commit/push follows
+failed or incomplete verification. The records below preserve prior history.
+
 Current standalone SVG capture correction (2026-10-10): the actual clean
 starting checkout is `2f9cba7d0bb3a555c13d2e70d4ec673a44237768`; prior fixes are
 tracked and preserved. Browser-capable parent `1V3I0G` passed 6,072 tests, build,

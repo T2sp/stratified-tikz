@@ -4,6 +4,7 @@ import { resolve } from 'node:path'
 import { assertStandaloneReopeningRecord, validateStandaloneSvgCaptureEvidence } from './standaloneSvgCaptureContract.mjs'
 import { assertPointNativeDragEvidence, assertPointCanvasPreparation } from './pointNativeDrag.mjs'
 import { assertGeometricSelectionEvidence, assertPointToolbarPreparation } from './pointGeometricShapesContract.mjs'
+import { assertUnsupportedDiagnosticEvidence } from './pointUnsupportedDiagnosticContract.mjs'
 
 export const layoutAnchorGroup = 'point-node-layout-anchors-combined'
 export const layoutShapes = ['circle', 'rectangle', 'square', 'triangle', 'ellipse', 'diamond', 'regular polygon',
@@ -198,34 +199,8 @@ export function assertLayoutAnchorEvidence(evidence, name) {
     for (const ambientDimension of [2, 3]) for (const shape of ['ellipse', 'circle', 'cylinder']) {
       const found = evidence.unsupportedAnchor.nativeCases.filter((entry) => entry.ambientDimension === ambientDimension && entry.shape === shape)
       assert.equal(found.length, 1)
-      const entry = found[0], rendered = entry.rendered
-      assert.equal(entry.result, 'passed'); assert.equal(entry.diagramUnchanged, true); assert.equal(rendered.state, 'ready')
-      assert.equal(rendered.source, 'WWWW diagnostic'); assert.equal(rendered.anchor, evidence.unsupportedAnchor.savedAnchor)
-      assert.ok(rendered.diagnostic.length > 0); assert.equal(rendered.contourCount, 0); assert.equal(rendered.nativeCanvasAtFarClick, true)
-      assert.equal(rendered.layout.minimumWidth, 1000); assert.equal(rendered.layout.minimumHeight, 1000)
-      assert.ok(rendered.shapeBounds.maxX - rendered.shapeBounds.minX >= 1000)
-      assert.ok(rendered.anchorBounds.maxX - rendered.anchorBounds.minX >= 1000)
-      assert.ok(Object.values(rendered.paintedBounds).every((value) => value === 0))
-      for (const bounds of [rendered.bodyBounds, rendered.warningBounds]) for (const value of Object.values(bounds)) assert.ok(Number.isFinite(value))
-      const inBounds = (point, bounds) => point.x >= bounds.minX && point.x <= bounds.maxX && point.y >= bounds.minY && point.y <= bounds.maxY
-      assert.ok(inBounds(rendered.bodyClick.local, rendered.bodyBounds)); assert.ok(inBounds(rendered.warningClick.local, rendered.warningBounds))
-      assert.ok(inBounds(rendered.farClick.local, rendered.shapeBounds))
-      for (const bounds of [rendered.bodyBounds, rendered.warningBounds]) {
-        const point = rendered.farClick.local
-        assert.ok(Math.max(bounds.minX - point.x, point.x - bounds.maxX, bounds.minY - point.y, point.y - bounds.maxY, 0) > 6)
-      }
-      const visibleRadius = Math.max(...[rendered.bodyBounds, rendered.warningBounds].flatMap((bounds) => [
-        [bounds.minX, bounds.minY], [bounds.maxX, bounds.minY], [bounds.minX, bounds.maxY], [bounds.maxX, bounds.maxY],
-      ]).map(([x, y]) => Math.hypot(x - entry.ring.cx, y - entry.ring.cy)))
-      assert.ok(Number.isFinite(entry.ring.radius) && entry.ring.radius >= visibleRadius && entry.ring.radius <= visibleRadius + 20)
-      assert.deepEqual(entry.clicks.map(({ kind }) => kind), ['body', 'far', 'warning'])
-      for (const action of entry.clicks) {
-        assert.deepEqual(action.click, rendered[`${action.kind}Click`])
-        if (action.kind === 'far') assert.notEqual(action.selectedId, 'app-point')
-        else assert.equal(action.selectedId, 'app-point')
-        for (const type of ['pointerdown', 'pointerup', 'click']) assert.ok(action.events.some((event) => event.type === type && event.trusted === true
-          && Math.abs(event.x - action.click.screen.x) < 1 && Math.abs(event.y - action.click.screen.y) < 1))
-      }
+      assertUnsupportedDiagnosticEvidence(found[0])
+      assert.equal(found[0].rendered.anchor, evidence.unsupportedAnchor.savedAnchor)
     }
   } else if (name === 'point-layout-native-controls-persistence') {
     for (const key of ['nativeInputs', 'historyRestored', 'clipboardRestored', 'presetRestored', 'saveReloadRestored', 'rawSourcePreserved', 'standaloneTikz', 'inlineTikz']) assert.equal(evidence[key], true, key)

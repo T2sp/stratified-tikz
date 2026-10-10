@@ -16,6 +16,7 @@ import { saveAppJson } from './appJsonPersistence.mjs'
 import { observePointLiteral, assertPositionedLiteral } from './pointLiteralOracle.mjs'
 import { withOwnedFontFace, observeOwnedFontFace } from './ownedFontFace.mjs'
 import { captureStandaloneSvg } from './standaloneSvgCapture.mjs'
+import { runUnsupportedDiagnosticCase } from './pointUnsupportedDiagnostic.mjs'
 
 const paint = { text: { color: '#203040', opacity: 1 }, fill: { enabled: true, color: '#d8ecff', opacity: .7 },
   stroke: { enabled: true, color: '#203040', opacity: 1, width: .4, lineStyle: 'solid', dashPhase: 0, lineCap: 'butt', lineJoin: 'miter' } }
@@ -344,26 +345,6 @@ export async function runPointLayoutAnchorChecks({ browser, origin, artifactDir,
     if (fieldPrimary) throw fieldPrimary
     return completedField
   }
-  async function diagnosticClick(kind, click) {
-    await page.evaluate(() => {
-      window.__stzLayoutDiagnosticEvents = []
-      window.__stzLayoutDiagnosticListener = (event) => window.__stzLayoutDiagnosticEvents.push({ type: event.type, trusted: event.isTrusted, x: event.clientX, y: event.clientY })
-      for (const type of ['pointerdown', 'pointerup', 'click']) document.addEventListener(type, window.__stzLayoutDiagnosticListener, true)
-    })
-    let clickPrimary, events, selected
-    try { await page.mouse.click(click.screen.x, click.screen.y); selected = (await state()).selection }
-    catch (error) { clickPrimary = error }
-    finally {
-      try { events = await page.evaluate(() => {
-        for (const type of ['pointerdown', 'pointerup', 'click']) document.removeEventListener(type, window.__stzLayoutDiagnosticListener, true)
-        const events = window.__stzLayoutDiagnosticEvents; delete window.__stzLayoutDiagnosticEvents; delete window.__stzLayoutDiagnosticListener; return events
-      }) } catch (error) { clickPrimary ??= error }
-    }
-    if (clickPrimary) throw clickPrimary
-    const entry = { kind, click, events, selectedId: selected?.id ?? null }
-    await observe(`${scenario}-diagnostic-${kind}`, { group, entry })
-    return entry
-  }
   try {
     setStage?.(group); await startGroup(group); await app.install(); await page.goto(url); await app.start()
     const sizing = [], outerSepPaintInvariant = []
@@ -394,38 +375,10 @@ export async function runPointLayoutAnchorChecks({ browser, origin, artifactDir,
     for (const ambientDimension of [2, 3]) for (const shape of ['ellipse', 'circle', 'cylinder']) {
       const input = await document(shape, { anchor: unsupportedAnchor.savedAnchor, minimumWidth: 1000, minimumHeight: 1000 }, 'WWWW diagnostic', ambientDimension)
       await load(input); await settle()
-      const close = page.getByRole('button', { name: 'Close inspector drawer', exact: true }); if (await close.count()) await close.click()
-      await page.getByRole('button', { name: 'Select', exact: true }).click(); await page.locator('svg.svg-diagram').scrollIntoViewIfNeeded()
-      const rendered = await page.evaluate(() => {
-        const node = document.querySelector('[data-point-id="app-point"] [data-point-node]'), body = node.querySelector('[data-label-state]')
-        const text = body.querySelector('text'), warning = node.querySelector('[data-point-shape-warning]'), matrix = node.getScreenCTM(), inverse = matrix.inverse()
-        const attrBounds = (name) => { const [minX, minY, maxX, maxY] = node.getAttribute(name).split(/\s+/).map(Number); return { minX, minY, maxX, maxY } }
-        const localBounds = (element) => {
-          const box = element.getBBox(), own = element.getScreenCTM()
-          const corners = [[box.x, box.y], [box.x + box.width, box.y], [box.x, box.y + box.height], [box.x + box.width, box.y + box.height]]
-            .map(([x, y]) => new DOMPoint(x, y).matrixTransform(own).matrixTransform(inverse))
-          return { minX: Math.min(...corners.map(({ x }) => x)), maxX: Math.max(...corners.map(({ x }) => x)), minY: Math.min(...corners.map(({ y }) => y)), maxY: Math.max(...corners.map(({ y }) => y)) }
-        }
-        const click = (local) => { const screen = new DOMPoint(local.x, local.y).matrixTransform(matrix); return { local, screen: { x: screen.x, y: screen.y } } }
-        const character = text.getExtentOfChar(0), bodyPoint = new DOMPoint(character.x + character.width / 2, character.y + character.height * .55).matrixTransform(text.getScreenCTM()).matrixTransform(inverse)
-        const bodyBounds = localBounds(text), warningBounds = localBounds(warning)
-        const bodyClick = click({ x: bodyPoint.x, y: bodyPoint.y }), warningClick = click({ x: (warningBounds.minX + warningBounds.maxX) / 2, y: warningBounds.minY + 3 })
-        const farClick = click({ x: bodyBounds.maxX + 100, y: (bodyBounds.minY + bodyBounds.maxY) / 2 })
-        return { source: body.getAttribute('data-label-source'), anchor: node.getAttribute('data-point-anchor'), layout: JSON.parse(node.getAttribute('data-point-layout')),
-          state: body.getAttribute('data-label-state'), diagnostic: warning.getAttribute('aria-label'), contourCount: node.querySelectorAll('[data-point-contour]').length,
-          bodyBounds, warningBounds, shapeBounds: attrBounds('data-point-shape-bounds'), paintedBounds: attrBounds('data-point-painted-bounds'), anchorBounds: attrBounds('data-point-anchor-bounds'), bodyClick, warningClick, farClick,
-          nativeCanvasAtFarClick: document.querySelector('svg.svg-diagram').contains(document.elementFromPoint(farClick.screen.x, farClick.screen.y)) }
-      })
-      assert.equal(rendered.nativeCanvasAtFarClick, true, 'Far diagnostic click reaches the native SVG canvas')
-      const before = await state(), body = await diagnosticClick('body', rendered.bodyClick); assert.equal(body.selectedId, 'app-point')
-      const ring = await page.evaluate(() => {
-        const node = document.querySelector('[data-point-id="app-point"] [data-point-node]'), ring = node.querySelector(':scope > circle[data-svg-export-exclude]')
-        return { radius: Number(ring.getAttribute('r')), cx: Number(ring.getAttribute('cx')), cy: Number(ring.getAttribute('cy')) }
-      })
-      const far = await diagnosticClick('far', rendered.farClick); assert.notEqual(far.selectedId, 'app-point', 'Hidden requested contour cannot receive hits')
-      const warning = await diagnosticClick('warning', rendered.warningClick); assert.equal(warning.selectedId, 'app-point')
-      assert.equal((await state()).json, before.json)
-      const entry = { result: 'passed', ambientDimension, shape, rendered, ring, clicks: [body, far, warning], diagramUnchanged: true }
+      const entry = await runUnsupportedDiagnosticCase({ page, readState: state,
+        expected: { id: 'app-point', ambientDimension, shape, source: 'WWWW diagnostic', anchor: unsupportedAnchor.savedAnchor },
+        token: `${scenario}:unsupported:${ambientDimension}:${shape}:${++selectionSequence}`, secondaryErrors: pageErrors,
+        diagnose: (details) => diagnostic(group, scenario, details) })
       unsupportedAnchor.nativeCases.push(entry); await observe(`${scenario}-unsupported-${shape}-${ambientDimension}d`, { group, entry })
     }
     await save({ cases: anchorCases, unsupportedAnchor })

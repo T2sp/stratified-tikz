@@ -7,6 +7,7 @@ import { allPointNodeScenarios, pointNodeScenarioArtifacts, validateBrowserEvide
 import { layoutAnchorGroup, layoutAnchorScenarios, layoutAnchorArtifacts, layoutShapes, layoutRegimes, layoutForShapeRegime,
   pointAnchorsForShape, layoutImportCases, assertLayoutAnchorEvidence, assertObservedPointPlacement, assertPointTikzSourceByMode, assertLayoutStandaloneEvidence } from '../../scripts/pointLayoutAnchorsContract.mjs'
 import { syntheticStandalonePointDownload } from './standalonePointDownloadFixture.mjs'
+import { syntheticUnsupportedDiagnosticEvidence } from './pointUnsupportedDiagnosticFixture.mjs'
 import { pointNodeAnchorSupport } from '../../src/geometry/pointNodeShapes/index.ts'
 import { createEmptyDiagram, createPointStratum } from '../../src/model/constructors.ts'
 import { generateTikz } from '../../src/tikz/generateTikz.ts'
@@ -25,17 +26,10 @@ function placement(shape = 'rectangle', anchor = 'base east', extra = {}) {
     bodyUpright: true, math: 1 }, ...extra }
 }
 function unsupportedNativeCases() {
-  return [2, 3].flatMap((ambientDimension) => ['ellipse', 'circle', 'cylinder'].map((shape) => {
-    const click = (x, y) => ({ local: { x, y }, screen: { x: x + 300, y: y + 300 } })
-    const rendered = { source: 'WWWW diagnostic', anchor: 'not a PGF anchor', state: 'ready', diagnostic: 'Anchor unsupported', contourCount: 0, nativeCanvasAtFarClick: true,
-      layout: { minimumWidth: 1000, minimumHeight: 1000 }, bodyBounds: { minX: -60, minY: -8, maxX: 60, maxY: 8 }, warningBounds: { minX: -68, minY: -10, maxX: -66, maxY: 2 },
-      shapeBounds: { minX: -600, minY: -600, maxX: 600, maxY: 600 }, anchorBounds: { minX: -600, minY: -600, maxX: 600, maxY: 600 }, paintedBounds: { minX: 0, minY: 0, maxX: 0, maxY: 0 },
-      bodyClick: click(-50, 0), warningClick: click(-67, -7), farClick: click(160, 0) }
-    return { result: 'passed', ambientDimension, shape, rendered, ring: { radius: 80, cx: 0, cy: 0 }, diagramUnchanged: true,
-      clicks: ['body', 'far', 'warning'].map((kind) => ({ kind, click: rendered[`${kind}Click`], selectedId: kind === 'far' ? null : 'app-point',
-        events: ['pointerdown', 'pointerup', 'click'].map((type) => ({ type, trusted: true, x: rendered[`${kind}Click`].screen.x, y: rendered[`${kind}Click`].screen.y })) })) }
-  }))
+  return [2, 3].flatMap((ambientDimension) => ['ellipse', 'circle', 'cylinder'].map((shape) =>
+    syntheticUnsupportedDiagnosticEvidence({ ambientDimension, shape })))
 }
+
 function syntheticOwnerCycle(selectedId, expectedId, initial = false) {
   const raw = syntheticPointNativeDragEvidence({ id: selectedId })
   const target = { tag: 'path', pointId: selectedId, drawer: false, svg: true, canvas: true }
@@ -425,6 +419,28 @@ for (const fault of ['missing-native-diagnostic', 'hidden-contour', 'hidden-pain
     assert.throws(() => assertLayoutAnchorEvidence(current, name))
   })
 }
+test('32D parent policy requires measured candidate frames and native event ownership beyond success flags', () => {
+  const name = 'point-layout-anchor-support-rotation'
+  for (const fault of ['missing-candidates', 'unrelated-target', 'wrong-event-epoch', 'missing-fresh-after-input']) {
+    const current = evidence(name), first = current.unsupportedAnchor.nativeCases[0]
+    if (fault === 'missing-candidates') delete first.rendered.candidates
+    if (fault === 'unrelated-target') first.clicks[1].events[0].target.canvasToken = 'other-native-canvas'
+    if (fault === 'wrong-event-epoch') first.clicks[1].events[0].epoch++
+    if (fault === 'missing-fresh-after-input') delete first.clicks[0].afterMeasurement
+    assert.throws(() => assertLayoutAnchorEvidence(current, name), fault)
+  }
+})
+test('32D parent policy rejects stale candidate projections and native frames after body selection', () => {
+  const name = 'point-layout-anchor-support-rotation'
+  for (const fault of ['root-projection', 'off-canvas-screen', 'stale-current-ctm', 'malformed-body-bounds']) {
+    const current = evidence(name), first = current.unsupportedAnchor.nativeCases[0]
+    if (fault === 'root-projection') first.rendered.candidates[1].root.x += 10
+    if (fault === 'off-canvas-screen') first.clicks[1].click.screen.x = 1000
+    if (fault === 'stale-current-ctm') first.clicks[1].measurement.nodeMatrix.e += 4
+    if (fault === 'malformed-body-bounds') first.clicks[1].measurement.bodyBounds.maxX = Infinity
+    assert.throws(() => assertLayoutAnchorEvidence(current, name), fault)
+  }
+})
 for (const fault of ['untrusted-input', 'missing-input', 'wrong-model', 'wrong-tikz', 'missing-clipboard', 'duplicate-field', 'synthetic-final-value']) {
   test(`32D native control evidence rejects ${fault}`, () => {
     const name = 'point-layout-native-controls-persistence', current = evidence(name)

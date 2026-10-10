@@ -7,6 +7,109 @@ later 32B have historical accepted evidence. The plan still records unaccepted
 fresh strict native/review gates for the merged 32C checkout; implementation
 presence does not close that prerequisite or the final gate.
 
+## Measured unsupported-anchor diagnostic input correction (2026-10-10)
+
+The actual starting checkout is clean at
+`d37c63f4e98c671f3a5f1ab359995ec04f0c2924`, fingerprint
+`9fa91def69c7a13a33dbb52d921f29f8db3f97e5a9916fa88e13740b8866ea94`.
+Earlier corrections, including the former thirteen modified files and four new
+standalone-capture files, are tracked in this tree. Production, completed native
+helpers, model/serialization, geometry, PGF references and capture contracts are
+preserved. Initial inventory and final command/identity records are retained
+under `/private/tmp/stz-32d-diagnostic-fix-20261010/`.
+
+The latest browser-capable parent `stz-phase32d-before-review-tIPiXu` passed
+6,119 tests, build, diff and full label-assets with Chrome 154.0.8037.98. It
+completed 16/18 cumulative groups. Complete paint/import and geometric coverage,
+including eleven shapes, eight contours, visibility and both transparent/white
+geometric SVG downloads, reopening and PNG capture, passed. Their raw standalone
+records remain observed candidates with saved capture, followed by separate
+terminal passed scenario records. Both measured one complete 520×360 SVG root,
+`bodyExists=false` and stable coordinates; actual PNGs are 1700×1300 and
+31,278/31,548 bytes. Those accepted files and their identity contracts remain.
+
+Layout sizing passed 90 cases across fifteen shapes. The anchor scenario's last
+checkpoint names supported cylinder/bottom, but the scenario is not terminal
+passed: preparation of its first unsupported native case, 2D ellipse at owner
+epoch 397, failed `Far diagnostic click reaches the native SVG canvas` before
+any body/far/warning click. Failure DOM retains viewBox `0 0 520 360`, node
+`translate(404 36)`, body metadata approximately `[-48.706,-7,48.706,7]`, the
+exact source `WWWW diagnostic`, unsupported anchor and minima 1000. The fixed
+rightward probe therefore appears to map beyond the SVG's right edge. Native
+getBBox/CTM/screen point/hit stack were not saved historically, so this remains
+a source/DOM-supported inference; Inspector or toolbar interception is not
+proven. Page errors are empty. Later layout controls/persistence, lifecycle,
+picking/owner cycle, imports, both pending layout downloads and final standalone
+export did not execute. This is distinct from child server-startup restrictions
+and the resolved standalone screenshot failure.
+
+`pointUnsupportedDiagnostic.mjs` provides narrowly scoped native observation,
+preparation, input and restoration without weakening the completed painted-
+contour selection helper. Its companion pure contract preserves the original
+rightward probe as the first observation, then considers left/below/above in a
+fixed bounded order with the same 100-unit declared clearance. Each measured
+candidate retains local, SVG-root and screen coordinates, native node/root CTMs,
+viewBox, preserveAspectRatio, client/viewport/scroll/clip observations, actual
+targets/hit stacks and eligibility/rejection reasons. Acceptance requires the
+connected unique production canvas, current owner/request/source/anchor, finite
+invertible matrices, intentional zero contour/paint, an interior requested-shape
+point beyond visible body/warning picking bounds and any current selection ring,
+and an unobstructed route into the actual drawing area. No eligible candidate
+fails with observations and no click; source, minima, placement and camera do
+not change to obtain a probe.
+
+The exact body → far → warning sequence uses one intended native mouse click
+per action and fresh measurements before every input, including after body
+selection creates its bounded visible ring. Partial preparation and action
+records are persisted as observed before assertions. Owned bounded listeners
+retain trusted pointerdown/up/click, target/composed path, pointer/button/order,
+document epoch, owner/request/source and exact canvas identity, plus before/after
+saved/runtime/history/UI/work-plane state and final selection. Literal text may
+have `pointer-events:none`; actual canvas-background delivery with production
+body hit testing is recorded rather than inventing a glyph or contour target.
+Actual camera background capture may deliver pointerup/click through the owned
+SVG root; that continuation requires the measured background down target, matching
+pointer, observed capture at pointerup and release before click. Far background
+delivery must leave `app-point` unselected; body and warning must select it. Only intended selection and explicitly owned UI preparation may vary.
+
+Scoped native Select access precedes conditional toolbar collapse, and an owned
+Inspector is closed only when measured obstruction requires preparation. Each UI
+change triggers remeasurement and exact authoritative-state checks. Restoration
+owns only its temporary UI changes, preserves terminal selection and retains
+the first action/assertion error through diagnostic/artifact/listener/cleanup
+failures. Only complete validated raw records publish a terminal passed case.
+The layout contract and strict 32D parent policy require all six native cases
+with these coordinates, candidates, input and state records. Registered pure,
+integration and policy controls exercise the off-canvas right probe, alternative
+candidates, nontrivial CTMs/aspect-ratio framing, clipping/overlays, all-invalid
+sets, visible-region/ring/request bounds, stale measurements and misdelivered
+events. These synthetic controls do not establish native acceptance. The explicit
+test list and isolated runner dependency copying include the new files; no
+dependency is added.
+
+Application build passed. Focused diagnostic/policy checks passed 346/346,
+including twelve pure contract and eleven integration controls; isolated runner
+checks passed 37/37. A broader geometry/native-helper/policy/capture checkpoint
+passed 1,356 checks. Immediate input measurements also bind current CTM/hit/state
+after observer activation; captured background continuation has positive and
+negative controls. Final full/strict command results and the exact tracked/
+untracked identity are retained in the external handoff. Baseline checks reproduce the geometric caller's two
+`no-unsafe-finally` errors and verifier unused `_role`, plus the unchanged layer
+test's unused `defaultCurveStyle` and eleven focused strict-TypeScript diagnostics.
+These checks remain failed, separate from application TypeScript/build. Both
+configured direct child browser commands failed at fresh owned-server
+`listen EPERM 127.0.0.1` before Chrome launch. Label-assets passed only its static
+graph (four entries, 43 worker chunks, 85 references and 40 fonts); strict
+free-labels retained startup/checkout evidence with no native pass. Logs are
+`direct-label-assets.log` and `direct-free-labels.log` in the external handoff,
+with raw startup evidence under `direct-free-labels/`. These restrictions are
+separate from the parent's unsupported-anchor assertion. Fresh
+strict parent verification must complete all eighteen groups, the full layout
+matrix and pending transparent/white layout downloads with real SVG/PNG evidence
+before matching read-only independent review. The 172-box / 4,925-anchor /
+11-failure reference inventory and diamond outer-separation review gate remain.
+Phase 32 stays incomplete; failed verification stops before review/commit/push.
+
 ## Standalone SVG capture integration (2026-10-10)
 
 The actual clean starting tree is `2f9cba7d0bb3a555c13d2e70d4ec673a44237768`
