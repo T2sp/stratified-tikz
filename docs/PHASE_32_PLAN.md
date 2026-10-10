@@ -1,5 +1,38 @@
 # Phase 32 Plan: Point-node math, paint, geometric shapes, and layout
 
+Current standalone SVG capture correction (2026-10-10): the actual clean
+starting checkout is `2f9cba7d0bb3a555c13d2e70d4ec673a44237768`; prior fixes are
+tracked and preserved. Browser-capable parent `1V3I0G` passed 6,072 tests, build,
+diff and full label-assets with 15/18 cumulative groups. Paint/import, eleven
+shapes, eight contours and terminal geometric visibility passed. The next
+transparent geometric SVG download/reopen reached `fullPage` screenshot and
+timed out after fonts loaded. Its real SVG exists; PNG, standalone observations
+and terminal download pass are missing. White geometric download, layout/anchor
+matrix and final standalone group did not execute. This is distinct from the
+child's fresh-server `listen EPERM` and earlier resolved failures.
+
+The configured Playwright `_fullPageSize` waits for an HTML body; SVG XML has an
+SVG root. The failed file page's body/bounds were not measured historically.
+Both pending-export callers now reuse the existing measured complete-root
+capture, saving raw reopening observations before assertions/image and updating
+the same observed artifact with pending/saved/failed capture details. One bounded
+CSS viewport screenshot retains font readiness; complete coverage and actual
+PNG bytes are required. Cleanup and secondary diagnostics preserve the first
+failure, with no additional failure image. Terminal success requires completed
+capture and assertions. Both parent policies bind retained file URL/path,
+root/stability measurements, complete PNG and existing raw click/source/paint/
+placement evidence, rejecting summary-only or malformed evidence. Caller suites
+are registered and isolated runner dependencies included. Production and all
+independent PGF references remain unchanged.
+
+Fresh strict 32D parent verification of the exact dirty tree must complete all
+18 groups and actual transparent/white geometric/layout/download/standalone PNG
+requirements before matching independent review. Phase 32 is **not complete**.
+Child results, preserved inventory and exact final identity are retained under
+`/private/tmp/stz-32d-svg-capture-fix-20261010/` and the
+[implementation audit](PHASE_32D_IMPLEMENTATION.md). Commit/push remain with the
+parent workflow after verification and review pass.
+
 Current canonical-layer evidence correction (2026-10-10): the actual clean
 checkout is `1bcfcd5f06c1c12e92b744e0cb542c6dd8cb4a1d`, with all preceding
 source-panel/camera/native corrections tracked and preserved. The latest

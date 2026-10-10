@@ -1,290 +1,297 @@
-# Phase 32D Fix for standalone SVG capture
+# Phase 32D Fix for unsupported-anchor diagnostic clicks
 
 ## Objective and preserved implementation
 
 Continue from the implemented Phase 32D checkout and completed Clear,
-Inspector/toolbar selection, native drag, revision, source-panel visibility,
-native camera, canonical layer validation and diagnostic-ordering corrections.
-Repair the next concrete parent failure: the transparent geometric SVG was
-downloaded and reopened, but its fullPage screenshot timed out after fonts
-loaded. Reuse the established complete-root standalone SVG capture mechanism
-and retain raw reopening observations before image work.
+Inspector/toolbar selection, native drag, revision, visibility/camera,
+canonical layer, diagnostic-ordering and standalone SVG capture corrections.
+Repair the next concrete parent failure: the unsupported-anchor diagnostic
+case chooses a fixed rightward far point which can leave the native SVG canvas.
 
-Keep the actual SVG download/reopening and PNG acceptance requirements.
-Preserve production code, model/serialization semantics, geometry, PGF references,
-all completed native helpers, and exact evidence comparisons. Do not repeat
-resolved fixes, rewrite unrelated files, or report the screenshot as optional.
+Keep this negative picking test meaningful: the far click must be inside the
+requested but unpainted shape, outside the visible body/warning picking region,
+and delivered to the actual canvas. Select an eligible point from a bounded
+deterministic set of measured candidates; do not weaken the canvas-hit assertion.
+
+Preserve production source, model/serialization semantics, geometry, PGF
+references, all completed native helpers, and accepted real download/PNG evidence.
+Do not repeat resolved fixes or rewrite unrelated files.
 
 Read `AGENTS.md`, `prompts/phase-32d-implement.md`,
 `prompts/phase-32d-review.md`, `docs/PHASE_32D_IMPLEMENTATION.md`, and
 `docs/PHASE_32_PLAN.md`. Inspect the actual tree before editing.
-
-Keep strict cumulative 32D verification and the parent workflow's
-verification-before-review/commit contract. Historical scoped evidence cannot
-establish a 32D pass. Phase 32 remains incomplete until the actual tree has
+Keep strict cumulative verification, verification-before-review/commit and
+the exact-tree post-review identity gate. Phase32 remains incomplete until
 complete accepted verification and matching independent review.
 
 ## Latest evidence and checkout identity
 
-The latest child handoff is
-`/private/tmp/stz-32d-canonical-layer-fix-20261010/HANDOFF.md`.
-Its exact inventory, tracked diff, preservation hashes, reports, and logs
-remain in the same directory. The browser-capable parent's newer records are:
+Latest child handoff:
+`/private/tmp/stz-32d-svg-capture-fix-20261010/HANDOFF.md`.
+Its exact inventory, diffs, preservation hashes, reports and logs are retained
+in the same directory. The newer browser-capable parent records are:
 
 - Worker response:
-  `/var/folders/vk/7kf940pd4bx8f6cg3rzlmtc80000gn/T/stz-phase-verifier-DOoEMD/response.json`.
+  `/var/folders/vk/7kf940pd4bx8f6cg3rzlmtc80000gn/T/stz-phase-verifier-oqcZ1K/response.json`.
 - Verification report:
-  `/var/folders/vk/7kf940pd4bx8f6cg3rzlmtc80000gn/T/stz-phase32d-before-review-1V3I0G/verification.json`.
-- Primary browser log:
-  `/var/folders/vk/7kf940pd4bx8f6cg3rzlmtc80000gn/T/stz-phase32d-before-review-1V3I0G/05-check-free-labels/command.log`.
-- Native observations and failure artifacts:
-  `/var/folders/vk/7kf940pd4bx8f6cg3rzlmtc80000gn/T/stz-phase32d-before-review-1V3I0G/05-check-free-labels/artifacts/`.
+  `/var/folders/vk/7kf940pd4bx8f6cg3rzlmtc80000gn/T/stz-phase32d-before-review-tIPiXu/verification.json`.
+- Browser log:
+  `/var/folders/vk/7kf940pd4bx8f6cg3rzlmtc80000gn/T/stz-phase32d-before-review-tIPiXu/05-check-free-labels/command.log`.
+- Raw native evidence/failure artifacts:
+  `/var/folders/vk/7kf940pd4bx8f6cg3rzlmtc80000gn/T/stz-phase32d-before-review-tIPiXu/05-check-free-labels/artifacts/`.
 
-At this prompt update, branch is `phase/32d-margin-minsize-anchor`, HEAD
-`1bcfcd5f06c1c12e92b744e0cb542c6dd8cb4a1d`. The actual pre-update tree matches
-both before/after identities of 1V3I0G and the child handoff:
+Branch is `phase/32d-margin-minsize-anchor`, HEAD
+`2f9cba7d0bb3a555c13d2e70d4ec673a44237768`.
+The actual pre-prompt-update tree matches both before/after parent identities
+and the child handoff:
 
 ~~~text
-7c83bba1a6e561f74bdb90e741b716656a20ab35a4e2bc66d6d8e959192cb419
+050578337d1576d341294dcabeaa612c9e1f3302807055a00ba0dabd29f7c67b
 ~~~
 
-Preserve the ten modified tracked files: both Phase 32 documents,
-`scripts/checkPointNodeGeometricShapes.mjs`,
-`scripts/pointCheckDiagnostics.mjs`,
-`scripts/pointGeometricShapesContract.mjs`,
-`tests/model/layers.test.ts`, both Phase 32C/32D policy suites,
-`tests/scripts/pointCheckDiagnostics.test.mjs`, and
-`tests/scripts/pointGeometricVisibilityFixture.mjs`.
-There are no untracked files. Earlier corrections, including source visibility
-and its fixtures, are now tracked. Updating this prompt changes the identity;
-capture the actual current tree rather than hard-coding this fingerprint.
+Preserve the thirteen modified tracked files: both Phase32 documents,
+`package.json`, `scripts/automation/phase-verification.mjs`,
+both geometric/layout export callers and contracts, `scripts/ownedAppPage.mjs`,
+`tests/scripts/ownedAppPage.test.mjs`, both 32C/32D policy suites, and
+`tests/scripts/runPhaseRunner.test.mjs`.
+Preserve the four new untracked files:
+`scripts/standaloneSvgCaptureContract.mjs`,
+`tests/scripts/pointGeometricStandaloneCapture.test.mjs`,
+`tests/scripts/pointLayoutStandaloneCapture.test.mjs`, and
+`tests/scripts/standalonePointDownloadFixture.mjs`.
+Earlier corrections are now tracked. This prompt edit changes the identity;
+capture the current tree rather than hard-coding a historical fingerprint.
 
 | Retained run | Actual result |
 | --- | --- |
-| Canonical-layer child | 6,072/6,072 full tests and 1,602 focused checks passed without failures/skips. Build, diff, and syntax checks passed. No new lint/type errors; reproduced baseline debt remains. Both direct browser attempts failed before Chrome at fresh-server `listen EPERM`. Fresh exact-tree strict child verification stopped at `check:label-assets`, without review/commit. |
-| Latest browser-capable parent | 6,072/6,072 tests, build, diff, and full `check:label-assets` passed. Chrome 154.0.8037.98 ran native scenarios. Paint/import, all eleven shapes, all eight contour interactions, and geometric visibility have terminal successes. The next transparent geometric download reached standalone screenshot and timed out. |
+| SVG-capture child | 6,119/6,119 full tests and 1,589 focused checks passed without failures/skips. Build, diff and syntax passed. Existing lint/type debt remains failed and documented. Fresh strict verification stopped at `check:label-assets` with fresh-server `listen EPERM` before Chrome. No review/commit/push. |
+| Latest browser-capable parent | 6,119/6,119 tests, build, diff and full `check:label-assets` passed. Chrome 154.0.8037.98 ran native scenarios. Paint/import, eleven geometric shapes, eight contours, visibility, and both transparent/white geometric SVG download/reopening/PNG scenarios passed. Layout sizing passed; unsupported-anchor diagnostic preparation then failed. |
 
-1V3I0G completed 15 of 18 cumulative groups. Its checkpoint is
-`point-geometric-download-transparent-observed`. The geometric group remains
-incomplete: transparent download has no terminal pass; white download did not
-execute. The layout/anchor group and final standalone-export group did not
-execute. Page errors are empty. Distinguish the parent screenshot failure from
-the child's startup failure and the resolved visibility/layer/native failures.
+tIPiXu completed 16 of 18 cumulative groups. The complete geometric group now
+passed. Both geometric raw standalone records remain observed candidates with
+saved capture; their separate terminal scenario records passed.
+Actual PNGs are 1700×1300, 31,278 bytes transparent and 31,548 bytes white.
+Each records one measurement, bodyExists=false, a complete 520×360 SVG root,
+stable coordinates, and the accepted actual file identity.
 
-## Preserve completed native and visibility contracts
+`point-layout-per-shape-spacing-minima` passed 90 cases across fifteen shapes.
+The anchor-support/rotation scenario is not terminal passed: its last summary
+checkpoint names the supported cylinder/bottom observation, while the active
+failure is its first unsupported native case, 2D ellipse.
+The remaining layout scenarios/pending downloads and final standalone-export
+group did not execute. Page errors are empty.
+Distinguish this native diagnostic failure from child startup restrictions and
+the resolved screenshot/visibility/layer/toolbar/drag failures.
 
-Keep Clear's detached imported paint/shape/layout behavior, exact persistence
-comparisons, raw source, policy/UI regressions, history, and JSON reload.
+## Preserve completed native, visibility and capture contracts
+
+Keep Clear's detached imported paint/shape/layout behavior, exact persistence,
+raw source, history, policy/UI regressions and JSON reload.
 
 Keep scoped native Inspector preparation and toolbar handling:
 Select access before conditional collapse, unique real controls, bounded
 detached/collapsed confirmation, exact model/history/epoch/selection invariance
-of UI actions, fresh connected fixed .23 contour measurement/current CTM/hit
-stack, one intended native click, trusted owner/path delivery, owned native
-restoration, and first-error-preserving diagnostics/cleanup.
-Preserve the precise native SVGPoint binary32 allowance without changing PGF
-geometry/reference tolerances or accepting altered requested coordinates.
+of UI actions, fresh fixed .23 contour/current CTM/hit stack, one native click,
+trusted owner/path delivery, owned native restoration and primary-error precedence.
+Preserve the precise SVGPoint binary32 allowance without changing PGF tolerances.
 
-Keep drag/layout preparation and owner cycling, selected-point-only movement,
-original gesture, pointer identity/capture/release, exactly one bounded history
-commit, exact saved/runtime Undo/Redo, and raw parent-imported evidence
-validation. Preserve native Inspector reopening for Shape/parameter controls,
-Select access, History controls, runner dependencies and test registration.
+Keep selected-point-only drag/layout movement, gesture identity, pointer capture/
+release, exactly one bounded commit, exact saved/runtime Undo/Redo, raw parent
+validation, native Inspector reopening for fields and fresh owner cycling.
+Keep same-document revision equality through preparation/drag/Undo/Redo;
+native JSON load/example replacement still advances ownership, including exact
+load +1 and stale reused-ID isolation. Do not modify production revision/cache.
 
-Keep valid same-document revision equality through preparation/drag/Undo/Redo,
-observed/authoritative and event epoch comparisons, and all revision regressions.
-Native JSON load/example replacement still advances document ownership;
-load's exact +1 and reused-ID stale completion isolation remain required.
-Do not modify production revision/cache/model behavior.
+Keep source-only exact-caption/direct-label/associated-select resolution,
+native scroll/preconditions, bounded dim/hide/dim actions, actual returned values,
+settings/event evidence, honest trusted=false selectOption provenance, native
+theta90/phi0 preparation and intended UI-angle-only changes.
+Keep canonical layer defaults, owned unique metadata, locked=true and explicit
+visible=false for the hidden layer, raw saved/runtime/history agreement and faithful fixtures.
+Keep actual owner/occluder/opacity validation and pre-assertion observed diagnostics.
 
-Keep the source-only exact-caption → direct production label → unique native
-associated select resolver, connected/visible/enabled checks, exact options,
-native source-header scroll preparation, bounded selectOption, returned/final
-value readback, authoritative settings, and owned actual event observations.
-Keep approximate-visibility checkbox prerequisites and native dim/hide/dim.
-A selectOption input/change trusted=false is recorded honestly; do not impose
-pointer/trusted=true requirements on this API.
+Keep both export callers using unchanged `captureStandaloneSvg`, normal fonts,
+bounded settling/one native image/no retry, measured complete-root coverage,
+at most one viewport expansion, stable coordinates, actual full PNG validation
+and exact SVG/PNG path/file identity. Preserve pre-image reopening records,
+owned page/listener cleanup, no extra failure screenshot, and first-error handling.
 
-Keep native camera details preparation, theta90/phi0 readback, state continuity
-and the requirement that only intended UI angles change. Preserve raw model,
-history, epoch, selection, source/style/coordinates, work plane, and unrelated
-UI settings. Keep actual owner/occluder classification, fill opacity,
-connected opacity ancestors and recomputed cumulative opacity.
+Keep `standaloneSvgCaptureContract.mjs` and parent verification of actual
+PNG CRC/chunks/inflated scanlines/dimensions/byte length and raw capture state.
+Do not accept missing/pending/failed/unrelated/cropped/changed capture or mock
+header files. Keep source/contour/cylinder paint/placement/background checks
+independent of image success, explicit artifact lists, registered integration
+tests and isolated runner dependency copying.
 
-Keep canonical layer validation: valid owned metadata arrays/records, exactly
-one configured matching layer, expected identity/name/point association,
-locked=true, optional boolean visibility with omitted/true interpreted visible,
-and explicit false for the hidden case. Missing/duplicate/unrelated/malformed
-records cannot pass via optional chaining. Keep exact saved/runtime/history
-provenance agreement; do not normalize or rewrite observed evidence.
-Preserve faithful canonical fixtures, production input→load/save normalization
-regression, actual locked before/after renders, hidden absent rendering,
-exact native load epoch, and all negative controls.
-
-Keep bounded locked/hidden stage observations before document replacement,
-completed candidate observations before assertions, observed versus terminal
-passed distinction, partial records, owned late rejections and primary failure
-ownership across diagnostics/listener/context cleanup.
-The visibility terminal `point-geometric-visibility.json` now exists and passed;
-the prior IocgXz rejection is historical, not the current failure.
-
-## Diagnose the standalone fullPage timeout
+## Diagnose the off-canvas diagnostic candidate
 
 The latest first failure is:
 
 ~~~text
-page.screenshot: Timeout 30000ms exceeded.
-  taking page screenshot
-  waiting for fonts to load...
-  fonts loaded
+AssertionError: Far diagnostic click reaches the native SVG canvas
+false !== true
 
-runPointNodeGeometricShapeChecks
-  scripts/checkPointNodeGeometricShapes.mjs:450
-scripts/checkFreeLabels.mjs:482
+runPointLayoutAnchorChecks
+  scripts/checkPointLayoutAnchors.mjs:419
+scripts/checkFreeLabels.mjs:483
 ~~~
 
-Read `free-labels-evidence.json`, `point-geometric-failure.json`,
-`point-geometric-app-failure.json`, `point-geometric-app-lifecycle.json`,
-the passed visibility/contour files and the retained
-`point-geometric-download-transparent.svg`.
+Read `free-labels-evidence.json`, `point-layout-failure.json`,
+`point-layout-app-failure.json`, `point-layout-app-lifecycle.json`,
+`point-layout-app-failure.png` and the passed layout sizing/geometric artifacts.
 
-The failure scenario is `point-geometric-download-transparent`.
-The saved SVG is 29,281 bytes, with SVG root width520/height360,
-viewBox `0 0 520 360`, eleven source titles, outlined math paths, and no href
-references or parsererror/foreignObject/image/script elements in its XML.
-The retained file is actual native-download output, not a generated substitute.
+The unsupported loop is 2D/3D × ellipse/circle/cylinder, source
+`WWWW diagnostic`, anchor `not a PGF anchor`, minimumWidth/Height1000.
+The first loaded native case is 2D ellipse, owner epoch397.
+No body/far/warning click has executed: line419 asserts the measured boolean
+before `diagnosticClick` or its native event collection.
 
-The caller had already saved/read the SVG, checked captured source against the
-later edits, reloaded original inputs, settled the reference preview, opened
-the actual file URL, evaluated standalone nodes, and passed the in-process
-contour/glyph/cylinder-region/no-external-request checks before screenshot.
-These observations are not yet retained in `...-standalone.json`: that write
-is after screenshot. The transparent PNG, standalone JSON and terminal scenario
-JSON are absent. Do not claim complete download acceptance.
-The post-screenshot immutable-parameter assertions and terminal save did not
-execute; their success remains required in the fresh run.
+The caller's current far candidate is:
 
-The failure snapshot/lifecycle belongs to the original HTTP App page, not the
-standalone file page. Empty page errors and the App's open/non-crashed state
-do not establish standalone body/viewport measurements.
-No direct standalone body/bounds/capture record was retained in this run.
+~~~js
+{ x: bodyBounds.maxX + 100, y: (bodyBounds.minY + bodyBounds.maxY) / 2 }
+~~~
 
-Inspect the configured local Playwright source:
-`/Users/takamatoshinori/.cache/codex-runtimes/codex-primary-runtime/dependencies/node/node_modules/playwright-core/lib/coreBundle.js`.
-Its screenshotPage prepares the page/fonts, then fullPage invokes
-`_fullPageSize`. That method waits for a utility callback which returns null
-when `document.body` or `document.documentElement` is absent.
-An SVG XML document has an SVG root without an HTML body. The source-supported
-diagnosis is this fullPage sizing mismatch, consistent with the observed
-post-font-readiness stall. The failing standalone body was not directly
-measured; retain its actual document/body/bounds in the fresh run.
-Do not diagnose this as an unresolved font load, inflate timeouts, or change
-export geometry to satisfy screenshot sizing.
+It is transformed through the current point screen CTM, then checked only with
+`canvas.contains(document.elementFromPoint(...))`.
+The returned `rendered` record is not persisted before this assertion.
+Thus the actual native far coordinate, CTM and hit stack are absent from the
+retained diagnostic artifact.
 
-## Reuse the measured complete-root capture
+The failure DOM independently retains root viewBox `0 0 520 360`,
+node `translate(404 36)`, data-label bounds approximately
+`[-48.706, -7, 48.706, 7]`, unsupported source/anchor/minima, no selection,
+Inspector opener aria-expanded=false and an expanded creation toolbar.
+The PNG shows the body near the right canvas edge.
 
-`scripts/standaloneSvgCapture.mjs` already provides the appropriate mechanism.
-Paint/import/responsive workflows use `captureStandaloneSvg` with persistence
-before image work. Read that helper, its registered tests, and those callers.
-Reuse it rather than adding a parallel screenshot workaround.
+The source/DOM-supported inference is that the fixed rightward candidate maps
+to SVG x≈552.7, beyond viewBox right520. Actual native text getBBox/CTM/screen
+coordinates were not saved; measure and retain them in the fresh run.
+Do not call this a proven toolbar or Inspector interception. Closing a drawer
+or increasing the browser viewport alone does not correct a point outside
+the SVG viewBox. Production point placement/minima are not the defect.
 
-Apply the same scoped correction to both affected pending-export callers:
-the geometric screenshot at line450 and the layout pending-export screenshot
-in `scripts/checkPointLayoutAnchors.mjs` (currently fullPage=true at line690).
-The layout case is the same known standalone SVG capture path, not a separate
-production geometry change. Preserve all its existing layout/download assertions.
+## Resolve an eligible negative probe from actual geometry
 
-The existing capture mechanism requires:
+Implement a small unsupported-diagnostic-specific measurement/candidate resolver
+or local helper. Keep the existing rightward candidate as an observed first
+candidate, then evaluate a bounded fixed-order set such as left/below/above
+with the same declared clearance relative to measured visible bounds.
+Do not search by trial clicks, pick an arbitrary successful pixel, or choose
+a point after observing selection outcomes.
 
-- Actual file-page measurements: URL, content type/ready state, SVG namespace/
-  root dimensions/viewBox/bounds, body state, parser errors, viewport, scroll
-  origin and device pixel ratio.
-- Bounded layout settling, finite positive root dimensions and complete-root
-  coverage within side/pixel budgets. Permit at most one measured viewport
-  expansion, followed by fresh measurements. Never shrink/scale the SVG or
-  accept a clipped corner as complete export evidence.
-- One `fullPage: false` CSS-scale native screenshot with the explicit bounded
-  timeout, preserving normal font readiness and document content.
-- Before/after coordinate stability, actual PNG signature/file presence and
-  pixel dimensions matching the measured CSS viewport, including root edges.
-- Pending/saved/failed capture status, actual requested/retained path,
-  PNG dimensions/byte length and diagnostic persistence throughout.
+Require the adopted far candidate to satisfy all of these before input:
 
-The helper is already tested and registered. Leave it unchanged unless actual
-integration evidence reveals a concrete defect. No browser flags, font-readiness
-bypass, retries, synthetic rasterization or new dependency is justified here.
+1. Actual connected unique canvas, expected point/body/warning and current
+   owner/request/source/unsupported anchor. Zero contour is intentional here.
+   All native local bounds and node/root screen matrices must be finite;
+   require valid invertible matrices and retain both coordinate frames.
+2. The local point lies inside actual requested shape bounds. Preserve the
+   requested minima1000 and zero painted bounds; this is a counterexample
+   inside the suppressed contour, not an unrelated blank page click.
+3. It is more than six local units from both actual body and warning bounds.
+   After body selection, preserve the bounded visible selection ring and
+   ensure the far probe remains outside that visible selection affordance.
+4. Its projection lies inside the actual SVG viewBox/drawing area, canvas
+   client bounds and visible viewport, with current scroll/clip conditions.
+   Account for SVG preserveAspectRatio and nontrivial CTMs rather than treating
+   local/viewBox/CSS/client coordinates as interchangeable.
+5. Native elementFromPoint/elementsFromPoint show an unobstructed route into
+   the exact production canvas, away from body/warning/handle/UI overlays.
+   Retain actual target identity and rejection reasons for every candidate.
+   Missing/null/outside/overlay targets cannot be accepted as negative picking.
 
-## Preserve reopening evidence before image work
+If no measured candidate is eligible, fail with all observations and no click.
+Do not relocate the model point, alter source/minima/anchor/shape, change
+camera/pan/zoom/work plane, force a click, synthesize events, or alter production
+picking/geometry/reference tolerances to make the test pass.
+Do not clamp the old point in a way that loses its geometric negative condition.
 
-Give each affected caller a bounded persist callback retaining the actual
-reopened nodes, requests, page errors, settled expected observations, captured
-click snapshot and scenario-specific pending/layout data before assertions/image
-work, then update the same raw standalone artifact with capture progress/results.
-Retain the actual saved file path/URL and bind records to the correct scenario
-and background. Use observations, not invented success booleans.
-Publish pre-image candidates as observed; terminal passed records still require
-the completed image and all applicable download assertions.
+Use scoped native UI preparation only when actual measured obstruction requires
+it: close an owned Inspector if present, access real Select before conditional
+toolbar collapse, and preserve the actual state. Re-measure after any native
+scroll/collapse/selection change. Restore only UI state owned by this preparation,
+preserving the terminal expected selection and first failure.
 
-Preserve all current source, exact contour/paint-region, glyph, XML/forbidden
-content, no-external-assets and background comparisons. For layout, preserve
-node/body transforms, immutable placement/layout, settled versus pending
-contour, free/inline labels, and both captured TikZ-mode outputs.
-Keep pending click-time source/parameters immutable through later editor edits,
-shape changes, replacement loads or view changes.
+`prepareGeometricCanvasClick` and `observeGeometricSelection` currently require
+a connected painted contour and intended point target. They cannot be used
+unchanged for contourCount0 or a far background probe.
+Reuse compatible controls/event ownership patterns, but do not weaken the
+completed contour selection helper's invariants or suppress its errors.
+Keep this unsupported diagnostic path narrowly scoped.
 
-A failed screenshot must retain pre-image reopening observations and failed
-capture details, propagate its original error, and fail the scenario.
-Only complete validated image and raw evidence may produce terminal passed
-records. Do not count an SVG alone, observed JSON, missing/invalid PNG,
-mock header file or screenshot metadata alone as native acceptance.
+## Retain measurements and actual input delivery
 
-Keep standalone page/context and event ownership, bounded persistence/failure
-diagnostics and cleanup, and owned late rejections. Do not try to use the
-App-specific state/API reader unchanged on the SVG file document.
-Do not run another screenshot in the failure path. Preserve the first
-action/assertion/capture error when diagnostic or close operations also fail;
-without a prior error, cleanup failure must still fail the workflow.
+Persist partial/raw preparation observations as observed before assertions,
+including scenario/dimension/shape/id/epoch, saved/runtime/history/UI settings,
+work plane, native body/warning/requested/painted/anchor bounds, point/canvas
+CTMs, viewBox/client bounds, viewport/scroll, Inspector/toolbar state, all
+candidate points/projections/hit stacks and eligibility/rejection reasons.
+The fresh failure must retain the actual coordinate and target, not only a
+derived `nativeCanvasAtFarClick` flag or a later full-page screenshot.
 
-## Contracts, regressions and native continuation
+Keep the exact body → far → warning sequence and one intended native mouse
+click per action. Re-measure current geometry/CTM/hit immediately before each
+input, including after body selection adds its ring and any UI changes.
+Bind each requested point to that fresh measurement and retain before/after
+authoritative state, native events and the actual final selection.
 
-Keep geometric/layout required artifact lists, including SVG, real PNG and
-standalone JSON. Bind parent evidence validation to retained capture records:
-saved status, exact scenario path/file URL, real PNG bytes/signature/dimensions/
-byte length, finite complete-root containment, and stable before/after raw
-measurements. Reuse suitable existing capture validation rather than duplicate
-screenshot logic. Check raw reopened/expected/click agreement and all existing
-source/paint/placement/background comparisons independently of capture success.
+Extend the current diagnostic listener, which records only type/trust/client,
+with owned bounded target/composed-path, pointer/button/order, document epoch,
+owner/request/source and canvas identity observations.
+Require trusted real pointerdown/pointerup/click at the adopted projected point
+and delivery through the exact production canvas, with expected selection.
+Keep body and warning selecting app-point; far must leave app-point unselected.
 
-Reject pending/failed/missing capture, mismatched path/URL/PNG dimensions,
-malformed/nonfinite or cropped root measurements, coordinate changes,
-unrelated records, and forged success flags. Do not weaken strict parent
-acceptance or relabel a failed image as diagnostic-only.
+Record the actual SVG/body/warning picking mechanism. Literal body glyphs may
+have pointer-events:none, so their native target can be canvas background while
+production hit testing selects the owned point. Do not invent glyph targets or
+require a painted-contour path for an intentionally missing contour.
+The far action must show actual background delivery outside the owned visible
+regions, not an unrelated document/UI event with matching coordinates.
 
-Run existing standaloneSvgCapture tests and add only meaningful integration/
-policy regressions for the affected callers and both parent suites.
-Cover pre-image persistence, one bounded capture/no retry, canonical SVG without
-an HTML body, real complete-root dimensions, rejecting invalid/missing PNG,
-observed versus passed status, and primary errors surviving secondary persistence/
-cleanup failures. Reuse existing helper controls; do not duplicate its whole
-test matrix or multiply equivalent fixture mutations.
+Preserve exact raw source, point coordinates/style/layout, model/history/epoch,
+camera/work plane and saved document throughout the diagnostic clicks.
+Allow only their intended selection changes and explicitly owned UI preparation.
+Keep ring radius bounded by visible body/warning geometry, never the hidden
+1000-unit requested shape. Keep actual zero contour, zero painted bounds,
+unsupported warning and unchanged diagram assertions.
 
-If contracts/verifier newly import the shared capture module, copy that
-dependency and its transitive dependencies into isolated runner fixtures.
-Register any new test file in the explicit test list. Preserve faithful
-synthetic policy controls as distinct from native browser acceptance.
+Bound observation/artifact/listener/restoration/cleanup work, own late failures,
+and retain primary action/assertion errors if secondary diagnostics fail.
+Only accepted full raw evidence produces terminal passed cases/scenarios.
 
-Reuse the cumulative App sequence through paint/import, all eleven shapes,
-eight contours and terminal visibility; then complete transparent and white
-geometric downloads, the full layout/anchor/owner-cycle matrix including its
-pending downloads, and final standalone export.
-Require actual native SVG download/reopening, real PNGs, both TikZ modes,
-and raw history/JSON persistence. Diagnose later failures from their own first
-fresh evidence.
+## Contracts, regressions and cumulative continuation
 
-Use strict TypeScript without `any`, add no dependency, and preserve model
-coordinates, 2D z=0, active 3D work planes and codimension conventions.
+Extend the layout raw contract and 32D parent policy for actual candidate/
+coordinate/input evidence. Preserve all six native cases, full supported anchor
+matrix, source/anchor/minima, zero-contour/paint, visible body/warning/ring,
+body/far/warning ordering, trusted input and unchanged state requirements.
+Reject success flags alone, missing or unrelated targets, stale owner/epoch/
+CTM/state, malformed bounds, off-canvas candidates and mismatched projections.
 
-## Preserve Phase 32D geometry and persistence
+Add meaningful pure/integration/policy controls for the actual failure:
+right candidate outside SVG but a left/below candidate valid; nontrivial CTMs/
+preserveAspectRatio; all candidates invalid; overlay/viewport clipping; far
+inside visible picking bounds/ring or outside requested shape; stale measurements
+after preparation/body selection; event misdelivery or wrong epoch; and primary
+failure through diagnostic/restoration/cleanup errors.
+Synthetic controls are not native acceptance. Do not duplicate unrelated helper
+test matrices or inflate equivalent fixture mutations.
+
+Register new tests in the explicit test list and copy new imported helper
+dependencies into isolated runner fixtures. Add no dependency.
+Use strict TypeScript without `any`. Preserve 2D z=0, active 3D work planes and
+the mathematical codimension convention.
+
+Use the same cumulative pages and strict predecessor sequence. Retain the
+complete geometric group with both actual download/PNG cases, then fresh layout
+sizing, supported anchors and six unsupported diagnostic cases.
+Complete remaining layout controls/persistence, lifecycle/picking/owner cycle,
+imports, both pending transparent/white layout SVG/TikZ downloads and final
+standalone export. Diagnose each later first failure from fresh raw evidence.
+
+## Preserve Phase32D geometry and persistence
 
 Keep saved envelope version2, additive layout, legacy Size/2 precedence,
 ordered shorthand/axis resolution and per-axis em/ex context.
@@ -293,16 +300,17 @@ diagnostics, overflow-body picking, painted/anchor-clearance bounds, 2D/3D
 projection and immutable click-time export placement.
 
 Retain the independent 172-box / 4,925-anchor / 11-failure reference inventory,
-all raw/reference files and tolerances. No geometry/reference regeneration
-is justified by this capture mismatch. The diamond outer-separation exception
-still requires independent PGF review. Preserve external source/exact text,
-typography/paragraph/TeX-program limitations, free labels and inline path nodes.
+all raw/reference files and tolerances. No geometry/reference regeneration is
+justified by this harness candidate failure. The diamond outer-separation
+exception still requires independent PGF review.
+Preserve external source/exact text, typography/paragraph/TeX-program limitations,
+free labels and inline path nodes.
 
 ## Fresh verification and parent handoff
 
-Use Node >=22.12.0 through Homebrew. Run focused capture/caller integration,
-both parent policy suites, diagnostics/ownership and runner regressions, while
-retaining the completed visibility/selection/toolbar/drag coverage.
+Use Node >=22.12.0 through Homebrew. Run focused unsupported-diagnostic geometry/
+input, parent policy, diagnostics/ownership and runner regressions; preserve
+completed native selection/toolbar/drag/visibility/capture checks.
 Run required commands:
 
 ~~~bash
@@ -314,18 +322,17 @@ PATH=/opt/homebrew/bin:$PATH npm run check:free-labels
 ~~~
 
 Run applicable focused TypeScript/lint and changed-script syntax checks.
-Report reproduced baseline debt accurately: three current geometric caller
-no-unsafe-finally errors and verifier unused _role; the existing layers test's
-unused defaultCurveStyle and eleven inherited focused strict-TypeScript
-diagnostics are also documented in the latest handoff.
-Application TypeScript/build passed. These separate failed baseline checks
-must not be described as passes or expanded into unrelated cleanup.
+Report reproduced baseline debt accurately: current geometric caller has two
+no-unsafe-finally errors and the verifier unused _role; the unchanged layers
+suite has unused defaultCurveStyle and eleven inherited focused strict-TypeScript
+diagnostics. These checks remain failed; application TypeScript/build passed.
+Do not describe failed baseline checks as passes or expand into unrelated cleanup.
 
 Use a fresh owned server and supported Playwright/Chrome in the browser-capable
-parent. Focused/scoped 32C results cannot establish strict 32D acceptance.
-If the child hits `listen EPERM`, retain its startup failure and exact tree
-for the parent without weakening sandbox/acceptance rules.
-Do not describe the latest parent screenshot failure as startup failure.
+parent. Focused/scoped evidence cannot establish strict 32D acceptance.
+If the child hits `listen EPERM`, retain its startup failure and exact tree for
+the parent without weakening sandbox/acceptance rules.
+Do not describe the latest parent diagnostic assertion as startup failure.
 
 Load updated callers/helpers/contracts/policy in a fresh parent process and
 verify the preserved dirty tree without committing:
@@ -334,34 +341,32 @@ verify the preserved dirty tree without committing:
 PATH=/opt/homebrew/bin:$PATH node scripts/automation/run-phase.mjs 32D verify
 ~~~
 
-Preserve the implementation/fix runner's clean-tree guard. Do not reset,
-discard, stash, commit or push unfinished work to bypass it.
-Require all twelve 31F groups, three 32A groups, full 32B paint/import,
-complete 32C shapes and `point-node-layout-anchors-combined`.
-Require terminal successes, valid raw artifacts, no page errors, native
-history/JSON persistence, both TikZ modes, pending transparent/white downloads
-and reopened standalone SVG with actual complete PNG evidence.
-
+Preserve the implementation/fix clean-tree guard. Do not reset, discard, stash,
+commit or push unfinished work to bypass it.
+Require all twelve 31F groups, three 32A groups, full 32B paint/import, complete
+32C shapes/visibility/downloads and point-node-layout-anchors-combined.
+Require terminal successes, valid raw artifacts, no page errors, native history/
+JSON persistence, both TikZ modes, pending transparent/white downloads and
+actual reopened standalone SVG/complete PNG acceptance.
 Do not skip predecessors, reuse historical/scoped reports, create a deferred
 32D profile or reclassify unexpected failures as backlog.
-Preserve first failures and cleanup.
 
 ## Independent review and completion
 
 After complete fresh strict parent verification, obtain read-only independent
 review of the exact matching tracked/untracked tree using
-`prompts/phase-32d-review.md`. Inspect the actual report/artifacts.
-Matching accepted parent evidence can support a sandboxed reviewer;
-stale, partial or failed reports cannot substitute for acceptance.
+`prompts/phase-32d-review.md`. Inspect actual report/artifacts.
+Matching accepted evidence can support a sandboxed reviewer; stale, partial
+or failed reports cannot substitute for acceptance.
 
 Update status only to observed accepted results. Keep Phase32 incomplete while
-any native/download/reference or review gate remains open.
+any native/download/reference/review gate remains open.
 Preserve stop-before-review/commit on failed verification and the parent's
 post-review identity guard.
 
-Report the scoped capture integration and pre-image evidence correction,
-changed files, focused/full checks, fresh parent evidence/identity, actual
-transparent/white geometric/layout download and standalone coverage, review
-result, and remaining concrete failures. Leave commit/push to the parent
-workflow after verification and review pass.
+Report the scoped measured diagnostic candidate/input correction, preserved
+download/capture contracts, changed files, focused/full checks, fresh parent
+evidence/identity, actual six-case/layout/download/standalone coverage,
+review result and remaining concrete failure.
+Leave commit/push to the parent workflow after verification and review pass.
 Do not claim completion from child-only or historical results.

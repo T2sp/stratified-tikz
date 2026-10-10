@@ -1,6 +1,6 @@
 import { phase32cProfile, phase32cDeferrals, phase32cAuthorization, resolveVerificationProfile, deferredMechanismKey, mechanismNotRun, assertScopedMechanismEvidence, assertNamedStrict32BFailure } from './phase32c-profile.mjs';
-import { geometricShapeGroup, geometricShapeScenarios, geometricShapeArtifacts, assertGeometricShapeEvidence } from '../pointGeometricShapesContract.mjs';
-import { layoutAnchorGroup, layoutAnchorScenarios, layoutAnchorArtifacts, assertLayoutAnchorEvidence } from '../pointLayoutAnchorsContract.mjs';
+import { geometricShapeGroup, geometricShapeScenarios, geometricShapeArtifacts, assertGeometricShapeEvidence, assertGeometricStandaloneEvidence } from '../pointGeometricShapesContract.mjs';
+import { layoutAnchorGroup, layoutAnchorScenarios, layoutAnchorArtifacts, assertLayoutAnchorEvidence, assertLayoutStandaloneEvidence } from '../pointLayoutAnchorsContract.mjs';
 import {
   closeSync,
   existsSync,
@@ -286,6 +286,7 @@ function validateTargetedPaintEvidence(artifactDir, name, group, profile = "stri
     assertLayoutAnchorEvidence(evidence, name);
     if (name.startsWith('point-layout-pending-')) {
       const standalone = evidenceObject(artifactDir, `${name}-standalone.json`);
+      assertLayoutStandaloneEvidence(evidence, standalone, artifactDir);
       assert.deepEqual(standalone.pageErrors, []);
       assert.deepEqual(standalone.expected, evidence.expected); assert.deepEqual(standalone.click, evidence.click);
       assert.equal(standalone.reopened.length, evidence.expected.length);
@@ -314,6 +315,7 @@ function validateTargetedPaintEvidence(artifactDir, name, group, profile = "stri
     assertGeometricShapeEvidence(evidence, name);
     if (name.startsWith('point-geometric-download-')) {
       const standalone = evidenceObject(artifactDir, `${name}-standalone.json`);
+      assertGeometricStandaloneEvidence(evidence, standalone, artifactDir);
       assert.deepEqual(standalone.pageErrors, []);
       assert.deepEqual(standalone.expected, evidence.expected); assert.deepEqual(standalone.click, evidence.click);
       assert.equal(standalone.reopened.length, evidence.expected.length);

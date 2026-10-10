@@ -167,6 +167,31 @@ test('owned failure persists primary before API-independent DOM and screenshot; 
   assert.equal(evidence.scenario, 'next-scenario-before-load')
 })
 
+test('standalone failure can retain App DOM and lifecycle without another screenshot or fixture API read', async (t) => {
+  const { app, page, artifactDir } = await setup(t)
+  const primary = new Error('primary standalone capture failure')
+  const original = page.evaluate.bind(page)
+  page.evaluate = async (operation, argument) => {
+    const saved = JSON.parse(await readFile(join(artifactDir, 'point-paint-app-failure.json'), 'utf8'))
+    assert.equal(saved.error.message, primary.message)
+    assert.equal(operation.name, 'observeOwnedAppDocument')
+    return original(operation, argument)
+  }
+  page.screenshot = () => assert.fail('Standalone failure must not attempt another image')
+  const evidence = await app.failure(primary, { scenario: 'point-geometric-download-transparent' }, { captureScreenshot: false })
+  assert.equal(evidence.error.message, primary.message)
+  assert.equal(evidence.snapshot.pageId, evidence.pageId)
+  assert.match(evidence.screenshotOmitted, /disabled additional failure screenshot/)
+  assert.equal(evidence.screenshot, undefined)
+  assert.equal(evidence.screenshotError, undefined)
+  await app.dispose()
+  const retained = JSON.parse(await readFile(join(artifactDir, 'point-paint-app-failure.json'), 'utf8'))
+  assert.deepEqual(retained, JSON.parse(JSON.stringify(evidence)))
+  const lifecycle = JSON.parse(await readFile(join(artifactDir, 'point-paint-app-lifecycle.json'), 'utf8'))
+  assert.equal(lifecycle.failure.error.message, primary.message)
+  assert.equal(page.eventNames().length, 0)
+})
+
 test('bounded failing capture and screenshot retain primary, own late rejections and permit cleanup', { timeout: 10_000 }, async (t) => {
   // Only advance the diagnostic clock after an intentionally hanging browser
   // operation starts. Real filesystem setup/persistence/disposal still happens,

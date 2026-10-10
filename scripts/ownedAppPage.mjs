@@ -279,7 +279,7 @@ export function createOwnedAppPage({ page, expectedUrl, artifactDir, prefix = 'p
       await persist('finish')
       return result
     },
-    async failure(primary, details = {}) {
+    async failure(primary, details = {}, { captureScreenshot = true } = {}) {
       // Save primary + lifecycle before any DOM or image operation, then update
       // the same owned artifact after each bounded best-effort diagnostic.
       const evidence = { boundary: 'owned-app-failure', pageId, expectedUrl, error: errorDetails(primary), ...details }
@@ -295,11 +295,13 @@ export function createOwnedAppPage({ page, expectedUrl, artifactDir, prefix = 'p
       try { evidence.snapshot = await capture('failure', true) }
       catch (error) { evidence.captureError = errorDetails(error) }
       await save('after-capture')
-      try {
-        const screenshot = `${prefix}-failure.png`
-        await diagnostic(() => page.screenshot({ path: resolve(artifactDir, screenshot), fullPage: false, timeout: timeoutMs }), 'owned App failure screenshot', timeoutMs + 100)
-        evidence.screenshot = screenshot
-      } catch (error) { evidence.screenshotError = errorDetails(error) }
+      if (captureScreenshot) {
+        try {
+          const screenshot = `${prefix}-failure.png`
+          await diagnostic(() => page.screenshot({ path: resolve(artifactDir, screenshot), fullPage: false, timeout: timeoutMs }), 'owned App failure screenshot', timeoutMs + 100)
+          evidence.screenshot = screenshot
+        } catch (error) { evidence.screenshotError = errorDetails(error) }
+      } else evidence.screenshotOmitted = 'Caller disabled additional failure screenshot after standalone observations'
       await save('after-screenshot')
       return evidence
     },

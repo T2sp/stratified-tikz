@@ -15,6 +15,7 @@ import { boundedPointDiagnostic, createPointDiagnostics } from './pointCheckDiag
 import { saveAppJson } from './appJsonPersistence.mjs'
 import { observePointLiteral, assertPositionedLiteral } from './pointLiteralOracle.mjs'
 import { withOwnedFontFace, observeOwnedFontFace } from './ownedFontFace.mjs'
+import { captureStandaloneSvg } from './standaloneSvgCapture.mjs'
 
 const paint = { text: { color: '#203040', opacity: 1 }, fill: { enabled: true, color: '#d8ecff', opacity: .7 },
   stroke: { enabled: true, color: '#203040', opacity: 1, width: .4, lineStyle: 'solid', dashPhase: 0, lineCap: 'butt', lineJoin: 'miter' } }
@@ -57,6 +58,58 @@ export async function observeLayoutPoint(page, id = 'app-point') {
       inkMatrix: Object.fromEntries(['a', 'b', 'c', 'd', 'e', 'f'].map((key) => [key, inkMatrix[key]])),
       literal: [...body.querySelectorAll('[data-label-literal]')].map((text) => text.textContent).join('') }
   }, id)
+}
+
+/** Own the reopened file page and retain its raw candidate before validation or
+ * image work. A saved capture is still observed evidence until the caller has
+ * completed the immutable download/layout assertions and terminal save. */
+export async function capturePointLayoutStandalone({ standalone, artifactDir, details, reopen, assertReopened, observe }) {
+  const requests = [], standaloneErrors = [], cleanupErrors = []
+  const candidate = { ...details, result: 'observed', requests, standaloneErrors, cleanupErrors }
+  const request = (request) => requests.push(request.url())
+  const pageerror = (error) => standaloneErrors.push(error.message)
+  const crash = () => standaloneErrors.push('Owned standalone layout page crashed')
+  const listeners = [['request', request], ['pageerror', pageerror], ['crash', crash]]
+  const persist = async (capture) => {
+    if (capture) candidate.capture = capture
+    await boundedPointDiagnostic(() => writeFile(resolve(artifactDir, `${details.scenario}-standalone.json`),
+      JSON.stringify(candidate, null, 2) + '\n'), 'Standalone layout evidence', 5000)
+  }
+  let primary
+  const retainFailure = async () => {
+    candidate.error = { message: primary.message, stack: primary.stack }
+    try { await persist() } catch (error) {
+      details.pageErrors.push(`Standalone layout failure evidence: ${error.message}`)
+    }
+  }
+  try {
+    for (const [type, listener] of listeners) standalone.on(type, listener)
+    await persist()
+    await standalone.goto(details.fileUrl)
+    Object.assign(candidate, await boundedPointDiagnostic(() => reopen(standalone), 'Standalone layout reopening observations', 5000))
+    await persist()
+    await boundedPointDiagnostic(() => observe(candidate), 'Standalone layout observed candidate', 5000)
+    await assertReopened(candidate)
+    assert.deepEqual(standaloneErrors, [], 'Standalone file has no page errors')
+    await captureStandaloneSvg(standalone, resolve(artifactDir, `${details.scenario}.png`), persist)
+    assert.deepEqual(standaloneErrors, [], 'Standalone capture has no page errors')
+  } catch (error) {
+    primary = error
+    await retainFailure()
+  } finally {
+    for (const [type, listener] of listeners) {
+      try { standalone.off(type, listener) } catch (error) {
+        primary ??= error; cleanupErrors.push({ operation: `${type} listener cleanup`, message: error.message })
+      }
+    }
+    try { await boundedPointDiagnostic(() => standalone.close(), 'Standalone layout page cleanup', 5000) }
+    catch (error) {
+      primary ??= error; cleanupErrors.push({ operation: 'page close', message: error.message })
+    }
+    if (primary) await retainFailure()
+  }
+  if (primary) throw primary
+  return candidate
 }
 
 export async function runPointLayoutAnchorChecks({ browser, origin, artifactDir, record, observe, startGroup, completeGroup, setStage }) {
@@ -662,43 +715,49 @@ export async function runPointLayoutAnchorChecks({ browser, origin, artifactDir,
       const outputs = await tikzArtifacts()
       for (const code of Object.values(outputs)) { assert.ok(code.includes('anchor=base')); assert.ok(code.includes('anchor=shape center')) }
       assertPointTikzSourceByMode(outputs, captured)
-      const standalone = await context.newPage(), requests = []; standalone.on('request', (request) => requests.push(request.url()))
-      let reopenPrimary
-      try {
-        await standalone.goto(pathToFileURL(svgPath).href)
-        const reopened = await standalone.evaluate((expected) => {
+      const standalone = await context.newPage(), fileUrl = pathToFileURL(svgPath).href
+      const standaloneEvidence = await capturePointLayoutStandalone({ standalone, artifactDir,
+        details: { scenario, group, background, svgPath, fileUrl, pageErrors, expected, click, pending, outputs, xml },
+        observe: (candidate) => observe(`${scenario}-standalone-observed`, { group, result: 'observed', candidate }),
+        reopen: async (standalone) => standalone.evaluate((expected) => {
           const clean = (element) => ({ tag: element.localName, attributes: Object.fromEntries([...element.attributes].filter(({ name }) => !name.startsWith('data-') && name !== 'pointer-events').map(({ name, value }) => [name, value])) })
-          return expected.map((entry) => {
+          const reopened = expected.map((entry) => {
             const title = [...document.querySelectorAll('title')].find((element) => element.textContent === entry.source), body = title?.parentElement, node = body?.parentElement
             const contour = node && [...node.children].find((element) => ['path', 'polygon', 'circle', 'ellipse', 'rect'].includes(element.localName) && element.hasAttribute('stroke') && element.getAttribute('stroke') !== 'none')
             return { source: title?.textContent, shape: entry.shape, contour: contour && clean(contour), nodeTransform: node?.getAttribute('transform'), bodyTransform: body?.getAttribute('transform'),
               glyphs: body?.querySelectorAll('path,use').length, errors: document.querySelectorAll('parsererror,foreignObject,image,script').length }
           })
-        }, expected)
-        for (const [index, actual] of reopened.entries()) {
-          assert.equal(actual.source, expected[index].source); assert.equal(actual.errors, 0); assert.ok(actual.glyphs > 0)
-          assert.deepEqual(actual.contour, expected[index].rendered.contour); assert.equal(actual.nodeTransform, expected[index].rendered.nodeTransform)
-          assert.equal(actual.bodyTransform, expected[index].rendered.bodyTransform)
-        }
-        assert.notDeepEqual(pending.contour, expected[0].rendered.contour, 'The accepted settled export cannot retain a pending-sized contour')
-        assert.ok(input.diagram.labels.every(({ text }) => xml.includes(text.replaceAll('&', '&amp;').replaceAll('<', '&lt;'))))
-        const inline = siblings[0].inlineNodes
-        assert.ok(inline.every(({ text }) => xml.includes(text.replaceAll('&', '&amp;').replaceAll('<', '&lt;'))))
-        assert.ok(requests.length > 0 && requests.every((url) => url.startsWith('file:')))
-        // Retain identity/bounds/source observations before the bounded image.
-        await writeFile(resolve(artifactDir, `${scenario}-standalone.json`), JSON.stringify({ reopened, requests, pageErrors, expected, click, pending }, null, 2) + '\n')
-        await standalone.screenshot({ path: resolve(artifactDir, `${scenario}.png`), fullPage: true, timeout: 5000 })
-        await save({ background, actualDownload: true, capturedPending: click.snapshot.points[0].status === 'pending', reopened: true, immutableSource: true, immutableLayout: true,
-          immutablePlacement: true, settledContour: true, combinedLabels: true, noExternalAssets: true, expected, click, pending })
-      } catch (error) { reopenPrimary = error }
-      finally { try { await standalone.close() } catch (error) { reopenPrimary ??= error; pageErrors.push(`Standalone layout cleanup: ${error.message}`) } }
-      if (reopenPrimary) throw reopenPrimary
+          const root = document.documentElement
+          return { reopened, document: { root: { localName: root.localName, namespace: root.namespaceURI,
+            width: root.getAttribute('width'), height: root.getAttribute('height'), viewBox: root.getAttribute('viewBox') },
+            forbiddenCount: document.querySelectorAll('parsererror,foreignObject,image,script,[data-svg-export-exclude]').length,
+            externalReferences: [...document.querySelectorAll('[href]')].map((element) => element.getAttribute('href'))
+              .filter((href) => !href.startsWith('#') || !document.getElementById(href.slice(1))),
+            backgroundCount: document.querySelectorAll('[data-stratified-tikz-export-background]').length } }
+        }, expected),
+        assertReopened: ({ reopened, requests, document }) => {
+          for (const [index, actual] of reopened.entries()) {
+            assert.equal(actual.source, expected[index].source); assert.equal(actual.errors, 0); assert.ok(actual.glyphs > 0)
+            assert.deepEqual(actual.contour, expected[index].rendered.contour); assert.equal(actual.nodeTransform, expected[index].rendered.nodeTransform)
+            assert.equal(actual.bodyTransform, expected[index].rendered.bodyTransform)
+          }
+          assert.notDeepEqual(pending.contour, expected[0].rendered.contour, 'The accepted settled export cannot retain a pending-sized contour')
+          assert.ok(input.diagram.labels.every(({ text }) => xml.includes(text.replaceAll('&', '&amp;').replaceAll('<', '&lt;'))))
+          const inline = siblings[0].inlineNodes
+          assert.ok(inline.every(({ text }) => xml.includes(text.replaceAll('&', '&amp;').replaceAll('<', '&lt;'))))
+          assert.deepEqual(requests, [fileUrl], 'Reopened SVG requests only its downloaded file')
+          assert.equal(document.forbiddenCount, 0); assert.deepEqual(document.externalReferences, [])
+          assert.equal(document.backgroundCount, background === 'white' ? 1 : 0)
+        } })
+      await save({ background, actualDownload: true, capturedPending: click.snapshot.points[0].status === 'pending', reopened: true, immutableSource: true, immutableLayout: true,
+        immutablePlacement: true, settledContour: true, combinedLabels: true, noExternalAssets: true, expected, click, pending,
+        capture: standaloneEvidence.capture })
     }
     assert.deepEqual(pageErrors, []); await completeGroup(group)
   } catch (error) {
     primary = error
     await retainFailure('point-layout-failure.json', { scenario, group, result: 'failed', pageErrors, error: { message: error.message, stack: error.stack } })
-    try { await app.failure(error, { scenario, pageErrors }) } catch (diagnosticError) {
+    try { await app.failure(error, { scenario, pageErrors }, { captureScreenshot: !scenario.startsWith('point-layout-pending-') }) } catch (diagnosticError) {
       await retainFailure('point-layout-secondary-failure.json', { primary: error.message, diagnostic: diagnosticError.message })
     }
     throw error

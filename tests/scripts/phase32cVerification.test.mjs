@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict'
 import test from 'node:test'
-import { mkdtemp, readFile, rm } from 'node:fs/promises'
+import { mkdtemp, readFile, rm, writeFile, unlink } from 'node:fs/promises'
 import { join } from 'node:path'
 import { tmpdir } from 'node:os'
 import { runPointDashCapMechanismChecks } from '../../scripts/checkPointDashCapMechanism.mjs'
@@ -10,7 +10,8 @@ import { phase32cProfile, resolveVerificationProfile, mechanismNotRun, assertSco
 import { phase32CDispositionMatchesCheckout, pointNodeScenarioArtifacts, allPointNodeScenarios,
   runPhaseVerification, runPhase32CReviewVerification } from '../../scripts/automation/phase-verification.mjs'
 import { geometricShapeManifest, geometricBodyVariants, geometricShapeScenarios, geometricShapeGroup,
-  assertGeometricShapeEvidence } from '../../scripts/pointGeometricShapesContract.mjs'
+  assertGeometricShapeEvidence, assertGeometricStandaloneEvidence } from '../../scripts/pointGeometricShapesContract.mjs'
+import { syntheticStandalonePointDownload } from './standalonePointDownloadFixture.mjs'
 import { syntheticMechanismEvidence } from './pointDashCapMechanismFixture.mjs'
 import { selectGeometricPoint, installGeometricSelectionObserver, observeGeometricSelection,
   removeGeometricSelectionObserver } from '../../scripts/pointGeometricSelection.mjs'
@@ -1148,6 +1149,39 @@ test('32C non-cylinder scenarios cannot carry unrelated color input observations
   evidence.nativeColorInputs = shapeEvidence(geometricShapeManifest.find(({ shape }) => shape === 'cylinder')).nativeColorInputs
   assert.throws(() => assertGeometricShapeEvidence(evidence, evidence.scenario))
 })
+for (const background of ['transparent', 'white']) {
+  test(`32C synthetic standalone ${background} policy requires complete PNG and raw reopening agreement`, async (t) => {
+    const directory = await mkdtemp(join(tmpdir(), 'stz-32c-standalone-policy-'))
+    t.after(() => rm(directory, { recursive: true, force: true }))
+    const fixture = syntheticStandalonePointDownload(directory, `point-geometric-download-${background}`)
+    assert.equal(fixture.raw.result, 'observed'); assert.equal(fixture.raw.capture.before.bodyExists, false)
+    assertGeometricStandaloneEvidence(fixture.evidence, fixture.raw, directory)
+  })
+}
+for (const fault of ['pending', 'failed', 'missing-record', 'wrong-path', 'wrong-url', 'cropped-root', 'changed-coordinates',
+  'invalid-png', 'missing-png', 'wrong-png-dimensions', 'wrong-png-byte-length', 'forged-terminal', 'wrong-reopened-source', 'wrong-cylinder-paint', 'secondary-cleanup']) {
+  test(`32C standalone parent contract rejects ${fault}`, async (t) => {
+    const directory = await mkdtemp(join(tmpdir(), 'stz-32c-standalone-policy-'))
+    t.after(() => rm(directory, { recursive: true, force: true }))
+    const fixture = syntheticStandalonePointDownload(directory, 'point-geometric-download-transparent')
+    const { evidence, raw } = fixture, capture = raw.capture
+    if (fault === 'pending' || fault === 'failed') capture.status = fault
+    if (fault === 'missing-record') delete raw.capture
+    if (fault === 'wrong-path') capture.requestedPath += '.other'
+    if (fault === 'wrong-url') { capture.before.url += '?other'; capture.after.url = capture.before.url }
+    if (fault === 'cropped-root') { capture.before.root.bounds.x = 1490; capture.after.root.bounds.x = 1490 }
+    if (fault === 'changed-coordinates') capture.after.root.bounds.x += 1
+    if (fault === 'invalid-png') { const corrupt = Buffer.from(fixture.png); corrupt[45] ^= 1; await writeFile(fixture.pngPath, corrupt) }
+    if (fault === 'missing-png') await unlink(fixture.pngPath)
+    if (fault === 'wrong-png-dimensions') await writeFile(fixture.pngPath, await readFile(new URL('../../prompts/assets/toolbar-current.png', import.meta.url)))
+    if (fault === 'wrong-png-byte-length') capture.png.bytes += 1
+    if (fault === 'forged-terminal') { raw.result = 'passed'; capture.fileExists = true; capture.coordinatesStable = true }
+    if (fault === 'wrong-reopened-source') raw.reopened[0].source = 'later $changed$'
+    if (fault === 'wrong-cylinder-paint') raw.reopened.at(-1).regions[0].attributes.fill = '#000000'
+    if (fault === 'secondary-cleanup') raw.cleanupErrors.push('owned close failed')
+    assert.throws(() => assertGeometricStandaloneEvidence(evidence, raw, directory))
+  })
+}
 test('review-only disposition rejects malformed, wrong-profile, failed, incomplete, or stale envelopes', () => {
   for (const response of [{}, { report: {} }, { report: { kind: 'phase32c-review-only', phase: '32B' }, disposition: { status: 'accepted' } },
     { report: { kind: 'phase32c-review-only', phase: '32C', profile: phase32cProfile }, disposition: { phase: '32C', status: 'accepted', profile: 'strict' } }]) {

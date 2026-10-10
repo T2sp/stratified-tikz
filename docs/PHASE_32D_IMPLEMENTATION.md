@@ -7,6 +7,82 @@ later 32B have historical accepted evidence. The plan still records unaccepted
 fresh strict native/review gates for the merged 32C checkout; implementation
 presence does not close that prerequisite or the final gate.
 
+## Standalone SVG capture integration (2026-10-10)
+
+The actual clean starting tree is `2f9cba7d0bb3a555c13d2e70d4ec673a44237768`
+on `phase/32d-margin-minsize-anchor`, fingerprint
+`ed5c6e2beff67c52e1596012f9d32f9eccef19fe46a78421e78b0a916bbf607d`.
+The prior ten-file canonical-layer correction and updated prompt are tracked.
+Production, completed native helpers, model/serialization semantics and all
+PGF reference inputs/artifacts/tolerances are preserved.
+
+The latest browser-capable parent `stz-phase32d-before-review-1V3I0G` passed
+6,072 tests/build/diff/full label-assets, then completed 15/18 cumulative groups
+with Chrome 154.0.8037.98. Full paint/import, eleven shapes, eight contour
+interactions and the terminal geometric visibility artifact passed. Its next
+failure is `point-geometric-download-transparent`: the actual 29,281-byte SVG
+was downloaded and reopened, then `fullPage` screenshot timed out after fonts
+loaded. Transparent PNG, standalone JSON and terminal download pass are absent;
+white geometric download, layout/anchor group and final standalone export did
+not execute. Empty App page errors/lifecycle do not supply standalone bounds.
+
+The configured Playwright source prepares fonts before `_fullPageSize`, whose
+utility callback returns null without `document.body`. SVG XML has an SVG root
+and no HTML body. This supports a full-page sizing mismatch; the failed file
+page's body/bounds were not directly retained, so no measured historical body
+claim is made. The saved XML has root width 520 / height 360, viewBox
+`0 0 520 360`, eleven source titles and outlined paths, with no href references
+or parsererror/foreignObject/image/script. This offline inspection is diagnostic
+only and cannot establish complete native download/image acceptance.
+
+Both geometric and layout pending-export callers now reuse unchanged
+`standaloneSvgCapture.mjs`. Bounded persistence retains actual reopened nodes,
+root/XML observations, requests/errors, settled expected geometry, click-time
+source/parameters and background/file identity before assertions or image work.
+Layout also retains pending contour, node/body transforms and both TikZ outputs.
+The same raw artifact stays `result: observed` while capture records progress
+through pending/saved/failed. One CSS viewport screenshot, bounded settling,
+measured complete-root coverage and before/after stability remain mandatory;
+there is no retry, font bypass, scaling or export geometry change.
+
+Standalone page/listener cleanup precedes terminal download save. The first
+assertion/capture error survives secondary persistence/cleanup failures; cleanup
+failure alone still fails the workflow. An optional owned-App diagnostic argument
+suppresses an additional failure image for these standalone failures while
+preserving its API-independent App snapshot/lifecycle and default native behavior.
+
+The cumulative parent verifier validates raw reopening/expected/click agreement
+and all existing source/paint/placement/background comparisons independently of
+image status. A shared evidence contract reuses capture coverage/stability
+functions and binds the saved record to exact SVG URL and PNG path, real complete
+PNG bytes/chunks/scanlines/dimensions/byte length, finite fixed-root coverage and
+stable coordinates. Pending/failed/missing/cropped/malformed/unrelated evidence,
+mock PNG headers and summary success flags cannot establish acceptance. Both
+parent policy suites add faithful synthetic controls, distinct from native
+acceptance; isolated runner fixtures include the new transitive dependencies.
+The two caller integration suites are explicitly registered. No dependency was added.
+
+Focused results and the final full checks, binary tracked/untracked identity,
+logs, retained parent observations and preservation inventory are recorded under
+`/private/tmp/stz-32d-svg-capture-fix-20261010/`. Configured direct browser commands
+in this child stop before Chrome at fresh-server `listen EPERM 127.0.0.1`;
+label-assets passes its static graph only. These startup failures are separate
+from the parent's post-font screenshot failure and provide no new native pass.
+Homebrew Node v26.9.0 is used. Read-only HEAD reproduces three geometric caller
+`no-unsafe-finally` errors and verifier unused `_role`; extraction removes the
+standalone finally error, leaving two caller errors and `_role`. Overall scoped
+lint including that debt remains failed. The unchanged layer test still reports
+unused `defaultCurveStyle` and eleven inherited focused strict-TypeScript errors;
+these are separate failed checks, not application-build results.
+
+Fresh strict `32D verify` must accept the exact preserved dirty tree with all
+18 cumulative groups, transparent/white geometric and layout downloads, actual
+standalone file measurements/complete PNGs, native history/JSON and both TikZ
+modes before matching independent read-only review. The 172-box / 4,925-anchor /
+11-failure inventory and diamond outer-separation review gate remain. Failed or
+partial verification stops before review/commit/push. Phase 32 stays incomplete;
+final child command/report/identity results belong to the external handoff.
+
 ## Canonical layer visibility evidence correction (2026-10-10)
 
 The actual starting checkout is clean at

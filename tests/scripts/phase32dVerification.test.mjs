@@ -1,11 +1,12 @@
 import assert from 'node:assert/strict'
-import { mkdtempSync, rmSync, writeFileSync } from 'node:fs'
+import { mkdtempSync, rmSync, writeFileSync, unlinkSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import test from 'node:test'
 import { allPointNodeScenarios, pointNodeScenarioArtifacts, validateBrowserEvidence } from '../../scripts/automation/phase-verification.mjs'
 import { layoutAnchorGroup, layoutAnchorScenarios, layoutAnchorArtifacts, layoutShapes, layoutRegimes, layoutForShapeRegime,
-  pointAnchorsForShape, layoutImportCases, assertLayoutAnchorEvidence, assertObservedPointPlacement, assertPointTikzSourceByMode } from '../../scripts/pointLayoutAnchorsContract.mjs'
+  pointAnchorsForShape, layoutImportCases, assertLayoutAnchorEvidence, assertObservedPointPlacement, assertPointTikzSourceByMode, assertLayoutStandaloneEvidence } from '../../scripts/pointLayoutAnchorsContract.mjs'
+import { syntheticStandalonePointDownload } from './standalonePointDownloadFixture.mjs'
 import { pointNodeAnchorSupport } from '../../src/geometry/pointNodeShapes/index.ts'
 import { createEmptyDiagram, createPointStratum } from '../../src/model/constructors.ts'
 import { generateTikz } from '../../src/tikz/generateTikz.ts'
@@ -123,6 +124,7 @@ function evidence(name) {
     cases: layoutImportCases.map(({ key, expected }) => ({ result: 'passed', key, actual: expected, expected, sourcePreserved: true })),
     nativeImport: true, saveReloadRestored: true, standaloneTikz: true, inlineTikz: true, unsupportedTextMetricsDiagnosed: true }
   return { ...common, background: name.includes('transparent') ? 'transparent' : 'white', actualDownload: true, capturedPending: true, reopened: true,
+    capture: { status: 'saved' },
     immutableSource: true, immutableLayout: true, immutablePlacement: true, settledContour: true, combinedLabels: true, noExternalAssets: true,
     expected: layoutShapes.map((shape) => placement(shape, shape === 'cylinder' ? 'shape center' : 'base')),
     click: { snapshot: { points: layoutShapes.map((shape) => ({ shape })) } } }
@@ -580,6 +582,42 @@ for (const fault of ['pending-sized-contour', 'later-source', 'later-layout', 'l
     if (fault === 'missing-inline') current.combinedLabels = false
     if (fault === 'missing-shape') current.expected.pop()
     assert.throws(() => assertLayoutAnchorEvidence(current, name))
+  })
+}
+for (const background of ['transparent', 'white']) {
+  test(`32D synthetic standalone ${background} policy accepts only complete raster and raw placement`, (t) => {
+    const directory = mkdtempSync(join(tmpdir(), 'stz-32d-standalone-policy-'))
+    t.after(() => rmSync(directory, { recursive: true, force: true }))
+    const fixture = syntheticStandalonePointDownload(directory, `point-layout-pending-${background === 'transparent' ? 'transparent-edit' : 'white-load'}`)
+    assert.equal(fixture.raw.result, 'observed'); assert.equal(fixture.raw.capture.before.bodyExists, false)
+    assertLayoutStandaloneEvidence(fixture.evidence, fixture.raw, directory)
+  })
+}
+for (const fault of ['pending', 'missing-record', 'unrelated-scenario', 'wrong-png-path', 'nonfinite-root', 'scaled-root',
+  'cropped-root', 'changed-coordinates', 'mock-png-header', 'missing-png', 'wrong-png-dimensions',
+  'wrong-body-transform', 'wrong-layout', 'pending-contour', 'wrong-captured-tikz', 'primary-error']) {
+  test(`32D standalone parent contract rejects ${fault}`, (t) => {
+    const directory = mkdtempSync(join(tmpdir(), 'stz-32d-standalone-policy-'))
+    t.after(() => rmSync(directory, { recursive: true, force: true }))
+    const fixture = syntheticStandalonePointDownload(directory, 'point-layout-pending-transparent-edit')
+    const { evidence, raw } = fixture, capture = raw.capture
+    if (fault === 'pending') capture.status = 'pending'
+    if (fault === 'missing-record') delete raw.capture
+    if (fault === 'unrelated-scenario') raw.scenario = 'point-layout-pending-white-load'
+    if (fault === 'wrong-png-path') capture.retainedPath += '.other'
+    if (fault === 'nonfinite-root') { capture.before.root.bounds.x = NaN; capture.after.root.bounds.x = NaN }
+    if (fault === 'scaled-root') { capture.before.root.bounds.width /= 2; capture.after.root.bounds.width /= 2 }
+    if (fault === 'cropped-root') { capture.before.root.bounds.y = 1140; capture.after.root.bounds.y = 1140 }
+    if (fault === 'changed-coordinates') capture.after.scroll.x = 1
+    if (fault === 'mock-png-header') writeFileSync(fixture.pngPath, fixture.png.subarray(0, 24))
+    if (fault === 'missing-png') unlinkSync(fixture.pngPath)
+    if (fault === 'wrong-png-dimensions') capture.png.height += 1
+    if (fault === 'wrong-body-transform') raw.reopened[0].bodyTransform = 'translate(0,0)'
+    if (fault === 'wrong-layout') evidence.click.snapshot.points[0].style.layout.innerXSep += 1
+    if (fault === 'pending-contour') raw.pending.contour = evidence.expected[0].rendered.contour
+    if (fault === 'wrong-captured-tikz') raw.outputs.inlineMath = 'later replacement'
+    if (fault === 'primary-error') raw.error = { message: 'first capture failure' }
+    assert.throws(() => assertLayoutStandaloneEvidence(evidence, raw, directory))
   })
 }
 

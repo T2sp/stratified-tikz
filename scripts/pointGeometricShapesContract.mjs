@@ -1,4 +1,6 @@
 import assert from 'node:assert/strict'
+import { resolve } from 'node:path'
+import { assertStandaloneReopeningRecord, validateStandaloneSvgCaptureEvidence } from './standaloneSvgCaptureContract.mjs'
 import { assertPointNativeDragEvidence } from './pointNativeDrag.mjs'
 import { assertHiddenPointVisibilityAction } from './pointSourceVisibility.mjs'
 
@@ -28,6 +30,23 @@ export const geometricShapeScenarios = [
 export function geometricShapeArtifacts(name) {
   return [`${name}.json`, ...(name.startsWith('point-geometric-download-')
     ? [`${name}.svg`, `${name}.png`, `${name}-standalone.json`] : [])]
+}
+
+export function assertGeometricStandaloneEvidence(evidence, raw, artifactDir) {
+  assertGeometricShapeEvidence(evidence, evidence.scenario)
+  assert.ok(evidence.scenario.startsWith('point-geometric-download-'))
+  assertStandaloneReopeningRecord(raw, evidence, artifactDir)
+  for (const [index, expected] of evidence.expected.entries()) {
+    const actual = raw.reopened[index]
+    assert.equal(actual.source, expected.source); assert.equal(actual.shape, expected.shape)
+    assert.equal(actual.missing, undefined); assert.equal(actual.errors, 0); assert.ok(actual.glyphs > 0)
+    assert.deepEqual(actual.contour, expected.rendered.contour, 'Reopened contour matches settled click-time inputs')
+    const regions = expected.rendered.paintRegions.map((region) => ({ tag: region.tag, attributes: region.attributes }))
+    assert.deepEqual(actual.regions, regions, 'Reopened cylinder regions match captured paints')
+  }
+  assert.deepEqual(evidence.capture, raw.capture, 'Terminal scenario retains the actual capture record')
+  validateStandaloneSvgCaptureEvidence(raw.capture, { svgPath: raw.svgPath,
+    pngPath: resolve(artifactDir, `${evidence.scenario}.png`), root: raw.document.root })
 }
 const selectionStateFields = ['json', 'runtimeDiagramJson', 'history', 'labelDocumentRevision', 'selection', 'uiSettings']
 function assertSelectionRevision(state, message) {
@@ -544,6 +563,7 @@ export function assertGeometricShapeEvidence(evidence, name) {
     assert.equal(evidence.reopened, true); assert.equal(evidence.immutableSource, true); assert.equal(evidence.immutableParameters, true)
     assert.equal(evidence.separateCylinderPaints, true); assert.equal(evidence.noExternalAssets, true)
     assert.equal(evidence.actualDownload, true)
+    assert.equal(evidence.capture?.status, 'saved', 'Terminal download requires a completed capture')
     assert.equal(evidence.click.error, undefined)
     assert.equal(evidence.click.snapshot.points.length, geometricShapeManifest.length)
     assert.equal(evidence.expected.length, geometricShapeManifest.length)

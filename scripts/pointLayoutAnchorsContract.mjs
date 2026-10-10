@@ -1,4 +1,7 @@
 import assert from 'node:assert/strict'
+import { readFileSync } from 'node:fs'
+import { resolve } from 'node:path'
+import { assertStandaloneReopeningRecord, validateStandaloneSvgCaptureEvidence } from './standaloneSvgCaptureContract.mjs'
 import { assertPointNativeDragEvidence, assertPointCanvasPreparation } from './pointNativeDrag.mjs'
 import { assertGeometricSelectionEvidence, assertPointToolbarPreparation } from './pointGeometricShapesContract.mjs'
 
@@ -68,6 +71,31 @@ export function assertPointTikzSourceByMode(outputs, source) {
   assert.ok(outputs.standalone.includes(`{${source}}`), 'Standalone retains the exact raw node body')
   const inlineBody = source.replace(/\r\n?/g, '\n').replace(/[^\S\n]*\n+[^\S\n]*/g, ' ')
   assert.ok(outputs.inlineMath.includes(`{${inlineBody}}`), 'Inline retains the established physical-line folding convention')
+}
+export function assertLayoutStandaloneEvidence(evidence, raw, artifactDir) {
+  assertLayoutAnchorEvidence(evidence, evidence.scenario)
+  assert.ok(evidence.scenario.startsWith('point-layout-pending-'))
+  assertStandaloneReopeningRecord(raw, evidence, artifactDir)
+  assert.deepEqual(raw.pending, evidence.pending)
+  for (const [index, expected] of evidence.expected.entries()) {
+    const actual = raw.reopened[index], captured = evidence.click.snapshot.points.find(({ id }) => id === expected.id)
+    assert.ok(captured); assert.equal(captured.source, expected.source); assert.equal(captured.style.shape, expected.shape)
+    assert.deepEqual(captured.style.layout, expected.layout)
+    assert.equal(actual.source, expected.source); assert.equal(actual.shape, expected.shape)
+    assert.equal(actual.errors, 0); assert.ok(actual.glyphs > 0)
+    assert.deepEqual(actual.contour, expected.rendered.contour)
+    assert.equal(actual.nodeTransform, expected.rendered.nodeTransform); assert.equal(actual.nodeTransform, captured.nodeTransform)
+    assert.equal(actual.bodyTransform, expected.rendered.bodyTransform)
+  }
+  assert.notDeepEqual(raw.pending.contour, evidence.expected[0].rendered.contour, 'Reopened export uses settled contour')
+  for (const mode of ['standalone', 'inlineMath']) {
+    assert.equal(raw.outputs[mode], readFileSync(resolve(artifactDir, `${evidence.scenario}-${mode}.tex`), 'utf8'), 'Retained captured TikZ output matches its actual artifact')
+    assert.ok(raw.outputs[mode].includes('anchor=base') && raw.outputs[mode].includes('anchor=shape center'))
+  }
+  assertPointTikzSourceByMode(raw.outputs, evidence.expected[0].source)
+  assert.deepEqual(evidence.capture, raw.capture, 'Terminal layout download retains its actual capture record')
+  validateStandaloneSvgCaptureEvidence(raw.capture, { svgPath: raw.svgPath,
+    pngPath: resolve(artifactDir, `${evidence.scenario}.png`), root: raw.document.root })
 }
 function finitePoint(point, message) {
   assert.ok(point && Number.isFinite(point.x) && Number.isFinite(point.y), message)
@@ -305,6 +333,7 @@ export function assertLayoutAnchorEvidence(evidence, name) {
     assert.ok(name.startsWith('point-layout-pending-'))
     assert.equal(evidence.background, name.includes('transparent') ? 'transparent' : 'white')
     for (const key of ['actualDownload', 'capturedPending', 'reopened', 'immutableSource', 'immutableLayout', 'immutablePlacement', 'settledContour', 'combinedLabels', 'noExternalAssets']) assert.equal(evidence[key], true, key)
+    assert.equal(evidence.capture?.status, 'saved', 'Terminal layout download requires a completed capture')
     assert.equal(evidence.expected.length, layoutShapes.length)
     assert.equal(evidence.click.error, undefined)
     assert.equal(evidence.click.snapshot.points.length, layoutShapes.length)

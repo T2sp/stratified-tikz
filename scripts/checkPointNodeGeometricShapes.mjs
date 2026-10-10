@@ -11,6 +11,7 @@ import { boundedPointDiagnostic, createPointDiagnostics, captureObservedPointChe
 import { selectGeometricPoint } from './pointGeometricSelection.mjs'
 import { dragSelectedPoint } from './pointNativeDrag.mjs'
 import { selectHiddenPointVisibility, inspectSourceHiddenPoints } from './pointSourceVisibility.mjs'
+import { captureStandaloneSvg } from './standaloneSvgCapture.mjs'
 
 const paint = { text: { color: '#000000', opacity: 1 }, fill: { enabled: true, color: '#e0f0ff', opacity: 1 },
   stroke: { enabled: true, color: '#203040', opacity: 1, width: .4, lineStyle: 'solid', dashPhase: 0, lineCap: 'butt', lineJoin: 'miter' } }
@@ -60,6 +61,97 @@ export async function observeGeometricPoint(page, id) {
         * opacityAncestors.reduce((product, { opacity }) => product * Number(opacity), 1),
       request: node.getAttribute('data-point-request') }
   }, id)
+}
+
+/** Reopen the actual download and retain its raw candidate before assertions or
+ * image work. The shared capture helper owns the one complete-root PNG attempt. */
+export async function captureGeometricStandalone({ standalone, svgPath, artifactDir, scenario,
+  background, pageErrors, expected, click, observe }) {
+  const fileUrl = pathToFileURL(svgPath).href, requests = [], standaloneErrors = []
+  const artifact = `${scenario}-standalone.json`
+  const details = { scenario, group, result: 'observed', background, svgPath, fileUrl,
+    requests, pageErrors, standaloneErrors, expected, click, cleanupErrors: [] }
+  const request = (event) => requests.push(event.url())
+  const pageerror = (error) => standaloneErrors.push(error.message)
+  const crash = () => standaloneErrors.push('Standalone SVG page crashed')
+  const persist = async (capture = details.capture) => {
+    details.capture = capture
+    await boundedPointDiagnostic(() => writeFile(resolve(artifactDir, artifact),
+      JSON.stringify(details, null, 2) + '\n'), 'Geometric standalone evidence', 5000)
+  }
+  let primary
+  try {
+    standalone.on('request', request); standalone.on('pageerror', pageerror); standalone.on('crash', crash)
+    await standalone.goto(fileUrl)
+    const raw = await boundedPointDiagnostic(() => standalone.evaluate(function observeGeometricStandaloneDocument(expected) {
+      const clean = (element) => ({ tag: element.localName, attributes: Object.fromEntries([...element.attributes]
+        .filter(({ name }) => !name.startsWith('data-') && name !== 'pointer-events').map(({ name, value }) => [name, value])) })
+      const root = document.documentElement
+      return {
+        document: { root: { localName: root.localName, namespace: root.namespaceURI,
+          width: root.getAttribute('width'), height: root.getAttribute('height'), viewBox: root.getAttribute('viewBox') },
+        forbiddenCount: document.querySelectorAll('parsererror,foreignObject,image,script').length,
+        externalReferences: [...document.querySelectorAll('[href]')].map((element) => element.getAttribute('href'))
+          .filter((href) => !href.startsWith('#') || !document.getElementById(href.slice(1))),
+        backgroundCount: [...root.children].filter((element) => element.localName === 'rect' && element.getAttribute('fill') === '#ffffff').length },
+        reopened: expected.map(({ source, shape }) => {
+          const title = [...document.querySelectorAll('title')].find((element) => element.textContent === source)
+          if (!title) return { source, missing: true }
+          const body = title.parentElement, node = body.parentElement
+          const shapes = [...node.children].filter((element) => ['path', 'polygon', 'circle', 'ellipse', 'rect'].includes(element.localName))
+          const border = shapes.find((element) => element.getAttribute('stroke') !== 'none' && element.hasAttribute('stroke'))
+          return { source: title.textContent, shape, contour: border && clean(border),
+            regions: shapes.filter((element) => element.getAttribute('stroke') === 'none').map(clean),
+            glyphs: body.querySelectorAll('path,use').length, errors: document.querySelectorAll('parsererror,foreignObject,image,script').length }
+        }),
+      }
+    }, expected), 'Geometric standalone reopening observations', 5000)
+    Object.assign(details, raw)
+    await persist()
+    await boundedPointDiagnostic(() => observe(`${scenario}-observed`, { group, artifact, result: 'observed' }),
+      'Geometric standalone observed candidate', 5000)
+    for (const [index, actual] of details.reopened.entries()) {
+      assert.equal(actual.missing, undefined); assert.equal(actual.errors, 0); assert.ok(actual.glyphs > 0)
+      assert.deepEqual(actual.contour, expected[index].rendered.contour)
+    }
+    const cylinder = details.reopened.find(({ shape }) => shape === 'cylinder')
+    assert.equal(cylinder.regions.length, 2)
+    assert.deepEqual(cylinder.regions.map(({ attributes }) => attributes.fill).sort(), ['#99ddff', '#ffcc66'])
+    assert.equal(details.document.forbiddenCount, 0)
+    assert.deepEqual(details.document.externalReferences, [])
+    assert.equal(details.document.backgroundCount, background === 'white' ? 1 : 0)
+    assert.deepEqual(requests.filter((request) => !request.startsWith('file:')), [])
+    assert.deepEqual(requests, [fileUrl], 'Standalone opens only the actual saved download')
+    assert.deepEqual(standaloneErrors, [])
+    await captureStandaloneSvg(standalone, resolve(artifactDir, `${scenario}.png`), persist)
+    assert.deepEqual(standaloneErrors, [])
+  } catch (error) {
+    primary = error
+    details.error = { message: error.message, stack: error.stack }
+    try { await persist() } catch (secondary) { pageErrors.push(`Geometric standalone failure evidence: ${secondary.message}`) }
+  }
+  // Cleanup occurs before this caller may publish a terminal scenario. A close
+  // or listener failure still fails an otherwise successful download.
+  for (const [name, cleanup] of [
+    ['page cleanup', () => standalone.close()],
+    ['request listener cleanup', () => standalone.off('request', request)],
+    ['pageerror listener cleanup', () => standalone.off('pageerror', pageerror)],
+    ['crash listener cleanup', () => standalone.off('crash', crash)],
+  ]) {
+    try { await boundedPointDiagnostic(cleanup, `Geometric standalone ${name}`, 5000) }
+    catch (error) {
+      primary ??= error
+      pageErrors.push(`Geometric standalone ${name}: ${error.message}`)
+      details.cleanupErrors.push({ message: error.message, stack: error.stack })
+      try { await persist() } catch (secondary) { pageErrors.push(`Geometric standalone cleanup evidence: ${secondary.message}`) }
+    }
+  }
+  if (!primary) {
+    try { await persist(); assert.deepEqual(standaloneErrors, []) }
+    catch (error) { primary = error }
+  }
+  if (primary) throw primary
+  return details
 }
 
 export async function runPointNodeGeometricShapeChecks({ browser, origin, artifactDir, record, observe, startGroup, completeGroup, setStage }) {
@@ -420,41 +512,13 @@ export async function runPointNodeGeometricShapeChecks({ browser, origin, artifa
       const expected = []
       for (const point of input.diagram.strata) expected.push({ id: point.id, source: point.text, shape: point.style.shape,
         rendered: await observeGeometricPoint(page, point.id) })
-      const standalone = await ownedContext.newPage(), requests = []
-      standalone.on('request', (request) => requests.push(request.url()))
-      let reopened, standaloneFailure
-      try {
-        await standalone.goto(pathToFileURL(svgPath).href)
-        reopened = await standalone.evaluate((expected) => {
-          const clean = (element) => ({ tag: element.localName, attributes: Object.fromEntries([...element.attributes]
-            .filter(({ name }) => !name.startsWith('data-') && name !== 'pointer-events').map(({ name, value }) => [name, value])) })
-          return expected.map(({ source, shape }) => {
-            const title = [...document.querySelectorAll('title')].find((element) => element.textContent === source)
-            if (!title) return { source, missing: true }
-            const body = title.parentElement, node = body.parentElement
-            const shapes = [...node.children].filter((element) => ['path', 'polygon', 'circle', 'ellipse', 'rect'].includes(element.localName))
-            const border = shapes.find((element) => element.getAttribute('stroke') !== 'none' && element.hasAttribute('stroke'))
-            return { source, shape, contour: border && clean(border),
-              regions: shapes.filter((element) => element.getAttribute('stroke') === 'none').map(clean),
-              glyphs: body.querySelectorAll('path,use').length, errors: document.querySelectorAll('parsererror,foreignObject,image,script').length }
-          })
-        }, expected)
-        for (const [index, actual] of reopened.entries()) {
-          assert.equal(actual.missing, undefined); assert.equal(actual.errors, 0); assert.ok(actual.glyphs > 0)
-          assert.deepEqual(actual.contour, expected[index].rendered.contour)
-        }
-        const cylinder = reopened.find(({ shape }) => shape === 'cylinder')
-        assert.equal(cylinder.regions.length, 2)
-        assert.deepEqual(cylinder.regions.map(({ attributes }) => attributes.fill).sort(), ['#99ddff', '#ffcc66'])
-        assert.deepEqual(requests.filter((request) => !request.startsWith('file:')), [])
-        await standalone.screenshot({ path: resolve(artifactDir, `${scenario}.png`), fullPage: true })
-        await writeFile(resolve(artifactDir, `${scenario}-standalone.json`), JSON.stringify({ reopened, requests, pageErrors, expected, click }, null, 2) + '\n')
-      } catch (error) { standaloneFailure = error; throw error }
-      finally { try { await standalone.close() } catch (error) { if (!standaloneFailure) throw error; pageErrors.push(`Standalone cleanup: ${error.message}`) } }
+      const standalone = await ownedContext.newPage()
+      const standaloneEvidence = await captureGeometricStandalone({ standalone, svgPath, artifactDir, scenario, background, pageErrors, expected, click, observe })
       const captured = click.snapshot.points
       for (const [index, entry] of captured.entries()) assert.deepEqual(entry.style.shapeParameters, input.diagram.strata[index].style.shapeParameters)
       await save({ background, shapes: geometricShapeManifest.map(({ shape }) => shape), reopened: true, immutableSource: true,
-        immutableParameters: true, separateCylinderPaints: true, noExternalAssets: true, actualDownload: true, click, expected })
+        immutableParameters: true, separateCylinderPaints: true, noExternalAssets: true, actualDownload: true,
+        click, expected, capture: standaloneEvidence.capture })
     }
     assert.deepEqual(pageErrors, []); await completeGroup(group)
   } catch (error) {
@@ -464,7 +528,8 @@ export async function runPointNodeGeometricShapeChecks({ browser, origin, artifa
         JSON.stringify({ scenario, result: 'failed', pageErrors, error: { message: error.message, stack: error.stack } }, null, 2) + '\n'),
       'Geometric primary failure evidence')
     } catch (diagnosticError) { pageErrors.push(`Geometric primary failure evidence: ${diagnosticError.message}`) }
-    try { await boundedPointDiagnostic(() => app.failure(error, { scenario, pageErrors }), 'Geometric App failure evidence') }
+    try { await boundedPointDiagnostic(() => app.failure(error, { scenario, pageErrors },
+      { captureScreenshot: !scenario.startsWith('point-geometric-download-') }), 'Geometric App failure evidence') }
     catch (diagnosticError) {
       pageErrors.push(`Geometric App failure evidence: ${diagnosticError.message}`)
       try {
