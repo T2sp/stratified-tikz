@@ -225,6 +225,65 @@ for (const fault of ['flags-only', 'earlier-selection', 'overlay-input', 'wrong-
     assert.throws(() => assertLayoutAnchorEvidence(current, name))
   })
 }
+function setSyntheticRevision(records, revision) {
+  for (const record of records) {
+    if (revision === undefined) delete record.labelDocumentRevision
+    else record.labelDocumentRevision = revision
+  }
+}
+function syntheticRevisionRecords(raw) {
+  return [raw.preparation.stateBefore, raw.preparation.stateAfter, raw.preparation.statePrepared,
+    raw.preparation.inherited, raw.preparation.closed, raw.preparation.prepared, raw.stateBefore, raw.before,
+    raw.afterAction.state, raw.afterAction.observation, raw.undo.stateBefore, raw.undo.stateAfter, raw.undo.observation,
+    raw.redo.stateBefore, raw.redo.stateAfter, raw.redo.observation,
+    ...raw.afterAction.observation.events, ...raw.undo.observation.events, ...raw.redo.observation.events]
+}
+function setSyntheticActionRevision(raw, action, revision) {
+  const records = action === 'drag' ? [raw.afterAction.state, raw.afterAction.observation, raw.undo.stateBefore]
+    : action === 'undo' ? [raw.undo.stateAfter, raw.undo.observation, raw.redo.stateBefore]
+      : [raw.redo.stateAfter, raw.redo.observation]
+  // Keep each observed state and its successor's before-state consistent, so
+  // these controls reach document ownership rather than record continuity.
+  setSyntheticRevision(records, revision)
+}
+for (const revision of [0, 100]) {
+  test(`synthetic 32D raw drag policy accepts unchanged document epoch ${revision} with movement and history`, () => {
+    const name = 'point-layout-native-interaction-2d-3d', current = evidence(name)
+    for (const { nativeDrag } of current.cases) {
+      setSyntheticRevision(syntheticRevisionRecords(nativeDrag), revision)
+      assert.ok(syntheticRevisionRecords(nativeDrag).every((record) => record.labelDocumentRevision === revision))
+    }
+    assertLayoutAnchorEvidence(current, name)
+  })
+}
+for (const action of ['drag', 'undo', 'redo']) {
+  for (const [fault, revision] of [['increased', 101], ['decreased', 99], ['missing', undefined], ['null', null],
+    ['negative', -1], ['fractional', 100.5], ['string', '100'], ['nonfinite', Infinity]]) {
+    test(`synthetic 32D raw ${action} policy rejects ${fault} document revision`, () => {
+      const name = 'point-layout-native-interaction-2d-3d', current = evidence(name)
+      setSyntheticActionRevision(current.cases[0].nativeDrag, action, revision)
+      const expected = ['increased', 'decreased'].includes(fault)
+        ? new RegExp(`Native point ${action}: same document revision`)
+        : /labelDocumentRevision must be a nonnegative integer/u
+      assert.throws(() => assertLayoutAnchorEvidence(current, name), expected)
+    })
+  }
+}
+for (const [fault, revision] of [['missing', undefined], ['negative', -1], ['fractional', 100.5], ['string', '100']]) {
+  test(`synthetic 32D raw drag policy rejects a consistently ${fault} preparation epoch`, () => {
+    const name = 'point-layout-native-interaction-2d-3d', current = evidence(name)
+    setSyntheticRevision(syntheticRevisionRecords(current.cases[0].nativeDrag), revision)
+    assert.throws(() => assertLayoutAnchorEvidence(current, name), /labelDocumentRevision must be a nonnegative integer/u)
+  })
+}
+for (const boundary of ['before', 'after', 'undo', 'redo']) {
+  test(`synthetic 32D raw ${boundary} policy rejects observed and authoritative revision disagreement`, () => {
+    const name = 'point-layout-native-interaction-2d-3d', current = evidence(name), raw = current.cases[0].nativeDrag
+    const observed = boundary === 'before' ? raw.before : boundary === 'after' ? raw.afterAction.observation : raw[boundary].observation
+    observed.labelDocumentRevision += 1
+    assert.throws(() => assertLayoutAnchorEvidence(current, name), /observed revision matches authoritative state/u)
+  })
+}
 for (const fault of ['stale-coordinate', 'wrong-next-owner', 'earlier-selection', 'overlay-only', 'wrong-pointer', 'model-edit', 'unclosed-drawer']) {
   test(`synthetic 32D owner-cycle policy rejects ${fault}`, () => {
     const name = 'point-layout-native-interaction-2d-3d', current = evidence(name), cycle = current.cases[0].ownerCycle

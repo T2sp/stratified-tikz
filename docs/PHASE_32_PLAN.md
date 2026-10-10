@@ -1,6 +1,39 @@
 # Phase 32 Plan: Point-node math, paint, geometric shapes, and layout
 
-Current native drag correction (2026-10-09): the inspected checkout starts clean
+Current document-revision correction (2026-10-10): the inspected checkout starts
+clean at `8d0a3dab4bea1fd3baf7889ffcfdb16c4478bd20`; previous implementation,
+Clear, selection and scoped native drag corrections are tracked and preserved.
+The latest `5waNKq` browser-capable parent passed 5,507 tests/build/diff/label-assets,
+the full paint/import group and all eleven named geometric-shape cases. It
+completed 15/18 groups, then failed an invented revision-increase requirement
+after the first diamond drag had delivered trusted/captured input, moved only
+the selected point and made one exact bounded history commit at capacity 100.
+The unchanged document epoch 100 is correct App behavior, distinct from the
+older unchanged-position failure and child server-startup restrictions.
+
+The shared helper now requires valid nonnegative integer revisions and same-
+document equality across preparation, drag and native Undo/Redo, preserving
+observed-to-authoritative comparisons and all model/history/delivery checks.
+Synthetic fixtures retain epoch 100 and both parent policy suites exercise the
+corrected contract. Native JSON loading still advances ownership exactly once;
+reused-ID obsolete completion rejection and production lifecycle remain intact.
+Fresh complete strict verification of this exact tree must precede independent
+review. All eight contour interactions with native Undo/Redo, later geometric
+cases, the full layout/anchor matrix and pending downloads/reopening remain
+required. Phase 32 is **not complete**. Current results and identity are retained
+in `/private/tmp/stz-32d-revision-fix-20261010/HANDOFF.md` and the
+[implementation audit](PHASE_32D_IMPLEMENTATION.md).
+
+Child checks passed 524/524 focused tests and 5,621/5,621 full tests, with no
+failures/skips, plus build, diff and eleven script syntax checks. Lint introduced
+no errors; the documented four geometric caller errors and verifier `_role` debt
+reproduce from HEAD. Both configured required browser attempts stopped before
+Chrome at fresh-server `listen EPERM`; zero current native/download groups ran.
+The failed startup artifacts precede the final documentation update; the final
+handoff captures the exact tree for fresh parent verification. Independent
+acceptance review has not started. No commit or push occurred.
+
+Earlier native drag correction (2026-10-09): the inspected checkout starts clean
 at `5021a1d8af30f55fa48b67744f6af77de0f2047d`, with the Clear and shared
 Inspector selection corrections already tracked. The retained `tfTYBh` parent
 passed 5,411 tests/build/diff/label-assets and completed 15 of 18 strict groups.

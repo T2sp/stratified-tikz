@@ -11,8 +11,9 @@ export function syntheticPointNativeDragEvidence({ id = 'app-point', ambientDime
   const historyAfter = { past: [before], present: after, future: [] }, historyUndo = { past: [], present: before, future: [after] }
   const state = (runtime, history, revision) => ({ json: JSON.stringify({ format: 'stratified-tikz-diagram', version: 2, diagram: runtime }),
     runtimeDiagramJson: JSON.stringify(runtime), history: JSON.stringify(history), selection, labelDocumentRevision: revision, uiSettings: '{}' })
-  const stateBefore = state(before, historyBefore, 100), stateAfter = state(after, historyAfter, 104)
-  const stateUndo = state(before, historyUndo, 105), stateRedo = state(after, historyAfter, 106)
+  // Geometry edits and Undo/Redo stay inside the current App document epoch.
+  const stateBefore = state(before, historyBefore, 100), stateAfter = state(after, historyAfter, 100)
+  const stateUndo = state(before, historyUndo, 100), stateRedo = state(after, historyAfter, 100)
   const element = { tag: 'circle', id: '', class: 'svg-geometry-handle', connected: true, drawer: false, pointId: null,
     ariaLabel: 'Point', svg: true, canvas: true, canvasRoot: false, pointHandle: true, selectedOwner: id }
   const group = { ...element, tag: 'g', class: null, ariaLabel: 'Selected point drag handles', pointHandle: false }
@@ -48,8 +49,8 @@ export function syntheticPointNativeDragEvidence({ id = 'app-point', ambientDime
       closedDrawerCount: 0, openerCount: 1, openerExpanded: 'false', closed: snapshot(), stateAfter: stateBefore,
       prepared: snapshot(), statePrepared: stateBefore },
     before: snapshot(), stateBefore, requested: { start, end },
-    afterAction: { state: stateAfter, observation: snapshot(false, events, after.strata[0], 104) },
-    undo: { stateBefore: stateAfter, stateAfter: stateUndo, observation: snapshot(false, events, point, 105) },
-    redo: { stateBefore: stateUndo, stateAfter: stateRedo, observation: snapshot(false, events, after.strata[0], 106) },
+    afterAction: { state: stateAfter, observation: snapshot(false, events, after.strata[0]) },
+    undo: { stateBefore: stateAfter, stateAfter: stateUndo, observation: snapshot(false, events, point) },
+    redo: { stateBefore: stateUndo, stateAfter: stateRedo, observation: snapshot(false, events, after.strata[0]) },
     secondaryErrors: [] }))
 }

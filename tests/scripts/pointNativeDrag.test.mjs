@@ -35,6 +35,69 @@ test('synthetic raw evidence supports drag history at its bounded capacity', () 
   assertPointNativeDragEvidence(evidence)
 })
 
+function setRevision(records, revision) {
+  for (const record of records) {
+    if (revision === undefined) delete record.labelDocumentRevision
+    else record.labelDocumentRevision = revision
+  }
+}
+function epochRecords(evidence) {
+  return [evidence.preparation.stateBefore, evidence.preparation.stateAfter, evidence.preparation.statePrepared,
+    evidence.preparation.inherited, evidence.preparation.closed, evidence.preparation.prepared,
+    evidence.stateBefore, evidence.before, evidence.afterAction.state, evidence.afterAction.observation,
+    evidence.undo.stateBefore, evidence.undo.stateAfter, evidence.undo.observation,
+    evidence.redo.stateBefore, evidence.redo.stateAfter, evidence.redo.observation,
+    ...evidence.afterAction.observation.events, ...evidence.undo.observation.events, ...evidence.redo.observation.events]
+}
+function actionRevisionRecords(evidence, action) {
+  // Keep the redundant authoritative, observed and successor records consistent
+  // so these controls reach the document epoch rule rather than continuity.
+  if (action === 'drag') return [evidence.afterAction.state, evidence.afterAction.observation, evidence.undo.stateBefore]
+  if (action === 'undo') return [evidence.undo.stateAfter, evidence.undo.observation, evidence.redo.stateBefore]
+  return [evidence.redo.stateAfter, evidence.redo.observation]
+}
+for (const revision of [0, 100]) test(`synthetic movement and native history records retain document epoch ${revision}`, () => {
+  const evidence = syntheticPointNativeDragEvidence()
+  setRevision(epochRecords(evidence), revision)
+  assertPointCanvasPreparation(evidence.preparation, evidence.id)
+  assertPointNativeDragEvidence(evidence)
+  assert.ok(epochRecords(evidence).every((record) => record.labelDocumentRevision === revision))
+  assert.notEqual(evidence.afterAction.state.runtimeDiagramJson, evidence.stateBefore.runtimeDiagramJson)
+  assert.equal(evidence.undo.stateAfter.json, evidence.stateBefore.json)
+  assert.equal(evidence.redo.stateAfter.json, evidence.afterAction.state.json)
+})
+const revisionFaults = [['increased', 101], ['decreased', 99], ['missing', undefined], ['null', null],
+  ['negative', -1], ['fractional', 100.5], ['string', '100'], ['infinite', Infinity], ['NaN', NaN]]
+for (const action of ['drag', 'undo', 'redo']) for (const [name, revision] of revisionFaults) {
+  test(`synthetic epoch policy rejects ${name} document revision during ${action}`, () => {
+    const evidence = syntheticPointNativeDragEvidence()
+    setRevision(actionRevisionRecords(evidence, action), revision)
+    const expected = name === 'increased' || name === 'decreased'
+      ? new RegExp(`Native point ${action}: same document revision`)
+      : /labelDocumentRevision must be a nonnegative integer/
+    assert.throws(() => assertPointNativeDragEvidence(evidence), expected)
+  })
+}
+for (const [name, revision] of revisionFaults.slice(2)) test(`synthetic preparation rejects consistently ${name} document epoch`, () => {
+  const evidence = syntheticPointNativeDragEvidence()
+  setRevision(epochRecords(evidence), revision)
+  assert.throws(() => assertPointNativeDragEvidence(evidence), /labelDocumentRevision must be a nonnegative integer/)
+})
+for (const [name, snapshot] of [
+  ['inherited', (e) => e.preparation.inherited], ['closed', (e) => e.preparation.closed],
+  ['prepared', (e) => e.preparation.prepared], ['before drag', (e) => e.before],
+  ['after drag', (e) => e.afterAction.observation], ['undo', (e) => e.undo.observation], ['redo', (e) => e.redo.observation],
+]) test(`synthetic epoch policy rejects ${name} observed-authoritative disagreement`, () => {
+  const evidence = syntheticPointNativeDragEvidence()
+  snapshot(evidence).labelDocumentRevision++
+  assert.throws(() => assertPointNativeDragEvidence(evidence), /observed revision matches authoritative state/)
+})
+for (const revision of [101, undefined, -1]) test(`synthetic epoch policy rejects inconsistent native event revision ${revision}`, () => {
+  const evidence = syntheticPointNativeDragEvidence()
+  setRevision([evidence.afterAction.observation.events[2]], revision)
+  assert.throws(() => assertPointNativeDragEvidence(evidence), /Native point drag event.*(same document revision|labelDocumentRevision must be a nonnegative integer)/)
+})
+
 const rejectionControls = [
   ['open drawer at drag', (e) => { e.before.inspector.open = true }],
   ['a duplicate close action', (e) => { e.preparation.closeActions = 2 }],

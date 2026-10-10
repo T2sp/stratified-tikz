@@ -426,6 +426,65 @@ test('synthetic 32C policy requires eight raw handle drags and exact history res
   const evidence = geometricInteractionEvidence()
   assertGeometricShapeEvidence(evidence, evidence.scenario)
 })
+function setSyntheticRevision(records, revision) {
+  for (const record of records) {
+    if (revision === undefined) delete record.labelDocumentRevision
+    else record.labelDocumentRevision = revision
+  }
+}
+function syntheticRevisionRecords(raw) {
+  return [raw.preparation.stateBefore, raw.preparation.stateAfter, raw.preparation.statePrepared,
+    raw.preparation.inherited, raw.preparation.closed, raw.preparation.prepared, raw.stateBefore, raw.before,
+    raw.afterAction.state, raw.afterAction.observation, raw.undo.stateBefore, raw.undo.stateAfter, raw.undo.observation,
+    raw.redo.stateBefore, raw.redo.stateAfter, raw.redo.observation,
+    ...raw.afterAction.observation.events, ...raw.undo.observation.events, ...raw.redo.observation.events]
+}
+function setSyntheticActionRevision(raw, action, revision) {
+  const records = action === 'drag' ? [raw.afterAction.state, raw.afterAction.observation, raw.undo.stateBefore]
+    : action === 'undo' ? [raw.undo.stateAfter, raw.undo.observation, raw.redo.stateBefore]
+      : [raw.redo.stateAfter, raw.redo.observation]
+  // Keep each observed state and its successor's before-state consistent, so
+  // these controls reach document ownership rather than record continuity.
+  setSyntheticRevision(records, revision)
+}
+for (const revision of [0, 100]) {
+  test(`synthetic 32C raw drag policy accepts unchanged document epoch ${revision} with movement and history`, () => {
+    const evidence = geometricInteractionEvidence()
+    for (const { nativeDrag } of evidence.cases) {
+      setSyntheticRevision(syntheticRevisionRecords(nativeDrag), revision)
+      assert.ok(syntheticRevisionRecords(nativeDrag).every((record) => record.labelDocumentRevision === revision))
+    }
+    assertGeometricShapeEvidence(evidence, evidence.scenario)
+  })
+}
+for (const action of ['drag', 'undo', 'redo']) {
+  for (const [fault, revision] of [['increased', 101], ['decreased', 99], ['missing', undefined], ['null', null],
+    ['negative', -1], ['fractional', 100.5], ['string', '100'], ['nonfinite', Infinity]]) {
+    test(`synthetic 32C raw ${action} policy rejects ${fault} document revision`, () => {
+      const evidence = geometricInteractionEvidence()
+      setSyntheticActionRevision(evidence.cases[0].nativeDrag, action, revision)
+      const expected = ['increased', 'decreased'].includes(fault)
+        ? new RegExp(`Native point ${action}: same document revision`)
+        : /labelDocumentRevision must be a nonnegative integer/u
+      assert.throws(() => assertGeometricShapeEvidence(evidence, evidence.scenario), expected)
+    })
+  }
+}
+for (const [fault, revision] of [['missing', undefined], ['negative', -1], ['fractional', 100.5], ['string', '100']]) {
+  test(`synthetic 32C raw drag policy rejects a consistently ${fault} preparation epoch`, () => {
+    const evidence = geometricInteractionEvidence()
+    setSyntheticRevision(syntheticRevisionRecords(evidence.cases[0].nativeDrag), revision)
+    assert.throws(() => assertGeometricShapeEvidence(evidence, evidence.scenario), /labelDocumentRevision must be a nonnegative integer/u)
+  })
+}
+for (const boundary of ['before', 'after', 'undo', 'redo']) {
+  test(`synthetic 32C raw ${boundary} policy rejects observed and authoritative revision disagreement`, () => {
+    const evidence = geometricInteractionEvidence(), raw = evidence.cases[0].nativeDrag
+    const observed = boundary === 'before' ? raw.before : boundary === 'after' ? raw.afterAction.observation : raw[boundary].observation
+    observed.labelDocumentRevision += 1
+    assert.throws(() => assertGeometricShapeEvidence(evidence, evidence.scenario), /observed revision matches authoritative state/u)
+  })
+}
 for (const fault of ['flags-only', 'selection-events', 'overlay-down', 'wrong-owner', 'wrong-pointer',
   'untrusted-down', 'cancelled', 'no-model-movement', 'camera-only', 'extra-history-commit',
   'bad-undo', 'bad-redo', 'wrong-displacement', 'wrong-steps', 'different-summary', 'duplicate-case']) {

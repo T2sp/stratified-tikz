@@ -1,24 +1,26 @@
 # Phase 32D spacing, minima, anchors, and combined audit
 
-Status (2026-10-09): implementation and focused Node verification are present.
+Status (2026-10-10): implementation and focused Node verification are present.
 Phase 32 is **not complete**. Fresh accepted required commands, strict native
 browser/download evidence and independent review remain required. 32A and main's
 later 32B have historical accepted evidence. The plan still records unaccepted
 fresh strict native/review gates for the merged 32C checkout; implementation
 presence does not close that prerequisite or the final gate.
 
-The latest browser-capable parent's retained `stz-phase32d-before-review-tfTYBh`
-report passed 5,411 tests, build, diff and label-assets, then failed the first
-2D diamond contour drag after 15 of 18 groups. The full paint/import group,
-including corrected Clear provenance, and all eleven named geometric-shape
-cases passed. Contour selection succeeded; the wrapper then reopened the
-Inspector over the selected handle center. Its old type/trust-only collector
-does not establish actual drag delivery. The new scoped preparation closes the
-drawer, verifies fresh handle geometry/hits and retains drag/capture/history
-records before assertions. This retained failure cannot establish complete
-current-tree native/download acceptance or justify a production geometry change.
-The completed Clear/selection corrections and exact layout/unit/context
-comparisons remain. Earlier failure/fix records are retained below.
+The latest browser-capable parent's retained `stz-phase32d-before-review-5waNKq`
+report passed 5,507 tests, build, diff and label-assets, then failed the harness's
+revision assertion after 15 of 18 groups. The full paint/import group, corrected
+Clear provenance and all eleven named geometric-shape cases passed. The first
+2D diamond contour drag delivered trusted handle input with captured canvas
+continuation/release, changed only its selected model position, and made exactly
+one bounded history commit. Both authoritative and observed document revisions
+remain 100. The revised harness requires that same document epoch across drag
+and Undo/Redo; production advances it only on document replacement. Drag Undo/Redo
+and the remaining contours, later geometric cases, layout/anchors and final
+standalone export did not execute in that failed parent run. Complete current-tree
+native/download acceptance and independent review remain required. The completed
+Clear/selection/preparation corrections and exact layout/unit/context comparisons
+remain. Earlier failure/fix records are retained below.
 
 ## Model, grammar, and compatibility
 
@@ -452,3 +454,83 @@ reopening remain required in the browser-capable parent. No independent
 acceptance review began. Use a fresh `32D verify` process on the exact final
 dirty tree, then matching read-only review only after complete accepted evidence.
 Phase 32 remains incomplete; commit/push remain with the parent workflow.
+
+## Same-document native drag revision contract (2026-10-10)
+
+The actual clean starting checkout is `8d0a3dab4bea1fd3baf7889ffcfdb16c4478bd20`
+on `phase/32d-margin-minsize-anchor`, fingerprint
+`708282ded8a7079f0add86d8f60bf67158216601e80614ece73121d19cc1c1fc`.
+It already tracks the thirteen-file native-drag handoff and the updated prompt.
+The actual inventory, diff and final tracked/untracked identity are captured under
+`/private/tmp/stz-32d-revision-fix-20261010/`; older fingerprints are diagnostic
+history, never acceptance constants.
+
+The retained `5waNKq` parent records the first 2D diamond, codim 2, aspect 1.8,
+source `drag $x_i$`, selected owner `app-point`, document epoch 100. Records
+0001–0005 retain one native Inspector close, fresh handle start approximately
+`(1296.4,268.975)`, original `(+28,-16)` displacement and four movement steps.
+Trusted pointerdown reaches the intended selected-position handle; pointer ID 1
+captures the owned canvas, receives all four moves and pointerup, then releases
+capture with lostpointercapture retained. Position changes from `(3,3,0)` to
+`(3.191563400173898,3.1286778583820283,0)`. Exact saved/runtime comparisons show
+only that selected position changed. History equals the prior history plus one
+effective bounded commit, with redo cleared; both past lengths are 100 because
+capacity is full. Authoritative and observed before/after revisions are 100,
+with no secondary diagnostics or page errors. Record 0004 precedes assertion;
+0005 preserves the same evidence, final observation and primary revision failure.
+No native Undo/Redo records exist for that failed first case.
+
+`App.tsx` initializes this runtime document ownership epoch outside Diagram/history
+and advances it only in `selectExample` and `commitLoadedJsonDiagram`. Geometry
+drag sessions and Undo/Redo edit/restore the current diagram under the same epoch.
+`SvgDiagram` keys its label-bound and point-commit maps by that document ownership;
+source/font/request/placement changes have their existing mechanisms. No production
+revision setter, schema, model, rendering, geometry or persistence behavior changed.
+
+`pointNativeDrag.mjs` now validates nonnegative integer revisions and exact
+same-document equality across preparation, movement, native Undo and native Redo.
+Observed revisions still match their authoritative states; scoped native drag
+events must retain the before-state epoch. Real selected-point movement, unchanged
+camera/work plane/source/style/other data, exact bounded history and native delivery
+checks remain. The synthetic fixture retains epoch 100 throughout instead of
+fabricating 100→104→105→106. Its genuine position/history transitions and trusted
+event/capture records remain explicitly synthetic, never native acceptance.
+
+The registered helper and both parent-imported policy suites add 114 revision
+regressions. They accept unchanged epochs 0/100, reject increased/decreased/missing/
+null/negative/fractional/string/nonfinite revisions at each action, reject invalid
+preparation epochs and observed/authoritative disagreements, and retain earlier
+movement, owner, camera, multiple-commit, history, contamination, capture and
+cleanup/primary-error controls. Redundant snapshots/successor states are updated
+consistently so faults reach the epoch rule. Native JSON load still requires exactly
+one ownership increment and reused-ID completion cannot restore an obsolete owner.
+Both geometric/layout contracts, callers, runner dependency-copying/clean-tree
+guards and strict cumulative policy are preserved byte-for-byte.
+
+Focused drag/selection/ownership/policy/runner verification passed 524/524 with no
+failures/skips, including all 37 runner controls. The two policy suites separately
+passed 261/261. Homebrew-first Node v26.9.0 was used. Full `npm test` passed
+5,621/5,621 with zero failures/skips, exit 0 (`npm-test.log`). Build (strict TypeScript), diff and eleven script syntax
+checks passed; no TypeScript source changed. Recommended JavaScript lint found
+zero new errors. Four geometric caller `no-unsafe-finally` errors and the verifier
+unused `_role` error reproduce identically from read-only HEAD and live files;
+overall lint including those baseline files remains failed.
+
+Both required configured browser attempts failed at fresh owned-server `listen
+EPERM 127.0.0.1` before Chrome launch. Label-assets passed its static graph only;
+strict free-labels completed zero groups, leaving all eighteen unexecuted. These
+startup artifacts identify their attempted tree before this final documentation
+update and provide no native acceptance. This child restriction is separate from
+the latest parent's real revision assertion. Native first-diamond Undo/Redo, all
+eight original 2D/3D contour interactions, later visibility/export, complete
+layout/anchor matrix, actual pending transparent/white downloads and standalone
+reopening remain required from a fresh browser-capable parent verifier.
+
+All original production files and PGF shape/anchor/paint references are preserved,
+including the 172-box / 4,925-anchor / eleven-failure inventory, raw artifacts and
+tolerances. The documented diamond outer-separation exception still requires
+independent PGF review. No dependency, scoped/deferred 32D profile, sandbox change
+or acceptance waiver was added. Fresh `32D verify` on the exact final dirty tree
+must pass all five required commands and complete cumulative raw evidence before
+read-only independent review of the matching checkout. No acceptance review,
+commit or push occurred. Phase 32 remains incomplete.

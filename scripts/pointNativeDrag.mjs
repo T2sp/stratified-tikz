@@ -138,8 +138,18 @@ export function removePointNativeDragObserver(token) {
 }
 
 const invariantFields = ['json', 'runtimeDiagramJson', 'history', 'selection', 'labelDocumentRevision', 'uiSettings']
+function assertDocumentRevision(state, message) {
+  assert.ok(Number.isInteger(state?.labelDocumentRevision) && state.labelDocumentRevision >= 0,
+    `${message}: labelDocumentRevision must be a nonnegative integer`)
+}
+function assertSameDocument(before, after, message) {
+  assertDocumentRevision(before, `${message} before`)
+  assertDocumentRevision(after, `${message} after`)
+  assert.equal(after.labelDocumentRevision, before.labelDocumentRevision, `${message}: same document revision`)
+}
 function assertUnchangedState(before, after, message) {
   assert.ok(before && after, `${message}: authoritative state retained`)
+  assertSameDocument(before, after, message)
   for (const field of invariantFields) assert.deepEqual(after[field], before[field], `${message}: ${field}`)
 }
 function assertSelected(state, id) {
@@ -147,6 +157,7 @@ function assertSelected(state, id) {
 }
 function assertSnapshot(snapshot, id) {
   assert.ok(snapshot, 'Native point snapshot retained')
+  assertDocumentRevision(snapshot, 'Native point snapshot')
   assert.deepEqual(snapshot.errors, [], 'Native point observation has no errors')
   assert.equal(snapshot.droppedEvents, 0, 'All scoped native events retained')
   assertSelected(snapshot, id)
@@ -174,7 +185,7 @@ export function assertPointCanvasPreparation(preparation, id) {
     const runtime = parsed(state).runtime
     assert.deepEqual(snapshot.modelPoint, runtime.strata.find((point) => point.id === id), 'Prepared rendered owner matches authoritative model')
     assert.deepEqual(snapshot.camera, runtime.camera, 'Prepared observed camera matches authoritative model')
-    assert.equal(snapshot.labelDocumentRevision, state.labelDocumentRevision)
+    assert.equal(snapshot.labelDocumentRevision, state.labelDocumentRevision, 'Prepared observed revision matches authoritative state')
   }
 }
 function intendedHandle(target, id) {
@@ -214,6 +225,7 @@ function assertNativeDelivery(observation) {
   assert.deepEqual(requested.start, before.handle.start, 'Native input uses the freshly measured handle center')
   assert.deepEqual(requested.end, { x: requested.start.x + observation.displacement.x, y: requested.start.y + observation.displacement.y })
   const events = afterAction.observation.events.filter((event) => event.phase === 'drag')
+  for (const event of events) assertSameDocument(observation.stateBefore, event, 'Native point drag event')
   const input = events.filter((event) => ['pointerdown', 'pointermove', 'pointerup', 'pointercancel'].includes(event.type))
   assert.deepEqual(input.map(({ type }) => type), ['pointerdown', ...Array(steps).fill('pointermove'), 'pointerup'], 'One complete native drag, without cancellation or contaminated selection events')
   const down = input[0], up = input.at(-1), moves = input.slice(1, -1)
@@ -273,7 +285,8 @@ function assertMovement(beforeState, afterState, id) {
   assert.deepEqual(after.saved.diagram.strata.find((point) => point.id === id).position, afterPoint.position)
   assert.deepEqual(after.history, { past: [...before.history.past, before.history.present].slice(-100), present: after.runtime, future: [] }, 'Native drag creates exactly one effective bounded history commit')
   assert.deepEqual(before.history.present, before.runtime); assert.deepEqual(afterState.uiSettings, beforeState.uiSettings)
-  assert.ok(Number.isInteger(afterState.labelDocumentRevision) && afterState.labelDocumentRevision > beforeState.labelDocumentRevision)
+  // This App epoch owns a document replacement, not its geometry/history edits.
+  assertSameDocument(beforeState, afterState, 'Native point drag')
 }
 export function assertPointNativeDragEvidence(observation) {
   assert.equal(observation?.kind, 'point-native-drag')
@@ -285,8 +298,8 @@ export function assertPointNativeDragEvidence(observation) {
   assertUnchangedState(observation.preparation.statePrepared, observation.stateBefore, 'Before native drag')
   assert.deepEqual(observation.before.modelPoint, parsed(observation.stateBefore).runtime.strata.find((point) => point.id === observation.id), 'Before handle owner matches authoritative model')
   assert.deepEqual(observation.afterAction.observation.modelPoint, parsed(observation.afterAction.state).runtime.strata.find((point) => point.id === observation.id), 'After handle owner matches authoritative model')
-  assert.equal(observation.before.labelDocumentRevision, observation.stateBefore.labelDocumentRevision)
-  assert.equal(observation.afterAction.observation.labelDocumentRevision, observation.afterAction.state.labelDocumentRevision)
+  assert.equal(observation.before.labelDocumentRevision, observation.stateBefore.labelDocumentRevision, 'Before drag observed revision matches authoritative state')
+  assert.equal(observation.afterAction.observation.labelDocumentRevision, observation.afterAction.state.labelDocumentRevision, 'After drag observed revision matches authoritative state')
   assertNativeDelivery(observation)
   assertMovement(observation.stateBefore, observation.afterAction.state, observation.id)
   assertUnchangedState(observation.afterAction.state, observation.undo.stateBefore, 'Before Undo')
@@ -298,11 +311,11 @@ export function assertPointNativeDragEvidence(observation) {
   assert.equal(observation.redo.stateAfter.json, observation.afterAction.state.json, 'Redo restores exact saved JSON')
   assert.equal(observation.redo.stateAfter.runtimeDiagramJson, observation.afterAction.state.runtimeDiagramJson, 'Redo restores exact runtime model')
   assert.deepEqual(redone.history, moved.history, 'Redo restores exact post-drag history')
-  for (const action of [observation.undo, observation.redo]) {
+  for (const [phase, action] of [['undo', observation.undo], ['redo', observation.redo]]) {
     assertSelected(action.stateAfter, observation.id); assertSnapshot(action.observation, observation.id)
     assert.deepEqual(action.stateAfter.uiSettings, observation.stateBefore.uiSettings)
-    assert.ok(action.stateAfter.labelDocumentRevision > action.stateBefore.labelDocumentRevision)
-    assert.equal(action.observation.labelDocumentRevision, action.stateAfter.labelDocumentRevision)
+    assertSameDocument(action.stateBefore, action.stateAfter, `Native point ${phase}`)
+    assert.equal(action.observation.labelDocumentRevision, action.stateAfter.labelDocumentRevision, `${phase} observed revision matches authoritative state`)
     assert.deepEqual(action.observation.modelPoint, parsed(action.stateAfter).runtime.strata.find((point) => point.id === observation.id))
   }
   assert.deepEqual(observation.afterAction.observation.camera, observation.before.camera)
