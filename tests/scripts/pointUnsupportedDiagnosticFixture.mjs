@@ -19,10 +19,27 @@ export function syntheticDiagnosticMeasurement({ ambientDimension = 2, shape = '
   const identity = { id, ambientDimension, shape, epoch, source, anchor, canvasToken: token,
     pointRequest: 'synthetic-current-request', bodyRequest: 'synthetic-current-request', ownerToken: JSON.stringify(['point-node', epoch, id]) }
   const background = { tag: 'rect', id: '', canvasToken: token, canvasRoot: false, canvas: true, background: true, pointId: null,
-    body: false, warning: false, ring: false, handle: false, overlay: false, connected: true, ownerToken: null, pointerEvents: 'auto' }
-  const root = { ...background, tag: 'svg', background: false, canvasRoot: true }
+    body: false, bodyTarget: false, exportExcluded: false, pointGroup: false, pointNode: false,
+    warning: false, ring: false, handle: false, overlay: false, connected: true, ownerToken: null, pointerEvents: 'auto',
+    elementToken: `${token}:background`, pointNodeToken: null, pointGroupToken: null,
+    pointRequest: null, bodyRequest: null, source: null, labelOwner: null }
+  const root = { ...background, elementToken: `${token}:root`, tag: 'svg', background: false, canvasRoot: true }
   const bodyBounds = { minX: -48.706, minY: -7, maxX: 48.706, maxY: 7 }
   const warningBounds = { minX: -58.706, minY: -10, maxX: -52.706, maxY: 2 }
+  const currentPoint = { ...background, background: false, pointId: id, ownerToken: identity.ownerToken,
+    pointRequest: identity.pointRequest, bodyRequest: identity.bodyRequest, source, labelOwner: identity.ownerToken,
+    pointNodeToken: `${token}:point-node`, pointGroupToken: `${token}:point-group` }
+  const ownerNode = { ...currentPoint, tag: 'g', elementToken: currentPoint.pointNodeToken, pointNode: true }
+  const ownerGroup = { ...currentPoint, tag: 'g', elementToken: currentPoint.pointGroupToken, pointGroup: true }
+  const label = { ...currentPoint, tag: 'g', elementToken: `${token}:label`, body: true }
+  const bodyDescriptor = { ...currentPoint, elementToken: `${token}:body-target`, bodyTarget: true, exportExcluded: true }
+  const warningDescriptor = { ...currentPoint, tag: 'path', elementToken: `${token}:warning`, warning: true }
+  const attributes = { x: bodyBounds.minX, y: bodyBounds.minY, width: bodyBounds.maxX - bodyBounds.minX,
+    height: bodyBounds.maxY - bodyBounds.minY, fill: 'transparent', transform: null }
+  const targetBox = Object.fromEntries(['x', 'y', 'width', 'height'].map((key) => [key, Math.fround(attributes[key])]))
+  const bodyTarget = { descriptor: bodyDescriptor, ownerNode, ownerGroup, label, parentIsPointNode: true, attributes,
+    nativeBounds: targetBox, bounds: { minX: targetBox.x, minY: targetBox.y,
+      maxX: targetBox.x + targetBox.width, maxY: targetBox.y + targetBox.height }, screenMatrix: nodeMatrix }
   const project = (local) => {
     const screen = { x: nodeMatrix.a * local.x + nodeMatrix.c * local.y + nodeMatrix.e,
       y: nodeMatrix.b * local.x + nodeMatrix.d * local.y + nodeMatrix.f }
@@ -32,18 +49,22 @@ export function syntheticDiagnosticMeasurement({ ambientDimension = 2, shape = '
     const inside = screen.x >= canvasClient.left && screen.x < canvasClient.right && screen.y >= canvasClient.top && screen.y < canvasClient.bottom
     return { local, screen, root: rootPoint, hit: { target: inside ? background : null, stack: inside ? [background, root] : [] } }
   }
-  const measurement = { identity, stateSnapshot, connected: { canvasCount: 1, nodeCount: 1, bodyCount: 1, warningCount: 1, canvas: true, node: true, body: true, warning: true },
+  const bodyClick = project({ x: -45, y: 0 }), warningClick = project({ x: -55.706, y: -7 })
+  bodyClick.hit = { target: bodyDescriptor, stack: [bodyDescriptor, root] }
+  warningClick.hit = { target: warningDescriptor, stack: [warningDescriptor, root] }
+  const measurement = { identity, stateSnapshot, connected: { canvasCount: 1, nodeCount: 1, bodyCount: 1, warningCount: 1,
+    bodyTargetCount: 1, bodyTarget: true, canvas: true, node: true, body: true, warning: true },
     ui: { inspector: { open: false, openerExpanded: 'false' }, toolbar: { collapsed: false, overlayCount: 1, floatingCount: 1, expandCount: 0, collapseCount: 1 },
       selectPressed: 'true', workPlaneControls: [], workPlaneStatus: ['xy-plane at z=0'] },
     source, anchor, layout: { anchor, minimumWidth: 1000, minimumHeight: 1000 }, state: 'ready', diagnostic: 'Anchor unsupported', contourCount: 0,
-    bodyBounds, warningBounds, shapeBounds: { minX: -600, minY: -600, maxX: 600, maxY: 600 }, anchorBounds: { minX: -600, minY: -600, maxX: 600, maxY: 600 },
+    bodyBounds, warningBounds, bodyTarget, shapeBounds: { minX: -600, minY: -600, maxX: 600, maxY: 600 }, anchorBounds: { minX: -600, minY: -600, maxX: 600, maxY: 600 },
     paintedBounds: { minX: 0, minY: 0, maxX: 0, maxY: 0 }, modelBodyBounds: bodyBounds,
     nativeBounds: { body: { x: bodyBounds.minX, y: bodyBounds.minY, width: bodyBounds.maxX - bodyBounds.minX, height: bodyBounds.maxY - bodyBounds.minY },
       warning: { x: warningBounds.minX, y: warningBounds.minY, width: warningBounds.maxX - warningBounds.minX, height: warningBounds.maxY - warningBounds.minY } },
     nodeMatrix, canvasMatrix, matrices: { node: nodeMatrix, canvas: canvasMatrix, bodyScreen: nodeMatrix, warningScreen: nodeMatrix },
     viewBox: { x: 0, y: 0, width: 520, height: 360 }, canvasClient, viewport: { width: 1700, height: 1300, scrollX: 0, scrollY: 0 },
     preserveAspectRatio: { attribute: null, align: 6, meetOrSlice: 1 }, clipAncestors: [], ring,
-    bodyClick: project({ x: -45, y: 0 }), warningClick: project({ x: -55.706, y: -7 }),
+    bodyClick, warningClick,
     candidates: fixedDiagnosticCandidates(bodyBounds, warningBounds).map(({ name, local }) => ({ name, ...project(local) })), errors: [] }
   return { ...measurement, ...resolveDiagnosticCandidates(measurement) }
 }
@@ -59,7 +80,8 @@ export function syntheticUnsupportedDiagnosticEvidence({ ambientDimension = 2, s
     const events = ['pointerdown', 'pointerup', 'click'].map((type, index) => ({ type, trusted: true,
       x: click.screen.x, y: click.screen.y, order: index, pointerId: 1, button: 0, buttons: index === 0 ? 1 : 0,
       altKey: false, shiftKey: false, ctrlKey: false, metaKey: false, canvasHasPointerCapture: false,
-      epoch: measurement.identity.epoch, identity: measurement.identity, target: click.hit.target, path: [click.hit.target, root] }))
+      epoch: measurement.identity.epoch, identity: measurement.identity, target: click.hit.target,
+      path: [click.hit.target, ...(kind === 'far' ? [] : [measurement.bodyTarget.ownerNode, measurement.bodyTarget.ownerGroup]), root] }))
     const afterMeasurement = syntheticDiagnosticMeasurement({ ambientDimension, shape, selection: stateAfter.selection, ring: stateAfter.selection ? ring : null })
     return { kind, measurement, inputMeasurement: structuredClone(measurement), click, before: measurement.stateSnapshot, after: stateAfter,
       afterMeasurement, events, droppedEvents: 0, errors: [], canvasCaptureAfterInput: false, selectedId: stateAfter.selection?.id ?? null }

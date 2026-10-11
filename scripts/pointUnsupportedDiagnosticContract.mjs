@@ -76,7 +76,7 @@ function exactCanvas(target, identity) {
 }
 function backgroundTarget(target, identity) {
   return exactCanvas(target, identity) && ((target.canvasRoot === true && target.tag === 'svg') || (target.background === true && target.tag === 'rect'))
-    && target.pointId === null && target.ownerToken === null && !target.body && !target.warning && !target.ring
+    && target.pointId === null && target.ownerToken === null && !target.body && !target.bodyTarget && !target.warning && !target.ring
 }
 function hitReasons(measurement, hit, background = false) {
   const reasons = []
@@ -136,15 +136,57 @@ function assertRing(measurement, ring) {
   ]).map(([x, y]) => Math.hypot(x - ring.cx, y - ring.cy)))
   assert.ok(ring.radius >= visibleRadius && ring.radius <= visibleRadius + 20, 'Diagnostic ring follows visible body/warning, not hidden minima')
 }
+function assertCurrentPointTarget(target, identity) {
+  assert.ok(exactCanvas(target, identity), 'Point target belongs to the exact connected canvas')
+  assert.equal(target.pointId, identity.id); assert.equal(target.ownerToken, identity.ownerToken)
+  assert.equal(target.pointRequest, identity.pointRequest); assert.equal(target.bodyRequest, identity.bodyRequest)
+  assert.equal(target.source, identity.source); assert.equal(target.labelOwner, identity.ownerToken)
+  for (const field of ['elementToken', 'pointNodeToken', 'pointGroupToken']) assert.ok(typeof target[field] === 'string' && target[field].length > 0, `Actual DOM ${field} retained`)
+  assert.equal(target.background, false); assert.equal(target.canvasRoot, false)
+  assert.equal(target.ring, false); assert.equal(target.handle, false)
+}
+function assertBodyTarget(measurement) {
+  const raw = measurement.bodyTarget, identity = measurement.identity
+  assert.ok(raw, 'Current visible body has a production-owned hit target')
+  const target = raw.descriptor
+  assertCurrentPointTarget(target, identity)
+  assert.equal(target.tag, 'rect'); assert.equal(target.bodyTarget, true); assert.equal(target.exportExcluded, true)
+  assert.notEqual(target.pointerEvents, 'none', 'Point body target accepts ordinary native input')
+  assert.equal(raw.parentIsPointNode, true, 'Body target is a direct child of its current point node')
+  assertCurrentPointTarget(raw.ownerNode, identity); assert.equal(raw.ownerNode.pointNode, true)
+  assertCurrentPointTarget(raw.ownerGroup, identity); assert.equal(raw.ownerGroup.pointGroup, true)
+  assertCurrentPointTarget(raw.label, identity); assert.equal(raw.label.body, true)
+  assert.equal(target.pointNodeToken, raw.ownerNode.elementToken)
+  assert.equal(target.pointGroupToken, raw.ownerGroup.elementToken)
+  assert.equal(raw.label.pointNodeToken, target.pointNodeToken)
+  assert.equal(raw.label.pointGroupToken, target.pointGroupToken)
+  const attributes = raw.attributes, bounds = measurement.modelBodyBounds
+  assert.ok(attributes && ['x', 'y', 'width', 'height'].every((key) => Number.isFinite(attributes[key]))
+    && attributes.width > 0 && attributes.height > 0, 'Visible body target has finite positive geometry')
+  assert.equal(attributes.fill, 'transparent'); assert.equal(attributes.transform, null, 'Body target uses the current point-node placement frame')
+  for (const [key, value] of Object.entries({ x: bounds.minX, y: bounds.minY, width: bounds.maxX - bounds.minX, height: bounds.maxY - bounds.minY })) {
+    assert.ok(close(attributes[key], value), `Body target ${key} follows only current resolved visible body bounds`)
+    // SVGRect getBBox exposes native binary32 values; model/PGF tolerances are unchanged.
+    assert.equal(raw.nativeBounds?.[key], Math.fround(attributes[key]), `Actual body target ${key} matches native SVG rectangle precision`)
+  }
+  assert.ok(boundsFinite(raw.bounds) && matrixFinite(raw.screenMatrix), 'Actual body target bounds and screen CTM retained')
+  assert.deepEqual(raw.screenMatrix, measurement.nodeMatrix, 'Direct body target shares its current point-node screen CTM')
+  const box = raw.nativeBounds
+  for (const [key, value] of Object.entries({ minX: box.x, minY: box.y, maxX: box.x + box.width, maxY: box.y + box.height })) {
+    assert.ok(close(raw.bounds[key], value), `Actual target ${key} agrees with native bbox and current placement`)
+  }
+}
 function assertOwnedClick(measurement, click, kind) {
   assert.deepEqual(visibleProjectionReasons(measurement, click), [], `${kind}: current local/root/client projection lies in visible canvas`)
   assert.deepEqual(hitReasons(measurement, click?.hit, kind === 'far'), [], `${kind}: actual native target belongs to the canvas`)
   if (kind !== 'far') {
     assert.ok(inBounds(click.local, measurement[`${kind}Bounds`]), `${kind}: input lies inside the measured visible region`)
     const target = click.hit.target
-    assert.ok(backgroundTarget(target, measurement.identity) || (target.pointId === measurement.identity.id && target.ownerToken === measurement.identity.ownerToken),
-      `${kind}: target is current owner or actual canvas background for production geometry picking`)
-    assert.equal(target.ring, false); assert.equal(target.handle, false)
+    assertCurrentPointTarget(target, measurement.identity)
+    if (kind === 'body') {
+      assert.deepEqual(target, measurement.bodyTarget.descriptor, 'Body native hit is the actual current owned visible-body target')
+      assert.ok(inBounds(click.local, measurement.bodyTarget.bounds), 'Measured literal-body input lies inside actual visible-body target bounds')
+    } else assert.equal(target.warning, true, 'Warning native hit reaches the actual owned warning')
   }
 }
 
@@ -178,7 +220,7 @@ export function assertDiagnosticMeasurement(measurement, { requireCandidate = fa
   assert.equal(measurement.layout.minimumWidth, 1000); assert.equal(measurement.layout.minimumHeight, 1000)
   assert.equal(measurement.layout.anchor, identity.anchor)
   if (identity.ambientDimension === 2) assert.equal(point.position.z, 0, '2D model coordinates remain z=0')
-  for (const name of ['canvas', 'node', 'body', 'warning']) {
+  for (const name of ['canvas', 'node', 'body', 'warning', 'bodyTarget']) {
     assert.equal(measurement.connected?.[`${name}Count`], 1, `One connected diagnostic ${name}`)
     assert.equal(measurement.connected?.[name], true, `Expected diagnostic ${name} is connected`)
   }
@@ -186,6 +228,7 @@ export function assertDiagnosticMeasurement(measurement, { requireCandidate = fa
   assert.equal(measurement.contourCount, 0, 'Unsupported requested contour is intentionally absent')
   for (const name of ['body', 'warning', 'shape', 'painted', 'anchor']) assert.ok(boundsFinite(measurement[`${name}Bounds`]), `Valid native ${name} bounds`)
   assert.ok(boundsFinite(measurement.modelBodyBounds), 'Resolved native model body bounds are finite and ordered')
+  assertBodyTarget(measurement)
   for (const name of ['body', 'warning']) {
     const bounds = measurement[`${name}Bounds`]; assert.ok(bounds.maxX > bounds.minX && bounds.maxY > bounds.minY, `Visible ${name} has actual extent`)
   }
@@ -213,6 +256,7 @@ export function assertDiagnosticMeasurement(measurement, { requireCandidate = fa
   assert.ok(measurement.ring === null || measurement.ring, 'Selection ring observation is explicit')
   if (measurement.ring) assertRing(measurement, measurement.ring)
   if (!allowObstructedClicks) {
+    assert.equal(measurement.ui.selectPressed, 'true', 'Ordinary diagnostic input uses the actual Select tool')
     assertOwnedClick(measurement, measurement.bodyClick, 'body'); assertOwnedClick(measurement, measurement.warningClick, 'warning')
   }
   assert.equal(measurement.candidates.length, 4, 'All four declared candidates retained')
@@ -242,7 +286,7 @@ export function assertDiagnosticAction(action, expected = action?.measurement?.i
   assertDiagnosticMeasurement(input, { requireCandidate: true, expected })
   assert.deepEqual(input.stateSnapshot, action.before, 'Immediate input state agrees with authoritative bound state')
   assert.deepEqual(input.identity, action.measurement.identity, 'Immediate input retains source/request/epoch/canvas owner')
-  for (const field of ['nodeMatrix', 'canvasMatrix', 'bodyBounds', 'warningBounds', 'shapeBounds', 'paintedBounds', 'anchorBounds', 'modelBodyBounds', 'nativeBounds', 'matrices', 'ring', 'viewBox', 'canvasClient', 'viewport', 'clipAncestors', 'preserveAspectRatio']) {
+  for (const field of ['nodeMatrix', 'canvasMatrix', 'bodyBounds', 'warningBounds', 'shapeBounds', 'paintedBounds', 'anchorBounds', 'modelBodyBounds', 'nativeBounds', 'bodyTarget', 'matrices', 'ring', 'viewBox', 'canvasClient', 'viewport', 'clipAncestors', 'preserveAspectRatio']) {
     assert.deepEqual(input[field], action.measurement[field], `Immediate native input retains current ${field}`)
   }
   assert.deepEqual(input[`${action.kind}Click`], action.click, 'Immediate native hit and projection bind the requested input')
@@ -271,7 +315,7 @@ export function assertDiagnosticAction(action, expected = action?.measurement?.i
     assert.ok(exactCanvas(event.target, identity), 'Native event target belongs to exact production canvas')
     let measuredTarget = false
     try { assert.deepEqual(event.target, action.click.hit.target); measuredTarget = true } catch { /* Only the measured capture continuation below may substitute. */ }
-    const capturedRoot = backgroundTarget(action.events[0].target, identity) && event.target.canvasRoot === true && event.target.tag === 'svg'
+    const capturedRoot = action.kind === 'far' && backgroundTarget(action.events[0].target, identity) && event.target.canvasRoot === true && event.target.tag === 'svg'
       && (type === 'pointerup' ? event.canvasHasPointerCapture === true : type === 'click' && capturedUp && event.canvasHasPointerCapture === false)
     assert.ok(measuredTarget || capturedRoot, 'Native gesture reaches the measured target or its observed owned root capture continuation')
     if (type === 'pointerdown') assert.equal(event.canvasHasPointerCapture, false, 'Diagnostic gesture starts without stale pointer capture')
@@ -281,6 +325,15 @@ export function assertDiagnosticAction(action, expected = action?.measurement?.i
     assert.ok(Array.isArray(event.path) && event.path.length > 0 && event.path.length <= 16, 'Owned bounded native composed path retained')
     assert.deepEqual(event.path[0], event.target, 'Native composed path begins at actual target')
     assert.ok(event.path.some((target) => exactCanvas(target, identity) && target.canvasRoot === true && target.tag === 'svg'), 'Native event traverses exact root canvas')
+    if (action.kind !== 'far') {
+      assertCurrentPointTarget(event.target, identity)
+      for (const [name, flag] of [['ownerNode', 'pointNode'], ['ownerGroup', 'pointGroup']]) {
+        const owner = action.measurement.bodyTarget[name]
+        assert.ok(event.path.some((target) => exactCanvas(target, identity) && target[flag] === true
+          && target.elementToken === owner.elementToken && target.pointId === identity.id && target.ownerToken === identity.ownerToken),
+        `Ordinary ${action.kind} input traverses its actual current ${name}`)
+      }
+    }
   }
   if (action.kind === 'far') assertRing(action.measurement, action.measurement.ring)
   const afterMeasurement = action.afterMeasurement
@@ -289,7 +342,7 @@ export function assertDiagnosticAction(action, expected = action?.measurement?.i
   assertDiagnosticMeasurement(resolvedAfter, { expected })
   assert.deepEqual(afterMeasurement.stateSnapshot, action.after, 'Native after-input observation agrees with authoritative state')
   assert.deepEqual(afterMeasurement.identity, identity, 'Native after-input geometry keeps same request/document/canvas owner')
-  for (const field of ['nodeMatrix', 'canvasMatrix', 'bodyBounds', 'warningBounds', 'shapeBounds', 'paintedBounds', 'anchorBounds', 'modelBodyBounds', 'nativeBounds', 'matrices', 'viewBox', 'canvasClient', 'preserveAspectRatio']) {
+  for (const field of ['nodeMatrix', 'canvasMatrix', 'bodyBounds', 'warningBounds', 'shapeBounds', 'paintedBounds', 'anchorBounds', 'modelBodyBounds', 'nativeBounds', 'bodyTarget', 'matrices', 'viewBox', 'canvasClient', 'preserveAspectRatio']) {
     assert.deepEqual(afterMeasurement[field], action.measurement[field], `Click selection preserves measured ${field}`)
   }
   for (const field of ['workPlaneControls', 'workPlaneStatus']) assert.deepEqual(afterMeasurement.ui[field], action.measurement.ui[field], `Click selection preserves actual ${field}`)
@@ -322,7 +375,7 @@ export function assertUnsupportedDiagnosticEvidence(entry) {
   for (const action of entry.clicks) {
     assertDiagnosticAction(action, initial.identity)
     assert.deepEqual(action.measurement.identity, initial.identity, 'Each click retains current source/request/document/canvas owner')
-    for (const field of ['nodeMatrix', 'canvasMatrix', 'bodyBounds', 'warningBounds', 'shapeBounds', 'paintedBounds', 'anchorBounds', 'modelBodyBounds', 'nativeBounds', 'matrices', 'viewBox', 'canvasClient', 'preserveAspectRatio']) {
+    for (const field of ['nodeMatrix', 'canvasMatrix', 'bodyBounds', 'warningBounds', 'shapeBounds', 'paintedBounds', 'anchorBounds', 'modelBodyBounds', 'nativeBounds', 'bodyTarget', 'matrices', 'viewBox', 'canvasClient', 'preserveAspectRatio']) {
       assert.deepEqual(action.measurement[field], initial[field], `Fresh click retains unchanged prepared ${field}`)
     }
     assert.deepEqual(action.before, previous, 'Fresh input starts from the preceding authoritative state')

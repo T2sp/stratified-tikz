@@ -1,11 +1,84 @@
 # Phase 32D spacing, minima, anchors, and combined audit
 
-Status (2026-10-10): implementation and focused Node verification are present.
+Status (2026-10-11): implementation and focused Node verification are present.
 Phase 32 is **not complete**. Fresh accepted required commands, strict native
 browser/download evidence and independent review remain required. 32A and main's
 later 32B have historical accepted evidence. The plan still records unaccepted
 fresh strict native/review gates for the merged 32C checkout; implementation
 presence does not close that prerequisite or the final gate.
+
+## Ordinary visible-body selection correction (2026-10-11)
+
+The actual clean starting checkout is
+`cf6a9d34feb64b8ba512371e272a1b8ff32c8b7d`, fingerprint
+`9132034f073fc8c63bc97c587c064de2465e3cb181902f32e9508be808a9541d`.
+The earlier seven-file/five-new-file diagnostic correction and prompt update
+are already tracked. Current inventory, retained parent file identities, final
+command logs and exact tracked/untracked handoff identity are recorded under
+`/private/tmp/stz-32d-body-fix-20261011/`.
+
+The latest browser-capable parent `pOKk4r` passed 6,144 tests, build, diff and
+full label-assets, then completed sixteen of eighteen cumulative groups.
+Complete geometric coverage includes both actual transparent/white SVG downloads,
+reopening and complete PNG capture. Layout sizing passed ninety cases across
+fifteen shapes. Its first unsupported case (2D ellipse, owner epoch 397) then
+failed `body selects the owned point`: actual selection stayed null, with no ring.
+Records 0007–0009 retain the measured first-character body point, actual trusted
+background pointerdown and captured-root pointerup/click, and unchanged state.
+This background capture occurred in 2D. No overlay intercepted input; page and
+secondary errors are empty. Far and warning input, the other five unsupported
+cases, later layout scenarios/downloads and final standalone export did not run.
+This native failure is distinct from child startup restrictions.
+
+Source tracing establishes the missing ordinary route: `SvgPointNode` supplies
+`boundsTarget:false`, the glyph group ignores pointer events, and the pure body
+collector runs only in the Alt capture branch. An ordinary background click
+clears selection. The earlier synthetic background-body success premise did
+not establish production selection and is superseded here.
+
+The live `SvgPointNode` now enables one preview-only `data-point-body-target`
+rectangle in `SvgPointNodeView`. It uses only finite positive current
+`layout.body.bounds`, including the current anchor placement, and the point
+node's actual transform. Empty/whitespace-only bodies emit no target. The
+transparent rectangle precedes the noninteractive glyph group and bubbles to
+the existing owned point handler. It inherits normal draw order, filtering,
+locking and pointer modes; no ordinary all-strata collector is added. Contour,
+warning, body overflow, Alt cycling, background capture and selected handles
+keep their existing routes. The shared view defaults the target off for settled
+export, and the live element also carries the exact export-exclusion marker.
+Visual source, paint, placement, TikZ and model/history semantics are unchanged.
+
+The measured right/left/below/above resolver, rejection reasons and first eligible
+adoption remain unchanged. The six-case native helper still performs exactly one
+body → far → warning gesture per case with immediate before/after observations.
+Raw body evidence now includes connected DOM object identities, exact rectangle
+attributes, native binary32 BBox, local bounds, screen CTM, current sibling label,
+point node and owner group. Native body input must reach that exact current target
+and traverse its real owner path without modifiers. Background body delivery,
+stale/wrong/absent/oversized targets, missing paths, null selection or absent ring
+cannot pass. Only the genuine far background route may retain observed capture
+continuation. Existing six-unit picking and PGF tolerances are unchanged.
+
+The registered `svgPointBodyInteraction.test.ts` executes real live production
+components and capture/owner/background callbacks with explicitly controlled
+Node hooks and event propagation. It detects the disconnected ordinary route,
+checks both ambient dimensions, body/far/warning selection and bounded rings,
+model/history invariance, lifecycle/current ownership, hidden/locked/filtered/
+empty bodies, negative-padding overflow, contour/Alt behavior and detached visual
+equality. It is not native acceptance. Diagnostic/policy controls reject the
+former synthetic background success assumption. Existing runner imports already
+copy the strengthened transitive contract; no dependency is added.
+
+Completed native helpers, capture contracts and retained real geometric SVG/PNG
+files are preserved. All PGF references remain unchanged (172 boxes, 4,925 anchors,
+eleven failures); the diamond outer-separation review gate remains open. Final
+required/focused check results and the frozen identity belong to the adjacent
+handoff. Reproduced baseline lint and isolated layer TypeScript checks remain
+failed, separate from application build. Complete fresh strict parent verification
+must accept all eighteen groups, all six unsupported cases, remaining layout and
+both pending layout downloads/final standalone capture before matching independent
+review. Failed/incomplete verification stops before review/commit/push. Phase 32
+remains incomplete.
 
 ## Measured unsupported-anchor diagnostic input correction (2026-10-10)
 
@@ -64,9 +137,9 @@ selection creates its bounded visible ring. Partial preparation and action
 records are persisted as observed before assertions. Owned bounded listeners
 retain trusted pointerdown/up/click, target/composed path, pointer/button/order,
 document epoch, owner/request/source and exact canvas identity, plus before/after
-saved/runtime/history/UI/work-plane state and final selection. Literal text may
-have `pointer-events:none`; actual canvas-background delivery with production
-body hit testing is recorded rather than inventing a glyph or contour target.
+saved/runtime/history/UI/work-plane state and final selection. This historical
+fixture permitted background-body delivery with declared selection; the newer
+ordinary-route correction above removes that unsupported success premise.
 Actual camera background capture may deliver pointerup/click through the owned
 SVG root; that continuation requires the measured background down target, matching
 pointer, observed capture at pointerup and release before click. Far background

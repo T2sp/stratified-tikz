@@ -430,6 +430,20 @@ test('32D parent policy requires measured candidate frames and native event owne
     assert.throws(() => assertLayoutAnchorEvidence(current, name), fault)
   }
 })
+test('32D parent policy requires actual ordinary visible-body owner delivery and current bounded preview target', () => {
+  const name = 'point-layout-anchor-support-rotation'
+  for (const fault of ['background-success', 'missing-target', 'hidden-minimum-target', 'stale-target-request', 'missing-owner-path', 'alt-body', 'actual-null-selection']) {
+    const current = evidence(name), first = current.unsupportedAnchor.nativeCases[0], action = first.clicks[0]
+    if (fault === 'background-success') first.rendered.bodyClick.hit = structuredClone(first.rendered.candidates[1].hit)
+    if (fault === 'missing-target') delete first.rendered.bodyTarget
+    if (fault === 'hidden-minimum-target') first.rendered.bodyTarget.attributes.width = 1000
+    if (fault === 'stale-target-request') first.rendered.bodyTarget.descriptor.bodyRequest = 'obsolete-request'
+    if (fault === 'missing-owner-path') action.events[0].path = [action.events[0].target, action.events[0].path.at(-1)]
+    if (fault === 'alt-body') action.events[0].altKey = true
+    if (fault === 'actual-null-selection') { action.after.selection = null; action.selectedId = null; action.afterMeasurement.ring = null }
+    assert.throws(() => assertLayoutAnchorEvidence(current, name), fault)
+  }
+})
 test('32D parent policy rejects stale candidate projections and native frames after body selection', () => {
   const name = 'point-layout-anchor-support-rotation'
   for (const fault of ['root-projection', 'off-canvas-screen', 'stale-current-ctm', 'malformed-body-bounds']) {

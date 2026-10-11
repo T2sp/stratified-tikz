@@ -28,5 +28,5 @@ export function SvgPointNode({ runtime, source, position, style, ownerIdentity, 
     boundsTarget: false, settings, pointStyle: style }), [runtime, source, position, style, textPaint.color, textPaint.opacity, ownerIdentity, settings])
   const elementRef = useCallback((node: SVGGElement | null) => node === null
     ? undefined : registerSvgLabelExportCapture(node, capture), [capture])
-  return createElement(SvgPointNodeView, { capture, state, selected, elementRef })
+  return createElement(SvgPointNodeView, { capture, state, selected, elementRef, previewBodyTarget: true })
 }

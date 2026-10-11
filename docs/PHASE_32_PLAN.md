@@ -1,5 +1,39 @@
 # Phase 32 Plan: Point-node math, paint, geometric shapes, and layout
 
+Current ordinary visible-body correction (2026-10-11): actual clean HEAD is
+`cf6a9d34feb64b8ba512371e272a1b8ff32c8b7d`, fingerprint
+`9132034f073fc8c63bc97c587c064de2465e3cb181902f32e9508be808a9541d`.
+Earlier fixes are tracked and preserved. The latest browser-capable parent
+`pOKk4r` passed 6,144 tests/build/diff/full label-assets and sixteen of eighteen
+groups, including complete geometric transparent/white SVG download/reopen/PNG
+coverage and ninety layout sizing cases. Its first unsupported 2D ellipse body
+input reached unobstructed background, continued through captured root, and left
+selection null with no ring. Far/warning input, the other five cases, remaining
+layout/download scenarios and final standalone export did not run.
+
+The actual ordinary route was disconnected: glyphs ignored pointer input,
+points emitted no body target, and the pure body collector was Alt-only.
+A small live-only owned rectangle now uses current finite placed body bounds
+and the existing point handler; empty/whitespace bodies create no target.
+Layer/lock/pointer ownership, contours, warnings, overflow, Alt cycling and
+background capture remain. Settled exports omit the target and preserve visuals.
+The diagnostic evidence now requires the exact connected current body rectangle,
+native BBox/CTM, owner/request/source and ordinary composed path. Background body
+input with declared selection can no longer pass. The fixed far resolver/order,
+all six body → far → warning cases, bounded ring/state checks and capture/download
+contracts remain mandatory. Registered production-component callback regressions
+are explicitly controlled Node evidence, separate from trusted native acceptance.
+
+Final command results, preservation/download hashes and exact handoff identity
+are retained under `/private/tmp/stz-32d-body-fix-20261011/` and the
+[implementation audit](PHASE_32D_IMPLEMENTATION.md). Baseline lint/type debt
+remains failed. Fresh strict parent verification must complete all eighteen
+groups, six unsupported cases, remaining layout controls/lifecycle/persistence,
+both pending layout SVG/TikZ downloads and final complete standalone capture
+before independent review of the matching tree. PGF inventory/tolerances and
+diamond review gate remain. Phase 32 is **not complete**; no review/commit/push
+follows failed or partial verification. Earlier records below are historical.
+
 Current measured unsupported-anchor diagnostic correction (2026-10-10): the
 actual clean starting checkout is
 `d37c63f4e98c671f3a5f1ab359995ec04f0c2924`, fingerprint

@@ -8,21 +8,41 @@ export function installUnsupportedDiagnosticObserver({ token, id }) {
   const registry = window.__stzUnsupportedDiagnostics ??= new Map()
   if (registry.has(token)) throw new Error('Unsupported diagnostic observer already owned')
   const canvas = document.querySelector('svg.svg-diagram')
-  const describe = (element) => element instanceof Element ? {
-    tag: element.localName, id: element.id, connected: element.isConnected,
-    canvas: !!canvas?.contains(element), canvasRoot: element === canvas,
-    canvasToken: canvas?.contains(element) ? token : null,
-    background: element.hasAttribute('data-svg-background'),
-    pointId: element.closest('[data-point-id]')?.getAttribute('data-point-id') ?? null,
-    ownerToken: element.closest('[data-point-node]')?.getAttribute('data-point-node') ?? null,
-    body: !!element.closest('[data-label-state]'), warning: !!element.closest('[data-point-shape-warning]'),
-    ring: element.matches('circle[data-svg-export-exclude]'),
-    handle: !!element.closest('[aria-label="Selected point drag handles"]'),
-    overlay: !!element.closest('#preview-inspector-drawer,.preview-toolbar-overlay-stack,.context-quick-style-bar,.preview-history-overlay'),
-    drawer: !!element.closest('#preview-inspector-drawer'),
-    toolbar: !!element.closest('.preview-floating-toolbar,.context-quick-style-bar'),
-    pointerEvents: getComputedStyle(element).pointerEvents,
-  } : null
+  const elements = new WeakMap()
+  let nextElement = 0
+  const elementIdentity = (element) => {
+    if (!(element instanceof Element)) return null
+    if (!elements.has(element)) elements.set(element, `${token}:element:${++nextElement}`)
+    return elements.get(element)
+  }
+  const describe = (element) => {
+    if (!(element instanceof Element)) return null
+    const pointGroup = element.closest('[data-point-id]')
+    const pointNode = element.closest('[data-point-node]') ?? pointGroup?.querySelector('[data-point-node]')
+    const label = pointNode?.querySelector('[data-label-state]')
+    return {
+      tag: element.localName, id: element.id, connected: element.isConnected,
+      elementToken: elementIdentity(element), pointNodeToken: elementIdentity(pointNode), pointGroupToken: elementIdentity(pointGroup),
+      canvas: !!canvas?.contains(element), canvasRoot: element === canvas,
+      canvasToken: canvas?.contains(element) ? token : null,
+      background: element.hasAttribute('data-svg-background'),
+      pointId: element.closest('[data-point-id]')?.getAttribute('data-point-id') ?? null,
+      ownerToken: pointNode?.getAttribute('data-point-node') ?? null,
+      pointRequest: pointNode?.getAttribute('data-point-request') ?? null,
+      bodyRequest: label?.getAttribute('data-label-request') ?? null,
+      source: label?.getAttribute('data-label-source') ?? null,
+      labelOwner: label?.getAttribute('data-label-owner') ?? null,
+      pointGroup: element === pointGroup, pointNode: element === pointNode,
+      bodyTarget: element.getAttribute('data-point-body-target') === 'true', exportExcluded: element.getAttribute('data-svg-export-exclude') === 'true',
+      body: !!element.closest('[data-label-state]'), warning: !!element.closest('[data-point-shape-warning]'),
+      ring: element.matches('circle[data-svg-export-exclude]'),
+      handle: !!element.closest('[aria-label="Selected point drag handles"]'),
+      overlay: !!element.closest('#preview-inspector-drawer,.preview-toolbar-overlay-stack,.context-quick-style-bar,.preview-history-overlay'),
+      drawer: !!element.closest('#preview-inspector-drawer'),
+      toolbar: !!element.closest('.preview-floating-toolbar,.context-quick-style-bar'),
+      pointerEvents: getComputedStyle(element).pointerEvents,
+    }
+  }
   const owned = { canvas, describe, events: [], droppedEvents: 0, errors: [], active: false }
   owned.listener = (event) => {
     if (!owned.active) return
@@ -54,6 +74,7 @@ export function observeUnsupportedDiagnostic({ token, id }) {
   const canvas = document.querySelector('svg.svg-diagram')
   const node = document.querySelector(`[data-point-id="${CSS.escape(id)}"] [data-point-node]`)
   const body = node?.querySelector('[data-label-state]'), text = body?.querySelector('text'), warning = node?.querySelector('[data-point-shape-warning]')
+  const bodyTarget = node?.querySelector('[data-point-body-target]')
   const ring = node?.querySelector(':scope > circle[data-svg-export-exclude]')
   const stateSnapshot = safe('authoritative state', () => window.stzAppLabels.state())
   const model = stateSnapshot && safe('runtime model', () => JSON.parse(stateSnapshot.runtimeDiagramJson))
@@ -123,13 +144,24 @@ export function observeUnsupportedDiagnostic({ token, id }) {
     connected: { canvasCount: document.querySelectorAll('svg.svg-diagram').length,
       nodeCount: document.querySelectorAll(`[data-point-id="${CSS.escape(id)}"] [data-point-node]`).length,
       bodyCount: node?.querySelectorAll('[data-label-state]').length, warningCount: node?.querySelectorAll('[data-point-shape-warning]').length,
-      canvas: canvas?.isConnected && owned?.canvas === canvas, node: !!node?.isConnected, body: !!body?.isConnected, warning: !!warning?.isConnected },
+      bodyTargetCount: node?.querySelectorAll('[data-point-body-target]').length,
+      canvas: canvas?.isConnected && owned?.canvas === canvas, node: !!node?.isConnected, body: !!body?.isConnected, warning: !!warning?.isConnected,
+      bodyTarget: !!bodyTarget?.isConnected },
     source: body?.getAttribute('data-label-source'), anchor: node?.getAttribute('data-point-anchor'), layout: safe('layout', () => JSON.parse(node.getAttribute('data-point-layout'))),
     state: body?.getAttribute('data-label-state'), diagnostic: warning?.getAttribute('aria-label'), contourCount: node?.querySelectorAll('[data-point-contour]').length,
     bodyBounds, warningBounds, shapeBounds: safe('requested shape bounds', () => attrBounds('data-point-shape-bounds')),
     paintedBounds: safe('painted bounds', () => attrBounds('data-point-painted-bounds')), anchorBounds: safe('anchor bounds', () => attrBounds('data-point-anchor-bounds')),
     modelBodyBounds: safe('model body bounds', () => attrBounds('data-point-body-bounds')),
     nativeBounds: { body: safe('body bbox', () => nativeBox(text)), warning: safe('warning bbox', () => nativeBox(warning)) },
+    bodyTarget: bodyTarget ? {
+      descriptor: owned.describe(bodyTarget), ownerNode: owned.describe(node), ownerGroup: owned.describe(node.closest('[data-point-id]')),
+      label: owned.describe(body), parentIsPointNode: bodyTarget.parentElement === node,
+      attributes: { x: Number(bodyTarget.getAttribute('x')), y: Number(bodyTarget.getAttribute('y')),
+        width: Number(bodyTarget.getAttribute('width')), height: Number(bodyTarget.getAttribute('height')),
+        fill: bodyTarget.getAttribute('fill'), transform: bodyTarget.getAttribute('transform') },
+      nativeBounds: safe('body target bbox', () => nativeBox(bodyTarget)), bounds: safe('body target bounds', () => localBounds(bodyTarget)),
+      screenMatrix: safe('body target screen CTM', () => matrix(bodyTarget.getScreenCTM())),
+    } : null,
     nodeMatrix: matrix(nodeScreen), canvasMatrix: matrix(canvasScreen),
     matrices: { node: safe('node CTM', () => matrix(node.getCTM())), canvas: safe('canvas CTM', () => matrix(canvas.getCTM())),
       bodyScreen: safe('body screen CTM', () => matrix(text.getScreenCTM())), warningScreen: safe('warning screen CTM', () => matrix(warning.getScreenCTM())) },
@@ -255,7 +287,7 @@ export async function runUnsupportedDiagnosticCase({ page, readState, diagnose, 
       preserve(entry.preparation.before, measurement.stateSnapshot, false)
       assert.equal(measurement.adopted, entry.rendered.adopted, 'Selection does not change the adopted negative candidate')
       assert.deepEqual(measurement.farClick.local, entry.rendered.farClick.local, 'The measured negative candidate retains its geometric location')
-      for (const field of ['identity', 'nodeMatrix', 'canvasMatrix', 'bodyBounds', 'warningBounds', 'shapeBounds', 'paintedBounds', 'anchorBounds']) {
+      for (const field of ['identity', 'nodeMatrix', 'canvasMatrix', 'bodyBounds', 'warningBounds', 'shapeBounds', 'paintedBounds', 'anchorBounds', 'bodyTarget']) {
         assert.deepEqual(measurement[field], entry.rendered[field], `Fresh diagnostic measurement preserves ${field}`)
       }
       const action = { kind, measurement, click, before: measurement.stateSnapshot }
@@ -274,7 +306,7 @@ export async function runUnsupportedDiagnosticCase({ page, readState, diagnose, 
         assertDiagnosticMeasurement(inputMeasurement, { expected, requireCandidate: true })
         assert.deepEqual(inputMeasurement.stateSnapshot, action.before, 'Immediate native measurement retains the bound authoritative state')
         assert.deepEqual(inputMeasurement.identity, measurement.identity, 'Immediate native input retains current owner/request/source/canvas')
-        for (const field of ['nodeMatrix', 'canvasMatrix', 'bodyBounds', 'warningBounds', 'shapeBounds', 'paintedBounds', 'anchorBounds', 'ring', 'viewBox', 'canvasClient', 'viewport', 'clipAncestors']) {
+        for (const field of ['nodeMatrix', 'canvasMatrix', 'bodyBounds', 'warningBounds', 'shapeBounds', 'paintedBounds', 'anchorBounds', 'bodyTarget', 'ring', 'viewBox', 'canvasClient', 'viewport', 'clipAncestors']) {
           assert.deepEqual(inputMeasurement[field], measurement[field], `Immediate native input retains measured ${field}`)
         }
         assert.deepEqual(inputMeasurement[`${kind}Click`], click, 'Immediate native geometry and hit route match the requested click')

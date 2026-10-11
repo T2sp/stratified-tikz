@@ -99,14 +99,48 @@ test('coordinate binding rejects tampered root/client projection, singular matri
   }
 })
 
-test('native picking mechanism accepts body and warning background delivery with expected production selection', () => {
+test('synthetic raw policy accepts owned body and warning routes with the exact six-case selection sequence', () => {
   for (const ambientDimension of [2, 3]) for (const shape of ['ellipse', 'circle', 'cylinder']) {
     const evidence = syntheticUnsupportedDiagnosticEvidence({ ambientDimension, shape })
-    assert.equal(evidence.clicks[0].click.hit.target.background, true)
+    assert.equal(evidence.clicks[0].click.hit.target.background, false)
+    assert.equal(evidence.clicks[0].click.hit.target.bodyTarget, true)
+    assert.equal(evidence.clicks[2].click.hit.target.warning, true)
     assert.equal(evidence.clicks[0].selectedId, 'app-point')
     assert.equal(evidence.clicks[1].selectedId, null)
     assert.equal(evidence.clicks[2].selectedId, 'app-point')
     assertUnsupportedDiagnosticEvidence(evidence)
+  }
+})
+
+test('visible-body native policy rejects disconnected, stale, unowned, absent and oversized body targets', () => {
+  for (const fault of ['absent', 'disconnected', 'wrong-owner', 'stale-request', 'old-document', 'oversized', 'wrong-frame', 'export-included']) {
+    const measurement = syntheticDiagnosticMeasurement()
+    const raw = measurement.bodyTarget
+    if (fault === 'absent') measurement.bodyTarget = null
+    if (fault === 'disconnected') raw.descriptor.connected = false
+    if (fault === 'wrong-owner') raw.descriptor.pointId = 'other-point'
+    if (fault === 'stale-request') raw.descriptor.bodyRequest = 'obsolete-request'
+    if (fault === 'old-document') raw.descriptor.ownerToken = '["point-node",1,"app-point"]'
+    if (fault === 'oversized') raw.attributes.width = 1000
+    if (fault === 'wrong-frame') raw.screenMatrix = { ...raw.screenMatrix, e: raw.screenMatrix.e + 10 }
+    if (fault === 'export-included') raw.descriptor.exportExcluded = false
+    assert.throws(() => assertDiagnosticMeasurement(measurement), fault)
+  }
+})
+
+test('declared body success cannot substitute background delivery, modifiers, missing owner path, null selection or absent ring', () => {
+  for (const fault of ['background', 'alt-cycle', 'missing-owner-path', 'null-selection', 'absent-ring']) {
+    const evidence = syntheticUnsupportedDiagnosticEvidence(), action = evidence.clicks[0]
+    if (fault === 'background') {
+      const background = action.measurement.candidates[1].hit
+      action.measurement.bodyClick.hit = background
+      action.click.hit = background
+    }
+    if (fault === 'alt-cycle') action.events[0].altKey = true
+    if (fault === 'missing-owner-path') action.events[0].path = [action.events[0].target, action.events[0].path.at(-1)]
+    if (fault === 'null-selection') { action.after.selection = null; action.selectedId = null }
+    if (fault === 'absent-ring') action.afterMeasurement.ring = null
+    assert.throws(() => assertDiagnosticAction(action, evidence.rendered.identity), fault)
   }
 })
 

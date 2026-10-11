@@ -8,13 +8,19 @@ import { getPointPaint } from '../model/styles.ts'
 import { resolvePointShapeParameters } from '../model/pointShapeParameters.ts'
 
 /** Pure whole-node view shared by preview and detached settled export. */
-export function SvgPointNodeView({ capture, state, selected = false, elementRef }: {
+export function SvgPointNodeView({ capture, state, selected = false, elementRef, previewBodyTarget = false }: {
   capture: SvgLabelExportCapture; state: SvgLabelState; selected?: boolean; elementRef?: Ref<SVGGElement>
+  previewBodyTarget?: boolean
 }): ReactElement {
   if (!capture.pointStyle) throw new Error('Missing point style')
   const style = capture.pointStyle
   const layout = svgPointNodeLayout(style, state)
   const { geometry, strokeContour } = layout
+  const bodyBounds = layout.body.bounds
+  const hasBodyTarget = previewBodyTarget && state.source !== ''
+    && state.layout.placements.some((item) => item.kind === 'math' || item.text.trim() !== '')
+    && Object.values(bodyBounds).every(Number.isFinite)
+    && bodyBounds.maxX > bodyBounds.minX && bodyBounds.maxY > bodyBounds.minY
   const textPaint = getPointPaint(style).text
   const parameters = resolvePointShapeParameters(style.shapeParameters)
   const offsetTransform = layout.placementOffset.x === 0 && layout.placementOffset.y === 0 ? undefined
@@ -62,6 +68,14 @@ export function SvgPointNodeView({ capture, state, selected = false, elementRef 
     ...paint, key: `seam-${index}`, d: contour.path, fill: 'none',
     'data-point-contour': undefined, 'data-point-internal-border': 'true',
   })) ?? [] : []),
+  // Glyphs ignore pointer input. This live-only target routes the current body
+  // through its existing point owner, including overflow and suppressed contours.
+  // Body bounds already include anchor placement; shape/minimum bounds never do.
+  hasBodyTarget ? createElement('rect', {
+    x: bodyBounds.minX, y: bodyBounds.minY,
+    width: bodyBounds.maxX - bodyBounds.minX, height: bodyBounds.maxY - bodyBounds.minY,
+    fill: 'transparent', 'data-point-body-target': 'true', 'data-svg-export-exclude': 'true',
+  }) : null,
   createElement(SvgTexLabelView, { capture: { ...capture, color: textPaint.color,
     opacity: style.opacity * textPaint.opacity, position: layout.placementOffset }, state }))
 }

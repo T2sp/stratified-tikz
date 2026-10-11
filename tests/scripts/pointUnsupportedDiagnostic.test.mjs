@@ -97,7 +97,7 @@ function setup(options = {}) {
       assert.ok(probe, 'The synthetic far route is the measured left candidate')
       assert.equal(x, probe.screen.x); assert.equal(y, probe.screen.y)
       if (options.nativeError) throw options.nativeError
-      const root = { ...probe.hit.target, tag: 'svg', canvasRoot: true, background: false }
+      const root = probe.hit.stack.find((target) => target.canvasRoot)
       nativeEvents = ['pointerdown', 'pointerup', 'click'].map((type, order) => {
         const captured = options.farCapture && kind === 'far' && order > 0
         const target = captured ? root : probe.hit.target
@@ -106,11 +106,17 @@ function setup(options = {}) {
           canvasHasPointerCapture: !!captured && type === 'pointerup',
           buttons: order === 0 ? 1 : 0, epoch: latest.identity.epoch,
           identity: structuredClone(latest.identity), target: structuredClone(target),
-          path: captured ? [structuredClone(root)] : [structuredClone(probe.hit.target), root],
+          path: captured ? [structuredClone(root)] : [structuredClone(probe.hit.target),
+            ...(kind === 'far' ? [] : [latest.bodyTarget.ownerNode, latest.bodyTarget.ownerGroup]), root],
         }
       })
       options.mutateEvents?.(nativeEvents, { kind, inputCount })
-      state.selection = kind === 'far' ? null : { kind: 'stratum', id: 'app-point' }
+      // A synthetic owner-route control, never proof of production delivery.
+      // Background body input cannot invent a successful point selection.
+      const target = probe.hit.target
+      const ownerRoute = target?.pointId === latest.identity.id && target.ownerToken === latest.identity.ownerToken
+        && (kind === 'body' ? target.bodyTarget === true : kind === 'warning' && target.warning === true)
+      state.selection = ownerRoute && !options.failSelection ? { kind: 'stratum', id: 'app-point' } : null
     } },
   }
   const diagnose = async ({ stage, entry }) => {
@@ -144,24 +150,44 @@ test('unsupported diagnostic adopts measured left after off-canvas right and ref
   assert.equal(context.installed, false); assert.deepEqual(context.secondaryErrors, [])
 })
 
-test('unsupported 3D far input retains native canvas pointer capture and release without changing the model', async () => {
-  const context = setup({ ambientDimension: 3, shape: 'cylinder', farCapture: true })
-  const result = await runUnsupportedDiagnosticCase(context.args)
-  assert.equal(result.result, 'passed')
-  const action = result.clicks.find(({ kind }) => kind === 'far')
-  assert.equal(action.events[0].target.background, true)
-  assert.equal(action.events[0].canvasHasPointerCapture, false)
-  assert.equal(action.events[1].target.canvasRoot, true)
-  assert.equal(action.events[1].canvasHasPointerCapture, true)
-  assert.equal(action.events[2].target.canvasRoot, true)
-  assert.equal(action.events[2].canvasHasPointerCapture, false)
-  assert.equal(action.canvasCaptureAfterInput, false)
-  assert.equal(action.after.selection, null)
-  for (const field of ['json', 'runtimeDiagramJson', 'history', 'labelDocumentRevision', 'uiSettings']) {
-    assert.equal(action.after[field], result.preparation.before[field])
+test('synthetic unsupported far input retains observed native capture in both ambient dimensions', async () => {
+  for (const ambientDimension of [2, 3]) {
+    const context = setup({ ambientDimension, shape: 'cylinder', farCapture: true })
+    const result = await runUnsupportedDiagnosticCase(context.args)
+    assert.equal(result.result, 'passed')
+    const action = result.clicks.find(({ kind }) => kind === 'far')
+    assert.equal(action.events[0].target.background, true)
+    assert.equal(action.events[0].canvasHasPointerCapture, false)
+    assert.equal(action.events[1].target.canvasRoot, true)
+    assert.equal(action.events[1].canvasHasPointerCapture, true)
+    assert.equal(action.events[2].target.canvasRoot, true)
+    assert.equal(action.events[2].canvasHasPointerCapture, false)
+    assert.equal(action.canvasCaptureAfterInput, false)
+    assert.equal(action.after.selection, null)
+    for (const field of ['json', 'runtimeDiagramJson', 'history', 'labelDocumentRevision', 'uiSettings']) {
+      assert.equal(action.after[field], result.preparation.before[field])
+    }
+    assert.deepEqual(context.calls.filter(({ type }) => type === 'input').map(({ kind }) => kind), ['body', 'far', 'warning'])
+    assert.equal(context.installed, false)
   }
-  assert.deepEqual(context.calls.filter(({ type }) => type === 'input').map(({ kind }) => kind), ['body', 'far', 'warning'])
+})
+
+test('ordinary body route rejects actual null selection and retains after-input state before failure', async () => {
+  const context = setup({ failSelection: true })
+  await assert.rejects(runUnsupportedDiagnosticCase(context.args), /body selects the owned point/)
+  assert.deepEqual(context.calls.filter(({ type }) => type === 'input').map(({ kind }) => kind), ['body'])
+  const retained = context.observed.find(({ stage }) => stage === 'body-after-input-before-assertion').entry.clicks[0]
+  assert.equal(retained.after.selection, null); assert.equal(retained.selectedId, null)
+  assert.equal(retained.afterMeasurement.ring, null); assert.equal(retained.events.length, 3)
+  assert.equal(retained.click.hit.target.bodyTarget, true)
   assert.equal(context.installed, false)
+})
+
+test('ordinary background body delivery fails before input despite a synthetic owner-selection hook', async () => {
+  const context = setup({ mutateMeasurement(raw) { raw.bodyClick.hit = structuredClone(raw.candidates[1].hit) } })
+  await assert.rejects(runUnsupportedDiagnosticCase(context.args))
+  assert.equal(context.calls.some(({ type }) => type === 'input'), false)
+  assert.equal(context.state.selection, null); assert.equal(context.installed, false)
 })
 
 test('unsupported diagnostic rejects a final native hit or CTM change despite unchanged authoritative state before any click', async () => {
