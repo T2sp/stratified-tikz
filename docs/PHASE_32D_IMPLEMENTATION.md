@@ -7,6 +7,83 @@ later 32B have historical accepted evidence. The plan still records unaccepted
 fresh strict native/review gates for the merged 32C checkout; implementation
 presence does not close that prerequisite or the final gate.
 
+## Resolved preview and exact native-edit provenance correction (2026-10-11)
+
+The actual starting checkout is clean at
+`8067dea1c9e43a1387a7b6083ff2d1805e4c9752`, fingerprint
+`832a100ce9dff7908961f6c3cbd5f2db9967f37f72590142249d06bcc463e58b`.
+The previous eleven modified files and three new view/helper fixture files are
+already tracked and preserved. Current identities, diff, preservation hashes,
+commands and final results are retained under
+`/private/tmp/stz-32d-resolved-provenance-20261011/`. Earlier sections below are
+historical; their identities/results never establish changed-tree acceptance.
+
+The latest browser-capable parent `E5qxLx` passed 6,347 tests, build, diff and
+full label-assets and completed sixteen of eighteen groups. Complete geometric
+transparent/white native downloads with reopening/PNG acceptance and the first
+six layout scenarios passed. Native transparent pending selection and the SVG
+click while held passed. Its next first failure is the before-stage view layout
+comparison: resolved DOM correctly omits authored `units`, while the harness
+incorrectly spread the whole authored layout into its expectation. The record
+contains only `before`, fillCount 0, zoom/slider 1, pan 0/0, no control events or
+observation errors. No zoom input or geometry change occurred. The circle is
+ready for its new source, while the original captured source remains held with
+started 2/completed 0/unreleased. The immutable click retains all fifteen original
+points, revision 427, old source/base/minimumWidth 35 and started 1/completed 0.
+Successful observer/disclosure restoration and later failure-cleanup release
+do not establish intended release or downloaded-file acceptance. Page errors
+and secondary errors are empty; both pending layout downloads and final
+standalone acceptance remain incomplete/unexecuted. This parent failure followed
+Chrome launch and is distinct from child server-startup restrictions.
+
+`pointLayoutPendingView.mjs` now explicitly expects all six finite resolved
+dimension fields, anchor and effective default/merged font context, then compares
+the entire parsed DOM object exactly. Missing, incorrect, malformed or extra
+resolved fields fail, including authored units incorrectly added to the DOM.
+This complete fixture explicitly authors every dimension; no generic fallback
+normalization or production resolution change is introduced.
+
+The native-edit expectation starts from immutable click-time runtime and saved
+inputs and applies only source `later $changed$`, anchor `north`, minimumWidth
+110 and `{source:'110',unit:'pt',texPoints:110}` provenance. Other-axis sources
+and per-axis/global contexts remain exact, without invented pt-axis context.
+Runtime, the full saved envelope and history present must match these expected
+authored forms. Saved runtime-camera/default omissions remain intact. Exact
+saved/runtime/history/selection/revision/uiSettings invariants during the view
+action and all control, projection, owner, request, hold and cleanup checks remain.
+The corrected stage and independently constructed native-edit expectations pass
+against unchanged retained parent before-only records as a diagnostic; that
+does not establish fresh view/download acceptance.
+
+The synthetic fixture independently writes native provenance into saved/runtime/
+history present and emits only resolved preview fields. It preserves honest
+intermediate source/anchor histories and the old immutable click. Registered
+view regressions cover direct before-stage and full control/projection success,
+missing/changed source/unit/texPoints, other-axis/context preservation, invented
+pt context, saved/history-only and view-only corruption, and complete resolved
+schema failures. Two parent standalone controls also reject authored metadata
+corruption in actual required raw-view/artifact records while numeric width
+remains 110. Existing runner dependency copying and test registration suffice;
+no new dependency or file is required.
+
+Focused layout/provenance/view/preparation/inline/capture/policy/ownership checks
+passed 1,334/1,334; the view suite includes 97 synthetic checks. Changed-script
+recommended lint passed. Reproduced baseline checks remain failed: two geometric
+`no-unsafe-finally` errors, verifier unused `_role`, unchanged layers unused
+`defaultCurveStyle` and eleven isolated strict-TypeScript diagnostics. Browser
+fixture strict TypeScript/configured lint passed; application build is separate.
+Final full/runner/required browser/strict verification results and matching frozen
+tree identity belong to the external handoff.
+
+Production model/rendering/Inspector/serialization/camera/geometry/TikZ and PGF
+references/tolerances remain unchanged. Deterministic fifteen-point pending
+fixtures, native `.23` preparation, unique export-path inline binding, click/hold/
+intended-release sequence, SVG/TikZ/reopening/complete-PNG contracts and cumulative
+strict predecessors remain mandatory. Fresh accepted verification must precede
+independent read-only review of the exact matching tree and the post-review
+identity guard. The diamond PGF review gate remains open. Phase 32 is **not
+complete**; failed/incomplete verification stops before review/commit/push.
+
 ## Current pending 2D view observation and inline binding correction (2026-10-11)
 
 The actual clean starting checkout is

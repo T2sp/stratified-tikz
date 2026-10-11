@@ -1,362 +1,322 @@
-# Phase 32D Fix for resolved layout and native edit provenance
+# Phase 32D Fix for signed anchors, arc picking and deterministic report tests
 
-## Objective and preserved implementation
+## Objective and scope
 
-Continue from the implemented Phase32D checkout, including native 2D zoom/control
-and root-relative placement proof, unique export-path inline-node binding,
-deterministic pending fixture/preparation and all preceding fixes.
-Repair the next concrete parent failure: the view baseline compares resolved
-preview layout with the entire authored model layout, including units provenance.
+Continue from the implemented Phase32D checkout and its successful cumulative
+parent browser/download verification. Independent review returned needs_changes:
+two production geometry defects and one full-suite reliability defect remain.
 
-Keep the correct production distinction. Preview layout contains resolved
-dimensions, anchor and font context; authored layout preserves dimension source/
-unit/context metadata. Correct the harness comparison and exact native-edit
-baseline, then make the synthetic fixtures faithfully represent both forms.
-Do not alter production model, rendering, Inspector, serialization, camera,
-geometry or PGF references to make the assertion pass.
+Correct all three targeted issues:
 
-Keep all current native view/control/matrix checks, pending/click/release contracts,
-inline binding and complete SVG/PNG/TikZ acceptance.
-Do not repeat completed fixes or rewrite unrelated files.
+1. Preserve signed fitted ellipse/rectangle axes when resolving PGF anchors.
+2. Use radius magnitudes for arc sampling density so negative radii do not
+   collapse the shared picking contour.
+3. Isolate ordinary writes from the stalled-report test's short deadline,
+   preserving its timeout, primary-error, late-rejection and cleanup assertions.
+
+The resolved-preview/native `110` provenance correction is implemented.
+Keep it and the complete native view/pending/inline/download/capture contracts.
+This iteration permits narrow production geometry corrections justified by the
+review. Do not rewrite unrelated rendering, model, camera, persistence or UI.
 
 Read `AGENTS.md`, `prompts/phase-32d-implement.md`,
-`prompts/phase-32d-review.md`, `docs/PHASE_32D_IMPLEMENTATION.md`, and
-`docs/PHASE_32_PLAN.md`. Inspect the actual tree before editing.
-Keep cumulative strict verification, verification-before-review/commit and
-the exact-tree post-review identity guard.
-Phase32 remains incomplete until accepted verification and matching review.
+`prompts/phase-32d-review.md`, `docs/PHASE_32D_IMPLEMENTATION.md` and
+`docs/PHASE_32_PLAN.md`. Inspect the actual tree and independent evidence first.
+Maintain cumulative strict verification, verification-before-review/commit and
+the parent's exact-tree post-review guard. Phase32 remains incomplete.
 
-## Latest evidence and checkout identity
+## Latest evidence and exact checkout
 
-Latest child handoff:
-`/private/tmp/stz-32d-view-fix-20261011/HANDOFF.md`.
-Its exact inventory, diff, identities, preservation hashes, reports and logs
-remain in that directory. Newer browser-capable parent records:
+Child handoff:
+`/private/tmp/stz-32d-resolved-provenance-20261011/HANDOFF.txt`.
+Its six-file diff, identities, preservation summary, reports and logs are adjacent.
+The newer browser-capable parent and subsequent review supersede the child's
+startup-only and acceptance-pending status for that same implementation tree:
 
-- Worker:
-  `/var/folders/vk/7kf940pd4bx8f6cg3rzlmtc80000gn/T/stz-phase-verifier-4XpVdp/response.json`.
-- Verification:
-  `/var/folders/vk/7kf940pd4bx8f6cg3rzlmtc80000gn/T/stz-phase32d-before-review-E5qxLx/verification.json`.
-- Free-labels log:
-  `/var/folders/vk/7kf940pd4bx8f6cg3rzlmtc80000gn/T/stz-phase32d-before-review-E5qxLx/05-check-free-labels/command.log`.
-- Raw evidence:
-  `/var/folders/vk/7kf940pd4bx8f6cg3rzlmtc80000gn/T/stz-phase32d-before-review-E5qxLx/05-check-free-labels/artifacts/`.
+- Parent worker:
+  `/var/folders/vk/7kf940pd4bx8f6cg3rzlmtc80000gn/T/stz-phase-verifier-ortrXN/response.json`.
+- Passed strict verification:
+  `/var/folders/vk/7kf940pd4bx8f6cg3rzlmtc80000gn/T/stz-phase32d-before-review-kpMSxP/verification.json`.
+- Native report/artifacts:
+  `/var/folders/vk/7kf940pd4bx8f6cg3rzlmtc80000gn/T/stz-phase32d-before-review-kpMSxP/05-check-free-labels/artifacts/`.
+- Review findings and machine summary:
+  `/Users/takamatoshinori/.codex/attachments/9c144160-38b9-4093-8c21-8fb48664e343/Pasted text.txt`.
+- Independent PGF and fixed-metric production reproductions:
+  `/private/tmp/stz32d-review-layout/manifest.json`, with authenticated input,
+  raw geometry, compilation, reproduction script and production results.
+- Reviewer failed full-suite log:
+  `/private/tmp/stz-32d-review-npm-test.log`.
 
 Branch: `phase/32d-margin-minsize-anchor`.
-HEAD: `63a6afc6ae212458d17d0fe11849bf2957ecb2f7`.
-The actual pre-prompt-update tree matches parent checkout/checkoutAfter and child:
+HEAD: `8067dea1c9e43a1387a7b6083ff2d1805e4c9752`.
+Pre-prompt current identity matches parent checkout/checkoutAfter and child:
 
 ~~~text
-ded68d9355198d2bdb1dd7a94b797d75b56fbdfc7dca461d1dfee295fe0ea3f9
+6a4c53cdf0a1a230294154f0723916f6d8c8549bb19596d681af57896a25639d
 ~~~
 
-Preserve eleven modified tracked files: both Phase32 documents, `package.json`,
-`scripts/automation/phase-verification.mjs`,
-`scripts/checkPointLayoutAnchors.mjs`, `scripts/pointLayoutAnchorsContract.mjs`,
-`scripts/pointLayoutPendingFixture.mjs`,
+Preserve six modified tracked files: `docs/PHASE_32D_IMPLEMENTATION.md`,
+`docs/PHASE_32_PLAN.md`, `scripts/pointLayoutPendingView.mjs`,
 `tests/scripts/phase32dVerification.test.mjs`,
-`tests/scripts/pointLayoutPendingFixture.test.mjs`,
-`tests/scripts/runPhaseRunner.test.mjs` and
-`tests/scripts/standalonePointDownloadFixture.mjs`.
-Preserve three new files: `scripts/pointLayoutPendingView.mjs`,
 `tests/scripts/pointLayoutPendingView.test.mjs` and
 `tests/scripts/pointLayoutPendingViewFixture.mjs`.
-Earlier pending preparation/body/diagnostic/capture corrections are tracked.
-This prompt edit changes the fingerprint: capture the actual current tree
-rather than treating this historical identity as future acceptance.
+There are no untracked files. Prior fixes are tracked in the actual baseline.
+The prompt edit changes identity; capture the actual current tree rather than
+hard-coding retained identity as future acceptance. Do not reset/stash/discard
+or commit existing work to bypass implementation/fix guards.
 
 | Retained run | Actual result |
 | --- | --- |
-| View/inline-binding child | 6,347/6,347 full tests, 779/779 focused checks, 37/37 runner checks, build and diff passed. Focused fixture TypeScript/changed-helper lint/syntax passed. Fresh strict verification stopped at label-assets server `listen EPERM` before Chrome; separate direct browser attempts also stopped before launch. Baseline lint/type checks remain failed. No completion review/commit/push. |
-| Latest E5qxLx parent | 6,347/6,347 tests, build, diff and full label-assets passed. Native Chrome launched and 16/18 groups completed. Transparent pending selection and held SVG click succeeded; view baseline validation failed before any zoom fill. |
+| Resolved-provenance child | 6,361/6,361 tests, 1,334 focused checks, 37 runner checks, build/diff/changed-script lint/syntax and fixture TypeScript passed. Fresh strict/direct browser attempts stopped before Chrome at server `listen EPERM`. Baseline lint/type checks remained failed. No completion review/commit/push. |
+| kpMSxP parent | Required tests/build/diff/label-assets/free-labels all passed. Node v26.9.0, Chrome154.0.8037.98. All18 cumulative groups completed, none incomplete/unexecuted, no page errors, matching before/after identity. |
+| Subsequent independent review | needs_changes, zero Critical, three Medium, ready_to_commit:false. Reviewer full suite failed6,360/6,361 with zero skips; build passed. Reported focused geometry/oracle241/241, model/export62/62 and policy478/478 passed; focused TypeScript/lint/syntax/diff passed. Isolated16/16 does not clear the full-suite failure. Existing baseline debt was reproduced separately. |
 
-Preserve E5qxLx terminal successes: complete geometric eleven-shape/eight-contour/
-visibility group and both geometric transparent/white native downloads with
-reopening/PNG acceptance; layout90 sizing cases across15 shapes; 305 supported
-anchor cases and all six unsupported 2D/3D×ellipse/circle/cylinder ordinary
-body → far → warning cases; native controls/persistence; six imports/order/unit
-cases; eleven async transitions; four 2D/3D×rectangle/circular-sector native
-interaction cases and two negative-padding body-overflow/Alt-cycle cases.
+The parent now accepted both transparent/white pending layout SVG downloads,
+actual reopening/complete PNG, both TikZ modes and final standalone exports.
+Transparent post-click view has one native fill, zoom1→1.4 and all three
+before/immediate-input/after stages. The whole geometric and eight layout
+scenarios passed. Keep these as authentic retained results; they do not cover
+the newly discovered negative-dimension cases or substitute for verification
+of the next changed tree. Review rejection, rather than a browser startup or
+pending download failure, is the current completion blocker.
+No commit/push followed the review.
 
-The first six layout scenarios passed. Both pending layout downloads and final
-standalone acceptance remain incomplete/unexecuted.
-An SVG click while held is not a terminal downloaded-file acceptance.
-Page errors are empty. Historical passes cannot replace fresh changed-tree checks.
+## Signed ellipse/rectangle anchors
 
-## First failure and retained observations
+Inspect `src/geometry/pointNodeShapes/solve.ts`, `anchors.ts`, `types.ts` and
+the authenticated PGF basic/geometric source and review artifacts.
 
-The actual first failure is `assertPendingLayoutViewStage` at
-`scripts/pointLayoutPendingView.mjs:170`, reached through `changePendingLayoutView`
-line288 and `checkPointLayoutAnchors.mjs:666`:
+For an empty ellipse or rectangle with:
 
 ~~~text
-actual resolved preview:
-{ innerXSep:3, innerYSep:1, outerXSep:5, outerYSep:2,
-  minimumWidth:110, minimumHeight:25, anchor:'north',
-  fontContext:{fontSizePt:10,xHeightPt:4.30554} }
-
-expected incorrectly spreads raw model layout:
-{ ...same values,
-  units:{minimumWidth:{source:'110',unit:'pt',texPoints:110}},
-  fontContext:{fontSizePt:10,xHeightPt:4.30554} }
+inner xsep=-100pt, inner ysep=-100pt
+minimum width=-160pt, minimum height=-160pt
+outer xsep=0pt, outer ysep=0pt, anchor=east
 ~~~
 
-Read `free-labels-evidence.json`,
-`point-layout-pending-transparent-edit-preparation.json`,
-`point-layout-pending-transparent-edit-post-click-view.json`,
-`point-layout-pending-cleanup.json`, current selection records and native
-source/anchor/minimumWidth diagnostics before changing code.
+Validation and save/load succeed. PGF resolves east to(-80,0)TeX pt.
+Production resolves east to(+96,0)SVG units at1.2 units/pt, i.e.(+80,0)pt.
+Correct placementOffset is(+96,0); current offset is(-96,0).
+Preview/settled SVG and TikZ disagree by160pt.
+Raw PGF north is(0,-80) in its positive-Y-up frame; convert Y exactly once
+when comparing with SVG. The smaller fixed20/8/3pt body with inner-30pt and
+minima-2/-5pt likewise has PGF east-1pt versus app+1.2SVG units.
 
-The raw view artifact honestly contains only `before`:
-`fillCount:0`, unique numeric/slider counts1, zoom1/slider1, pan0/0,
-no control events, no observation errors. The actual camera disclosure was
-initially closed, opened for baseline measurement and restored closed.
-Observer removal/disclosure restoration succeeded; secondaryErrors are empty.
+The solver's ellipse/rectangle construction already computes signed fitted axes:
+rectangle max(padded half-size, minimum/2), ellipse
+max(sqrt(2)*padded half-size, minimum/2).
+`anchors.ts` reconstructs axes from ordered painted bounds.maxX/maxY,
+which loses their signs. Paint bounds describe the envelope, not PGF's
+signed saved dimensions.
 
-Selected circle has source `later $changed$`, anchor north, minimumWidth110,
-and exact units metadata shown above in both saved and runtime JSON.
-Rectangle/cylinder retain their original sources/layouts.
-All three observed nodes are connected/current; the circle is ready for its new
-source. Its original export source remains held with started2/completed0/
-releasedfalse. Do not confuse new-source readiness with captured-source release.
-Current before-stage root-relative origins are measured, but no after-stage
-zoom geometry or native zoom input exists. This run proves no completed zoom.
+Preserve authoritative signed fitted axes through a small pure construction/
+anchor boundary, or an equally narrow shared fitting calculation.
+Apply each axis's own outer separation to its signed fitted axis before anchor
+resolution. Do not infer sign from sorted envelope bounds or sparse vertices.
+Keep named compass/text-side and numeric border semantics distinct, including
+ellipse eccentric compass diagonals versus radial numeric directions.
+Preserve PGF's signed comparisons, zero-axis behavior, numeric parser/range/
+rounding branches and negative outer-separation rules.
 
-The immutable click snapshot still has all15 points, selected layout-circle,
-revision427, original captured transparent source, anchor base/minimumWidth35
-and click-time started1/completed0/unreleased. The later hold count2 is distinct.
-No intended release, saved pending-layout SVG/PNG/TikZ or reopening acceptance
-was reached. Cleanup subsequently released both held requests without errors
-and released the export listener; this is failure cleanup, not acceptance.
-White pending and final standalone are unexecuted.
-Do not reclassify this browser-capable parent failure as child startup EPERM.
+Do not clamp, reject or absolute-value authored dimensions/fitted anchor axes.
+Do not change model coordinates, saved version2, Inspector validation or TikZ
+source to hide the disagreement. Keep ordered finite painted bounds, true SVG
+paint contours, upright body/baseline/anchor placement and shared preview/export
+coordinates. Do not change circle/diamond or other shapes without independent
+evidence requiring it.
 
-## Correct the resolved-layout oracle
+Correct the narrow README explanation that negative minima are always inactive:
+`src/geometry/pointNodeShapes/README.md` currently states that around lines62–63.
+They can dominate when fitted content axes are more negative. Describe the
+observed PGF max behavior; preserve valid negative dimensions and genuine
+upstream singular-branch diagnostics.
 
-Trace the unchanged production contract:
+## Negative radii and picking density
 
-1. `src/ui/inspector/PointLayoutFields.tsx` uses `updatePointNodeDimension`.
-   Native Minimum width input `110` means pt when no suffix is written.
-2. `src/model/pointNodeLayout.ts` stores resolved minimumWidth110 and
-   `units.minimumWidth={source:'110',unit:'pt',texPoints:110}`.
-   It preserves other authored metadata and per-axis contexts.
-3. `resolvePointNodeLayoutOptions` returns exactly six numerical dimension
-   fields, anchor and merged fontContext. Its resolved type has no units.
-   Legacy size/stroke/default precedence and resolution are unchanged.
-4. `src/rendering/svgPointNodeLayout.ts` computes that resolved form;
-   `src/rendering/svgPointNodeView.ts` serializes it as `data-point-layout`.
-5. The harness spreads `point.model.style.layout` into expected DOM layout.
-   This injects authored units into a diagnostic that intentionally omits them.
+Independently inspect `src/geometry/pointNodeShapes/contours.ts:75`:
+`ShapeContourBuilder.arc` uses `Math.max(rx,ry)` to choose the sagitta step.
+For rx=ry=-96 it takes the small-radius π/2 branch and samples four cardinal
+vertices, even though the actual SVG path paints a radius96 ellipse.
 
-Use a narrow explicit resolved-field expectation for the actual preview.
-Compare the entire parsed DOM layout strictly with the correct resolved schema:
-all six dimensions, anchor and effective fontContext. Reject missing, malformed,
-extra or incorrect resolved fields; keep current owner/source/request/model
-binding and finite geometry checks.
-For this complete pending fixture, the authored six dimensions are explicit.
-Do not add an unrelated generic normalization framework or redefine fallback
-semantics. If supporting omitted values, match existing size/stroke/font-context
-precedence exactly with meaningful existing controls.
+The retained production picking reproduction is `ellipse-strong`, nonempty
+source `x`, anchor center. Local(67.2,-67.2) lies95.035 units from the center,
+inside painted radius96; the sampled diamond boundary is27.153 units away,
+beyond existing six-unit proximity tolerance, so candidates are empty.
+`ellipse-empty` independently records empty-source east placement and the same
+negative radii/four vertices. Empty-source center picking is a required new
+regression, not an already recorded browser observation.
+The PGF/fixed-metric reproduction bundle is independent/pure evidence,
+not native browser acceptance.
 
-Keep raw authored layout separate and exact in the authoritative model/saved
-state/history and stage invariants. Its source, unit, texPoints and applicable
-per-axis/context metadata remain mandatory wherever the native edit supplies
-them. The absence of units in resolved DOM is correct; absent or altered units
-in the authored expected baseline is not correct.
+SVG rendering normalizes arc radius signs to magnitudes; see the primary
+[SVG arc parameter rules](https://www.w3.org/TR/SVG/paths.html#ArcOutOfRangeParameters).
+Use `max(abs(rx),abs(ry))` for sampling density.
+Preserve signed coordinate construction, start/end progression, endpoints,
+sweep flags, rotation and analytic extrema. Do not apply a blanket absolute-value
+change to the path/PGF fitting/anchor math.
 
-Do not merely delete the comparison, allow arbitrary subsets, globally strip
-metadata from records, copy actual DOM into its expected value, or relax all
-deep-equality/persistence checks. Do not add units to production preview diagnostics
-or drop units from production model/persistence to make schemas identical.
-Keep raw persisted observations unchanged, including failed pre-input records.
+Keep0.005-unit sagitta precision and the bounded2048-sample arc budget.
+Large negative magnitudes must receive the same precision/work guard as their
+positive counterparts. Preserve zero-axis/degenerate behavior and excessive-work
+rejection; do not enlarge the budget/tolerance or add a blanket circle hit region.
+Shared current contour/paint/picking/export consistency and layer/filter/lock/
+owner/request/stale-result guards remain mandatory.
 
-## Correct the exact native-edit baseline and faithful fixtures
+## Independent and production regressions
 
-A second source-proven defect is in `assertPendingLayoutViewEvidence`'s intended
-post-click baseline construction around lines195–197. It changes circle text,
-anchor and minimumWidth110 but does not add native units metadata.
-After fixing the first stage comparison, its exact runtime equality would still
-reject the real Inspector edit. This is inspected code, not an executed second
-native failure in E5qxLx.
+Add a compact registered set that fails against the current production defects.
+Retain all existing reference files, hashes and tolerances byte-for-byte,
+including the original172-box/4,925-anchor/11-failure inventory and32C references.
+Add separately authenticated negative-padding-plus-negative-minima PGF evidence;
+do not overwrite old oracles or regenerate expectations from production.
 
-Construct the expected baseline from the immutable complete click-time model
-and the actual declared native edits: source `later $changed$`, anchor north,
-minimumWidth110, with minimumWidth provenance
-`{source:'110',unit:'pt',texPoints:110}`.
-Preserve pre-existing units for other axes and any existing font contexts.
-Do not invent pt-axis font metadata that the native editor does not add.
-Require exact full runtime/model equality after only these intended edits.
-Keep exact saved/runtime/history/selection/revision/uiSettings invariance during
-the subsequent view-only action. Do not base the expected edit on the unvalidated
-actual model or discard provenance before equality.
+Start from the review's manifest/input/raw outputs, verify hashes and engine/
+PGF versions, and retain reproducible no-shell-escape commands, complete input,
+compiler output, raw paths/anchors and independent parsed observations in the
+repository. Supplement cases through actual PGF when needed, keeping production
+solvers/support tables out of oracle generation.
+Document TeX pt versus1.2 SVG units/pt and Y-up/Y-down conversion.
+Do not enlarge geometry tolerances to fit incorrect signs/sparse contours.
 
-`tests/scripts/pointLayoutPendingViewFixture.mjs` repeats both mistakes:
-numeric-only minimumWidth edit and raw-layout spread into synthetic DOM.
-Update it to represent actual native provenance in runtime/saved/history present
-and resolved-only preview diagnostics.
-Retain honest intermediate source/anchor history snapshots, the immutable old
-click source/layout, all15 points and all current synthetic native view geometry/
-control/event/hold/cleanup contracts. Avoid using the assertion under test to
-generate its own expected success. Coordinate any dependent parent-policy/
-standalone/runner fixtures; do not loosen their required raw records.
+Cover a small purposeful set: empty strongly negative ellipse/rectangle,
+the recorded nonempty small-minimum case, mixed-sign axes and an outer separation
+crossing an axis sign. Check PGF-backed east/west/north/south, appropriate
+diagonals/text-side and numeric directions without assuming their equivalence.
+Wrong-sign/absolute-axis controls must fail, including correct absolute paint
+bounds paired with incorrect signed anchors.
 
-Add a small set of meaningful regressions that exposes both bugs:
+Use existing geometry/reference and rendering integration suites where practical:
+`tests/geometry/pointNodeLayoutAnchors.test.ts`,
+`tests/geometry/pointNodeAnchorReferences.test.ts`,
+`tests/geometry/pointNodeShapes.test.ts` and
+`tests/rendering/svgPointNodeAnchors.test.ts`.
+Verify correct selected anchor/placementOffset at scale1.2, unchanged model
+coordinates and signed source/provenance through validation/save/load and both
+TikZ modes. Preview/current/settled SVG must share placement for the same body.
 
-- The faithful native `110` edit retains units in authored saved/runtime model,
-  omits them from resolved preview, and passes genuine control/projection proof.
-  A direct before-stage test and complete evidence test should exercise both
-  stage and exact-baseline paths.
-- Missing/changed minimumWidth source, unit or texPoints in the authored baseline
-  fails even if resolved minimumWidth stays110. Preserve applicable context and
-  other-axis metadata; view-only metadata changes must fail exact invariants.
-- Missing/changed dimension, anchor or effective fontContext, malformed layout
-  JSON or unexpected fields in actual resolved DOM fail.
-  A fixture incorrectly including authored units in resolved DOM fails.
-- Preserve existing no-op/unapplied zoom, numeric-only/CSS-only movement,
-  invalid matrix, stale owner/request/epoch, changed model/history/pan,
-  early release, rewritten click and cleanup/diagnostic-error negative controls.
-- Fresh parent validation still requires matching full raw native view artifact/
-  diagnostics/terminal/standalone records. Add a focused metadata corruption
-  control where needed; summary flags or synthetic fixtures cannot replace
-  actual native acceptance.
+For picking, assert analytic contour precision and production candidate inclusion
+at the recorded oblique interior point; include empty-body center and meaningful
+mixed-sign/dominant-negative axes. Keep a genuinely outside point excluded under
+existing tolerance. Overlapping candidates must allow Alt cycling to this
+ellipse while honoring current ownership/filter/lock guards.
+Exercise both ambient dimensions through appropriate production projection,
+preserving2D z=0 and3D active work planes; avoid a large redundant cross product.
+Vertex count alone is not sufficient proof of contour or interaction correctness.
 
-Keep existing import units, per-axis em/ex, context cloning, persistence and
-PGF controls. Do not inflate broad test matrices or rewrite successful suites.
+Retain genuine native acceptance for corrected placement/picking through the
+existing cumulative workflow where applicable. Any new native case must use
+actual current controls/CTM/hit/owner evidence and be required by its raw contract/
+parent policy; synthetic flags cannot establish native Alt-cycle success.
+Keep observed/failing records persisted before assertions and distinguish
+pure/fixed-metric, synthetic and real browser evidence honestly.
 
-## Preserve implemented 2D view and inline binding
+Register new tests in the explicit `npm test` list and copy actual imported
+dependencies into isolated runner fixtures. Do not skip new/old cases or
+silently omit references from full verification.
 
-Keep the scoped `pointLayoutPendingView.mjs` helper: actual unique zoom numeric/
-associated slider/disclosure, baseline after required expansion/scroll and
-intended source/layout edits, target1.4 differing from baseline, one ordinary
-native fill and truthful ordered trusted input/optional change evidence.
-Keep bounded before/immediate-input/after observations persisted before validation,
-current references, ranges, pan and exact state/hold invariants.
+## Deterministic stalled-report test
 
-Keep connected outer point origins for circle/rectangle/cylinder normalized
-through finite invertible native node/root matrices into the actual SVG root.
-Stable rectangle/cylinder separation must follow zoom on both axes; measured
-fixed origin verifies absolute placements at fixed model coordinates/pan.
-Retain precise propagated binary32 rounding, viewBox/viewport/scroll evidence,
-immutable click identity and primary-error-preserving observer/disclosure cleanup.
-Root screenCTM may remain constant; CSS/scroll-only movement cannot pass.
-Do not substitute text/contour/anchor-offset changes or async completion for zoom.
-Production 2D uiSettings/persisted camera omission remains correct.
+The review full suite failed at
+`tests/scripts/pointNativeFocused.test.mjs:237–246`,
+`a stalled failure report has a finite deadline and owns its late rejection`.
+It expected injected `native first error` but received:
 
-Keep mandatory `point-layout-pending-transparent-edit-post-click-view.json`,
-ordered fresh diagnostics and their binding into actual terminal/standalone
-records and parent validation. Failed before-only evidence cannot pass.
+~~~text
+Timed out after 20ms during focused-point-native-evidence.json write
+~~~
 
-Keep unique `export-path` inline binding through the complete current pending
-fixture, correct geometricKind curve/kind polyline, both exact declared inline
-nodes, raw content/order/placement/options and existing XML checks.
-Preserve missing/duplicate/wrong-kind/changed-content regressions, both free labels,
-all15 points and successful distinct async sibling snapshots.
-Do not restore the former `siblings[0]` lookup or weaken content comparisons.
+`diagnosticTimeoutMs:20` covers all injected writes, including ordinary
+`writeFile` calls for startup/running reports before the native error is reached.
+Under full-suite filesystem load a normal report write can time out first.
+The runner then correctly owns that timeout as primary.
+This is fixture isolation failure, not justification to change production
+timeout or primary-error priority.
 
-## Preserve pending fixture, preparation and immutable downloads
+Limit the fix to this test's injected writer. Make ordinary writes complete
+immediately through an in-memory recorder; only result===failed report writes
+should return deliberately unresolved controllable promises.
+Retain the actual short20ms bounded diagnostic path and production helper
+`boundedPointDiagnostic` unchanged.
+Other existing tests continue covering real filesystem/report serialization.
 
-Keep `pointLayoutPendingFixture.mjs`'s declared initial positions:
-circle (7,6.5,0), right grid x19/23/27/31 and rows13/9/5/1 with its per-shape
-assignments. Preserve all fifteen ids/shapes/order/full sources/styles/layout/
-parameters, circle at index0, two free labels and the export-path inline nodes.
-Keep pre-load cloning and normal JSON load, with no outcome-based repositioning.
+Require exact injected native Error identity and one arrival at nativeChecks,
+two failed-report attempts, finite timeout of each stalled operation and owned
+late rejections fired after runner completion and drained without unhandled
+rejection. Keep listener removal → page close → browser close → server close,
+empty handlers and cleanup even when report capture/write fails.
+Record/inspect ordinary write arguments and failed report payloads as needed
+without racing normal disk latency against the intentional20ms stall.
 
-Keep `pointLayoutPendingPreparation.mjs` and the unchanged shared .23 native
-selection helper, current sibling body/contour bounds/CTMs/owner/request/state,
-real first hit/stack, current held request, authoritative state invariance,
-immediate input binding, one ordinary trusted no-modifier gesture and selected
-owner proof before Inspector reopening. Keep separate preparation artifact,
-native modifier cleanup, UI restoration and first-error handling.
+Do not increase deadlines to mask the race, change test concurrency globally,
+skip/mark flaky the test, retry until a pass or remove primary/late-error/cleanup
+assertions. Preserve all production diagnostic/owned-runner/resource semantics.
+Run the focused suite and a fresh full `npm test` with normal project concurrency.
+A focused16/16 pass alone does not clear the review's required full-suite failure.
 
-Keep actual click-time snapshots for all fifteen points, selected owner,
-background control and held conversion. Require current unreleased pending
-source at the SVG click, exact source/style/position entries and intended
-post-click release. Do not conflate cleanup release with that successful boundary.
+## Preserve completed layout, native and capture work
 
-Preserve the sequence: hold full source → normal combined load → pending native
-selection → actual background control/armed snapshots → SVG click while pending →
-transparent source/layout/view edits or white replacement load → intended release →
-actual downloaded file → original-fixture reload/settled expectations/both TikZ
-modes → external standalone reopening → complete-root PNG validation.
+Keep explicit resolved preview schema (six dimensions, anchor, effective font
+context) separate from exact authored units/source/context.
+Keep immutable-click-derived native source/anchor/`110` expectations for full
+runtime/saved envelope/history present, faithful fixtures and parent corruption
+controls. Do not restore raw layout spreads or globally strip metadata.
 
-Keep captured old source/layout/placement after post-click changes, no edit/load
-leakage, actual ready MathJax expected nodes, pending-versus-settled contour
-inequality, cylinder paint/shape-center anchors and combined label/path content.
-Do not settle/release the held source before click or weaken source/position
-comparisons to accommodate later changes.
+Keep real unique zoom numeric/associated slider/disclosure, one native1.4 fill,
+ordered before/immediate/after observations, native input/change provenance,
+connected circle/rectangle/cylinder root-relative matrices, measured both-axis
+scale/fixed-origin proof and precise binary32 propagation.
+Keep exact state/history/selection/revision/uiSettings/pan/held-source invariants,
+owned cleanup, mandatory post-click artifact and terminal/standalone/raw-policy
+binding. Root screenCTM equality and persisted2D camera omission remain valid.
 
-## Contracts and cumulative continuation
+Keep deterministic pre-load fifteen-point fixture/ids/order/sources/styles/layout/
+parameters, selected circle(7,6.5,0), two free labels and unique export-path
+curve/polyline with both exact inline nodes/content/options.
+Keep fixed.23 native preparation, current hit stack/owner/request/held source,
+one ordinary trusted gesture, selected owner proof, Inspector/UI restoration and
+all missing/duplicate/wrong-content inline/preparation regressions.
 
-Retain current preparation/hold/click/release/view and SVG/PNG/TikZ raw contracts.
-Terminal and standalone observations must agree with the same actual persisted
-records and immutable click snapshot. Missing, unrelated, stale, failed or
-summary-only evidence cannot pass.
+Keep immutable pending sequence: hold → normal load → native selection →
+actual background/armed snapshots → SVG click while held → post-click edit/view
+or replacement load → intended release → actual download → original reload/
+settled expectations/both TikZ modes → external reopening → complete-root PNG.
+Keep all15 click-time entries, original source/layout/placement, pending/settled
+contour distinction and release-boundary evidence. Cleanup release is not
+acceptance. Preserve transparent/white content and background assertions.
 
-Register any new test in the explicit test list and copy actual imported
-dependencies into isolated runner fixtures. Preserve current policy/ownership/
-runner controls. Add no dependency without explaining necessity.
-Use strict TypeScript without `any`; preserve 2D z=0, active 3D work planes and
-the mathematical codimension convention.
+Keep Clear/imported paint/shape/layout detachment and exact persistence/history;
+native Select/Inspector/toolbar preparation/restoration; trusted handle/capture/
+release movement, one history commit and exact Undo/Redo under the same valid
+document revision; fresh JSON-load/reused-ID/cache/request isolation;
+canonical layers, exact Hidden points controls, dim/hide/dim provenance,
+camera theta90/phi0 and owner/filter/lock/occluder checks.
+Keep ordinary unsupported body → far → warning, fixed diagnostic candidates,
+six-unit clearance, bounded warnings, overflow bodies and native owner cycles.
 
-Use the same cumulative pages and strict predecessor sequence. Preserve fresh
-geometric and first-six-layout acceptance; complete both pending transparent/
-white SVG/TikZ downloads, reopening/PNG acceptance and final standalone export.
-Diagnose any next first failure from fresh raw observations.
-
-## Preserve completed native, visibility, geometry and capture work
-
-Keep Clear's detached imported paint/shape/layout behavior, exact persistence,
-raw source, history, policy/UI regressions and JSON reload.
-
-Keep scoped native Inspector/toolbar preparation, real Select before conditional
-collapse, state invariance, fresh fixed .23 contour/CTM/hit, trusted owner/path,
-owned restoration and first-error handling. Keep precise SVGPoint binary32
-allowances without changing PGF tolerances.
-
-Keep selected-point drag/layout movement, trusted handle/capture/release, one
-history commit, exact saved/runtime Undo/Redo, field Inspector reopening and
-owner cycles. Keep same valid revision through drag/Undo/Redo, native JSON-load +1,
-stale reused-ID isolation and existing cache/revision semantics.
-
-Keep canonical layers, exact-caption/associated-select visibility resolution,
-dim/hide/dim/raw provenance, honest trusted=false selectOption records, native
-theta90/phi0 and intended UI-angle-only changes, actual owner/occluder/opacity
-validation and conditional owned preparation/restoration helpers.
-
-Keep preview-only current body bounds/placement/request targets, nonempty finite
-conditions, inherited layer/filter/lock behavior and detached/export exclusion.
-Keep ordinary unsupported body/warning hits, bounded rings, body overflow,
-contour/Alt selection and production-backed regressions.
-Keep four fixed diagnostic candidates/first eligible adoption, six-unit visible
-clearance, bounded-ring exclusion, viewport/clipping and genuine far background
-delivery. Preserve all six ordinary body → far → warning cases.
-
-Keep saved envelope version2, additive layout, legacy Size/2 precedence, ordered
-shorthand/axis resolution, per-axis em/ex contexts, PGF solvers/anchors, actual
-body/baseline/depth and painted/anchor-clearance bounds, 2D/3D projection and
-immutable click-time placement. Preserve external raw text and existing
-typography/paragraph/TeX-program limitations, free labels and inline path nodes.
-
-Retain independent 172-box / 4,925-anchor / 11-failure reference inventory,
-raw/reference files and tolerances. No geometry/reference regeneration is
-justified by this observation/binding correction.
-The diamond outer-separation exception still requires independent PGF review.
+Keep saved version2/additive layout, legacy Size/2, ordered spacing/shorthand/
+per-axis em/ex contexts, text/baseline/depth, real preview/export projection,
+raw free/attached/inline text and existing typography/TeX limitations.
+The documented diamond outer-separation exception was authenticated and judged
+correct by this review; preserve it without applying that exception to these
+signed-axis defects. No unrelated reference issue was found.
 
 Keep both callers using unchanged `captureStandaloneSvg`, normal fonts,
-bounded settling/one native image/no retry, complete-root coverage, at most one
-viewport expansion, stable coordinates and exact SVG/PNG file identity.
-Preserve pre-image reopening records, owned page/listener cleanup,
-no extra failure screenshot and primary-error handling.
-Keep actual PNG CRC/chunks/inflated scanlines/dimensions/byte length validation,
-independent source/contour/cylinder paint/placement/background checks, explicit
-artifact lists and runner copying. Reject incomplete/cropped/unrelated/changed
-images, missing raw observations or mock PNG headers.
+bounded settling, one actual image/no retry, complete-root coverage, at most
+one viewport expansion, stable coordinates and exact SVG/PNG file identity.
+Keep pre-image reopening records, owned cleanup, primary errors and no extra
+failure screenshot. Preserve actual PNG CRC/chunks/inflated scanline/dimensions/
+byte validation, artifact inventories, raw-policy checks and runner copies.
 
-## Fresh verification and parent handoff
+## Fresh verification, review and handoff
 
-Use Node >=22.12.0 through Homebrew. Run focused resolved-layout/provenance/
-native-baseline/faithful-fixture checks plus current view/preparation/inline
-binding, layout/capture, parent-policy/ownership and runner checks.
+Use strict TypeScript without `any`; keep module separation, codim convention,
+user raw text and model coordinates. Add no dependency without explaining why.
+Update Phase32 status documents with actual new scope/results and README's
+signed-minimum correction; retain baseline debt and evidence history accurately.
+
+Use Node>=22.12.0 through Homebrew. Run focused independent PGF/geometry/
+production placement/picking, deterministic focused-runner, resolved-provenance/
+view/pending/capture, parent-policy/ownership and isolated runner checks.
 Run required commands:
 
 ~~~bash
@@ -367,52 +327,40 @@ PATH=/opt/homebrew/bin:$PATH npm run check:label-assets
 PATH=/opt/homebrew/bin:$PATH npm run check:free-labels
 ~~~
 
-Run applicable focused TypeScript/lint and changed-script syntax checks.
-Report reproduced baseline debt accurately: geometric caller's two
-no-unsafe-finally errors, modified verifier's inherited unused _role, unchanged
-layers' unused defaultCurveStyle and eleven inherited focused strict-TypeScript
-diagnostics. These checks remain failed; application TypeScript/build is separate.
-Do not relabel baseline failures as passes or expand into unrelated cleanup.
+Run applicable focused strict TypeScript/lint and changed-script syntax checks.
+The reviewer full-suite failure is required work, separate from documented
+baseline geometric-script no-unsafe-finally, verifier unused _role, layers unused
+defaultCurveStyle and eleven inherited focused-TypeScript diagnostics.
+Baseline failed checks remain failed; do not relabel them as passes or expand
+into unrelated cleanup.
 
-Use a fresh owned server and supported Playwright/Chrome in the browser-capable
-parent. Focused/scoped evidence cannot establish strict32D acceptance.
-If child browser attempts encounter `listen EPERM`, retain startup failure and
-exact tree for the parent without weakening sandbox/acceptance rules.
-The latest parent's resolved-layout assertion occurred after native launch.
-
-Load updated helpers/contracts/policy in a fresh parent process and verify
-the preserved dirty tree without committing:
+Use a fresh owned browser-capable parent process/server, supported Playwright/
+Chrome and the actual preserved dirty tree:
 
 ~~~bash
 PATH=/opt/homebrew/bin:$PATH node scripts/automation/run-phase.mjs 32D verify
 ~~~
 
-Preserve implementation/fix clean-tree guard. Do not reset, discard, stash,
-commit or push unfinished work to bypass it.
 Require all twelve31F groups, three32A groups, complete32B paint/import,
-complete32C shapes/visibility/downloads and point-node-layout-anchors-combined.
-Require terminal successes, actual valid artifacts, no page errors, native
-history/JSON persistence, both TikZ modes, both pending downloads and reopened
-standalone SVG/complete PNG acceptance.
-Do not skip predecessors, reuse historical/scoped reports, create a deferred32D
-profile or reclassify unexpected failures as backlog.
+complete32C shapes/visibility/downloads, full combined32D layout and final
+standalone exports. Require both pending downloads/reopening/complete PNG/TikZ,
+native geometry/history/JSON persistence, actual valid artifacts and no page errors.
+Do not reuse kpMSxP after geometry/test edits, skip predecessors, adopt deferred
+profiles or substitute scoped/synthetic reports.
+If child attempts stop at server EPERM, retain exact startup failure/identity and
+remaining native acceptance for the parent without weakening rules.
 
-## Independent review and completion
-
-After complete fresh strict parent verification, obtain read-only independent
-review of the exact matching tracked/untracked tree using
-`prompts/phase-32d-review.md`. Inspect actual report/artifacts.
-Matching accepted evidence can support a sandboxed reviewer; stale, partial or
-failed reports cannot substitute for acceptance.
-
-Update status only to observed accepted results. Keep Phase32 incomplete while
-any native/download/reference/review gate remains open.
+After all fresh required checks pass, obtain independent read-only completion
+review of the exact matching tracked/untracked tree with
+`prompts/phase-32d-review.md` and inspect actual reports/artifacts.
+Require the three findings resolved with authenticated negative-case evidence,
+full-suite success and fresh cumulative native/download acceptance.
 Preserve stop-before-review/commit on failed verification and the parent's
-post-review identity guard.
+post-review exact-tree guard. needs_changes prevents completion/commit even
+when an earlier verification passed.
 
-Report corrected resolved-layout/native-edit expectations and faithful fixtures,
-preserved production/view/pending/capture contracts, changed files, focused/full
-checks, fresh parent evidence/identity, actual transparent/white downloads/final
-standalone coverage, review result and any remaining concrete first failure.
-Leave commit/push to the parent after verification and review pass.
-Do not claim completion from child-only or historical results.
+Report the scoped signed-axis/sampling/test-fixture fixes, additive authenticated
+references, preserved contracts, changed files, focused/full checks and any
+baseline failures, current native/download coverage, exact tree/report identity
+and independent review result. Keep Phase32 incomplete until all gates pass.
+Leave commit/push to the parent after verification and review.

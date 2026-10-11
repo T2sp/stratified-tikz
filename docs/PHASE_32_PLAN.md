@@ -1,5 +1,48 @@
 # Phase 32 Plan: Point-node math, paint, geometric shapes, and layout
 
+Resolved preview/native-edit provenance correction (2026-10-11): the actual
+starting checkout is clean at `8067dea1c9e43a1387a7b6083ff2d1805e4c9752`,
+fingerprint `832a100ce9dff7908961f6c3cbd5f2db9967f37f72590142249d06bcc463e58b`.
+The prior eleven-file/three-new-file view/inline correction is tracked and
+preserved. Browser-capable parent `E5qxLx` passed 6,347 tests/build/diff/full
+label-assets and sixteen of eighteen groups, complete geometric transparent/
+white downloads/reopening/PNG and the first six layout scenarios. Native pending
+selection and held SVG click succeeded. The next first failure occurred before
+zoom fill: the view oracle injected authored units into the resolved DOM layout.
+Only before-stage evidence exists, zoom/slider 1, pan 0/0, fillCount 0, no control
+events or observation errors. New-source readiness is distinct from the still
+held old captured source. Cleanup restored disclosure/observer and released two
+requests without errors; this is failure cleanup, not download acceptance.
+Neither pending layout download nor final standalone acceptance completed.
+This Chrome-launched parent assertion is distinct from child startup failures.
+
+The scoped harness now compares the complete explicit resolved six-dimension/
+anchor/effective-font-context schema, rejecting extra units and malformed/
+missing/changed fields. Its independent native-edit expectation applies exact
+source/anchor/minimumWidth110 edits and `{source:'110',unit:'pt',texPoints:110}`
+to immutable click-time runtime and saved forms, preserving other-axis/context
+metadata and saved camera/default omissions. Full runtime/saved/history-present
+equality and exact subsequent view-only invariants remain. Faithful synthetic
+fixtures carry native authored units and resolved-only DOM, honest intermediate
+histories and immutable old click. Focused controls cover metadata/schema faults
+and raw artifact/standalone binding without weakening existing native proof.
+
+Focused checks passed 1,334/1,334, including the 97-check view suite; changed-script
+lint passed. Browser fixture strict TypeScript/lint passed. Baseline geometric/
+verifier/layer lint and eleven isolated layer TypeScript diagnostics remain
+failed. Final full/runner/required browser/strict results, preservation hashes
+and exact frozen identity are retained under
+`/private/tmp/stz-32d-resolved-provenance-20261011/` and the
+[implementation audit](PHASE_32D_IMPLEMENTATION.md). Production, completed native
+view/preparation/inline/capture contracts and independent PGF references remain
+unchanged. A fresh browser-capable parent must load current helpers/contracts/
+policy and verify the preserved dirty tree cumulatively, including both pending
+transparent/white SVG/TikZ downloads, reopening/complete PNG and final standalone
+acceptance. Accepted exact-tree verification must precede matching independent
+read-only review and the post-review identity guard. Phase 32 is **not complete**;
+diamond PGF review remains open and failed/partial verification stops before
+review/commit/push. All following entries retain their historical dispositions.
+
 Current pending 2D view/inline binding correction (2026-10-11): the actual clean
 starting checkout is `63a6afc6ae212458d17d0fe11849bf2957ecb2f7`, fingerprint
 `fd1568c469bc6af3a11e9a361f64358de682fad918fe6a2cec26ac8759b08580`.

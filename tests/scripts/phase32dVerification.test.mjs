@@ -742,7 +742,7 @@ for (const fault of ['pending', 'missing-record', 'unrelated-scenario', 'wrong-p
   'wrong-body-transform', 'wrong-layout', 'pending-contour', 'wrong-captured-tikz', 'primary-error',
   'missing-preparation-artifact', 'wrong-preparation-artifact', 'raw-preparation-disagrees', 'raw-before-export-disagrees', 'raw-release-disagrees',
   'missing-view-artifact', 'unrelated-view-artifact', 'wrong-view-artifact-group', 'passed-view-artifact', 'failed-view-artifact',
-  'view-artifact-disagrees', 'missing-raw-view', 'raw-view-disagrees']) {
+  'view-artifact-disagrees', 'view-artifact-authored-provenance', 'missing-raw-view', 'raw-view-disagrees', 'raw-view-authored-provenance']) {
   test(`32D standalone parent contract rejects ${fault}`, (t) => {
     const directory = mkdtempSync(join(tmpdir(), 'stz-32d-standalone-policy-'))
     t.after(() => rmSync(directory, { recursive: true, force: true }))
@@ -773,7 +773,7 @@ for (const fault of ['pending', 'missing-record', 'unrelated-scenario', 'wrong-p
     if (fault === 'raw-release-disagrees') raw.capturedRelease.result.completed = 0
     const viewPath = join(directory, `${evidence.scenario}-post-click-view.json`)
     if (fault === 'missing-view-artifact') unlinkSync(viewPath)
-    if (['unrelated-view-artifact', 'wrong-view-artifact-group', 'passed-view-artifact', 'failed-view-artifact', 'view-artifact-disagrees'].includes(fault)) {
+    if (['unrelated-view-artifact', 'wrong-view-artifact-group', 'passed-view-artifact', 'failed-view-artifact', 'view-artifact-disagrees', 'view-artifact-authored-provenance'].includes(fault)) {
       const viewArtifact = { scenario: `${evidence.scenario}-post-click-view`, group: layoutAnchorGroup, result: 'observed',
         postClickView: structuredClone(evidence.postClickView) }
       if (fault === 'unrelated-view-artifact') viewArtifact.scenario = 'point-layout-pending-white-load-post-click-view'
@@ -781,10 +781,24 @@ for (const fault of ['pending', 'missing-record', 'unrelated-scenario', 'wrong-p
       if (fault === 'passed-view-artifact') viewArtifact.result = 'passed'
       if (fault === 'failed-view-artifact') viewArtifact.result = 'failed'
       if (fault === 'view-artifact-disagrees') viewArtifact.postClickView.viewChanged = false
+      if (fault === 'view-artifact-authored-provenance') {
+        const stage = viewArtifact.postClickView.stages[0], saved = JSON.parse(stage.state.json)
+        const circle = saved.diagram.strata.find(({ id }) => id === 'layout-circle')
+        assert.equal(circle.style.layout.minimumWidth, 110)
+        circle.style.layout.units.minimumWidth.texPoints = 111
+        stage.state.json = JSON.stringify(saved)
+      }
       writeFileSync(viewPath, JSON.stringify(viewArtifact))
     }
     if (fault === 'missing-raw-view') delete raw.postClickView
     if (fault === 'raw-view-disagrees') raw.postClickView.viewChanged = false
+    if (fault === 'raw-view-authored-provenance') {
+      const stage = raw.postClickView.stages[0], saved = JSON.parse(stage.state.json)
+      const circle = saved.diagram.strata.find(({ id }) => id === 'layout-circle')
+      assert.equal(circle.style.layout.minimumWidth, 110)
+      circle.style.layout.units.minimumWidth.source = '110pt'
+      stage.state.json = JSON.stringify(saved)
+    }
     assert.throws(() => assertLayoutStandaloneEvidence(evidence, raw, directory))
   })
 }

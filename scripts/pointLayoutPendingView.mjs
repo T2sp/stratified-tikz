@@ -167,8 +167,15 @@ export function assertPendingLayoutViewStage(stage, record) {
     assert.equal(point.model.position.z, 0); assert.ok(Object.values(point.model.position).every(Number.isFinite))
     assert.deepEqual(JSON.parse(point.owner), ['point-node', stage.state.labelDocumentRevision, point.id])
     assert.ok(point.request); assert.equal(point.request, point.bodyRequest); assert.equal(point.source, point.model.text)
-    assert.equal(point.anchor, point.model.style.layout.anchor); assert.deepEqual(JSON.parse(point.layout), { ...point.model.style.layout,
-      fontContext: { fontSizePt: 10, xHeightPt: 4.30554, ...point.model.style.layout.fontContext } })
+    // This complete fixture authors every dimension. Preview diagnostics carry
+    // only resolved values; source/unit/per-axis context stays in the model.
+    const layout = point.model.style.layout
+    const resolved = { innerXSep: layout.innerXSep, innerYSep: layout.innerYSep,
+      outerXSep: layout.outerXSep, outerYSep: layout.outerYSep,
+      minimumWidth: layout.minimumWidth, minimumHeight: layout.minimumHeight,
+      anchor: layout.anchor, fontContext: { fontSizePt: 10, xHeightPt: 4.30554, ...layout.fontContext } }
+    for (const field of ['innerXSep', 'innerYSep', 'outerXSep', 'outerYSep', 'minimumWidth', 'minimumHeight']) assert.ok(Number.isFinite(resolved[field]))
+    assert.equal(point.anchor, layout.anchor); assert.deepEqual(JSON.parse(point.layout), resolved)
     assert.ok(['pending', 'ready'].includes(point.status))
     for (const key of ['screenCTM', 'CTM', 'rootMatrix']) finiteMatrix(point[key])
     close(point.screen.x, point.screenCTM.e); close(point.screen.y, point.screenCTM.f)
@@ -192,9 +199,17 @@ export function assertPendingLayoutViewEvidence(record, click = record?.click) {
   for (const stage of record.stages) { assertPendingLayoutViewStage(stage, record); sameState(before.state, stage.state) }
   sameState(record.preparation.stateBefore, before.state)
   assert.ok(before.at <= immediate.at && immediate.at <= after.at, 'Actual view observations retain chronological order')
-  const edited = JSON.parse(click.snapshot.runtimeDiagramJson), circle = edited.strata.find(({ id }) => id === 'layout-circle')
-  circle.text = 'later $changed$'; circle.style.layout.anchor = 'north'; circle.style.layout.minimumWidth = 110
+  const edited = JSON.parse(click.snapshot.runtimeDiagramJson), savedEdited = JSON.parse(click.snapshot.json)
+  // Build each authored form from its immutable click input. Saved 2D diagrams
+  // intentionally omit runtime camera/default fields; native edits retain units.
+  for (const diagram of [edited, savedEdited.diagram]) {
+    const circle = diagram.strata.find(({ id }) => id === 'layout-circle')
+    circle.text = 'later $changed$'; circle.style.layout.anchor = 'north'; circle.style.layout.minimumWidth = 110
+    circle.style.layout.units = { ...circle.style.layout.units, minimumWidth: { source: '110', unit: 'pt', texPoints: 110 } }
+  }
   assert.deepEqual(JSON.parse(before.state.runtimeDiagramJson), edited, 'Baseline follows only the intended source/anchor/minimum edits')
+  assert.deepEqual(JSON.parse(before.state.json), savedEdited, 'Saved baseline follows only the intended source/anchor/minimum edits')
+  assert.deepEqual(JSON.parse(before.state.history).present, edited, 'History present retains the exact native-edit baseline')
   assert.equal(before.state.labelDocumentRevision, click.snapshot.runtime.documentRevision)
   assert.equal(before.state.uiSettings, click.snapshot.uiSettings); assert.deepEqual(before.state.selection, click.snapshot.selection)
   const zoom = Number(before.controls.zoom.value), ratio = record.target / zoom

@@ -1,18 +1,55 @@
 import assert from 'node:assert/strict'
 import test from 'node:test'
-import { assertPendingLayoutViewEvidence, changePendingLayoutView } from '../../scripts/pointLayoutPendingView.mjs'
+import { assertPendingLayoutViewEvidence, assertPendingLayoutViewStage, changePendingLayoutView } from '../../scripts/pointLayoutPendingView.mjs'
 import { syntheticPendingLayoutViewEvidence } from './pointLayoutPendingViewFixture.mjs'
 import { syntheticPendingLayoutPreparation } from './standalonePointDownloadFixture.mjs'
 
 // Every control, event and matrix below is explicitly synthetic Node evidence.
 // These tests enforce the acceptance oracle, never native browser acceptance.
-function fixture() {
+function fixture(authoredLayout) {
   const pending = syntheticPendingLayoutPreparation(), source = pending.pendingPreparation.source
+  if (authoredLayout) {
+    const snapshot = pending.click.snapshot, diagram = JSON.parse(snapshot.runtimeDiagramJson)
+    const circle = diagram.strata.find(({ id }) => id === 'layout-circle')
+    circle.style.layout = { ...circle.style.layout, ...structuredClone(authoredLayout) }
+    const saved = JSON.parse(snapshot.json), history = JSON.parse(snapshot.history)
+    circleLayout(saved.diagram).fontContext = structuredClone(circle.style.layout.fontContext)
+    circleLayout(saved.diagram).units = structuredClone(circle.style.layout.units)
+    history.present = structuredClone(diagram)
+    snapshot.runtimeDiagramJson = JSON.stringify(diagram); snapshot.json = JSON.stringify(saved); snapshot.history = JSON.stringify(history)
+    snapshot.points.find(({ id }) => id === 'layout-circle').style = structuredClone(circle.style)
+  }
   return { click: pending.click, source, record: syntheticPendingLayoutViewEvidence({ click: pending.click, source }) }
 }
 const after = (record) => record.stages[2]
 const immediate = (record) => record.stages[1]
 const before = (record) => record.stages[0]
+const circleLayout = (diagram) => diagram.strata.find(({ id }) => id === 'layout-circle').style.layout
+
+test('synthetic before-stage separates resolved preview fields from native authored minimum-width provenance', () => {
+  const { click, record } = fixture(), stage = before(record)
+  const authored = circleLayout(JSON.parse(stage.state.runtimeDiagramJson))
+  assert.deepEqual(authored.units, { minimumWidth: { source: '110', unit: 'pt', texPoints: 110 } })
+  assert.deepEqual(circleLayout(JSON.parse(stage.state.json).diagram), authored)
+  assert.deepEqual(circleLayout(JSON.parse(stage.state.history).present), authored)
+  assert.deepEqual(JSON.parse(stage.points[0].layout), { innerXSep: 3, innerYSep: 1, outerXSep: 5, outerYSep: 2,
+    minimumWidth: 110, minimumHeight: 25, anchor: 'north', fontContext: { fontSizePt: 10, xHeightPt: 4.30554 } })
+  assert.equal(Object.hasOwn(JSON.parse(stage.points[0].layout), 'units'), false)
+  assertPendingLayoutViewStage(stage, record)
+  const original = JSON.parse(click.snapshot.runtimeDiagramJson), history = JSON.parse(stage.state.history)
+  assert.equal(original.strata.filter(({ geometricKind }) => geometricKind === 'point').length, 15)
+  assert.equal(original.strata[0].text, record.source)
+  assert.deepEqual(circleLayout(original), { innerXSep: 3, innerYSep: 1, outerXSep: 5, outerYSep: 2,
+    minimumWidth: 35, minimumHeight: 25, anchor: 'base' })
+  assert.deepEqual(history.past[0], original)
+  assert.equal(history.past[1].strata[0].text, 'later $changed$')
+  assert.equal(circleLayout(history.past[1]).anchor, 'base')
+  assert.equal(circleLayout(history.past[2]).anchor, 'north')
+  for (const intermediate of history.past) {
+    assert.equal(circleLayout(intermediate).minimumWidth, 35)
+    assert.equal(Object.hasOwn(circleLayout(intermediate), 'units'), false)
+  }
+})
 
 test('synthetic actual-control and root-relative projection proof accepts unchanged serialized 2D UI and root screen CTM', () => {
   const { click, record } = fixture(), original = structuredClone(click)
@@ -22,8 +59,148 @@ test('synthetic actual-control and root-relative projection proof accepts unchan
   assert.equal(click.snapshot.points[0].held.started, 1)
   assert.equal(before(record).hold.started, 2, 'The later held observation remains distinct from the actual export-click snapshot')
   assert.equal(before(record).points[0].source, 'later $changed$')
+  assert.deepEqual(circleLayout(JSON.parse(before(record).state.runtimeDiagramJson)).units.minimumWidth,
+    { source: '110', unit: 'pt', texPoints: 110 })
   assertPendingLayoutViewEvidence(record, click)
   assert.deepEqual(click, original)
+})
+
+const authoredContext = {
+  fontContext: { fontSizePt: 12, xHeightPt: 5 },
+  units: {
+    innerXSep: { source: '.5em', unit: 'em', texPoints: 3, fontContext: { fontSizePt: 6, xHeightPt: 2.5 } },
+    outerYSep: { source: '.4ex', unit: 'ex', texPoints: 2, fontContext: { fontSizePt: 10, xHeightPt: 5 } },
+    minimumWidth: { source: '35pt', unit: 'pt', texPoints: 35 },
+  },
+}
+test('synthetic native edit preserves other-axis provenance and contexts while replacing minimum-width source without inventing pt context', () => {
+  const { click, record } = fixture(authoredContext), expected = { ...authoredContext.units,
+    minimumWidth: { source: '110', unit: 'pt', texPoints: 110 } }
+  for (const stage of record.stages) {
+    const authored = circleLayout(JSON.parse(stage.state.runtimeDiagramJson))
+    assert.deepEqual(authored.units, expected)
+    assert.deepEqual(authored.fontContext, authoredContext.fontContext)
+    assert.deepEqual(circleLayout(JSON.parse(stage.state.json).diagram), authored)
+    assert.deepEqual(circleLayout(JSON.parse(stage.state.history).present), authored)
+    assert.deepEqual(JSON.parse(stage.points[0].layout).fontContext, authoredContext.fontContext)
+    assert.equal(Object.hasOwn(JSON.parse(stage.points[0].layout), 'units'), false)
+  }
+  for (const diagram of JSON.parse(before(record).state.history).past) {
+    assert.deepEqual(circleLayout(diagram).units, authoredContext.units)
+    assert.deepEqual(circleLayout(diagram).fontContext, authoredContext.fontContext)
+  }
+  assert.deepEqual(circleLayout(JSON.parse(click.snapshot.runtimeDiagramJson)).units, authoredContext.units)
+  assertPendingLayoutViewStage(before(record), record)
+  assertPendingLayoutViewEvidence(record, click)
+})
+
+test('synthetic native edit preserves independent saved and runtime forms with saved camera and empty-anchor omissions', () => {
+  const { click, source } = fixture(), saved = JSON.parse(click.snapshot.json), runtime = JSON.parse(click.snapshot.runtimeDiagramJson)
+  delete saved.diagram.camera
+  runtime.coordinateAnchors = []
+  const history = JSON.parse(click.snapshot.history); history.present = structuredClone(runtime)
+  click.snapshot.json = JSON.stringify(saved); click.snapshot.runtimeDiagramJson = JSON.stringify(runtime); click.snapshot.history = JSON.stringify(history)
+  const record = syntheticPendingLayoutViewEvidence({ click, source }), stage = before(record)
+  const editedSaved = JSON.parse(stage.state.json).diagram, editedRuntime = JSON.parse(stage.state.runtimeDiagramJson)
+  assert.equal(Object.hasOwn(editedSaved, 'camera'), false)
+  assert.equal(Object.hasOwn(editedSaved, 'coordinateAnchors'), false)
+  assert.deepEqual(editedRuntime.camera, runtime.camera)
+  assert.deepEqual(editedRuntime.coordinateAnchors, [])
+  assert.deepEqual(circleLayout(editedSaved).units.minimumWidth, { source: '110', unit: 'pt', texPoints: 110 })
+  assertPendingLayoutViewEvidence(record, click)
+})
+
+function editAuthoredState(state, edit) {
+  const saved = JSON.parse(state.json), runtime = JSON.parse(state.runtimeDiagramJson), history = JSON.parse(state.history)
+  for (const diagram of [saved.diagram, runtime, history.present]) edit(circleLayout(diagram))
+  state.json = JSON.stringify(saved); state.runtimeDiagramJson = JSON.stringify(runtime); state.history = JSON.stringify(history)
+}
+function corruptAuthoredBaseline(record, edit) {
+  for (const stage of record.stages) {
+    editAuthoredState(stage.state, edit)
+    edit(stage.points[0].model.style.layout)
+    for (const event of stage.events) editAuthoredState(event.state, edit)
+  }
+  editAuthoredState(record.preparation.stateBefore, edit)
+  editAuthoredState(record.cleanup.observation.state, edit)
+}
+for (const field of ['source', 'unit', 'texPoints']) {
+  test(`synthetic native-edit baseline rejects missing or changed minimum-width ${field} with unchanged resolved width`, () => {
+    for (const missing of [true, false]) {
+      const { click, record } = fixture()
+      corruptAuthoredBaseline(record, (layout) => {
+        if (missing) delete layout.units.minimumWidth[field]
+        else layout.units.minimumWidth[field] = { source: '110pt', unit: 'mm', texPoints: 109 }[field]
+      })
+      assert.equal(JSON.parse(before(record).points[0].layout).minimumWidth, 110)
+      assertPendingLayoutViewStage(before(record), record)
+      assert.throws(() => assertPendingLayoutViewEvidence(record, click), /Baseline follows only the intended/)
+    }
+  })
+}
+test('synthetic native-edit baseline rejects missing provenance object and invented pt-axis font context', () => {
+  for (const edit of [(layout) => { delete layout.units },
+    (layout) => { layout.units.minimumWidth.fontContext = { fontSizePt: 10, xHeightPt: 4.30554 } }]) {
+    const { click, record } = fixture(); corruptAuthoredBaseline(record, edit)
+    assertPendingLayoutViewStage(before(record), record)
+    assert.throws(() => assertPendingLayoutViewEvidence(record, click), /Baseline follows only the intended/)
+  }
+})
+test('synthetic native-edit baseline rejects lost other-axis source or altered per-axis context', () => {
+  for (const edit of [(layout) => { delete layout.units.innerXSep },
+    (layout) => { layout.units.outerYSep.fontContext.xHeightPt = 4 }]) {
+    const { click, record } = fixture(authoredContext); corruptAuthoredBaseline(record, edit)
+    assertPendingLayoutViewStage(before(record), record)
+    assert.throws(() => assertPendingLayoutViewEvidence(record, click), /Baseline follows only the intended/)
+  }
+})
+test('synthetic native-edit baseline rejects saved-only or history-present-only provenance corruption', () => {
+  for (const field of ['json', 'history']) {
+    const { click, record } = fixture()
+    const states = [record.preparation.stateBefore, record.cleanup.observation.state,
+      ...record.stages.flatMap((stage) => [stage.state, ...stage.events.map((event) => event.state)])]
+    for (const state of states) {
+      const parsed = JSON.parse(state[field]), diagram = field === 'json' ? parsed.diagram : parsed.present
+      delete circleLayout(diagram).units.minimumWidth.source
+      state[field] = JSON.stringify(parsed)
+    }
+    assertPendingLayoutViewStage(before(record), record)
+    assert.throws(() => assertPendingLayoutViewEvidence(record, click))
+  }
+})
+test('synthetic view-only action rejects authored metadata changes even when numeric projection and resolved layout remain unchanged', () => {
+  for (const edit of [(layout) => { layout.units.minimumWidth.source = '110pt' },
+    (layout) => { layout.units.innerXSep.fontContext.fontSizePt = 7 }]) {
+    const { click, record } = fixture(authoredContext)
+    editAuthoredState(after(record).state, edit); edit(after(record).points[0].model.style.layout)
+    assertPendingLayoutViewStage(after(record), record)
+    assert.throws(() => assertPendingLayoutViewEvidence(record, click), /View-only action preserves/)
+  }
+})
+
+test('synthetic resolved preview rejects missing or changed dimensions, anchor and effective font context', () => {
+  for (const field of ['innerXSep', 'innerYSep', 'outerXSep', 'outerYSep', 'minimumWidth', 'minimumHeight', 'anchor', 'fontContext']) {
+    for (const missing of [true, false]) {
+      const { record } = fixture(), stage = before(record), layout = JSON.parse(stage.points[0].layout)
+      if (missing) delete layout[field]
+      else layout[field] = field === 'anchor' ? 'south' : field === 'fontContext'
+        ? { fontSizePt: 11, xHeightPt: 4.30554 } : layout[field] + 1
+      stage.points[0].layout = JSON.stringify(layout)
+      assert.throws(() => assertPendingLayoutViewStage(stage, record), `${field} must match the entire resolved schema`)
+    }
+  }
+})
+test('synthetic resolved preview rejects malformed JSON, unexpected fields and authored units', () => {
+  for (const malformed of ['{', 'null', '[]', '110']) {
+    const { record } = fixture(); before(record).points[0].layout = malformed
+    assert.throws(() => assertPendingLayoutViewStage(before(record), record))
+  }
+  for (const extra of [{ units: { minimumWidth: { source: '110', unit: 'pt', texPoints: 110 } } },
+    { fontContext: { fontSizePt: 10, xHeightPt: 4.30554, unit: 'pt' } }, { unexpected: 0 }]) {
+    const { record } = fixture(), stage = before(record)
+    stage.points[0].layout = JSON.stringify({ ...JSON.parse(stage.points[0].layout), ...extra })
+    assert.throws(() => assertPendingLayoutViewStage(stage, record))
+  }
 })
 
 test('synthetic owned input accepts honest optional change provenance and unrelated same-request completion', () => {

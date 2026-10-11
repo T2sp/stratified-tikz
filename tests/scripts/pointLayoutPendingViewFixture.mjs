@@ -13,8 +13,14 @@ export function syntheticPendingLayoutViewEvidence({ click, source }) {
   circle.style.layout.anchor = 'north'
   const anchorEdit = structuredClone(diagram)
   circle.style.layout.minimumWidth = 110
+  circle.style.layout.units = { ...circle.style.layout.units,
+    minimumWidth: { source: '110', unit: 'pt', texPoints: 110 } }
   const saved = JSON.parse(captured.json), oldHistory = JSON.parse(captured.history)
-  const state = { json: JSON.stringify({ ...saved, diagram }), runtimeDiagramJson: JSON.stringify(diagram),
+  const savedCircle = saved.diagram.strata.find(({ id }) => id === 'layout-circle')
+  savedCircle.text = 'later $changed$'; savedCircle.style.layout.anchor = 'north'; savedCircle.style.layout.minimumWidth = 110
+  savedCircle.style.layout.units = { ...savedCircle.style.layout.units,
+    minimumWidth: { source: '110', unit: 'pt', texPoints: 110 } }
+  const state = { json: JSON.stringify(saved), runtimeDiagramJson: JSON.stringify(diagram),
     history: JSON.stringify({ past: [...oldHistory.past, old, sourceEdit, anchorEdit].slice(-100), present: diagram, future: [] }),
     selection: structuredClone(captured.selection), labelDocumentRevision: captured.runtime.documentRevision,
     uiSettings: captured.uiSettings, requests: 15 }
@@ -34,7 +40,11 @@ export function syntheticPendingLayoutViewEvidence({ click, source }) {
     return { id, count: 1, connected: true, sameIdentity: true, inRoot: true, model,
       owner: JSON.stringify(['point-node', state.labelDocumentRevision, id]), request, bodyRequest: request, source: model.text,
       status: id === 'layout-circle' ? 'pending' : 'ready', anchor: model.style.layout.anchor,
-      layout: JSON.stringify({ ...model.style.layout, fontContext: { fontSizePt: 10, xHeightPt: 4.30554 } }),
+      layout: JSON.stringify({ innerXSep: model.style.layout.innerXSep, innerYSep: model.style.layout.innerYSep,
+        outerXSep: model.style.layout.outerXSep, outerYSep: model.style.layout.outerYSep,
+        minimumWidth: model.style.layout.minimumWidth, minimumHeight: model.style.layout.minimumHeight,
+        anchor: model.style.layout.anchor,
+        fontContext: { fontSizePt: 10, xHeightPt: 4.30554, ...model.style.layout.fontContext } }),
       nodeTransform: `translate(${root.x} ${root.y})`, root, screen,
       rootMatrix: { ...identity, e: root.x, f: root.y }, CTM: { ...identity, e: root.x, f: root.y },
       screenCTM: { ...rootScreen, e: screen.x, f: screen.y } }
