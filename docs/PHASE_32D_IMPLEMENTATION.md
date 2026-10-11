@@ -7,6 +7,76 @@ later 32B have historical accepted evidence. The plan still records unaccepted
 fresh strict native/review gates for the merged 32C checkout; implementation
 presence does not close that prerequisite or the final gate.
 
+## Pending combined-export fixture preparation correction (2026-10-11)
+
+The actual starting checkout is clean at
+`dab98a52983920f68da09982dedacb9342c959ab`, fingerprint
+`5a863f505aca7c1201dd6826367e024c2eb71980769182b2ea923d12e3bdccde`.
+The prompt update and earlier ordinary-body/native/capture corrections are
+tracked here. Initial/final inventories, diff, preservation hashes, commands
+and exact current-tree handoff are retained under
+`/private/tmp/stz-32d-pending-fix-20261011/`.
+
+The latest browser-capable parent `DvEwwg` passed 6,158 tests, build, diff and
+full label-assets, then completed sixteen of eighteen cumulative groups. Full
+geometric transparent/white download/reopening/PNG acceptance passed. Layout
+sizing (90 cases), supported anchors (305), all six unsupported ordinary
+body → far → warning cases, controls/persistence/imports/async isolation and
+four native interactions plus both negative-padding overflow/Alt cases passed.
+Its first pending transparent setup failed before canvas input: the current
+`.23` circle contour point hit the sibling trapezium body rectangle, followed
+by trapezium/isosceles-triangle paint and then the intended circle. Records
+0493–0499 retain the native circle CTM/hit stack, closed Inspector, expanded
+toolbar, unchanged null selection and empty page errors. Historical sibling
+dimensions are not measured there. No pending layout download or final
+standalone export was accepted; there is no pending failure screenshot.
+
+Only these two pending fixtures now use a deterministic initial position
+declaration: circle `(7,6.5,0)` and the fourteen other shapes in the right-hand
+grid, with incircle triangle/semicircle farther right and compact dart nearer
+the circle. The complete fifteen-shape id/source/style/layout/parameter/list
+order, both free labels and inline path are preserved. A pure builder clones
+the declared document before normal JSON load; picking never changes loaded
+coordinates. Both expected placement and TikZ comparisons use those same
+positions. Production projection controls with the retained actual circle box
+and explicit emergency sibling estimates expose the old overlap and check the
+new target clearance. They establish neither native acceptance nor complete
+visibility/nonoverlap of every sibling footprint; current bounds are measured
+independently in the fresh browser.
+
+The scoped pending preparation wrapper retains the unchanged shared `.23`
+selection route. Fresh observations include all current sibling body targets
+and painted contours, native bounds/matrices, owner/request/source/state,
+declared and rendered order, canvas/viewport/scroll/clipping and top hit/stack.
+Immediately before one ordinary click it persists and validates those raw
+observations and the unreleased pending hold. The shared intended-first-hit,
+binary32 allowance, toolbar/Inspector preparation/restoration and trusted
+owner/path assertions remain unchanged. A bounded scoped listener additionally
+requires no modifiers and actual selected circle ownership; unavailable, stale
+or intercepted targets fail without input. No body route, trial click, forced
+selection, sort/layer/visibility change, camera reset or renderer change is used.
+
+The actual export-click fixture snapshot additionally records authoritative
+selection/runtime/UI state, the native background select and held conversion
+state. Both pending terminal policies require matching raw preparation,
+unreleased current request at click, exact fifteen captured entries/positions,
+and the intended post-click captured release. The standalone record binds the
+same preparation artifact and continues to require actual immutable SVG/TikZ,
+settled contour inequality, reopening and complete PNG byte validation. Failure
+cleanup records hold release and owns export/modifier listeners while preserving
+the first error; no extra failure image is added. New focused controls are
+registered and imported runner dependencies are copied. No dependency is added.
+
+Production/model/serialization/geometry/TikZ files, completed native/body/
+visibility helpers, shared capture contracts and independent PGF files remain
+byte-preserved. Reproduced baseline lint/type debt remains failed, separate
+from application build and changed-file checks. Final executed command results
+and strict fresh-process verifier identity belong to the external handoff.
+Complete accepted current-tree verification and matching read-only independent
+review remain required, including both pending layout downloads and the final
+standalone group. The diamond PGF review gate remains open. Phase 32 is
+**not complete**; failed/incomplete verification stops before review/commit/push.
+
 ## Ordinary visible-body selection correction (2026-10-11)
 
 The actual clean starting checkout is

@@ -1,6 +1,44 @@
 # Phase 32 Plan: Point-node math, paint, geometric shapes, and layout
 
-Current ordinary visible-body correction (2026-10-11): actual clean HEAD is
+Current pending combined-export fixture correction (2026-10-11): the actual
+starting checkout is clean at `dab98a52983920f68da09982dedacb9342c959ab`,
+fingerprint `5a863f505aca7c1201dd6826367e024c2eb71980769182b2ea923d12e3bdccde`.
+Earlier corrections are tracked and preserved. Latest browser-capable parent
+`DvEwwg` passed 6,158 tests/build/diff/full label-assets and sixteen of eighteen
+groups, including complete geometric transparent/white SVG/reopen/PNG coverage.
+Layout sizing, 305 supported anchors, all six unsupported ordinary body/far/
+warning cases, controls/persistence/imports/async and native interaction/overflow/
+owner cycles passed. The first pending transparent setup then failed before
+native input: actual `.23` circle hit was a sibling trapezium body rectangle,
+with the intended circle fourth in the native stack. Page errors are empty;
+both pending layout downloads and final standalone group remain unaccepted.
+
+The two pending fixtures now declare a separate circle lane and right-hand
+sibling grid before normal JSON load. All fifteen shapes/ids/order/raw sources/
+styles/layout/parameters, both free labels and inline path remain. Production
+projection controls expose the old overlap and check conservative target
+clearance, distinct from fresh native acceptance. A scoped wrapper uses the
+unchanged shared `.23` helper, retains every current sibling target/paint bound,
+matrix/ownership/request, viewport/clipping/top hit, held pending conversion,
+one ordinary no-modifier gesture, selected owner and owned cleanup. Current
+native interception/staleness fails with raw evidence before input.
+
+Both pending parent policies bind actual preparation and its raw artifact to
+the native export-click snapshot, actual background and held request, exact
+captured positions and intended post-click release. Complete immutable SVG/TikZ,
+settled contour inequality, standalone reopening and PNG byte contracts remain.
+No production rendering/geometry/model/native helper/capture/reference change
+or dependency is introduced. Command results, preservation hashes and final
+tracked/untracked identity belong to
+`/private/tmp/stz-32d-pending-fix-20261011/` and the
+[implementation audit](PHASE_32D_IMPLEMENTATION.md). Baseline lint/type debt
+remains failed. Fresh complete strict verification must precede matching
+independent review and the post-review exact-tree identity gate. Both pending
+layout downloads, final standalone exports and the diamond PGF review remain
+open. Phase 32 is **not complete**; no review/commit/push follows failed or
+partial verification. Earlier records below are historical.
+
+Earlier ordinary visible-body correction (2026-10-11): actual clean HEAD is
 `cf6a9d34feb64b8ba512371e272a1b8ff32c8b7d`, fingerprint
 `9132034f073fc8c63bc97c587c064de2465e3cb181902f32e9508be808a9541d`.
 Earlier fixes are tracked and preserved. The latest browser-capable parent

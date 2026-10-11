@@ -17,6 +17,9 @@ import { observePointLiteral, assertPositionedLiteral } from './pointLiteralOrac
 import { withOwnedFontFace, observeOwnedFontFace } from './ownedFontFace.mjs'
 import { captureStandaloneSvg } from './standaloneSvgCapture.mjs'
 import { runUnsupportedDiagnosticCase } from './pointUnsupportedDiagnostic.mjs'
+import { buildPendingLayoutFixture, assertPendingLayoutFixture } from './pointLayoutPendingFixture.mjs'
+import { preparePendingLayoutPoint, capturePendingLayoutPreparation,
+  assertPendingLayoutClickContinuation } from './pointLayoutPendingPreparation.mjs'
 
 const paint = { text: { color: '#203040', opacity: 1 }, fill: { enabled: true, color: '#d8ecff', opacity: .7 },
   stroke: { enabled: true, color: '#203040', opacity: 1, width: .4, lineStyle: 'solid', dashPhase: 0, lineCap: 'butt', lineJoin: 'miter' } }
@@ -150,11 +153,16 @@ export async function runPointLayoutAnchorChecks({ browser, origin, artifactDir,
     }
     return input
   }
-  async function select(id = 'app-point', observePoint = observeLayoutPoint) {
-    const rendered = await selectGeometricPoint({ page, readState: state, observePoint, diagnose: async (details) => {
+  async function select(id = 'app-point', observePoint = observeLayoutPoint, pendingFixture) {
+    const selection = { page, readState: state, observePoint, diagnose: async (details) => {
       await diagnostic(group, scenario, details)
+      if (details.pendingPreparation) await writeFile(resolve(artifactDir, `${scenario}-preparation.json`),
+        JSON.stringify({ scenario, group, result: 'observed', pendingPreparation: details.pendingPreparation }, null, 2) + '\n')
     },
-      secondaryErrors: pageErrors, scenario, sequence: ++selectionSequence, id, boundary: true })
+      secondaryErrors: pageErrors, scenario, sequence: ++selectionSequence, id, boundary: true }
+    const rendered = pendingFixture
+      ? await preparePendingLayoutPoint({ ...selection, fixture: pendingFixture, source: pendingFixture.diagram.strata[0].text })
+      : await selectGeometricPoint(selection)
     const beforeInspector = await state()
     const open = page.getByRole('button', { name: 'Open inspector drawer', exact: true })
     if (await open.count()) await open.click()
@@ -632,22 +640,25 @@ export async function runPointLayoutAnchorChecks({ browser, origin, artifactDir,
 
     for (const background of ['transparent', 'white']) {
       scenario = `point-layout-pending-${background}-${background === 'transparent' ? 'edit' : 'load'}`
-      const captured = `captured ${background} $\\frac{anchor_{32D}}{1+\\frac{x}{y}}$`, input = await document('circle', {}, captured, 2, true), template = input.diagram.strata[0]
-      const siblings = input.diagram.strata.slice(1)
-      input.diagram.strata = [...layoutShapes.map((shape, index) => ({ ...structuredClone(template), id: `layout-${shape.replaceAll(' ', '-')}`,
-        text: index === 0 ? captured : `${shape} $x_j$`, position: { x: (index % 4) * 4, y: 13 - Math.floor(index / 4) * 4, z: 0 },
-        style: { ...structuredClone(template.style), shape, shapeParameters: structuredClone(layoutShapeParameters[shape] ?? {}),
-          layout: { innerXSep: 3, innerYSep: 1, outerXSep: 5, outerYSep: 2, minimumWidth: 35, minimumHeight: 25, anchor: shape === 'cylinder' ? 'shape center' : 'base' } } })), ...siblings]
+      const captured = `captured ${background} $\\frac{anchor_{32D}}{1+\\frac{x}{y}}$`
+      const input = buildPendingLayoutFixture(await document('circle', {}, captured, 2, true), captured, layoutShapes, layoutShapeParameters)
+      assertPendingLayoutFixture(input, captured, layoutShapes, layoutShapeParameters)
       await page.evaluate((source) => window.stzAppLabels.hold(source), captured); held.add(captured); await load(input)
       await page.waitForFunction((source) => window.stzAppLabels.pending(source)?.started > 0, captured)
       const pending = await observeLayoutPoint(page, 'layout-circle')
-      await select('layout-circle'); await page.getByLabel('SVG export background', { exact: true }).selectOption(background)
+      const selected = await select('layout-circle', observeLayoutPoint, input), pendingPreparation = selected.pendingPreparation
+      await page.getByLabel('SVG export background', { exact: true }).selectOption(background)
       const points = input.diagram.strata.filter(({ geometricKind }) => geometricKind === 'point')
       await page.evaluate((ids) => window.stzAppLabels.armPointExportClick(ids), points.map(({ id }) => id))
-      let click
+      const beforeExportClick = await capturePendingLayoutPreparation({ page, readState: state, fixture: input, source: captured })
+      await observe(`${scenario}-before-export-click`, { group, result: 'observed', pendingPreparation, beforeExportClick })
+      let click, capturedRelease
       const { event: download } = await event(scenario, 'download', async ({ check }) => {
         await page.getByRole('button', { name: 'Export current diagram view as SVG', exact: true }).click(); check()
-        click = await page.evaluate(() => window.stzAppLabels.pointExportClick()); assert.equal(click.error, undefined)
+        click = await page.evaluate(() => window.stzAppLabels.pointExportClick())
+        await observe(`${scenario}-export-click-held`, { group, result: 'observed', pendingPreparation, beforeExportClick, click,
+          heldAfterClick: await page.evaluate((source) => window.stzAppLabels.pending(source), captured) })
+        assertPendingLayoutClickContinuation(pendingPreparation, click, beforeExportClick)
         if (background === 'transparent') {
           await (await resolvePointInspectorField(page, 'Node text', 'textarea')).fill('later $changed$')
           await nativeField('anchor', 'north'); await nativeField('minimumWidth', 110)
@@ -658,7 +669,13 @@ export async function runPointLayoutAnchorChecks({ browser, origin, artifactDir,
           assert.notEqual((await state()).uiSettings, changedView.uiSettings)
           await observe(scenario + '-post-click-view', { group, before: changedView, after: await state() })
         } else await load(await document('rectangle', { anchor: 'west', minimumWidth: 110 }, 'replacement $loaded$'))
-        check(); await page.evaluate((source) => window.stzAppLabels.release(source), captured); held.delete(captured)
+        check()
+        const beforeRelease = await page.evaluate((source) => window.stzAppLabels.pending(source), captured)
+        capturedRelease = { source: captured, before: beforeRelease,
+          result: await page.evaluate((source) => window.stzAppLabels.release(source), captured) }
+        held.delete(captured)
+        capturedRelease.after = await page.evaluate((source) => window.stzAppLabels.pending(source), captured)
+        await observe(`${scenario}-captured-release`, { group, result: 'observed', capturedRelease })
       })
       const svgPath = resolve(artifactDir, `${scenario}.svg`); await download.saveAs(svgPath)
       const xml = await readFile(svgPath, 'utf8'); assert.ok(xml.includes(captured)); assert.ok(!xml.includes('later $changed$') && !xml.includes('replacement $loaded$'))
@@ -670,7 +687,8 @@ export async function runPointLayoutAnchorChecks({ browser, origin, artifactDir,
       assertPointTikzSourceByMode(outputs, captured)
       const standalone = await context.newPage(), fileUrl = pathToFileURL(svgPath).href
       const standaloneEvidence = await capturePointLayoutStandalone({ standalone, artifactDir,
-        details: { scenario, group, background, svgPath, fileUrl, pageErrors, expected, click, pending, outputs, xml },
+        details: { scenario, group, background, svgPath, fileUrl, pageErrors, expected, click, pending, outputs, xml,
+          pendingPreparation, beforeExportClick, capturedRelease },
         observe: (candidate) => observe(`${scenario}-standalone-observed`, { group, result: 'observed', candidate }),
         reopen: async (standalone) => standalone.evaluate((expected) => {
           const clean = (element) => ({ tag: element.localName, attributes: Object.fromEntries([...element.attributes].filter(({ name }) => !name.startsWith('data-') && name !== 'pointer-events').map(({ name, value }) => [name, value])) })
@@ -704,6 +722,7 @@ export async function runPointLayoutAnchorChecks({ browser, origin, artifactDir,
         } })
       await save({ background, actualDownload: true, capturedPending: click.snapshot.points[0].status === 'pending', reopened: true, immutableSource: true, immutableLayout: true,
         immutablePlacement: true, settledContour: true, combinedLabels: true, noExternalAssets: true, expected, click, pending,
+        pendingPreparation, beforeExportClick, capturedRelease,
         capture: standaloneEvidence.capture })
     }
     assert.deepEqual(pageErrors, []); await completeGroup(group)
@@ -716,7 +735,28 @@ export async function runPointLayoutAnchorChecks({ browser, origin, artifactDir,
     throw error
   } finally {
     for (const wait of waits) wait.dispose()
-    for (const source of held) { try { await page.evaluate((source) => window.stzAppLabels.release(source), source) } catch (error) { if (!primary) primary = error; pageErrors.push(`Held layout conversion cleanup: ${error.message}`) } }
+    const pendingCleanup = { scenario, result: 'observed', primary: primary?.message, holds: [], errors: [] }
+    if (scenario.startsWith('point-layout-pending-')) {
+      try {
+        await boundedPointDiagnostic(() => page.evaluate(() => window.stzAppLabels.releasePointExportClick()), 'Pending export listener cleanup')
+        pendingCleanup.exportListenerReleased = true
+      } catch (error) {
+        primary ??= error; pendingCleanup.errors.push({ operation: 'export listener cleanup', message: error.message })
+        pageErrors.push(`Pending export listener cleanup: ${error.message}`)
+      }
+    }
+    for (const source of held) {
+      const release = { source }
+      pendingCleanup.holds.push(release)
+      try {
+        release.before = await page.evaluate((source) => window.stzAppLabels.pending(source), source)
+        release.result = await page.evaluate((source) => window.stzAppLabels.release(source), source)
+        release.after = await page.evaluate((source) => window.stzAppLabels.pending(source), source)
+      } catch (error) {
+        primary ??= error; release.error = error.message; pageErrors.push(`Held layout conversion cleanup: ${error.message}`)
+      }
+    }
+    if (scenario.startsWith('point-layout-pending-')) await retainFailure('point-layout-pending-cleanup.json', pendingCleanup)
     try { await context.close() } catch (error) { primary ??= error; await retainFailure('point-layout-cleanup-failure.json', { primary: primary.message, cleanup: error.message }) }
     await Promise.allSettled(waits.map((wait) => wait.drain()))
   }

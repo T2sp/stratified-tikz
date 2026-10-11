@@ -6,7 +6,7 @@ import test from 'node:test'
 import { allPointNodeScenarios, pointNodeScenarioArtifacts, validateBrowserEvidence } from '../../scripts/automation/phase-verification.mjs'
 import { layoutAnchorGroup, layoutAnchorScenarios, layoutAnchorArtifacts, layoutShapes, layoutRegimes, layoutForShapeRegime,
   pointAnchorsForShape, layoutImportCases, assertLayoutAnchorEvidence, assertObservedPointPlacement, assertPointTikzSourceByMode, assertLayoutStandaloneEvidence } from '../../scripts/pointLayoutAnchorsContract.mjs'
-import { syntheticStandalonePointDownload } from './standalonePointDownloadFixture.mjs'
+import { syntheticStandalonePointDownload, syntheticPendingLayoutPreparation } from './standalonePointDownloadFixture.mjs'
 import { syntheticUnsupportedDiagnosticEvidence } from './pointUnsupportedDiagnosticFixture.mjs'
 import { pointNodeAnchorSupport } from '../../src/geometry/pointNodeShapes/index.ts'
 import { createEmptyDiagram, createPointStratum } from '../../src/model/constructors.ts'
@@ -117,11 +117,18 @@ function evidence(name) {
   if (name === 'point-layout-import-order-units') return { ...common,
     cases: layoutImportCases.map(({ key, expected }) => ({ result: 'passed', key, actual: expected, expected, sourcePreserved: true })),
     nativeImport: true, saveReloadRestored: true, standaloneTikz: true, inlineTikz: true, unsupportedTextMetricsDiagnosed: true }
-  return { ...common, background: name.includes('transparent') ? 'transparent' : 'white', actualDownload: true, capturedPending: true, reopened: true,
+  const background = name.includes('transparent') ? 'transparent' : 'white'
+  const preparation = syntheticPendingLayoutPreparation(background)
+  return { ...common, background, actualDownload: true, capturedPending: true, reopened: true,
     capture: { status: 'saved' },
     immutableSource: true, immutableLayout: true, immutablePlacement: true, settledContour: true, combinedLabels: true, noExternalAssets: true,
-    expected: layoutShapes.map((shape) => placement(shape, shape === 'cylinder' ? 'shape center' : 'base')),
-    click: { snapshot: { points: layoutShapes.map((shape) => ({ shape })) } } }
+    expected: preparation.click.snapshot.points.map((point) => {
+      const entry = placement(point.style.shape, point.style.layout.anchor, { id: point.id, source: point.source, layout: point.style.layout })
+      entry.rendered.source = point.source; entry.rendered.nodeTransform = point.nodeTransform
+      return entry
+    }), ...preparation, capturedRelease: { source: preparation.pendingPreparation.source,
+      before: { started: 1, completed: 0, released: false },
+      result: { source: preparation.pendingPreparation.source, started: 1, completed: 1, fail: false }, after: null } }
 }
 
 test('32D named group and every artifact are registered cumulatively', () => {
@@ -614,6 +621,36 @@ for (const fault of ['pending-sized-contour', 'later-source', 'later-layout', 'l
     assert.throws(() => assertLayoutAnchorEvidence(current, name))
   })
 }
+for (const fault of ['missing-preparation', 'observed-preparation', 'trapezium-before-circle', 'missing-before-export',
+  'wrong-click-owner', 'wrong-click-selection', 'released-before-click', 'ready-at-click', 'changed-click-position',
+  'changed-declared-position', 'wrong-captured-order', 'missing-release', 'wrong-release-source', 'unfinished-release']) {
+  test(`synthetic 32D pending terminal policy rejects success flags with ${fault}`, () => {
+    const name = 'point-layout-pending-transparent-edit', current = evidence(name)
+    const preparation = current.pendingPreparation
+    const immediate = preparation.stages.find(({ boundary }) => boundary === 'immediate-before-input')
+    if (fault === 'missing-preparation') delete current.pendingPreparation
+    if (fault === 'observed-preparation') preparation.result = 'observed'
+    if (fault === 'trapezium-before-circle') {
+      const target = { ...immediate.measurement.elementFromPoint, tag: 'rect', pointId: 'layout-trapezium', bodyTarget: true, contour: false }
+      immediate.measurement.elementFromPoint = target
+      immediate.measurement.elementsFromPoint = [target, { ...target, tag: 'path', bodyTarget: false, contour: true },
+        { ...target, tag: 'path', pointId: 'layout-isosceles-triangle', bodyTarget: false, contour: true },
+        immediate.measurement.elementsFromPoint[0]]
+    }
+    if (fault === 'missing-before-export') delete current.beforeExportClick
+    if (fault === 'wrong-click-owner') current.click.snapshot.points[0].owner = JSON.stringify(['point-node', 1, 'layout-circle'])
+    if (fault === 'wrong-click-selection') current.click.snapshot.selection = { kind: 'stratum', id: 'layout-trapezium' }
+    if (fault === 'released-before-click') current.click.snapshot.points[0].held.released = true
+    if (fault === 'ready-at-click') current.click.snapshot.points[0].status = 'ready'
+    if (fault === 'changed-click-position') current.click.snapshot.points[0].position.x += 1
+    if (fault === 'changed-declared-position') preparation.fixture.diagram.strata[0].position.x += 1
+    if (fault === 'wrong-captured-order') current.click.snapshot.points.reverse()
+    if (fault === 'missing-release') delete current.capturedRelease
+    if (fault === 'wrong-release-source') current.capturedRelease.result.source = 'later replacement'
+    if (fault === 'unfinished-release') current.capturedRelease.result.completed = 0
+    assert.throws(() => assertLayoutAnchorEvidence(current, name))
+  })
+}
 for (const background of ['transparent', 'white']) {
   test(`32D synthetic standalone ${background} policy accepts only complete raster and raw placement`, (t) => {
     const directory = mkdtempSync(join(tmpdir(), 'stz-32d-standalone-policy-'))
@@ -625,7 +662,8 @@ for (const background of ['transparent', 'white']) {
 }
 for (const fault of ['pending', 'missing-record', 'unrelated-scenario', 'wrong-png-path', 'nonfinite-root', 'scaled-root',
   'cropped-root', 'changed-coordinates', 'mock-png-header', 'missing-png', 'wrong-png-dimensions',
-  'wrong-body-transform', 'wrong-layout', 'pending-contour', 'wrong-captured-tikz', 'primary-error']) {
+  'wrong-body-transform', 'wrong-layout', 'pending-contour', 'wrong-captured-tikz', 'primary-error',
+  'missing-preparation-artifact', 'wrong-preparation-artifact', 'raw-preparation-disagrees', 'raw-before-export-disagrees', 'raw-release-disagrees']) {
   test(`32D standalone parent contract rejects ${fault}`, (t) => {
     const directory = mkdtempSync(join(tmpdir(), 'stz-32d-standalone-policy-'))
     t.after(() => rmSync(directory, { recursive: true, force: true }))
@@ -647,6 +685,13 @@ for (const fault of ['pending', 'missing-record', 'unrelated-scenario', 'wrong-p
     if (fault === 'pending-contour') raw.pending.contour = evidence.expected[0].rendered.contour
     if (fault === 'wrong-captured-tikz') raw.outputs.inlineMath = 'later replacement'
     if (fault === 'primary-error') raw.error = { message: 'first capture failure' }
+    const preparationPath = join(directory, `${evidence.scenario}-preparation.json`)
+    if (fault === 'missing-preparation-artifact') unlinkSync(preparationPath)
+    if (fault === 'wrong-preparation-artifact') writeFileSync(preparationPath, JSON.stringify({ scenario: evidence.scenario, group: layoutAnchorGroup,
+      result: 'observed', pendingPreparation: { ...evidence.pendingPreparation, result: 'observed' } }))
+    if (fault === 'raw-preparation-disagrees') raw.pendingPreparation.source = 'later replacement'
+    if (fault === 'raw-before-export-disagrees') raw.beforeExportClick.measurement.hold.released = true
+    if (fault === 'raw-release-disagrees') raw.capturedRelease.result.completed = 0
     assert.throws(() => assertLayoutStandaloneEvidence(evidence, raw, directory))
   })
 }

@@ -5,6 +5,8 @@ import { assertStandaloneReopeningRecord, validateStandaloneSvgCaptureEvidence }
 import { assertPointNativeDragEvidence, assertPointCanvasPreparation } from './pointNativeDrag.mjs'
 import { assertGeometricSelectionEvidence, assertPointToolbarPreparation } from './pointGeometricShapesContract.mjs'
 import { assertUnsupportedDiagnosticEvidence } from './pointUnsupportedDiagnosticContract.mjs'
+import { assertPendingLayoutPreparation, assertPendingLayoutClickContinuation } from './pointLayoutPendingPreparation.mjs'
+import { assertPendingLayoutFixture } from './pointLayoutPendingFixture.mjs'
 
 export const layoutAnchorGroup = 'point-node-layout-anchors-combined'
 export const layoutShapes = ['circle', 'rectangle', 'square', 'triangle', 'ellipse', 'diamond', 'regular polygon',
@@ -63,7 +65,7 @@ export const layoutImportCases = [
 ]
 export function layoutAnchorArtifacts(name) {
   const files = [`${name}.json`]
-  if (name.startsWith('point-layout-pending-')) files.push(`${name}.svg`, `${name}.png`, `${name}-standalone.json`, `${name}-standalone.tex`, `${name}-inlineMath.tex`)
+  if (name.startsWith('point-layout-pending-')) files.push(`${name}-preparation.json`, `${name}.svg`, `${name}.png`, `${name}-standalone.json`, `${name}-standalone.tex`, `${name}-inlineMath.tex`)
   if (name === 'point-layout-native-controls-persistence') files.push(`${name}-saved.json`, `${name}-standalone.tex`, `${name}-inlineMath.tex`)
   if (name === 'point-layout-import-order-units') files.push(`${name}.sty`, `${name}-saved.json`, `${name}-standalone.tex`, `${name}-inlineMath.tex`)
   return files
@@ -78,6 +80,13 @@ export function assertLayoutStandaloneEvidence(evidence, raw, artifactDir) {
   assert.ok(evidence.scenario.startsWith('point-layout-pending-'))
   assertStandaloneReopeningRecord(raw, evidence, artifactDir)
   assert.deepEqual(raw.pending, evidence.pending)
+  assert.deepEqual(raw.pendingPreparation, evidence.pendingPreparation, 'Retained standalone record preserves the accepted native pending preparation')
+  assert.deepEqual(raw.beforeExportClick, evidence.beforeExportClick, 'Retained standalone record preserves the held request immediately before export')
+  assert.deepEqual(raw.capturedRelease, evidence.capturedRelease, 'Retained standalone record preserves the intended post-click release')
+  const preparation = JSON.parse(readFileSync(resolve(artifactDir, `${evidence.scenario}-preparation.json`), 'utf8'))
+  assert.equal(preparation.scenario, evidence.scenario); assert.equal(preparation.group, layoutAnchorGroup)
+  assert.equal(preparation.result, 'observed', 'Preparation artifact retains raw observations before terminal download acceptance')
+  assert.deepEqual(preparation.pendingPreparation, evidence.pendingPreparation, 'Retained native preparation matches the accepted terminal download')
   for (const [index, expected] of evidence.expected.entries()) {
     const actual = raw.reopened[index], captured = evidence.click.snapshot.points.find(({ id }) => id === expected.id)
     assert.ok(captured); assert.equal(captured.source, expected.source); assert.equal(captured.style.shape, expected.shape)
@@ -312,10 +321,33 @@ export function assertLayoutAnchorEvidence(evidence, name) {
     assert.equal(evidence.expected.length, layoutShapes.length)
     assert.equal(evidence.click.error, undefined)
     assert.equal(evidence.click.snapshot.points.length, layoutShapes.length)
+    assert.ok(evidence.pendingPreparation, 'Terminal pending download retains its native selection preparation')
+    assert.equal(evidence.pendingPreparation.source, `captured ${evidence.background} $\\frac{anchor_{32D}}{1+\\frac{x}{y}}$`,
+      'Pending preparation retains the complete declared captured source')
+    assertPendingLayoutFixture(evidence.pendingPreparation?.fixture, evidence.pendingPreparation?.source, layoutShapes, layoutShapeParameters)
+    assertPendingLayoutPreparation(evidence.pendingPreparation)
+    assert.equal(evidence.pendingPreparation.result, 'passed', 'Terminal pending download requires accepted complete native preparation')
+    assert.equal(evidence.pendingPreparation.scenario, name, 'Native pending preparation belongs to this download scenario')
+    assertPendingLayoutClickContinuation(evidence.pendingPreparation, evidence.click, evidence.beforeExportClick)
+    const release = evidence.capturedRelease
+    assert.equal(release?.source, evidence.pendingPreparation.source, 'The intended post-click boundary releases the captured source')
+    assert.ok(Number.isInteger(release.before?.started) && release.before.started > 0)
+    assert.equal(release.before.completed, 0); assert.equal(release.before.released, false)
+    assert.equal(release.result?.source, release.source)
+    assert.equal(release.result.started, release.before.started); assert.equal(release.result.completed, release.before.started)
+    assert.equal(release.result.fail, false); assert.equal(release.after, null, 'The captured hold is removed only at the intended release boundary')
+    const ids = layoutShapes.map((shape) => `layout-${shape.replaceAll(' ', '-')}`)
+    assert.deepEqual(evidence.expected.map(({ id }) => id), ids, 'Settled expectations retain all fifteen declared owners in order')
+    assert.deepEqual(evidence.click.snapshot.points.map(({ id }) => id), ids, 'Click snapshots retain the captured circle at index zero and every sibling')
     for (const shape of layoutShapes) {
       const found = evidence.expected.filter((entry) => entry.shape === shape)
       assert.equal(found.length, 1); assertObservedPointPlacement(found[0]); assert.equal(found[0].rendered.state, 'ready')
       assert.ok(found[0].rendered.math > 0)
+      const captured = evidence.click.snapshot.points.find(({ id }) => id === found[0].id)
+      assert.equal(captured.source, found[0].source, 'Settled comparison retains the exact click-time source')
+      assert.equal(captured.style.shape, found[0].shape)
+      assert.deepEqual(captured.style.layout, found[0].layout, 'Settled comparison retains the exact click-time layout')
+      assert.equal(captured.nodeTransform, found[0].rendered.nodeTransform, 'Settled comparison preserves immutable model placement')
     }
   }
 }

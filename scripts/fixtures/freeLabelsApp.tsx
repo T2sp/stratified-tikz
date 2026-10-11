@@ -90,6 +90,7 @@ function pointExportClickSnapshot(ids: string[]) {
     const body = point?.querySelector<SVGGElement>('[data-label-state]')
     if (!stratum || !point || !body) throw new Error(`Missing export-click point ${id}`)
     const source = stratum.text ?? ''
+    const hold = held.get(source)
     const documentContext = inspectOracleDocumentContext(body)
     const literalObservation = inspectPositionedLiteral(body, source)
     return { id, source, modelSource: source, style: structuredClone(stratum.style), position: structuredClone(stratum.position),
@@ -97,9 +98,14 @@ function pointExportClickSnapshot(ids: string[]) {
       anchorOffset: point.getAttribute('data-point-anchor-offset'), nodeTransform: point.getAttribute('transform'),
       request: body.getAttribute('data-label-request'), pointRequest: point.getAttribute('data-point-request'),
       owner: point.getAttribute('data-point-node'), status: body.getAttribute('data-label-state'), runtime: pointRuntime(),
+      held: hold ? { started: hold.requests.length, completed: hold.completed, released: hold.released } : null,
       literalObservation: { ...literalObservation, documentContext, documentUnchanged: before === serialize() } }
   })
-  return { json: snapshot.json, history: snapshot.history, runtime: pointRuntime(), points,
+  const backgrounds = [...document.querySelectorAll<HTMLSelectElement>('select[aria-label="SVG export background"]')]
+  return { json: snapshot.json, runtimeDiagramJson: snapshot.runtimeDiagramJson, history: snapshot.history,
+    selection: JSON.parse(snapshot.selection) as unknown, uiSettings: snapshot.uiSettings, runtime: pointRuntime(), points,
+    exportBackground: { count: backgrounds.length, tag: backgrounds[0]?.localName ?? null,
+      ariaLabel: backgrounds[0]?.getAttribute('aria-label') ?? null, value: backgrounds[0]?.value ?? null },
     camera: structuredClone(model.diagram.camera),
     documentUnchanged: before === serialize() }
 }
