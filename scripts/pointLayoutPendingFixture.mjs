@@ -13,6 +13,28 @@ export const pendingLayoutPositions = [
 ].map(([x, y]) => Object.freeze({ x, y, z: 0 }))
 Object.freeze(pendingLayoutPositions)
 
+const pendingInlineNodes = [
+  { id: 'repeated', text: '$\\frac{x_1}{y^2}$', position: { kind: 'segment', segmentIndex: 0, value: .3 },
+    options: { placement: 'above', marker: 'dot' } },
+  { id: 'mixed', text: '経路 $\\sum_{k=1}^{n}k$', position: { kind: 'segment', segmentIndex: 0, value: .8 },
+    options: { placement: 'below', marker: 'none' } },
+]
+
+// Resolve from this scenario's declared input, independently of an earlier
+// async-isolation snapshot or later replacement model. Source, order and inline
+// placement are part of the immutable combined-export fixture.
+export function resolvePendingLayoutInlineNodes(input) {
+  assert.ok(input && typeof input === 'object', 'Pending inline binding requires its declared fixture')
+  assert.ok(input.diagram && Array.isArray(input.diagram.strata), 'Pending inline binding requires declared strata')
+  const paths = input.diagram.strata.filter(({ id }) => id === 'export-path')
+  assert.equal(paths.length, 1, 'Pending inline binding requires one unique export-path')
+  const path = paths[0]
+  assert.equal(path.geometricKind, 'curve', 'Pending export-path must be a curve')
+  assert.equal(path.kind, 'polyline', 'Pending export-path must retain its declared polyline kind')
+  assert.deepEqual(path.inlineNodes, pendingInlineNodes, 'Pending export-path must retain both exact declared inline nodes')
+  return path.inlineNodes
+}
+
 export function buildPendingLayoutFixture(input, captured, shapes, shapeParameters) {
   assert.equal(input.diagram.ambientDimension, 2)
   assert.equal(shapes.length, pendingLayoutPositions.length)
@@ -50,5 +72,5 @@ export function assertPendingLayoutFixture(input, captured, shapes, shapeParamet
   assert.equal(input.diagram.strata.length, points.length + 1)
   const path = input.diagram.strata.at(-1)
   assert.equal(path.id, 'export-path'); assert.equal(path.geometricKind, 'curve')
-  assert.equal(path.inlineNodes.length, 2)
+  assert.equal(resolvePendingLayoutInlineNodes(input), path.inlineNodes)
 }

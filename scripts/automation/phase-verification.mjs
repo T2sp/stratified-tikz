@@ -1,6 +1,7 @@
 import { phase32cProfile, phase32cDeferrals, phase32cAuthorization, resolveVerificationProfile, deferredMechanismKey, mechanismNotRun, assertScopedMechanismEvidence, assertNamedStrict32BFailure } from './phase32c-profile.mjs';
 import { geometricShapeGroup, geometricShapeScenarios, geometricShapeArtifacts, assertGeometricShapeEvidence, assertGeometricStandaloneEvidence } from '../pointGeometricShapesContract.mjs';
-import { layoutAnchorGroup, layoutAnchorScenarios, layoutAnchorArtifacts, assertLayoutAnchorEvidence, assertLayoutStandaloneEvidence } from '../pointLayoutAnchorsContract.mjs';
+import { layoutAnchorGroup, layoutAnchorScenarios, layoutAnchorArtifacts, assertLayoutAnchorEvidence, assertLayoutStandaloneEvidence,
+  assertLayoutPostClickViewDiagnostic } from '../pointLayoutAnchorsContract.mjs';
 import {
   closeSync,
   existsSync,
@@ -877,6 +878,9 @@ export function validateBrowserEvidence(name, artifactDir, phase, checkout, prof
           }
         }
         validateTargetedPaintEvidence(artifactDir, name, group, profile);
+        if (name === 'point-layout-pending-transparent-edit') {
+          assertLayoutPostClickViewDiagnostic(evidenceObject(artifactDir, `${name}.json`), evidence.diagnostics);
+        }
       }
     }
   }

@@ -5,6 +5,7 @@ import { geometricShapeGroup, geometricShapeManifest } from '../../scripts/point
 import { layoutAnchorGroup, layoutShapes, layoutShapeParameters } from '../../scripts/pointLayoutAnchorsContract.mjs'
 import { buildPendingLayoutFixture } from '../../scripts/pointLayoutPendingFixture.mjs'
 import { syntheticGeometricSelectionEvidence } from './pointGeometricSelectionFixture.mjs'
+import { syntheticPendingLayoutViewEvidence } from './pointLayoutPendingViewFixture.mjs'
 
 // Fabricated policy records use a complete retained PNG only to exercise byte
 // validation. They do not assert native download or screenshot acceptance.
@@ -19,8 +20,13 @@ export function syntheticPendingLayoutPreparation(background = 'transparent') {
   const base = syntheticGeometricSelectionEvidence({ id: 'layout-circle', shape: 'circle', requireUnselected: true })
   const diagram = JSON.parse(base.stateBefore.runtimeDiagramJson)
   diagram.strata[0].text = source
-  diagram.strata.push({ id: 'export-path', geometricKind: 'curve', codim: 1, layer: 0,
-    inlineNodes: [{ text: 'inline $a$' }, { text: 'inline $b$' }] })
+  diagram.strata.push({ id: 'export-path', geometricKind: 'curve', kind: 'polyline', codim: 1, layer: 0,
+    inlineNodes: [
+      { id: 'repeated', text: '$\\frac{x_1}{y^2}$', position: { kind: 'segment', segmentIndex: 0, value: .3 },
+        options: { placement: 'above', marker: 'dot' } },
+      { id: 'mixed', text: '経路 $\\sum_{k=1}^{n}k$', position: { kind: 'segment', segmentIndex: 0, value: .8 },
+        options: { placement: 'below', marker: 'none' } },
+    ] })
   diagram.labels = [{ id: 'free-a', text: 'free $a$', position: { x: 0, y: 1, z: 0 } },
     { id: 'free-b', text: 'free $b$', position: { x: 1, y: 0, z: 0 } }]
   const fixture = buildPendingLayoutFixture({ version: 2, diagram }, source, layoutShapes, layoutShapeParameters)
@@ -98,6 +104,8 @@ export function syntheticStandalonePointDownload(directory, scenario) {
   const background = scenario.includes('transparent') ? 'transparent' : 'white'
   const group = geometric ? geometricShapeGroup : layoutAnchorGroup
   const preparation = geometric ? null : syntheticPendingLayoutPreparation(background)
+  const postClickView = !geometric && background === 'transparent'
+    ? syntheticPendingLayoutViewEvidence({ click: preparation.click, source: preparation.pendingPreparation.source }) : null
   const models = preparation?.pendingPreparation.fixture.diagram.strata.filter(({ geometricKind }) => geometricKind === 'point')
   const specs = geometric ? geometricShapeManifest : layoutShapes.map((shape) => ({ shape, slug: shape.replaceAll(' ', '-'), parameters: layoutShapeParameters[shape] ?? {} }))
   const expected = specs.map((spec, index) => {
@@ -125,15 +133,17 @@ export function syntheticStandalonePointDownload(directory, scenario) {
     coverage: { completeRoot: true, bounds: measurements.root.bounds, viewport: measurements.viewport }, coordinatesStable: true,
     png: { width: 1500, height: 1150, bytes: fixturePng.length } }
   const pending = { contour: { tag: 'path', attributes: { d: 'M0,0 L1,0 Z' } } }
+  const releasedRequests = postClickView ? postClickView.cleanup.observation.hold.started : 1
   const capturedRelease = geometric ? null : { source: preparation.pendingPreparation.source,
-    before: { started: 1, completed: 0, released: false },
-    result: { source: preparation.pendingPreparation.source, started: 1, completed: 1, fail: false }, after: null }
+    before: postClickView ? structuredClone(postClickView.cleanup.observation.hold) : { started: 1, completed: 0, released: false },
+    result: { source: preparation.pendingPreparation.source, started: releasedRequests, completed: releasedRequests, fail: false }, after: null }
   const outputs = Object.fromEntries(['standalone', 'inlineMath'].map((mode) => [mode,
     expected.map((entry) => `\\node[anchor=${entry.shape === 'cylinder' ? 'shape center' : 'base'}] {${entry.source}};`).join('\n')]))
   const evidence = { scenario, group, result: 'passed', pageErrors: [], background, expected, click, capture,
     actualDownload: true, reopened: true, immutableSource: true, noExternalAssets: true,
     ...(geometric ? { shapes: specs.map(({ shape }) => shape), immutableParameters: true, separateCylinderPaints: true }
       : { capturedPending: true, immutableLayout: true, immutablePlacement: true, settledContour: true, combinedLabels: true, pending,
+        ...(postClickView ? { postClickView } : {}),
         pendingPreparation: preparation.pendingPreparation, beforeExportClick: preparation.beforeExportClick, capturedRelease }) }
   const reopened = expected.map((entry) => ({ source: entry.source, shape: entry.shape, contour: entry.rendered.contour, glyphs: 1, errors: 0,
     ...(geometric ? { regions: entry.rendered.paintRegions.map((region) => ({ tag: region.tag, attributes: region.attributes })) }
@@ -142,6 +152,7 @@ export function syntheticStandalonePointDownload(directory, scenario) {
     requests: [fileUrl], pageErrors: [], standaloneErrors: [], cleanupErrors: [], reopened: structuredClone(reopened),
     document: { root, forbiddenCount: 0, externalReferences: [], backgroundCount: background === 'white' ? 1 : 0 },
     ...(geometric ? {} : { pending: structuredClone(pending), outputs,
+      ...(postClickView ? { postClickView: structuredClone(postClickView) } : {}),
       pendingPreparation: structuredClone(preparation.pendingPreparation), beforeExportClick: structuredClone(preparation.beforeExportClick),
       capturedRelease: structuredClone(capturedRelease) }) }
   const element = ({ tag, attributes }) => `<${tag} ${Object.entries(attributes).map(([key, value]) => `${key}="${escape(value)}"`).join(' ')}/>`
@@ -150,6 +161,8 @@ export function syntheticStandalonePointDownload(directory, scenario) {
   writeFileSync(svgPath, svg); writeFileSync(pngPath, fixturePng)
   if (!geometric) writeFileSync(resolve(directory, `${scenario}-preparation.json`), JSON.stringify({ scenario, group, result: 'observed',
     pendingPreparation: preparation.pendingPreparation }, null, 2) + '\n')
+  if (postClickView) writeFileSync(resolve(directory, `${scenario}-post-click-view.json`), JSON.stringify({ scenario: `${scenario}-post-click-view`,
+    group, result: 'observed', postClickView }, null, 2) + '\n')
   for (const [mode, source] of Object.entries(outputs)) if (!geometric) writeFileSync(resolve(directory, `${scenario}-${mode}.tex`), source)
   return { evidence, raw, svgPath, pngPath, svg, png: Buffer.from(fixturePng) }
 }

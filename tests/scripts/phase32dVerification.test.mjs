@@ -5,8 +5,10 @@ import { join } from 'node:path'
 import test from 'node:test'
 import { allPointNodeScenarios, pointNodeScenarioArtifacts, validateBrowserEvidence } from '../../scripts/automation/phase-verification.mjs'
 import { layoutAnchorGroup, layoutAnchorScenarios, layoutAnchorArtifacts, layoutShapes, layoutRegimes, layoutForShapeRegime,
-  pointAnchorsForShape, layoutImportCases, assertLayoutAnchorEvidence, assertObservedPointPlacement, assertPointTikzSourceByMode, assertLayoutStandaloneEvidence } from '../../scripts/pointLayoutAnchorsContract.mjs'
+  pointAnchorsForShape, layoutImportCases, assertLayoutAnchorEvidence, assertObservedPointPlacement, assertPointTikzSourceByMode,
+  assertLayoutStandaloneEvidence, assertLayoutPostClickViewDiagnostic } from '../../scripts/pointLayoutAnchorsContract.mjs'
 import { syntheticStandalonePointDownload, syntheticPendingLayoutPreparation } from './standalonePointDownloadFixture.mjs'
+import { syntheticPendingLayoutViewEvidence } from './pointLayoutPendingViewFixture.mjs'
 import { syntheticUnsupportedDiagnosticEvidence } from './pointUnsupportedDiagnosticFixture.mjs'
 import { pointNodeAnchorSupport } from '../../src/geometry/pointNodeShapes/index.ts'
 import { createEmptyDiagram, createPointStratum } from '../../src/model/constructors.ts'
@@ -119,6 +121,9 @@ function evidence(name) {
     nativeImport: true, saveReloadRestored: true, standaloneTikz: true, inlineTikz: true, unsupportedTextMetricsDiagnosed: true }
   const background = name.includes('transparent') ? 'transparent' : 'white'
   const preparation = syntheticPendingLayoutPreparation(background)
+  const postClickView = background === 'transparent'
+    ? syntheticPendingLayoutViewEvidence({ click: preparation.click, source: preparation.pendingPreparation.source }) : null
+  const releasedRequests = postClickView ? postClickView.cleanup.observation.hold.started : 1
   return { ...common, background, actualDownload: true, capturedPending: true, reopened: true,
     capture: { status: 'saved' },
     immutableSource: true, immutableLayout: true, immutablePlacement: true, settledContour: true, combinedLabels: true, noExternalAssets: true,
@@ -126,9 +131,9 @@ function evidence(name) {
       const entry = placement(point.style.shape, point.style.layout.anchor, { id: point.id, source: point.source, layout: point.style.layout })
       entry.rendered.source = point.source; entry.rendered.nodeTransform = point.nodeTransform
       return entry
-    }), ...preparation, capturedRelease: { source: preparation.pendingPreparation.source,
-      before: { started: 1, completed: 0, released: false },
-      result: { source: preparation.pendingPreparation.source, started: 1, completed: 1, fail: false }, after: null } }
+    }), ...preparation, ...(postClickView ? { postClickView } : {}), capturedRelease: { source: preparation.pendingPreparation.source,
+      before: postClickView ? structuredClone(postClickView.cleanup.observation.hold) : { started: 1, completed: 0, released: false },
+      result: { source: preparation.pendingPreparation.source, started: releasedRequests, completed: releasedRequests, fail: false }, after: null } }
 }
 
 test('32D named group and every artifact are registered cumulatively', () => {
@@ -139,6 +144,26 @@ test('32D named group and every artifact are registered cumulatively', () => {
     assert.deepEqual(pointNodeScenarioArtifacts(name), layoutAnchorArtifacts(name))
     assertLayoutAnchorEvidence(evidence(name), name)
   }
+})
+test('32D post-click view raw artifact is mandatory only for the transparent pending edit', () => {
+  assert.ok(layoutAnchorArtifacts('point-layout-pending-transparent-edit').includes('point-layout-pending-transparent-edit-post-click-view.json'))
+  assert.ok(!layoutAnchorArtifacts('point-layout-pending-white-load').some((file) => file.endsWith('-post-click-view.json')))
+})
+test('synthetic 32D oracle accepts unchanged 2D uiSettings and root CTM with actual control and root-relative projection changes', () => {
+  const name = 'point-layout-pending-transparent-edit', current = evidence(name)
+  const [before, immediate, after] = current.postClickView.stages
+  assert.equal(after.state.uiSettings, before.state.uiSettings)
+  assert.deepEqual(after.canvas.screenCTM, before.canvas.screenCTM)
+  assert.equal(before.controls.zoom.value, '1'); assert.equal(after.controls.zoom.value, '1.4')
+  assert.equal(immediate.events[0].value, '1.4')
+  assert.equal(current.click.snapshot.points[0].held.started, 1)
+  assert.equal(before.hold.started, 2); assert.equal(current.capturedRelease.before.started, 2)
+  const references = (stage) => ['layout-rectangle', 'layout-cylinder'].map((id) => stage.points.find((point) => point.id === id))
+  const [a, b] = references(before), [c, d] = references(after)
+  assert.notDeepEqual(c.root, a.root); assert.notDeepEqual(d.root, b.root)
+  assert.equal(d.root.x - c.root.x, (b.root.x - a.root.x) * 1.4)
+  assert.equal(d.root.y - c.root.y, (b.root.y - a.root.y) * 1.4)
+  assertLayoutAnchorEvidence(current, name)
 })
 for (const options of [{}, { collapsed: true }, { obstructed: true }, { collapsed: true, obstructed: true }]) {
   test(`synthetic 32D toolbar policy accepts owned preparation/restoration ${JSON.stringify(options)}`, () => {
@@ -660,10 +685,64 @@ for (const background of ['transparent', 'white']) {
     assertLayoutStandaloneEvidence(fixture.evidence, fixture.raw, directory)
   })
 }
+for (const fault of ['missing-view', 'flags-only-view', 'unrelated-view', 'observed-view', 'failed-view', 'overwritten-click-placement', 'release-reuses-click-hold']) {
+  test(`synthetic 32D pending terminal policy rejects post-click 2D view ${fault}`, () => {
+    const name = 'point-layout-pending-transparent-edit', current = evidence(name)
+    if (fault === 'missing-view') delete current.postClickView
+    if (fault === 'flags-only-view') current.postClickView = { scenario: name, result: 'passed', viewChanged: true }
+    if (fault === 'unrelated-view') current.postClickView.scenario = 'point-layout-pending-white-load'
+    if (fault === 'observed-view') current.postClickView.result = 'observed'
+    if (fault === 'failed-view') current.postClickView.result = 'failed'
+    if (fault === 'overwritten-click-placement') current.click.snapshot.points[0].nodeTransform = 'translate(999,999)'
+    if (fault === 'release-reuses-click-hold') {
+      current.capturedRelease.before = structuredClone(current.click.snapshot.points[0].held)
+      current.capturedRelease.result.started = 1; current.capturedRelease.result.completed = 1
+    }
+    assert.throws(() => assertLayoutAnchorEvidence(current, name))
+  })
+}
+function syntheticPostClickViewDiagnostics(current) {
+  const common = { name: `${current.scenario}-post-click-view`, group: layoutAnchorGroup, result: 'observed' }
+  return [0, 1, 2, 3].map((count) => ({ ...common, postClickView: { ...structuredClone(current.postClickView),
+    result: 'observed', stages: structuredClone(current.postClickView.stages.slice(0, count)) } }))
+    .concat({ ...common, postClickView: structuredClone(current.postClickView) })
+}
+test('synthetic 32D fresh browser report binds partial provenance and one final accepted view diagnostic', () => {
+  const current = evidence('point-layout-pending-transparent-edit')
+  assertLayoutPostClickViewDiagnostic(current, syntheticPostClickViewDiagnostics(current))
+})
+for (const fault of ['missing-diagnostics', 'unrelated-name', 'missing-view', 'wrong-group', 'wrong-source', 'failed-last',
+  'stale-last', 'duplicate-accepted', 'missing-accepted', 'changed-accepted', 'overwritten-click', 'primary-error', 'secondary-error',
+  'missing-before-observation', 'missing-immediate-observation', 'missing-after-observation', 'changed-stage-prefix', 'unordered-stage-observations']) {
+  test(`synthetic 32D fresh browser report rejects post-click view diagnostic ${fault}`, () => {
+    const current = evidence('point-layout-pending-transparent-edit'), records = syntheticPostClickViewDiagnostics(current)
+    if (fault === 'missing-diagnostics') records.length = 0
+    if (fault === 'unrelated-name') for (const entry of records) entry.name = 'point-layout-pending-white-load-post-click-view'
+    if (fault === 'missing-view') delete records[0].postClickView
+    if (fault === 'wrong-group') records[0].group = 'point-node-geometric-shapes'
+    if (fault === 'wrong-source') records[0].postClickView.source = 'unrelated held source'
+    if (fault === 'failed-last') records.at(-1).postClickView.result = 'failed'
+    if (fault === 'stale-last') records.push(structuredClone(records[0]))
+    if (fault === 'duplicate-accepted') records.push(structuredClone(records.at(-1)))
+    if (fault === 'missing-accepted') records.at(-1).postClickView.result = 'observed'
+    if (fault === 'changed-accepted') records.at(-1).postClickView.viewChanged = false
+    if (fault === 'overwritten-click') records[0].postClickView.click.snapshot.points[0].nodeTransform = 'translate(999,999)'
+    if (fault === 'primary-error') records[0].postClickView.error = { message: 'native fill failed' }
+    if (fault === 'secondary-error') records[0].postClickView.secondaryErrors.push({ message: 'observer cleanup failed' })
+    if (fault === 'missing-before-observation') records.splice(1, 1)
+    if (fault === 'missing-immediate-observation') records.splice(2, 1)
+    if (fault === 'missing-after-observation') records.splice(3, 1)
+    if (fault === 'changed-stage-prefix') records[2].postClickView.stages[0].state.history = 'stale history'
+    if (fault === 'unordered-stage-observations') [records[1], records[2]] = [records[2], records[1]]
+    assert.throws(() => assertLayoutPostClickViewDiagnostic(current, records))
+  })
+}
 for (const fault of ['pending', 'missing-record', 'unrelated-scenario', 'wrong-png-path', 'nonfinite-root', 'scaled-root',
   'cropped-root', 'changed-coordinates', 'mock-png-header', 'missing-png', 'wrong-png-dimensions',
   'wrong-body-transform', 'wrong-layout', 'pending-contour', 'wrong-captured-tikz', 'primary-error',
-  'missing-preparation-artifact', 'wrong-preparation-artifact', 'raw-preparation-disagrees', 'raw-before-export-disagrees', 'raw-release-disagrees']) {
+  'missing-preparation-artifact', 'wrong-preparation-artifact', 'raw-preparation-disagrees', 'raw-before-export-disagrees', 'raw-release-disagrees',
+  'missing-view-artifact', 'unrelated-view-artifact', 'wrong-view-artifact-group', 'passed-view-artifact', 'failed-view-artifact',
+  'view-artifact-disagrees', 'missing-raw-view', 'raw-view-disagrees']) {
   test(`32D standalone parent contract rejects ${fault}`, (t) => {
     const directory = mkdtempSync(join(tmpdir(), 'stz-32d-standalone-policy-'))
     t.after(() => rmSync(directory, { recursive: true, force: true }))
@@ -692,6 +771,20 @@ for (const fault of ['pending', 'missing-record', 'unrelated-scenario', 'wrong-p
     if (fault === 'raw-preparation-disagrees') raw.pendingPreparation.source = 'later replacement'
     if (fault === 'raw-before-export-disagrees') raw.beforeExportClick.measurement.hold.released = true
     if (fault === 'raw-release-disagrees') raw.capturedRelease.result.completed = 0
+    const viewPath = join(directory, `${evidence.scenario}-post-click-view.json`)
+    if (fault === 'missing-view-artifact') unlinkSync(viewPath)
+    if (['unrelated-view-artifact', 'wrong-view-artifact-group', 'passed-view-artifact', 'failed-view-artifact', 'view-artifact-disagrees'].includes(fault)) {
+      const viewArtifact = { scenario: `${evidence.scenario}-post-click-view`, group: layoutAnchorGroup, result: 'observed',
+        postClickView: structuredClone(evidence.postClickView) }
+      if (fault === 'unrelated-view-artifact') viewArtifact.scenario = 'point-layout-pending-white-load-post-click-view'
+      if (fault === 'wrong-view-artifact-group') viewArtifact.group = 'point-node-geometric-shapes'
+      if (fault === 'passed-view-artifact') viewArtifact.result = 'passed'
+      if (fault === 'failed-view-artifact') viewArtifact.result = 'failed'
+      if (fault === 'view-artifact-disagrees') viewArtifact.postClickView.viewChanged = false
+      writeFileSync(viewPath, JSON.stringify(viewArtifact))
+    }
+    if (fault === 'missing-raw-view') delete raw.postClickView
+    if (fault === 'raw-view-disagrees') raw.postClickView.viewChanged = false
     assert.throws(() => assertLayoutStandaloneEvidence(evidence, raw, directory))
   })
 }

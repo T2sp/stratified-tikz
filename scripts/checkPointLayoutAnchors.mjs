@@ -17,9 +17,10 @@ import { observePointLiteral, assertPositionedLiteral } from './pointLiteralOrac
 import { withOwnedFontFace, observeOwnedFontFace } from './ownedFontFace.mjs'
 import { captureStandaloneSvg } from './standaloneSvgCapture.mjs'
 import { runUnsupportedDiagnosticCase } from './pointUnsupportedDiagnostic.mjs'
-import { buildPendingLayoutFixture, assertPendingLayoutFixture } from './pointLayoutPendingFixture.mjs'
+import { buildPendingLayoutFixture, assertPendingLayoutFixture, resolvePendingLayoutInlineNodes } from './pointLayoutPendingFixture.mjs'
 import { preparePendingLayoutPoint, capturePendingLayoutPreparation,
   assertPendingLayoutClickContinuation } from './pointLayoutPendingPreparation.mjs'
+import { changePendingLayoutView } from './pointLayoutPendingView.mjs'
 
 const paint = { text: { color: '#203040', opacity: 1 }, fill: { enabled: true, color: '#d8ecff', opacity: .7 },
   stroke: { enabled: true, color: '#203040', opacity: 1, width: .4, lineStyle: 'solid', dashPhase: 0, lineCap: 'butt', lineJoin: 'miter' } }
@@ -652,7 +653,7 @@ export async function runPointLayoutAnchorChecks({ browser, origin, artifactDir,
       await page.evaluate((ids) => window.stzAppLabels.armPointExportClick(ids), points.map(({ id }) => id))
       const beforeExportClick = await capturePendingLayoutPreparation({ page, readState: state, fixture: input, source: captured })
       await observe(`${scenario}-before-export-click`, { group, result: 'observed', pendingPreparation, beforeExportClick })
-      let click, capturedRelease
+      let click, capturedRelease, postClickView
       const { event: download } = await event(scenario, 'download', async ({ check }) => {
         await page.getByRole('button', { name: 'Export current diagram view as SVG', exact: true }).click(); check()
         click = await page.evaluate(() => window.stzAppLabels.pointExportClick())
@@ -662,12 +663,12 @@ export async function runPointLayoutAnchorChecks({ browser, origin, artifactDir,
         if (background === 'transparent') {
           await (await resolvePointInspectorField(page, 'Node text', 'textarea')).fill('later $changed$')
           await nativeField('anchor', 'north'); await nativeField('minimumWidth', 110)
-          const changedView = await state()
-          const zoom = page.getByRole('spinbutton', { name: 'zoom value', exact: true })
-          if (!await zoom.count()) await page.locator('.camera-summary-toggle').click()
-          await zoom.fill('1.4')
-          assert.notEqual((await state()).uiSettings, changedView.uiSettings)
-          await observe(scenario + '-post-click-view', { group, before: changedView, after: await state() })
+          postClickView = await changePendingLayoutView({ page, scenario, source: captured, click, secondaryErrors: pageErrors,
+            persist: async (view) => {
+              const entry = { scenario: `${scenario}-post-click-view`, group, result: 'observed', postClickView: structuredClone(view) }
+              await writeFile(resolve(artifactDir, `${scenario}-post-click-view.json`), JSON.stringify(entry, null, 2) + '\n')
+              await observe(entry.scenario, entry)
+            } })
         } else await load(await document('rectangle', { anchor: 'west', minimumWidth: 110 }, 'replacement $loaded$'))
         check()
         const beforeRelease = await page.evaluate((source) => window.stzAppLabels.pending(source), captured)
@@ -688,7 +689,7 @@ export async function runPointLayoutAnchorChecks({ browser, origin, artifactDir,
       const standalone = await context.newPage(), fileUrl = pathToFileURL(svgPath).href
       const standaloneEvidence = await capturePointLayoutStandalone({ standalone, artifactDir,
         details: { scenario, group, background, svgPath, fileUrl, pageErrors, expected, click, pending, outputs, xml,
-          pendingPreparation, beforeExportClick, capturedRelease },
+          pendingPreparation, beforeExportClick, capturedRelease, ...(postClickView ? { postClickView } : {}) },
         observe: (candidate) => observe(`${scenario}-standalone-observed`, { group, result: 'observed', candidate }),
         reopen: async (standalone) => standalone.evaluate((expected) => {
           const clean = (element) => ({ tag: element.localName, attributes: Object.fromEntries([...element.attributes].filter(({ name }) => !name.startsWith('data-') && name !== 'pointer-events').map(({ name, value }) => [name, value])) })
@@ -714,7 +715,7 @@ export async function runPointLayoutAnchorChecks({ browser, origin, artifactDir,
           }
           assert.notDeepEqual(pending.contour, expected[0].rendered.contour, 'The accepted settled export cannot retain a pending-sized contour')
           assert.ok(input.diagram.labels.every(({ text }) => xml.includes(text.replaceAll('&', '&amp;').replaceAll('<', '&lt;'))))
-          const inline = siblings[0].inlineNodes
+          const inline = resolvePendingLayoutInlineNodes(input)
           assert.ok(inline.every(({ text }) => xml.includes(text.replaceAll('&', '&amp;').replaceAll('<', '&lt;'))))
           assert.deepEqual(requests, [fileUrl], 'Reopened SVG requests only its downloaded file')
           assert.equal(document.forbiddenCount, 0); assert.deepEqual(document.externalReferences, [])
@@ -722,7 +723,7 @@ export async function runPointLayoutAnchorChecks({ browser, origin, artifactDir,
         } })
       await save({ background, actualDownload: true, capturedPending: click.snapshot.points[0].status === 'pending', reopened: true, immutableSource: true, immutableLayout: true,
         immutablePlacement: true, settledContour: true, combinedLabels: true, noExternalAssets: true, expected, click, pending,
-        pendingPreparation, beforeExportClick, capturedRelease,
+        pendingPreparation, beforeExportClick, capturedRelease, ...(postClickView ? { postClickView } : {}),
         capture: standaloneEvidence.capture })
     }
     assert.deepEqual(pageErrors, []); await completeGroup(group)

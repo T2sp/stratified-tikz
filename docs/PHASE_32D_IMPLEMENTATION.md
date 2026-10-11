@@ -7,6 +7,114 @@ later 32B have historical accepted evidence. The plan still records unaccepted
 fresh strict native/review gates for the merged 32C checkout; implementation
 presence does not close that prerequisite or the final gate.
 
+## Current pending 2D view observation and inline binding correction (2026-10-11)
+
+The actual clean starting checkout is
+`63a6afc6ae212458d17d0fe11849bf2957ecb2f7`, fingerprint
+`fd1568c469bc6af3a11e9a361f64358de682fad918fe6a2cec26ac8759b08580`.
+All nine modified files and four new files from the earlier pending-fixture
+handoff are now tracked here and preserved. Current command results, preservation
+hashes, raw evidence and final tracked/untracked identity are retained externally
+under `/private/tmp/stz-32d-view-fix-20261011/`; an earlier fingerprint is never
+used as acceptance for this changed tree. Earlier sections below retain their
+historical evidence and original dispositions.
+
+The retained browser-capable parent `bmgK6V` passed 6,212 tests, build, diff and
+full label-assets, then completed sixteen of eighteen cumulative groups. It
+accepted the complete geometric group, including both actual transparent/white
+SVG downloads, reopening and PNG capture, and the first six layout scenarios:
+90 sizing cases, 305 supported anchors, all six unsupported body → far → warning
+cases, native controls/persistence, six import/order/unit cases, eleven async
+transitions, four 2D/3D native interactions and both body-overflow/Alt cycles.
+Transparent pending preparation also passed sequence 39 at document epoch 427:
+one ordinary trusted `.23` gesture selected `layout-circle` without interception.
+The actual SVG click captured all fifteen points, selected circle and transparent
+background while the original full source remained pending. Its click-time hold
+was started 1/completed 0/unreleased; the later held observation was started
+2/completed 0/unreleased. These distinct observations remain intact.
+
+After the intended source edit, native anchor `north` and minimum width `110`
+inputs were recorded with trusted input and matching model values. The camera
+disclosure caption still read zoom 1/pan x 0/pan y 0 before the awaited fill of
+`1.4`. The next assertion incorrectly demanded changed serialized `uiSettings`.
+App intentionally omits 2D zoom/pan there and omits runtime camera from saved
+JSON; preview camera adjustment changes the projected positions independently.
+No actual post-fill control or placement observation was retained because the
+planned post-click record followed that assertion. The bounded failure DOM ends
+before camera inputs, so it proves neither applied zoom `1.4` nor a native matrix
+change. Page errors are empty. Cleanup released two held requests and removed
+the export listener with no errors; that is not the intended captured release
+or terminal download acceptance. Neither pending layout download nor the final
+standalone group was accepted. This is a real parent oracle failure, distinct
+from prior sibling interception and child server-startup restrictions.
+
+`pointLayoutPendingView.mjs` now scopes the transparent pending view action to
+the real owned Preview view panel. It resolves exactly one numeric `zoom value`
+control, its associated `zoom slider` and the disclosure for `camera-details`,
+retaining actual accessible names, counts, values, connection/object identity,
+supported finite ranges, step values and pan controls. It expands only when
+needed and takes the baseline after expansion/scroll and the already intended
+source/anchor/minimum edits. Already-equal zoom is a failed precondition. One
+ordinary native numeric fill targets `1.4`; actual input/change provenance,
+ordered values and owners are recorded without synthetic events or value retries.
+Before, immediate-input and bounded committed-after observations are persisted
+before validation, including partial or failed observations.
+
+Each stage measures the current connected outer point-node origins for circle
+`(7,6.5,0)`, rectangle `(19,13,0)` and cylinder `(23,1,0)`, with exact model data,
+source/request/document ownership and native node/root matrices. Finite invertible
+screen matrices normalize those origins into the actual SVG root frame; viewBox,
+client/viewport and scroll/disclosure conditions remain raw evidence. The stable
+rectangle/cylinder separation establishes the measured scale on both axes and
+must change by the actual zoom ratio. Their measured origin also checks absolute
+placement of all three nodes with fixed pan. Child text/contour dimensions and
+selected-anchor offsets cannot supply that proof, nor can CSS/scroll-only movement
+or root screenCTM inequality. Native half-ulp binary32 translation allowances are
+propagated through subtraction and scale/origin inference without changing PGF
+tolerances or using the production camera solver as the acceptance oracle.
+
+The view-only action preserves exact saved/runtime diagram, history, selection,
+document revision, source/layout and unrelated UI settings; 2D `uiSettings` may
+correctly remain identical. Current async completion is retained under the same
+source/request owner and cannot stand in for camera movement. The old export-click
+snapshot remains exact, the original full source stays unreleased until its
+intended later release, and owned listener/disclosure cleanup preserves the first
+error. No extra click/export/retry, camera reset or failure screenshot is added.
+
+The mandatory `point-layout-pending-transparent-edit-post-click-view.json`
+artifact binds the same observations and immutable old click into terminal,
+standalone and fresh browser-report records. Parent validation rejects missing,
+stale, failed or unrelated records and a declared view-change flag without actual
+control and root-relative projection proof. Focused synthetic controls cover the
+unchanged-uiSettings success contract, no-op/unapplied input, numeric-only or
+CSS-only movement, incorrect controls/owners/requests/epochs, invalid matrices,
+changed model/history/pan, missing stages/events, overwritten click snapshots,
+early release and diagnostic/cleanup errors. These controls are separate from
+native acceptance; their current execution results remain pending verification.
+
+The pending standalone callback now resolves its own declared fixture's unique
+`export-path`, requiring `geometricKind: "curve"`, `kind: "polyline"` and both
+exact inline-node records, including source, order and placement/options. It no
+longer indexes the distinct earlier async-isolation object named `siblings`.
+Missing/duplicate/wrong-kind paths and omitted/changed inline content fail the
+binding regression. The successful earlier async snapshot, both free-label XML
+checks, existing inline XML text checks and all-fifteen point/source/layout/
+placement comparisons remain unchanged.
+
+Production model/persistence/uiSettings, geometry/rendering/camera semantics,
+completed native/pending preparation, shared standalone SVG capture and all PGF
+references/tolerances are preserved. No dependency is added. Required commands
+and focused checks on this tree are currently pending; reproduced baseline
+geometric/verifier/layer lint and isolated strict-TypeScript debt remain failed
+checks, separate from application build. The browser-capable parent must load
+the updated callers/helpers/contracts/policy in a fresh owned process and run
+strict cumulative `32D verify` on the exact preserved dirty tree. All eighteen
+groups, both pending layout SVG/TikZ downloads, actual reopening/complete PNGs,
+final standalone exports and the diamond PGF review gate remain required.
+Only complete accepted verification can precede matching independent read-only
+review and the exact-tree post-review identity gate. Phase 32 is **not complete**;
+failed or incomplete verification stops before review/commit/push.
+
 ## Pending combined-export fixture preparation correction (2026-10-11)
 
 The actual starting checkout is clean at

@@ -1,6 +1,7 @@
 import assert from 'node:assert/strict'
 import test from 'node:test'
-import { buildPendingLayoutFixture, assertPendingLayoutFixture, pendingLayoutPositions } from '../../scripts/pointLayoutPendingFixture.mjs'
+import { buildPendingLayoutFixture, assertPendingLayoutFixture, pendingLayoutPositions,
+  resolvePendingLayoutInlineNodes } from '../../scripts/pointLayoutPendingFixture.mjs'
 import { layoutShapes, layoutShapeParameters } from '../../scripts/pointLayoutAnchorsContract.mjs'
 import { createEmptyDiagram, createPointStratum, createCurveStratum, createTextLabel } from '../../src/model/constructors.ts'
 import { parseSavedDiagramJson, serializeDiagram } from '../../src/model/serialization.ts'
@@ -138,4 +139,44 @@ test('synthetic production projection controls isolate the retained pending cont
   const oldCamera = fit(oldGrid), oldPlacement = projectToSvgPoint(oldCamera, oldGrid.strata[0].position, 360)
   const oldTarget = { x: oldPlacement.x - anchor.x + local.x, y: oldPlacement.y - anchor.y + local.y }
   assert.ok(gap(oldGrid.strata[8], oldCamera, oldTarget) < 0, 'Old trapezium estimated envelopes overlap the fixed contour control')
+})
+
+test('synthetic pending inline binding resolves its complete declared fixture despite a distinct prior async snapshot', () => {
+  const captured = 'captured transparent $\\frac{anchor_{32D}}{1+\\frac{x}{y}}$'
+  const input = inputFixture(captured), fixture = buildPendingLayoutFixture(input, captured, layoutShapes, layoutShapeParameters)
+  const siblings = { labels: [{ id: 'previous-label', text: 'prior async label' }],
+    paths: [{ id: 'export-path', geometricKind: 'curve', kind: 'polyline',
+      inlineNodes: [{ id: 'prior-inline', text: 'different async source' }] }], rendered: [{ source: '$initial$' }] }
+  const before = structuredClone(fixture), prior = structuredClone(siblings)
+  const inline = resolvePendingLayoutInlineNodes(fixture)
+  assert.equal(inline, fixture.diagram.strata.find(({ id }) => id === 'export-path').inlineNodes)
+  assert.deepEqual(inline, input.diagram.strata[1].inlineNodes)
+  assert.notDeepEqual(inline, siblings.paths[0].inlineNodes)
+  assert.equal(siblings[0], undefined, 'The historical async snapshot is an object, never the pending path array')
+  assert.throws(() => resolvePendingLayoutInlineNodes(siblings), /requires declared strata/)
+  assert.deepEqual(fixture, before, 'Resolving immutable expectations does not mutate the fixture')
+  assert.deepEqual(siblings, prior, 'The successful async-isolation observation remains untouched')
+})
+
+const invalidInlineBindings = [
+  ['missing export-path', (fixture) => { fixture.diagram.strata = fixture.diagram.strata.filter(({ id }) => id !== 'export-path') }],
+  ['duplicate export-path', (fixture) => { fixture.diagram.strata.push(structuredClone(fixture.diagram.strata.at(-1))) }],
+  ['point geometric kind', (fixture) => { fixture.diagram.strata.at(-1).geometricKind = 'point' }],
+  ['wrong curve kind', (fixture) => { fixture.diagram.strata.at(-1).kind = 'cubicBezier' }],
+  ['omitted inline nodes', (fixture) => { delete fixture.diagram.strata.at(-1).inlineNodes }],
+  ['omitted repeated inline node', (fixture) => { fixture.diagram.strata.at(-1).inlineNodes.shift() }],
+  ['omitted mixed inline node', (fixture) => { fixture.diagram.strata.at(-1).inlineNodes.pop() }],
+  ['changed repeated content', (fixture) => { fixture.diagram.strata.at(-1).inlineNodes[0].text = '$changed$' }],
+  ['changed mixed content', (fixture) => { fixture.diagram.strata.at(-1).inlineNodes[1].text = 'changed $content$' }],
+  ['changed inline id', (fixture) => { fixture.diagram.strata.at(-1).inlineNodes[0].id = 'replacement-inline' }],
+  ['reversed inline order', (fixture) => { fixture.diagram.strata.at(-1).inlineNodes.reverse() }],
+  ['changed inline position', (fixture) => { fixture.diagram.strata.at(-1).inlineNodes[0].position.value = .4 }],
+  ['changed inline options', (fixture) => { fixture.diagram.strata.at(-1).inlineNodes[1].options.placement = 'above' }],
+]
+for (const [name, corrupt] of invalidInlineBindings) test(`synthetic pending inline binding rejects ${name}`, () => {
+  const captured = 'captured transparent $\\frac{anchor_{32D}}{1+\\frac{x}{y}}$'
+  const fixture = buildPendingLayoutFixture(inputFixture(captured), captured, layoutShapes, layoutShapeParameters)
+  corrupt(fixture)
+  assert.throws(() => resolvePendingLayoutInlineNodes(fixture))
+  assert.throws(() => assertPendingLayoutFixture(fixture, captured, layoutShapes, layoutShapeParameters))
 })

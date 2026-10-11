@@ -1,259 +1,257 @@
-# Phase 32D Fix for post-click 2D view evidence
+# Phase 32D Fix for resolved layout and native edit provenance
 
 ## Objective and preserved implementation
 
-Continue from the implemented Phase 32D checkout and completed Clear,
-Inspector/toolbar selection, native drag/revision, visibility/camera,
-canonical layer, measured diagnostics, ordinary body selection,
-deterministic pending fixture/preparation and standalone SVG/PNG capture fixes.
-Repair the next concrete parent failure: transparent pending export changes
-2D zoom, then incorrectly requires `state.uiSettings` to change.
+Continue from the implemented Phase32D checkout, including native 2D zoom/control
+and root-relative placement proof, unique export-path inline-node binding,
+deterministic pending fixture/preparation and all preceding fixes.
+Repair the next concrete parent failure: the view baseline compares resolved
+preview layout with the entire authored model layout, including units provenance.
 
-2D zoom/pan are absent from that serialized observation by design.
-Use actual native controls and current SVG point placement to prove the view
-change. Do not alter production persistence or uiSettings to force inequality.
-Also correct the source-proven pending inline-node binding described below,
-which would fail later in the same export callback.
+Keep the correct production distinction. Preview layout contains resolved
+dimensions, anchor and font context; authored layout preserves dimension source/
+unit/context metadata. Correct the harness comparison and exact native-edit
+baseline, then make the synthetic fixtures faithfully represent both forms.
+Do not alter production model, rendering, Inspector, serialization, camera,
+geometry or PGF references to make the assertion pass.
 
-Keep the now successful pending fixture and native .23 preparation.
-Preserve production model/rendering/geometry/camera semantics, PGF references
-and tolerances, all completed helpers and download/capture contracts.
-Do not repeat resolved fixes or rewrite unrelated files.
+Keep all current native view/control/matrix checks, pending/click/release contracts,
+inline binding and complete SVG/PNG/TikZ acceptance.
+Do not repeat completed fixes or rewrite unrelated files.
 
 Read `AGENTS.md`, `prompts/phase-32d-implement.md`,
 `prompts/phase-32d-review.md`, `docs/PHASE_32D_IMPLEMENTATION.md`, and
 `docs/PHASE_32_PLAN.md`. Inspect the actual tree before editing.
-Keep strict cumulative verification, verification-before-review/commit and
-the exact-tree post-review identity gate. Phase32 remains incomplete until
-complete accepted verification and matching independent review.
+Keep cumulative strict verification, verification-before-review/commit and
+the exact-tree post-review identity guard.
+Phase32 remains incomplete until accepted verification and matching review.
 
 ## Latest evidence and checkout identity
 
 Latest child handoff:
-`/private/tmp/stz-32d-pending-fix-20261011/HANDOFF.md`.
-Its inventory, full diff, preservation hashes, raw reports and logs are retained
-in the same directory. The newer browser-capable parent records are:
+`/private/tmp/stz-32d-view-fix-20261011/HANDOFF.md`.
+Its exact inventory, diff, identities, preservation hashes, reports and logs
+remain in that directory. Newer browser-capable parent records:
 
-- Worker response:
-  `/var/folders/vk/7kf940pd4bx8f6cg3rzlmtc80000gn/T/stz-phase-verifier-zgKwaA/response.json`.
-- Verification report:
-  `/var/folders/vk/7kf940pd4bx8f6cg3rzlmtc80000gn/T/stz-phase32d-before-review-bmgK6V/verification.json`.
-- Browser log:
-  `/var/folders/vk/7kf940pd4bx8f6cg3rzlmtc80000gn/T/stz-phase32d-before-review-bmgK6V/05-check-free-labels/command.log`.
-- Raw native evidence/failure artifacts:
-  `/var/folders/vk/7kf940pd4bx8f6cg3rzlmtc80000gn/T/stz-phase32d-before-review-bmgK6V/05-check-free-labels/artifacts/`.
+- Worker:
+  `/var/folders/vk/7kf940pd4bx8f6cg3rzlmtc80000gn/T/stz-phase-verifier-4XpVdp/response.json`.
+- Verification:
+  `/var/folders/vk/7kf940pd4bx8f6cg3rzlmtc80000gn/T/stz-phase32d-before-review-E5qxLx/verification.json`.
+- Free-labels log:
+  `/var/folders/vk/7kf940pd4bx8f6cg3rzlmtc80000gn/T/stz-phase32d-before-review-E5qxLx/05-check-free-labels/command.log`.
+- Raw evidence:
+  `/var/folders/vk/7kf940pd4bx8f6cg3rzlmtc80000gn/T/stz-phase32d-before-review-E5qxLx/05-check-free-labels/artifacts/`.
 
-Branch is `phase/32d-margin-minsize-anchor`, HEAD
-`dab98a52983920f68da09982dedacb9342c959ab`.
-The actual pre-prompt-update tree matches both before/after parent identities
-and the child handoff:
+Branch: `phase/32d-margin-minsize-anchor`.
+HEAD: `63a6afc6ae212458d17d0fe11849bf2957ecb2f7`.
+The actual pre-prompt-update tree matches parent checkout/checkoutAfter and child:
 
 ~~~text
-483e48d2aa8cbf2f8094ef3d200d5a0f7dc19c7e7f7112f76ddb07dbaba6826c
+ded68d9355198d2bdb1dd7a94b797d75b56fbdfc7dca461d1dfee295fe0ea3f9
 ~~~
 
-Preserve the nine modified tracked files: both Phase32 documents, `package.json`,
-`scripts/checkPointLayoutAnchors.mjs`, `scripts/fixtures/freeLabelsApp.tsx`,
-`scripts/pointLayoutAnchorsContract.mjs`,
-`tests/scripts/phase32dVerification.test.mjs`,
-`tests/scripts/runPhaseRunner.test.mjs`, and
-`tests/scripts/standalonePointDownloadFixture.mjs`.
-Preserve the four new untracked files:
+Preserve eleven modified tracked files: both Phase32 documents, `package.json`,
+`scripts/automation/phase-verification.mjs`,
+`scripts/checkPointLayoutAnchors.mjs`, `scripts/pointLayoutAnchorsContract.mjs`,
 `scripts/pointLayoutPendingFixture.mjs`,
-`scripts/pointLayoutPendingPreparation.mjs`,
-`tests/scripts/pointLayoutPendingFixture.test.mjs`, and
-`tests/scripts/pointLayoutPendingPreparation.test.mjs`.
-Earlier body/candidate/helper/capture corrections are tracked.
-This prompt edit changes the fingerprint; capture the actual current tree,
-rather than hard-coding a historical identity as acceptance.
+`tests/scripts/phase32dVerification.test.mjs`,
+`tests/scripts/pointLayoutPendingFixture.test.mjs`,
+`tests/scripts/runPhaseRunner.test.mjs` and
+`tests/scripts/standalonePointDownloadFixture.mjs`.
+Preserve three new files: `scripts/pointLayoutPendingView.mjs`,
+`tests/scripts/pointLayoutPendingView.test.mjs` and
+`tests/scripts/pointLayoutPendingViewFixture.mjs`.
+Earlier pending preparation/body/diagnostic/capture corrections are tracked.
+This prompt edit changes the fingerprint: capture the actual current tree
+rather than treating this historical identity as future acceptance.
 
 | Retained run | Actual result |
 | --- | --- |
-| Pending-fixture child | 6,212/6,212 full tests, build and diff passed. Frozen pending fixture/preparation/policy/capture focus passed 384/384; runner controls passed 37/37. Changed fixture TypeScript/lint and changed-script lint/syntax passed. Fresh strict verification and direct browser attempts stopped at fresh-server `listen EPERM` before Chrome. Baseline lint/type debt remains failed. No completion review/commit/push. |
-| Latest browser-capable parent | 6,212/6,212 tests, build, diff and full `check:label-assets` passed. Geometric and the first six layout scenarios passed. Transparent pending native preparation, selected owner and held SVG export-click snapshot succeeded; the post-click 2D uiSettings inequality then failed. |
+| View/inline-binding child | 6,347/6,347 full tests, 779/779 focused checks, 37/37 runner checks, build and diff passed. Focused fixture TypeScript/changed-helper lint/syntax passed. Fresh strict verification stopped at label-assets server `listen EPERM` before Chrome; separate direct browser attempts also stopped before launch. Baseline lint/type checks remain failed. No completion review/commit/push. |
+| Latest E5qxLx parent | 6,347/6,347 tests, build, diff and full label-assets passed. Native Chrome launched and 16/18 groups completed. Transparent pending selection and held SVG click succeeded; view baseline validation failed before any zoom fill. |
 
-bmgK6V completed 16 of 18 cumulative groups. Preserve these terminal successes:
+Preserve E5qxLx terminal successes: complete geometric eleven-shape/eight-contour/
+visibility group and both geometric transparent/white native downloads with
+reopening/PNG acceptance; layout90 sizing cases across15 shapes; 305 supported
+anchor cases and all six unsupported 2D/3D×ellipse/circle/cylinder ordinary
+body → far → warning cases; native controls/persistence; six imports/order/unit
+cases; eleven async transitions; four 2D/3D×rectangle/circular-sector native
+interaction cases and two negative-padding body-overflow/Alt-cycle cases.
 
-- Complete geometric group: eleven shapes, eight contours, visibility and both
-  actual transparent/white geometric SVG download/reopening/PNG scenarios.
-- Layout sizing: 90 cases across fifteen shapes.
-- Anchors/rotation: 305 supported cases and all six unsupported native cases,
-  2D/3D × ellipse/circle/cylinder, ordinary body → far → warning.
-- Native controls/persistence, six import/order/unit cases and eleven async
-  isolation transitions.
-- Four native interaction cases, 2D/3D × rectangle/circular sector, with drag/
-  history/owner cycles/visibility/camera/reference checks.
-  Both negative-padding body-overflow cases and Alt cycles pass.
+The first six layout scenarios passed. Both pending layout downloads and final
+standalone acceptance remain incomplete/unexecuted.
+An SVG click while held is not a terminal downloaded-file acceptance.
+Page errors are empty. Historical passes cannot replace fresh changed-tree checks.
 
-The new transparent pending preparation also passes, but is an accepted
-preparation record within an incomplete download scenario.
-An actual SVG export click is recorded while held.
-Neither pending layout download has terminal acceptance or saved SVG/PNG/TikZ/
-reopening artifacts. White and final standalone export remain unexecuted.
-Page errors are empty. Historical passes cannot substitute for fresh acceptance
-of the next changed tree.
+## First failure and retained observations
 
-## Diagnose the incorrect 2D view observation
-
-The latest first failure is:
+The actual first failure is `assertPendingLayoutViewStage` at
+`scripts/pointLayoutPendingView.mjs:170`, reached through `changePendingLayoutView`
+line288 and `checkPointLayoutAnchors.mjs:666`:
 
 ~~~text
-AssertionError: Expected "actual" to be strictly unequal to:
-'{"exportMode":"standalone","includeCoordinateAxesInTikz":false,
-  "visibility":{...}}'
+actual resolved preview:
+{ innerXSep:3, innerYSep:1, outerXSep:5, outerYSep:2,
+  minimumWidth:110, minimumHeight:25, anchor:'north',
+  fontContext:{fontSizePt:10,xHeightPt:4.30554} }
 
-scripts/checkPointLayoutAnchors.mjs:669
-scripts/ownedPageEvent.mjs:62
-scripts/checkPointLayoutAnchors.mjs:656
-scripts/checkFreeLabels.mjs:483
+expected incorrectly spreads raw model layout:
+{ ...same values,
+  units:{minimumWidth:{source:'110',unit:'pt',texPoints:110}},
+  fontContext:{fontSizePt:10,xHeightPt:4.30554} }
 ~~~
 
-Read `free-labels-evidence.json`, `point-layout-failure.json`,
-`point-layout-app-failure.json`, `point-layout-app-lifecycle.json`,
+Read `free-labels-evidence.json`,
 `point-layout-pending-transparent-edit-preparation.json`,
-`point-layout-pending-cleanup.json` and the last selection records through
-`point-layout-selection-0516.json`.
-The failure screenshot is intentionally omitted for pending scenarios.
-The bounded failure DOM ends before the camera inputs and cannot prove their
-post-fill values. Do not invent a measured zoom/CTM change from it.
+`point-layout-pending-transparent-edit-post-click-view.json`,
+`point-layout-pending-cleanup.json`, current selection records and native
+source/anchor/minimumWidth diagnostics before changing code.
 
-Relevant observed diagnostic entries in `free-labels-evidence.json` are:
-`point-layout-pending-transparent-edit-before-export-click`,
-`point-layout-pending-transparent-edit-export-click-held`,
-`point-layout-pending-transparent-edit-anchor-native-input` and
-`point-layout-pending-transparent-edit-minimumWidth-native-input`.
+The raw view artifact honestly contains only `before`:
+`fillCount:0`, unique numeric/slider counts1, zoom1/slider1, pan0/0,
+no control events, no observation errors. The actual camera disclosure was
+initially closed, opened for baseline measurement and restored closed.
+Observer removal/disclosure restoration succeeded; secondaryErrors are empty.
 
-The raw evidence shows:
+Selected circle has source `later $changed$`, anchor north, minimumWidth110,
+and exact units metadata shown above in both saved and runtime JSON.
+Rectangle/cylinder retain their original sources/layouts.
+All three observed nodes are connected/current; the circle is ready for its new
+source. Its original export source remains held with started2/completed0/
+releasedfalse. Do not confuse new-source readiness with captured-source release.
+Current before-stage root-relative origins are measured, but no after-stage
+zoom geometry or native zoom input exists. This run proves no completed zoom.
 
-- Native preparation sequence39 selects `layout-circle` at epoch427 with one
-  trusted ordinary .23 gesture. Input hits that circle first at approximately
-  (593.53717,1134.83984), with no sibling/UI interception or secondary errors.
-- All fifteen click-time point snapshots are captured. The circle at (7,6.5,0)
-  has full source `captured transparent $\frac{anchor_{32D}}{1+\frac{x}{y}}$`,
-  status pending, held started1/completed0/releasedfalse and transform
-  `translate(158.1818181818182 167.78181818181818)`.
-  Actual selected owner is circle and native background control is transparent.
-- The production SVG export control is clicked while held. The immediately
-  observed hold later has started2/completed0/releasedfalse.
-  Preserve the distinct actual click-time and later hold observations.
-- Native post-click source edit runs, then anchor north and minimumWidth110
-  inputs are recorded with trusted input and matching model values.
-- The camera disclosure summary before fill reads zoom1, pan x0, pan y0.
-  `zoom.fill('1.4')` is awaited, then the inequality fails.
-  The planned `-post-click-view` observation is after the assertion, so no
-  actual post-fill control/placement record exists.
-- Intended captured-release/download.saveAs/reopening/comparison never executes.
-  Finally cleanup releases two held requests and removes the export listener,
-  with errors[]. This is cleanup evidence, not intended release or acceptance.
+The immutable click snapshot still has all15 points, selected layout-circle,
+revision427, original captured transparent source, anchor base/minimumWidth35
+and click-time started1/completed0/unreleased. The later hold count2 is distinct.
+No intended release, saved pending-layout SVG/PNG/TikZ or reopening acceptance
+was reached. Cleanup subsequently released both held requests without errors
+and released the export listener; this is failure cleanup, not acceptance.
+White pending and final standalone are unexecuted.
+Do not reclassify this browser-capable parent failure as child startup EPERM.
 
-Do not describe this as zoom already1.4, a lost native click, renewed fixture
-obstruction or child startup failure. The requested fill is known; its actual
-applied value and view geometry still require fresh observation.
+## Correct the resolved-layout oracle
 
-Trace the source contract:
+Trace the unchanged production contract:
 
-1. `src/App.tsx`'s DEV `AppLabelBrowserSnapshot.uiSettings` records export mode,
-   axes, visibility and `camera3d` only when ambientDimension===3.
-   It intentionally excludes the 2D camera controls.
-2. `updateCameraNumericField` updates cameraControl. In both dimensions,
-   `previewCameraAdjustment` supplies zoom/pan to `SvgDiagram`.
-3. `src/rendering/svgCamera.ts` applies the 2D adjustment to the fitted scale/
-   origin, changing model-point projection independently of uiSettings.
-4. Saved JSON omits runtime camera; `pointExportClickSnapshot`'s camera read
-   from saved JSON is not an effective live 2D preview-camera observation.
+1. `src/ui/inspector/PointLayoutFields.tsx` uses `updatePointNodeDimension`.
+   Native Minimum width input `110` means pt when no suffix is written.
+2. `src/model/pointNodeLayout.ts` stores resolved minimumWidth110 and
+   `units.minimumWidth={source:'110',unit:'pt',texPoints:110}`.
+   It preserves other authored metadata and per-axis contexts.
+3. `resolvePointNodeLayoutOptions` returns exactly six numerical dimension
+   fields, anchor and merged fontContext. Its resolved type has no units.
+   Legacy size/stroke/default precedence and resolution are unchanged.
+4. `src/rendering/svgPointNodeLayout.ts` computes that resolved form;
+   `src/rendering/svgPointNodeView.ts` serializes it as `data-point-layout`.
+5. The harness spreads `point.model.style.layout` into expected DOM layout.
+   This injects authored units into a diagnostic that intentionally omits them.
 
-Thus uiSettings equality is compatible with a real 2D view change.
-Purely deleting the assertion would remove needed immutable-view acceptance.
-Replace its observation and preserve the production contracts.
+Use a narrow explicit resolved-field expectation for the actual preview.
+Compare the entire parsed DOM layout strictly with the correct resolved schema:
+all six dimensions, anchor and effective fontContext. Reject missing, malformed,
+extra or incorrect resolved fields; keep current owner/source/request/model
+binding and finite geometry checks.
+For this complete pending fixture, the authored six dimensions are explicit.
+Do not add an unrelated generic normalization framework or redefine fallback
+semantics. If supporting omitted values, match existing size/stroke/font-context
+precedence exactly with meaningful existing controls.
 
-## Prove the actual post-click view change
+Keep raw authored layout separate and exact in the authoritative model/saved
+state/history and stage invariants. Its source, unit, texPoints and applicable
+per-axis/context metadata remain mandatory wherever the native edit supplies
+them. The absence of units in resolved DOM is correct; absent or altered units
+in the authored expected baseline is not correct.
 
-Implement a small scoped read-only view observation/control helper or fixture
-diagnostic for this transparent pending export path. Prefer actual DOM controls
-and native point measurements. If a DEV observation is necessary, keep it separate
-from saved model/UI serialization and the normal product flow.
-Do not add camera fields to persisted version2 or production uiSettings solely
-to make the failed inequality pass.
+Do not merely delete the comparison, allow arbitrary subsets, globally strip
+metadata from records, copy actual DOM into its expected value, or relax all
+deep-equality/persistence checks. Do not add units to production preview diagnostics
+or drop units from production model/persistence to make schemas identical.
+Keep raw persisted observations unchanged, including failed pre-input records.
 
-Require all of the following:
+## Correct the exact native-edit baseline and faithful fixtures
 
-1. Resolve one actual zoom numeric control and its associated slider/disclosure
-   from the current App. Expand the real owned camera details only when needed.
-   Capture the baseline after expansion/scroll, so those actions cannot be
-   confused with camera projection. Retain actual accessible name, count, values,
-   connection/identity and supported finite input range.
-2. The baseline is after the already intended source/anchor/minimum edits and
-   before the zoom input. Observe its authoritative state and current owners.
-   Require the declared target1.4 to differ from actual current zoom.
-   An already-equal value is a failed precondition, not view-change success.
-3. Apply one ordinary native numeric fill through the real control.
-   Retain actual input/change provenance honestly, input value/order and owner.
-   Observe after input and bounded commit, before any assertion or image work.
-   Require actual numeric/slider values to reflect the declared finite zoom.
-   Do not synthesize input, retry values or patch camera state programmatically.
-4. Observe current connected point-node outer placement, source/request/document
-   owner and native matrices before/after. Use stable reference points or anchors,
-   keeping their model coordinates exact and separate from their text/contour
-   dimensions and selected-anchor placement.
-   Demonstrate that the current model-to-canvas projection changes with zoom.
-5. Normalize point geometry into the actual SVG root coordinate frame using
-   finite invertible native node/root matrices. Record viewBox, client/viewport,
-   scroll/disclosure conditions and actual model positions.
-   Root SVG screenCTM can stay constant when zoom changes: it primarily describes
-   viewport/CSS placement. Root CTM inequality alone cannot prove a view change.
-   Screen-coordinate differences due only to scrolling/resizing cannot pass.
-6. Verify the actual placement change is consistent with zoom while pan and
-   declared model coordinates remain fixed. For example, use two distinct stable
-   model points and their root-relative projected separation before/after,
-   independent of CSS movement and source/layout edits.
-   Use existing precise native rounding allowances; do not alter PGF tolerances
-   or derive a successful observation solely from the production solver under test.
-7. During this view-only action preserve exact saved/runtime diagram, history,
-   selection, document revision, source/layout and unrelated UI settings.
-   uiSettings may correctly remain identical in this 2D case.
-   Preserve current held source unreleased until its intended post-click release.
-   Account honestly for unrelated async typesetting completion; it cannot be
-   substituted for camera movement or mix stale owner/request observations.
-8. Keep the immutable old export-click snapshot and its captured placement.
-   The later live view differs, but downloaded/reopened geometry must match
-   original click-time/settled expectations after normal original-fixture reload.
-   Do not overwrite click data with a later current-view snapshot.
+A second source-proven defect is in `assertPendingLayoutViewEvidence`'s intended
+post-click baseline construction around lines195–197. It changes circle text,
+anchor and minimumWidth110 but does not add native units metadata.
+After fixing the first stage comparison, its exact runtime equality would still
+reject the real Inspector edit. This is inspected code, not an executed second
+native failure in E5qxLx.
 
-Persist before/immediate-input/after observations and actual control events
-before validation, including failed/no-op/stale/missing observations.
-Keep the planned `-post-click-view` evidence and bind it into terminal download,
-standalone raw records and fresh parent validation.
-Reject a declared `viewChanged:true` without actual control/geometry proof.
+Construct the expected baseline from the immutable complete click-time model
+and the actual declared native edits: source `later $changed$`, anchor north,
+minimumWidth110, with minimumWidth provenance
+`{source:'110',unit:'pt',texPoints:110}`.
+Preserve pre-existing units for other axes and any existing font contexts.
+Do not invent pt-axis font metadata that the native editor does not add.
+Require exact full runtime/model equality after only these intended edits.
+Keep exact saved/runtime/history/selection/revision/uiSettings invariance during
+the subsequent view-only action. Do not base the expected edit on the unvalidated
+actual model or discard provenance before equality.
 
-Own only this control/listener/preparation work; bound it and remove observers
-through primary-error-preserving cleanup. Do not add an extra click/export/retry,
-failure screenshot, camera reset or 3D replacement scenario to make it pass.
+`tests/scripts/pointLayoutPendingViewFixture.mjs` repeats both mistakes:
+numeric-only minimumWidth edit and raw-layout spread into synthetic DOM.
+Update it to represent actual native provenance in runtime/saved/history present
+and resolved-only preview diagnostics.
+Retain honest intermediate source/anchor history snapshots, the immutable old
+click source/layout, all15 points and all current synthetic native view geometry/
+control/event/hold/cleanup contracts. Avoid using the assertion under test to
+generate its own expected success. Coordinate any dependent parent-policy/
+standalone/runner fixtures; do not loosen their required raw records.
 
-## Correct the pending inline-node binding
+Add a small set of meaningful regressions that exposes both bugs:
 
-One further concrete source defect is reachable after the current inequality
-is fixed. This is code inspection, not an executed native failure:
+- The faithful native `110` edit retains units in authored saved/runtime model,
+  omits them from resolved preview, and passes genuine control/projection proof.
+  A direct before-stage test and complete evidence test should exercise both
+  stage and exact-baseline paths.
+- Missing/changed minimumWidth source, unit or texPoints in the authored baseline
+  fails even if resolved minimumWidth stays110. Preserve applicable context and
+  other-axis metadata; view-only metadata changes must fail exact invariants.
+- Missing/changed dimension, anchor or effective fontContext, malformed layout
+  JSON or unexpected fields in actual resolved DOM fail.
+  A fixture incorrectly including authored units in resolved DOM fails.
+- Preserve existing no-op/unapplied zoom, numeric-only/CSS-only movement,
+  invalid matrix, stale owner/request/epoch, changed model/history/pan,
+  early release, rewritten click and cleanup/diagnostic-error negative controls.
+- Fresh parent validation still requires matching full raw native view artifact/
+  diagnostics/terminal/standalone records. Add a focused metadata corruption
+  control where needed; summary flags or synthetic fixtures cannot replace
+  actual native acceptance.
 
-- `checkPointLayoutAnchors.mjs:470` defines `siblings` for async isolation using
-  `siblingSnapshot()`. That value is an object with labels/paths/rendered.
-- Pending fixture construction now uses `buildPendingLayoutFixture` and no longer
-  declares the old pending array named siblings.
-- The pending standalone callback at line717 still reads
-  `siblings[0].inlineNodes`. It resolves the earlier async object, so index0 is
-  undefined; it cannot validate the current exported inline nodes.
+Keep existing import units, per-axis em/ex, context cloning, persistence and
+PGF controls. Do not inflate broad test matrices or rewrite successful suites.
 
-Bind the pending callback to its own declared fixture's unique `export-path`,
-checking geometricKind/kind and the expected two inline nodes.
-Preserve exact current inline source/content and existing XML text checks.
-Do not use the post-click replacement model, an unrelated async snapshot,
-a positional point at index0, or optional chaining that silently skips validation.
-Keep the successful async-isolation snapshot and tests unchanged.
+## Preserve implemented 2D view and inline binding
 
-Add a small meaningful binding regression using the complete pending fixture
-and a distinct prior async snapshot. Require missing/duplicate/wrong-kind path
-or omitted/changed inline content to fail. Preserve both free-label checks and
-the all-fifteen point/source/layout/placement comparison.
-Do not expand into unrelated export refactoring.
+Keep the scoped `pointLayoutPendingView.mjs` helper: actual unique zoom numeric/
+associated slider/disclosure, baseline after required expansion/scroll and
+intended source/layout edits, target1.4 differing from baseline, one ordinary
+native fill and truthful ordered trusted input/optional change evidence.
+Keep bounded before/immediate-input/after observations persisted before validation,
+current references, ranges, pan and exact state/hold invariants.
+
+Keep connected outer point origins for circle/rectangle/cylinder normalized
+through finite invertible native node/root matrices into the actual SVG root.
+Stable rectangle/cylinder separation must follow zoom on both axes; measured
+fixed origin verifies absolute placements at fixed model coordinates/pan.
+Retain precise propagated binary32 rounding, viewBox/viewport/scroll evidence,
+immutable click identity and primary-error-preserving observer/disclosure cleanup.
+Root screenCTM may remain constant; CSS/scroll-only movement cannot pass.
+Do not substitute text/contour/anchor-offset changes or async completion for zoom.
+Production 2D uiSettings/persisted camera omission remains correct.
+
+Keep mandatory `point-layout-pending-transparent-edit-post-click-view.json`,
+ordered fresh diagnostics and their binding into actual terminal/standalone
+records and parent validation. Failed before-only evidence cannot pass.
+
+Keep unique `export-path` inline binding through the complete current pending
+fixture, correct geometricKind curve/kind polyline, both exact declared inline
+nodes, raw content/order/placement/options and existing XML checks.
+Preserve missing/duplicate/wrong-kind/changed-content regressions, both free labels,
+all15 points and successful distinct async sibling snapshots.
+Do not restore the former `siblings[0]` lookup or weaken content comparisons.
 
 ## Preserve pending fixture, preparation and immutable downloads
 
@@ -287,36 +285,23 @@ inequality, cylinder paint/shape-center anchors and combined label/path content.
 Do not settle/release the held source before click or weaken source/position
 comparisons to accommodate later changes.
 
-## Contracts, regressions and cumulative continuation
+## Contracts and cumulative continuation
 
-Extend the layout raw contract and parent policy for mandatory actual post-click
-2D view evidence, while preserving the current preparation/hold/click/release
-and SVG/PNG/TikZ checks. Terminal and standalone records must agree with their
-actual persisted observations and exact same old click snapshot.
-If adding an artifact, register and require it explicitly; missing/unrelated/
-stale/failed evidence cannot pass or support completion review.
+Retain current preparation/hold/click/release/view and SVG/PNG/TikZ raw contracts.
+Terminal and standalone observations must agree with the same actual persisted
+records and immutable click snapshot. Missing, unrelated, stale, failed or
+summary-only evidence cannot pass.
 
-Add focused controls that expose this real oracle error: uiSettings unchanged
-while 2D controls and root-relative point projection change correctly; no-op or
-unapplied control; numeric value alone without view movement; CSS/scroll-only
-movement; wrong control/owner/request/epoch; invalid matrices; changed model/
-history/pan; missing before/after event/geometry; overwritten click snapshot;
-early release or secondary diagnostic/cleanup errors.
-Do not assert root CTM must change or treat serialized camera omission as failure.
-Clearly identify synthetic controls; they are not native acceptance.
-
-Retain production component body tests, the successful native pending selection
-and fixture/policy/runner/capture controls. Register new tests in the explicit
-list and copy imported dependencies into isolated runner fixtures.
-Add no dependency without explaining necessity.
+Register any new test in the explicit test list and copy actual imported
+dependencies into isolated runner fixtures. Preserve current policy/ownership/
+runner controls. Add no dependency without explaining necessity.
 Use strict TypeScript without `any`; preserve 2D z=0, active 3D work planes and
 the mathematical codimension convention.
 
-Use the same cumulative pages and strict predecessor sequence. Preserve freshly
-passed geometric and six layout scenarios, all anchors/diagnostics/body/overflow/
-owner cycles. Complete both pending transparent/white layout SVG/TikZ downloads,
-their actual reopening/PNG acceptance, then final standalone export.
-Diagnose any subsequent first failure from fresh raw evidence.
+Use the same cumulative pages and strict predecessor sequence. Preserve fresh
+geometric and first-six-layout acceptance; complete both pending transparent/
+white SVG/TikZ downloads, reopening/PNG acceptance and final standalone export.
+Diagnose any next first failure from fresh raw observations.
 
 ## Preserve completed native, visibility, geometry and capture work
 
@@ -369,9 +354,9 @@ images, missing raw observations or mock PNG headers.
 
 ## Fresh verification and parent handoff
 
-Use Node >=22.12.0 through Homebrew. Run focused 2D post-click view and inline
-binding controls, pending preparation, native selection/body, layout/capture,
-parent-policy/ownership and runner checks.
+Use Node >=22.12.0 through Homebrew. Run focused resolved-layout/provenance/
+native-baseline/faithful-fixture checks plus current view/preparation/inline
+binding, layout/capture, parent-policy/ownership and runner checks.
 Run required commands:
 
 ~~~bash
@@ -383,20 +368,20 @@ PATH=/opt/homebrew/bin:$PATH npm run check:free-labels
 ~~~
 
 Run applicable focused TypeScript/lint and changed-script syntax checks.
-Report reproduced baseline debt accurately: retained geometric caller
-no-unsafe-finally errors, verifier unused _role, unchanged layers suite unused
-defaultCurveStyle and inherited focused strict-TypeScript diagnostics.
-These checks remain failed; application TypeScript/build passed.
-Do not report baseline failures as passes or expand into unrelated cleanup.
+Report reproduced baseline debt accurately: geometric caller's two
+no-unsafe-finally errors, modified verifier's inherited unused _role, unchanged
+layers' unused defaultCurveStyle and eleven inherited focused strict-TypeScript
+diagnostics. These checks remain failed; application TypeScript/build is separate.
+Do not relabel baseline failures as passes or expand into unrelated cleanup.
 
 Use a fresh owned server and supported Playwright/Chrome in the browser-capable
-parent. Focused/scoped evidence cannot establish strict 32D acceptance.
-If the child hits `listen EPERM`, retain its startup failure and exact tree for
-the parent without weakening sandbox/acceptance rules.
-Do not reclassify the latest parent's uiSettings assertion as startup failure.
+parent. Focused/scoped evidence cannot establish strict32D acceptance.
+If child browser attempts encounter `listen EPERM`, retain startup failure and
+exact tree for the parent without weakening sandbox/acceptance rules.
+The latest parent's resolved-layout assertion occurred after native launch.
 
-Load updated callers/helpers/contracts/policy in a fresh parent process and
-verify the preserved dirty tree without committing:
+Load updated helpers/contracts/policy in a fresh parent process and verify
+the preserved dirty tree without committing:
 
 ~~~bash
 PATH=/opt/homebrew/bin:$PATH node scripts/automation/run-phase.mjs 32D verify
@@ -404,30 +389,30 @@ PATH=/opt/homebrew/bin:$PATH node scripts/automation/run-phase.mjs 32D verify
 
 Preserve implementation/fix clean-tree guard. Do not reset, discard, stash,
 commit or push unfinished work to bypass it.
-Require all twelve 31F groups, three 32A groups, full 32B paint/import, complete
-32C shapes/visibility/downloads and point-node-layout-anchors-combined.
-Require terminal successes, actual valid artifacts, no page errors, native history/
-JSON persistence, both TikZ modes, both pending layout downloads and reopened
+Require all twelve31F groups, three32A groups, complete32B paint/import,
+complete32C shapes/visibility/downloads and point-node-layout-anchors-combined.
+Require terminal successes, actual valid artifacts, no page errors, native
+history/JSON persistence, both TikZ modes, both pending downloads and reopened
 standalone SVG/complete PNG acceptance.
-Do not skip predecessors, reuse historical/scoped reports, create a deferred
-32D profile or reclassify unexpected failures as backlog.
+Do not skip predecessors, reuse historical/scoped reports, create a deferred32D
+profile or reclassify unexpected failures as backlog.
 
 ## Independent review and completion
 
 After complete fresh strict parent verification, obtain read-only independent
 review of the exact matching tracked/untracked tree using
 `prompts/phase-32d-review.md`. Inspect actual report/artifacts.
-Matching accepted evidence can support a sandboxed reviewer; stale, partial
-or failed reports cannot substitute for acceptance.
+Matching accepted evidence can support a sandboxed reviewer; stale, partial or
+failed reports cannot substitute for acceptance.
 
 Update status only to observed accepted results. Keep Phase32 incomplete while
 any native/download/reference/review gate remains open.
 Preserve stop-before-review/commit on failed verification and the parent's
 post-review identity guard.
 
-Report the corrected 2D view observation and current-fixture inline binding,
-preserved native/pending/capture contracts, changed files, focused/full checks,
-fresh parent evidence/identity, actual transparent/white/download/final standalone
-coverage, review result and any remaining concrete first failure.
+Report corrected resolved-layout/native-edit expectations and faithful fixtures,
+preserved production/view/pending/capture contracts, changed files, focused/full
+checks, fresh parent evidence/identity, actual transparent/white downloads/final
+standalone coverage, review result and any remaining concrete first failure.
 Leave commit/push to the parent after verification and review pass.
 Do not claim completion from child-only or historical results.

@@ -7,6 +7,7 @@ import { assertGeometricSelectionEvidence, assertPointToolbarPreparation } from 
 import { assertUnsupportedDiagnosticEvidence } from './pointUnsupportedDiagnosticContract.mjs'
 import { assertPendingLayoutPreparation, assertPendingLayoutClickContinuation } from './pointLayoutPendingPreparation.mjs'
 import { assertPendingLayoutFixture } from './pointLayoutPendingFixture.mjs'
+import { assertPendingLayoutViewEvidence } from './pointLayoutPendingView.mjs'
 
 export const layoutAnchorGroup = 'point-node-layout-anchors-combined'
 export const layoutShapes = ['circle', 'rectangle', 'square', 'triangle', 'ellipse', 'diamond', 'regular polygon',
@@ -66,6 +67,7 @@ export const layoutImportCases = [
 export function layoutAnchorArtifacts(name) {
   const files = [`${name}.json`]
   if (name.startsWith('point-layout-pending-')) files.push(`${name}-preparation.json`, `${name}.svg`, `${name}.png`, `${name}-standalone.json`, `${name}-standalone.tex`, `${name}-inlineMath.tex`)
+  if (name === 'point-layout-pending-transparent-edit') files.push(`${name}-post-click-view.json`)
   if (name === 'point-layout-native-controls-persistence') files.push(`${name}-saved.json`, `${name}-standalone.tex`, `${name}-inlineMath.tex`)
   if (name === 'point-layout-import-order-units') files.push(`${name}.sty`, `${name}-saved.json`, `${name}-standalone.tex`, `${name}-inlineMath.tex`)
   return files
@@ -74,6 +76,34 @@ export function assertPointTikzSourceByMode(outputs, source) {
   assert.ok(outputs.standalone.includes(`{${source}}`), 'Standalone retains the exact raw node body')
   const inlineBody = source.replace(/\r\n?/g, '\n').replace(/[^\S\n]*\n+[^\S\n]*/g, ' ')
   assert.ok(outputs.inlineMath.includes(`{${inlineBody}}`), 'Inline retains the established physical-line folding convention')
+}
+export function assertLayoutPostClickViewDiagnostic(evidence, reportRecords) {
+  assert.equal(evidence.scenario, 'point-layout-pending-transparent-edit')
+  assert.ok(Array.isArray(reportRecords), 'The fresh browser report retains post-click view diagnostics')
+  const related = reportRecords.filter(({ name }) => name === `${evidence.scenario}-post-click-view`)
+  assert.ok(related.length > 0, 'The fresh browser report retains actual post-click view observations')
+  for (const entry of related) {
+    assert.equal(entry.group, layoutAnchorGroup); assert.equal(entry.result, 'observed')
+    const view = entry.postClickView
+    assert.ok(view, 'Every related view diagnostic retains its raw observations')
+    assert.equal(view.scenario, evidence.scenario); assert.equal(view.source, evidence.pendingPreparation.source)
+    assert.ok(['observed', 'passed'].includes(view.result)); assert.equal(view.error, undefined)
+    assert.deepEqual(view.secondaryErrors, [], 'Secondary view diagnostic and cleanup errors cannot support acceptance')
+    assert.deepEqual(view.click, evidence.click, 'Every view diagnostic preserves the same immutable old export click')
+  }
+  const accepted = related.filter(({ postClickView }) => postClickView.result === 'passed')
+  assert.equal(accepted.length, 1, 'The fresh browser report contains one accepted actual post-click view observation')
+  let preceding = -1
+  for (const [stageIndex, boundary] of ['before', 'immediate-input', 'after'].entries()) {
+    const index = related.findIndex(({ postClickView }) => postClickView.result === 'observed'
+      && postClickView.stages?.at(-1)?.boundary === boundary)
+    assert.ok(index > preceding && index < related.indexOf(accepted[0]), `Raw ${boundary} observations are persisted in order before view acceptance`)
+    assert.deepEqual(related[index].postClickView.stages, evidence.postClickView.stages.slice(0, stageIndex + 1),
+      `Persisted ${boundary} stage prefix retains the terminal native observations`)
+    preceding = index
+  }
+  assert.deepEqual(related.at(-1).postClickView, evidence.postClickView, 'The last view diagnostic matches terminal acceptance')
+  assert.deepEqual(accepted[0].postClickView, evidence.postClickView, 'The accepted diagnostic matches terminal control and geometry proof')
 }
 export function assertLayoutStandaloneEvidence(evidence, raw, artifactDir) {
   assertLayoutAnchorEvidence(evidence, evidence.scenario)
@@ -87,6 +117,14 @@ export function assertLayoutStandaloneEvidence(evidence, raw, artifactDir) {
   assert.equal(preparation.scenario, evidence.scenario); assert.equal(preparation.group, layoutAnchorGroup)
   assert.equal(preparation.result, 'observed', 'Preparation artifact retains raw observations before terminal download acceptance')
   assert.deepEqual(preparation.pendingPreparation, evidence.pendingPreparation, 'Retained native preparation matches the accepted terminal download')
+  if (evidence.background === 'transparent') {
+    assert.deepEqual(raw.postClickView, evidence.postClickView, 'Standalone and terminal records retain the same post-click native 2D view evidence')
+    const view = JSON.parse(readFileSync(resolve(artifactDir, `${evidence.scenario}-post-click-view.json`), 'utf8'))
+    assert.equal(view.scenario, `${evidence.scenario}-post-click-view`, 'The raw 2D view artifact belongs to this pending download')
+    assert.equal(view.group, layoutAnchorGroup)
+    assert.equal(view.result, 'observed', 'The raw 2D view artifact precedes terminal download acceptance')
+    assert.deepEqual(view.postClickView, evidence.postClickView, 'Raw 2D view observations match the accepted terminal and standalone records')
+  }
   for (const [index, expected] of evidence.expected.entries()) {
     const actual = raw.reopened[index], captured = evidence.click.snapshot.points.find(({ id }) => id === expected.id)
     assert.ok(captured); assert.equal(captured.source, expected.source); assert.equal(captured.style.shape, expected.shape)
@@ -329,8 +367,17 @@ export function assertLayoutAnchorEvidence(evidence, name) {
     assert.equal(evidence.pendingPreparation.result, 'passed', 'Terminal pending download requires accepted complete native preparation')
     assert.equal(evidence.pendingPreparation.scenario, name, 'Native pending preparation belongs to this download scenario')
     assertPendingLayoutClickContinuation(evidence.pendingPreparation, evidence.click, evidence.beforeExportClick)
+    if (evidence.background === 'transparent') {
+      assert.ok(evidence.postClickView, 'Transparent pending download requires actual post-click 2D view observations')
+      assert.equal(evidence.postClickView.scenario, name, 'Post-click 2D view observations belong to this pending download')
+      assert.equal(evidence.postClickView.source, evidence.pendingPreparation.source, 'Post-click view evidence retains the original held captured source')
+      assert.equal(evidence.postClickView.result, 'passed', 'Transparent pending download requires accepted native control and geometry proof')
+      assertPendingLayoutViewEvidence(evidence.postClickView, evidence.click)
+    }
     const release = evidence.capturedRelease
     assert.equal(release?.source, evidence.pendingPreparation.source, 'The intended post-click boundary releases the captured source')
+    if (evidence.background === 'transparent') assert.deepEqual(release.before, evidence.postClickView.cleanup.observation.hold,
+      'The captured source stays held through view restoration until the intended release')
     assert.ok(Number.isInteger(release.before?.started) && release.before.started > 0)
     assert.equal(release.before.completed, 0); assert.equal(release.before.released, false)
     assert.equal(release.result?.source, release.source)
