@@ -59,8 +59,13 @@ minimum calculation; callers must retain authoritative style intent and display
 an explicit preview limitation. Finite negative inner/outer separation is accepted.
 Cylinder's PGF `asin` fitting rejects negative inner y separation, including
 minimum-dominant cases; the solver diagnoses the upstream domain failure instead
-of inventing a contour. Signed minimum dimensions are accepted, with negative
-minima inactive under PGF's content-dominant max rules.
+of inventing a contour. Signed minimum dimensions are accepted. Rectangle and
+ellipse fit each axis as PGF's signed maximum of its content candidate and half
+the corresponding minimum. The content candidate is the padded half-axis for
+rectangle and `sqrt(2)` times that padded half-axis for ellipse. A negative minimum
+dominates when this content candidate is more negative. The signed fitted axes
+remain authoritative for anchors; ordered painted bounds describe their envelope
+and cannot recover those signs.
 
 ## Placement and anchors
 
@@ -77,7 +82,8 @@ polar math, and negative values can fail earlier at the dimensional boundary.
 The source spelling remains unchanged. Directions use PGF's positive-up convention and returned
 coordinates use SVG's downward y sign.
 
-The solution carries `anchors`, `placementAnchor`, `anchorDiagnostic`,
+The solution carries runtime-only rectangle/ellipse `signedFittedAxes`,
+`anchors`, `placementAnchor`, `anchorDiagnostic`,
 `textCenter`, `shapeCenter` and `anchorBounds`. Painted paths remain relative to
 the upright body center. Rendering translates the complete body and shape by
 minus `placementAnchor`, keeping the selected anchor at the model coordinate.

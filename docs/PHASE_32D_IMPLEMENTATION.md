@@ -1,5 +1,108 @@
 # Phase 32D spacing, minima, anchors, and combined audit
 
+## Signed axes, arc picking and deterministic report follow-up (2026-10-11)
+
+The actual starting tree is clean at
+`f9893fad1fa0586260d614e832ffb99b00ce513f`, fingerprint
+`1ea95cbae3ee30bf7ca5f1ed5d8d807ac705e8052854cc5f30880c427730abeb`.
+The resolved-preview/native `110` provenance correction and its six files are
+already tracked here. They are preserved. The retained browser-capable parent
+`kpMSxP` accepted all five required commands and all eighteen cumulative groups
+on its earlier exact tree, including both transparent/white pending layout SVG
+downloads, both TikZ modes, external reopening, complete PNG and final standalone
+exports. Those are authentic historical results, superseding the startup-only
+child disposition below. The subsequent independent review found three Medium
+issues and returned `needs_changes`, `ready_to_commit:false`: signed basic-shape
+anchors, negative-radius contour density, and the stalled-report fixture's
+ordinary filesystem-write race. Its full suite failed 6,360/6,361; its build
+passed. Review rejection is the completion blocker for that earlier tree.
+The diamond outer-separation exception was independently authenticated and
+accepted by that review; older open-diamond wording below is historical.
+
+This follow-up preserves the signed fitted axes computed by ellipse/rectangle
+construction across the pure anchor boundary. Each outer axis separation is
+added to its own signed fitted axis. Ordered painted envelopes do not encode
+PGF saved-axis signs. Named compass/text anchors and numeric border branches
+retain their separate PGF semantics, including zero axes and parser/range/
+rounding behavior. No authored dimension is clamped, rejected or made positive.
+Only arc sampling density uses radius magnitudes; signed path coordinates,
+endpoints, sweep, rotation and extrema remain unchanged, with the same 0.005-unit
+sagitta precision and 2048-sample work guard.
+
+The stalled-report fixture records ordinary writes immediately in memory and
+stalls only failed-report writes. Production diagnostics remain unchanged. Its
+20ms deadlines, exact native Error identity, single nativeChecks invocation,
+two failed writes, owned late rejections after completion, drained listeners and
+page/browser/server cleanup order remain required.
+
+Additive evidence under `tests/fixtures/point-node-anchors/signed-axes/` retains
+the authenticated review bundle byte for byte and eight newly compiled PGF boxes
+with 192 anchors. The generator checks the pdfTeX engine, all seven source
+hashes, compiler-emitted PGF 3.1.11a and input/raw/compiler/generator hashes; it
+imports no production solver/support table. Cases cover empty strong negatives,
+the nonempty 20/8/3pt small-minimum reproduction, mixed signs and per-axis outer
+separation crossing signs. Raw Y-up TeX pt is reversed once to Y-down SVG units,
+then scaled by 1.2. Original 32C and 172-box/4,925-anchor/11-failure references
+and .025pt/.03pt tolerances remain byte-preserved. A single exact `.gitignore`
+exception includes the retained review production-command log in the tree
+fingerprint and future repository checkout.
+
+Registered geometry/rendering tests cover wrong-sign/absolute-axis controls,
+analytic .005-unit contour precision, zero axes/work rejection, pending/current/
+settled placement, validation/version-2/source/unit provenance and both TikZ
+modes. Production picking covers the recorded `(67.2,-67.2)` oblique point,
+empty-body center, mixed/dominant-negative axes, outside exclusion, both ambient
+dimensions/active work planes and current owner/font/source/layout/filter/lock
+guards. Isolated old-production controls fail for both signs and picking.
+These are pure/fixed-metric results, not native browser observations.
+
+The existing interaction scenario additionally requires two empty signed east
+placement cases and two signed ellipse native selection/Alt-cycle cases (2D
+nonempty and 3D empty). Raw actual .23 contour points, native path/BBox, local
+placement CTM, separately framed screen bounds, current hit stack/owner/epoch,
+trusted events and exact runtime/saved/history coordinates are mandatory.
+The oblique point must exceed the old four-cardinal contour's six-unit clearance;
+flags cannot substitute for actual native cycle success. Registered synthetic
+policy controls reject missing/corrupt/frame-confused records. All eight original
+scenarios, all eighteen cumulative groups, pending downloads and capture/raw
+contracts remain required. Existing suites are already in the explicit npm-test
+list and the existing isolated runner copy list includes every imported helper;
+no dependency or skipped case is added.
+
+Executed child checks used Homebrew-first Node v26.9.0. Fresh full `npm test`
+passed **6,425/6,425**, zero failures/cancellations/skips/todo, with normal project
+concurrency (`npm-test.log`, 826,669.455416ms). The focused geometry/model/TikZ/
+stalled-runner sweep passed 489/489; preserved view/preparation/pending/capture/
+ownership checks passed 347/347; cumulative policy/ownership passed 1,308/1,308;
+isolated runner/process/evidence checks passed 51/51. Build, focused strict
+TypeScript, configured TypeScript lint, recommended changed-script lint, all
+five changed/new script syntax checks and `git diff --check` passed. Existing
+geometric caller `no-unsafe-finally` (two), verifier unused `_role`, layer unused
+`defaultCurveStyle` and eleven focused layer TypeScript diagnostics were
+reproduced separately from unchanged HEAD bytes. Those checks remain failed;
+application build is a separate pass.
+
+Both configured direct required browser commands failed at fresh owned-server
+`listen EPERM 127.0.0.1` before Chrome. Label-assets passed its static graph only
+(four entries, 43 chunks, 85 references, 40 font modules). Strict free-labels
+retains browserVersion null, no completed groups, all eighteen unexecuted and
+pageErrors empty. The new signed native placement/Alt cases, both pending layout
+downloads/reopening/PNG/TikZ and final standalone acceptance remain unexecuted
+for this changed tree. These diagnostic attempts precede this final results
+documentation update. A fresh `node scripts/automation/run-phase.mjs 32D verify`
+is required on the final frozen tree; its actual command/report/checkout results
+belong to the external handoff. Completion review does not start after failed
+or incomplete verification. The retained earlier `needs_changes` review has
+not been replaced by a current passing review. No commit or push occurred.
+
+Current commands, additive independent references, preservation hashes, final
+tracked/untracked identity and native acceptance disposition are recorded under
+`/private/tmp/stz-32d-signed-fix-20261011/`. Fresh cumulative verification of this
+changed tree must precede independent read-only completion review and the
+parent's exact-tree post-review guard. No earlier browser report verifies these
+negative cases or the changed tree. Phase 32 remains **incomplete**. Failed or
+incomplete verification stops before completion review, commit and push.
+
 Status (2026-10-11): implementation and focused Node verification are present.
 Phase 32 is **not complete**. Fresh accepted required commands, strict native
 browser/download evidence and independent review remain required. 32A and main's

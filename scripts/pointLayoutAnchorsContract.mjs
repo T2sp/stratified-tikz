@@ -56,6 +56,15 @@ export const layoutAnchorScenarios = ['point-layout-per-shape-spacing-minima', '
   'point-layout-native-controls-persistence', 'point-layout-import-order-units', 'point-layout-async-combined-isolation',
   'point-layout-native-interaction-2d-3d', 'point-layout-pending-transparent-edit', 'point-layout-pending-white-load']
 export const layoutFieldKeys = ['innerXSep', 'innerYSep', 'outerXSep', 'outerYSep', 'minimumWidth', 'minimumHeight', 'anchor']
+// PGF 3.1.11a's signed maximum retains -80 TeX pt fitted axes for these
+// authored dimensions. Preview uses 1.2 SVG units per TeX pt: east=-96.
+export const signedAxisLayout = { innerXSep: -100, innerYSep: -100, minimumWidth: -160, minimumHeight: -160,
+  outerXSep: 0, outerYSep: 0 }
+export const signedAnchorCases = ['ellipse', 'rectangle'].map((shape) => ({ key: `${shape}-empty-east`, shape,
+  ambientDimension: 2, source: '', layout: { ...signedAxisLayout, anchor: 'east' } }))
+export const signedPickingCases = [{ key: 'ellipse-body-2d', ambientDimension: 2, source: 'x' },
+  { key: 'ellipse-empty-3d', ambientDimension: 3, source: '' }]
+  .map((entry) => ({ ...entry, shape: 'ellipse', layout: { ...signedAxisLayout, anchor: 'center' } }))
 export const layoutImportCases = [
   { key: 'layout ordered shorthand', options: 'inner xsep=2pt,inner sep=3pt,inner ysep=4pt,outer xsep=2pt,outer sep=5pt,outer ysep=6pt,minimum width=20pt,minimum size=30pt,minimum height=40pt', expected: { innerXSep: 3, innerYSep: 4, outerXSep: 5, outerYSep: 6, minimumWidth: 30, minimumHeight: 40 } },
   { key: 'layout ordered axis', options: 'inner sep=3pt,inner xsep=2pt,outer sep=5pt,outer xsep=2pt,minimum size=30pt,minimum width=20pt', expected: { innerXSep: 2, innerYSep: 3, outerXSep: 2, outerYSep: 5, minimumWidth: 20, minimumHeight: 30 } },
@@ -209,6 +218,29 @@ export function assertPointOwnerCycleEvidence(entry, selectedId, expectedId) {
     previous = index
   }
 }
+function assertSignedCaseState(state, spec, ids = ['app-point']) {
+  const envelope = JSON.parse(state.json), runtime = JSON.parse(state.runtimeDiagramJson), history = JSON.parse(state.history)
+  assert.equal(envelope.version, 2, 'Signed dimensions retain saved version 2')
+  for (const diagram of [envelope.diagram, runtime, history.present]) {
+    assert.equal(diagram.ambientDimension, spec.ambientDimension)
+    for (const id of ids) {
+      const point = diagram.strata.find((point) => point.id === id)
+      assert.ok(point); assert.equal(point.geometricKind, 'point'); assert.equal(point.codim, spec.ambientDimension)
+      assert.equal(point.text ?? '', spec.source); assert.equal(point.style.shape, spec.shape)
+      assert.deepEqual(point.style.layout, spec.layout, 'Signed authored layout survives runtime, saved envelope and history')
+      assert.deepEqual(point.position, { x: 3, y: 3, z: spec.ambientDimension === 3 ? .5 : 0 }, 'Signed geometry preserves model coordinates')
+    }
+  }
+}
+function assertSignedCasePlacement(entry, spec) {
+  assert.equal(entry.key, spec.key); assert.equal(entry.ambientDimension, spec.ambientDimension)
+  assert.equal(entry.source, spec.source); assert.equal(entry.shape, spec.shape); assert.equal(entry.anchor, spec.layout.anchor)
+  assert.deepEqual(entry.layout, spec.layout)
+  assertObservedPointPlacement(entry)
+  assert.equal(entry.rendered.bodyUpright, true)
+  for (const key of layoutFieldKeys) assert.equal(entry.rendered.layout[key], spec.layout[key], 'Resolved layout preserves signed authored dimensions')
+  assertSignedCaseState(entry.state, spec)
+}
 export function assertLayoutAnchorEvidence(evidence, name) {
   assert.equal(evidence.scenario, name); assert.equal(evidence.group, layoutAnchorGroup); assert.equal(evidence.result, 'passed')
   assert.deepEqual(evidence.pageErrors, [])
@@ -349,6 +381,55 @@ export function assertLayoutAnchorEvidence(evidence, name) {
       for (const type of ['pointerdown', 'pointerup', 'click']) {
         assert.ok(entry.rendered.nativeSelection.events.some((event) => event.type === type && event.trusted === true))
         assert.ok(entry.altSelection.events.some((event) => event.type === type && event.trusted === true && event.altKey === true))
+      }
+    }
+    assert.equal(evidence.signedAnchorCases.length, signedAnchorCases.length)
+    for (const spec of signedAnchorCases) {
+      const found = evidence.signedAnchorCases.filter(({ key }) => key === spec.key)
+      assert.equal(found.length, 1)
+      const entry = found[0]; assertSignedCasePlacement(entry, spec)
+      assert.deepEqual(entry.rendered.anchorOffset, { x: -96, y: 0 }, 'PGF east retains its signed fitted x axis')
+      assert.ok(Math.abs(entry.rendered.placementOffset.x - 96) < .001 && Math.abs(entry.rendered.placementOffset.y) < .001,
+        'Actual contour CTM placement offsets the signed east anchor')
+      assert.equal(entry.rendered.contour.attributes.transform, 'translate(96 0)')
+      assert.deepEqual(entry.rendered.bounds, { x: -96, y: -96, width: 192, height: 192 }, 'Signed anchors coexist with ordered absolute paint bounds')
+    }
+    assert.equal(evidence.signedPickingCases.length, signedPickingCases.length)
+    for (const spec of signedPickingCases) {
+      const found = evidence.signedPickingCases.filter(({ key }) => key === spec.key)
+      assert.equal(found.length, 1)
+      const entry = found[0]; assertSignedCasePlacement(entry, spec)
+      assert.deepEqual(entry.rendered.anchorOffset, { x: 0, y: 0 })
+      assert.ok(Math.abs(entry.rendered.placementOffset.x) < .001 && Math.abs(entry.rendered.placementOffset.y) < .001)
+      assert.equal(entry.rendered.contour.tag, 'path')
+      const path = entry.rendered.contour.attributes.d
+      assert.equal(typeof path, 'string'); assert.match(path, /\bZ\s*$/)
+      assert.deepEqual([...path.matchAll(/\bA\s+(-?[0-9.]+)\s+(-?[0-9.]+)/g)].map((match) => [Number(match[1]), Number(match[2])]),
+        [[-96, -96], [-96, -96]], 'Actual SVG path retains both signed radius-96 half-arcs')
+      assert.deepEqual(entry.rendered.bounds, { x: -96, y: -96, width: 192, height: 192 })
+      const selection = entry.rendered.nativeSelection
+      assertGeometricSelectionEvidence(selection, 'signed-overlap')
+      assert.equal(selection.scenario, name); assert.equal(selection.selected.id, 'signed-overlap')
+      assert.deepEqual(selection.requestedClick, entry.rendered.boundary)
+      assertSignedCaseState(selection.stateBefore, spec, ['app-point', 'signed-overlap'])
+      const contour = selection.before.geometry.contour, local = contour.localBoundary
+      assert.equal(contour.fraction, .23)
+      assert.deepEqual(contour.bounds, entry.rendered.contourScreenBounds, 'Fresh native input uses the current painted contour in screen coordinates')
+      assert.ok((Math.abs(local.x) + Math.abs(local.y) - 96) / Math.SQRT2 > 6,
+        'The native oblique click lies beyond the old four-cardinal picking contour and six-unit tolerance')
+      assertPointOwnerCycleEvidence(entry.ownerCycleStart, 'signed-overlap', 'signed-overlap')
+      assertPointOwnerCycleEvidence(entry.ownerCycle, 'signed-overlap', 'app-point')
+      for (const field of ['json', 'runtimeDiagramJson', 'history', 'selection', 'labelDocumentRevision', 'uiSettings']) {
+        assert.deepEqual(entry.ownerCycle.stateBefore[field], entry.ownerCycleStart.stateAfter[field], `Signed owner-cycle continuation preserves ${field}`)
+      }
+      for (const cycle of [entry.ownerCycleStart, entry.ownerCycle]) {
+        assertSignedCaseState(cycle.stateBefore, spec, ['app-point', 'signed-overlap'])
+        assertSignedCaseState(cycle.stateAfter, spec, ['app-point', 'signed-overlap'])
+        const local = cycle.before.geometry.contour.localBoundary
+        assert.equal(cycle.before.geometry.contour.fraction, .23)
+        assert.deepEqual(cycle.before.geometry.contour.bounds, cycle.rendered.contourScreenBounds,
+          'Each owner cycle measures its current painted contour in screen coordinates')
+        assert.ok((Math.abs(local.x) + Math.abs(local.y) - 96) / Math.SQRT2 > 6)
       }
     }
   } else {

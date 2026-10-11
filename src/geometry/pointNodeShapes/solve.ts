@@ -25,7 +25,7 @@ const tan = pgfTan
 const cot = pgfCot
 
 type Parameters = Required<PointShapeParameters>
-type Construction = { contours: PointShapeContour[]; regions?: PointShapePaintRegion[]; rotation: number }
+type Construction = { contours: PointShapeContour[]; regions?: PointShapePaintRegion[]; rotation: number; signedFittedAxes?: Vec2 }
 
 /**
  * Solve the PGF background path around a fixed upright box. All geometry is in
@@ -54,6 +54,7 @@ export function solvePointNodeShape(input: PointNodeShapeInput): PointNodeShapeS
     bodyBounds,
     bodyOrigin: { x: bodyBounds.minX, y: bodyBounds.minY },
     baseline: (input.body.height - input.body.depth) / 2,
+    ...(construction.signedFittedAxes ? { signedFittedAxes: construction.signedFittedAxes } : {}),
     anchorBounds: bounds,
     rotation: construction.rotation,
     radius: Math.max(...construction.contours.flatMap((contour) => contour.vertices.map((point) => Math.hypot(point.x, point.y)))),
@@ -71,14 +72,16 @@ function construct(input: PointNodeShapeInput, p: Parameters, x: number, y: numb
     case 'rectangle': {
       const halfWidth = Math.max(x, input.minimumWidth / 2)
       const halfHeight = Math.max(y, input.minimumHeight / 2)
-      return single(polygonContour([
+      return { ...single(polygonContour([
         { x: halfWidth, y: halfHeight }, { x: -halfWidth, y: halfHeight },
         { x: -halfWidth, y: -halfHeight }, { x: halfWidth, y: -halfHeight },
-      ]))
+      ])), signedFittedAxes: { x: halfWidth, y: halfHeight } }
     }
-    case 'ellipse':
+    case 'ellipse': {
       // This PGF shape does not consume shape-border rotation/incircle keys.
-      return single(ellipseContour(Math.max(Math.SQRT2 * x, input.minimumWidth / 2), Math.max(Math.SQRT2 * y, input.minimumHeight / 2)))
+      const axes = { x: Math.max(Math.SQRT2 * x, input.minimumWidth / 2), y: Math.max(Math.SQRT2 * y, input.minimumHeight / 2) }
+      return { ...single(ellipseContour(axes.x, axes.y)), signedFittedAxes: axes }
+    }
     case 'diamond': {
       // Minima intentionally operate independently, after aspect fitting.
       const rx = Math.max(x + p.aspect * y, input.minimumWidth / 2)

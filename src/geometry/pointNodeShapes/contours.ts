@@ -72,7 +72,7 @@ export class ShapeContourBuilder {
         `A ${number(rx)} ${number(ry)} ${number(-this.rotation)} 0 ${to > from ? 0 : 1} ${pointText(target)}`,
       )
       const span = Math.abs(to - from) * radians
-      const radius = Math.max(rx, ry)
+      const radius = Math.max(Math.abs(rx), Math.abs(ry))
       const step = radius <= sampleSagitta
         ? Math.PI / 2
         : 2 * Math.acos(Math.max(-1, 1 - sampleSagitta / radius))

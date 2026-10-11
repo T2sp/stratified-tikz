@@ -53,6 +53,8 @@ export type PointNodeShapeSolution = {
   bodyOrigin: Vec2
   /** SVG y coordinate of the baseline, relative to the body-center node anchor. */
   baseline: number
+  /** Rectangle/ellipse fitted axes retain PGF's signs; painted bounds are only their ordered envelope. */
+  signedFittedAxes?: Vec2
   /** Clearance is separate from the path and paint and is never a hit region. */
   anchorBounds: PointShapeBounds
   /** Supported named anchors, relative to the upright text-box center, SVG y down. */

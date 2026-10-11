@@ -3,6 +3,7 @@ import test from 'node:test'
 import type { PointShape, PointShapeParameters, Vec2 } from '../../src/model/types.ts'
 import { solvePointNodeShape, type PointNodeShapeInput } from '../../src/geometry/pointNodeShapes/index.ts'
 import { restrictedBorderRotation } from '../../src/geometry/pointNodeShapes/solve.ts'
+import { ellipseContour, ellipsePoint, svgPoint } from '../../src/geometry/pointNodeShapes/contours.ts'
 
 const shapes: PointShape[] = ['ellipse', 'diamond', 'regular polygon', 'star', 'trapezium',
   'isosceles triangle', 'kite', 'dart', 'semicircle', 'circular sector', 'cylinder']
@@ -203,6 +204,56 @@ test('curved shapes reject excessive sampling work without degrading hit precisi
     /bounded 2048-sample arc budget/)
   assert.throws(() => solvePointNodeShape({ ...fixed('trapezium'), body: { width: 0, height: 0, depth: 0 }, innerXSep: 0, innerYSep: 0 }),
     /zero-area body/)
+})
+
+function segmentDistance(point: Vec2, start: Vec2, end: Vec2): number {
+  const dx = end.x - start.x
+  const dy = end.y - start.y
+  const lengthSquared = dx * dx + dy * dy
+  const fraction = lengthSquared === 0 ? 0
+    : Math.max(0, Math.min(1, ((point.x - start.x) * dx + (point.y - start.y) * dy) / lengthSquared))
+  return Math.hypot(point.x - start.x - fraction * dx, point.y - start.y - fraction * dy)
+}
+
+test('signed ellipse radii retain analytic paint bounds and 0.005-unit contour precision', () => {
+  const center = { x: 7, y: -11 }
+  for (const [rx, ry, rotation] of [[-96, -96, 0], [-180, 24, 37], [24, -180, 37], [180, 24, 37]] as const) {
+    const contour = ellipseContour(rx, ry, center, rotation)
+    const angle = rotation * Math.PI / 180
+    const paintedCenter = svgPoint(center, rotation)
+    const halfWidth = Math.hypot(rx * Math.cos(angle), ry * Math.sin(angle))
+    const halfHeight = Math.hypot(rx * Math.sin(angle), ry * Math.cos(angle))
+    close(contour.bounds.minX, paintedCenter.x - halfWidth)
+    close(contour.bounds.maxX, paintedCenter.x + halfWidth)
+    close(contour.bounds.minY, paintedCenter.y - halfHeight)
+    close(contour.bounds.maxY, paintedCenter.y + halfHeight)
+    assert.ok(contour.closed)
+    assert.match(contour.path, new RegExp(`A ${rx} ${ry} ${-rotation} 0 0`))
+    // Sample the independent analytic ellipse, rather than treating vertex
+    // count as proof that the shared picking contour follows painted SVG arcs.
+    for (let degrees = .25; degrees < 360; degrees += .5) {
+      const analytic = svgPoint(ellipsePoint(center, rx, ry, degrees), rotation)
+      const distance = Math.min(...contour.vertices.map((vertex, index) =>
+        segmentDistance(analytic, vertex, contour.vertices[(index + 1) % contour.vertices.length]!)))
+      assert.ok(distance <= .005 + 1e-9, `${rx}/${ry} at ${degrees}: ${distance} exceeds sagitta precision`)
+    }
+    assert.ok(contour.vertices.length <= 4104, 'two half arcs retain the bounded per-arc budget')
+  }
+  const negative = ellipseContour(-96, -96)
+  assert.ok(inside({ x: 67.2, y: -67.2 }, negative.vertices), 'review oblique point lies inside the shared contour')
+  assert.ok(!inside({ x: 80, y: -80 }, negative.vertices), 'a genuinely outside point stays outside')
+})
+
+test('negative dominant radii retain excessive-work rejection and zero-axis contours', () => {
+  for (const [rx, ry] of [[-1_000_000, -96], [24, -1_000_000], [1_000_000, 96]] as const) {
+    assert.throws(() => ellipseContour(rx, ry), /bounded 2048-sample arc budget at 0.005-unit hit precision/)
+  }
+  for (const [rx, ry] of [[0, -96], [-96, 0], [0, 0]] as const) {
+    const contour = ellipseContour(rx, ry)
+    close(contour.bounds.minX, -Math.abs(rx)); close(contour.bounds.maxX, Math.abs(rx))
+    close(contour.bounds.minY, -Math.abs(ry)); close(contour.bounds.maxY, Math.abs(ry))
+    assert.ok(contour.closed && contour.vertices.every(({ x, y }) => Number.isFinite(x) && Number.isFinite(y)))
+  }
 })
 
 test('geometry unit scaling preserves PGF minimum arithmetic independently of preview scale', () => {

@@ -458,10 +458,17 @@ function anchorBoundary(input: PointNodeShapeInput, solution: UnanchoredSolution
   let angularStart: number | undefined
   switch (input.shape) {
     case 'circle': signedAxes = { x: bounds.maxX + sep, y: bounds.maxY + sep }; segments = [arc(center, signedAxes.x, signedAxes.y)]; break
-    case 'ellipse': signedAxes = { x: bounds.maxX + input.outerXSep, y: bounds.maxY + input.outerYSep }; segments = [arc(center, signedAxes.x, signedAxes.y)]; break
-    case 'rectangle': signedAxes = { x: bounds.maxX + input.outerXSep, y: bounds.maxY + input.outerYSep }; segments = polyline([{ x: bounds.maxX + input.outerXSep, y: bounds.maxY + input.outerYSep },
-      { x: bounds.minX - input.outerXSep, y: bounds.maxY + input.outerYSep }, { x: bounds.minX - input.outerXSep, y: bounds.minY - input.outerYSep },
-      { x: bounds.maxX + input.outerXSep, y: bounds.minY - input.outerYSep }]); break
+    case 'ellipse': case 'rectangle': {
+      // Saved PGF axes can be negative after fitting. The sorted paint envelope
+      // and boundary samples cannot recover their signs.
+      const axes = solution.signedFittedAxes
+      if (!axes) throw new RangeError('The basic shape is missing its signed fitted axes.')
+      signedAxes = { x: axes.x + input.outerXSep, y: axes.y + input.outerYSep }
+      segments = input.shape === 'ellipse' ? [arc(center, signedAxes.x, signedAxes.y)]
+        : polyline([{ x: signedAxes.x, y: signedAxes.y }, { x: -signedAxes.x, y: signedAxes.y },
+          { x: -signedAxes.x, y: -signedAxes.y }, { x: signedAxes.x, y: -signedAxes.y }])
+      break
+    }
     case 'diamond': {
       const paddedX = input.body.width / 2 + input.innerXSep, paddedY = (input.body.height + input.body.depth) / 2 + input.innerYSep
       const rx = Math.max(paddedX + p.aspect * paddedY, input.minimumWidth / 2) + input.outerXSep

@@ -1,6 +1,7 @@
 # Logs
 logs
 *.log
+!tests/fixtures/point-node-anchors/signed-axes/review/production-command.log
 npm-debug.log*
 yarn-debug.log*
 yarn-error.log*

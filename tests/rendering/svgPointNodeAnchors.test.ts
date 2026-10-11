@@ -1,17 +1,24 @@
 import assert from 'node:assert/strict'
 import test from 'node:test'
+import { createElement } from 'react'
+import { renderToStaticMarkup } from 'react-dom/server'
 import { createEmptyDiagram, createPointStratum } from '../../src/model/constructors.ts'
-import type { PointShape, PointStyle } from '../../src/model/types.ts'
+import { pointNodeDimensionFields, updatePointNodeDimension } from '../../src/model/pointNodeLayout.ts'
+import { parseSavedDiagramJson, serializeDiagram } from '../../src/model/serialization.ts'
+import { validateDiagram } from '../../src/model/validation.ts'
+import type { PointShape, PointStyle, Vec2, WorkPlane } from '../../src/model/types.ts'
 import { createLabelService } from '../../src/rendering/labels/labelService.ts'
 import type { TextMeasurementProvider } from '../../src/rendering/labels/labelMetrics.ts'
 import { createSvgLabelController, createSvgLabelRuntime, initialSvgLabelState } from '../../src/rendering/labels/svgLabelRuntime.ts'
 import { svgLabelLayoutSettings } from '../../src/rendering/labels/svgLabelLayout.ts'
-import { svgPointNodeLayout, currentSvgPointNodeLayout, svgPointNodeOwner } from '../../src/rendering/svgPointNodeLayout.ts'
+import { svgPointNodeLayout, currentSvgPointNodeLayout, svgPointNodeOwner, type SvgPointNodeCommit } from '../../src/rendering/svgPointNodeLayout.ts'
+import { SvgPointNodeView } from '../../src/rendering/svgPointNodeView.ts'
 import { svgPointNodeTextFontFamily } from '../../src/rendering/svgPointNodeText.ts'
 import { captureSvgLabelExport } from '../../src/rendering/svgLabelExportRegistry.ts'
 import { renderSettledSvgLabelDocument, settleSvgExportLabels } from '../../src/ui/svgSettledExport.ts'
-import { collectSvgPreviewSelectionCandidates } from '../../src/rendering/svgHitTesting.ts'
-import { projectToSvgPoint } from '../../src/rendering/svgProjection.ts'
+import { collectSvgPreviewSelectionCandidates, nextSvgPreviewSelectionCycle } from '../../src/rendering/svgHitTesting.ts'
+import { projectToSvgPoint, svgPointToModelOnWorkPlane } from '../../src/rendering/svgProjection.ts'
+import { generateTikz } from '../../src/tikz/generateTikz.ts'
 
 const measurement: TextMeasurementProvider = { identity: '32d-point-layout-font',
   measure: (text, font) => ({ width: [...text].length * font.sizePx / 2, ascent: .8 * font.sizePx, descent: .2 * font.sizePx }),
@@ -245,4 +252,147 @@ test('font readiness and stale owner completion cannot restore an obsolete nonce
   controller.start({ source: 'loaded replacement', settings, ownerIdentity: svgPointNodeOwner(2, 'p') })()
   await tick()
   assert.equal(controller.getSnapshot()!.source, 'loaded replacement')
+})
+
+// These fixed metrics reproduce the independent PGF 20/8/3pt body at the
+// production 1.2 SVG-unit/TeX-pt scale. They are not native/font evidence.
+const signedMeasurement: TextMeasurementProvider = { identity: '32d-signed-fixed-20-8-3',
+  measure: () => ({ width: 24, ascent: 9.6, descent: 3.6 }),
+  lineMetrics: () => ({ ascent: 9.6, descent: 3.6 }) }
+const signedRuntime = createSvgLabelRuntime({ measurement: signedMeasurement, service: createLabelService({ measurement: signedMeasurement }) })
+
+function signedStyle(shape: PointShape, anchor = 'center', dimensions = [-100, -100, 0, 0, -160, -160]): PointStyle {
+  let style: PointStyle = { ...pointStyle(shape, anchor), layout: { anchor, fontContext: { fontSizePt: 10, xHeightPt: 4.30554 } } }
+  for (const [index, field] of pointNodeDimensionFields.entries()) {
+    const updated = updatePointNodeDimension(style, [field], ` ${dimensions[index]}pt `)
+    assert.ok(updated)
+    style = updated
+  }
+  return style
+}
+
+function signedCommit(source: string, style: PointStyle, requestIdentity: string,
+  layout: ReturnType<typeof svgPointNodeLayout>, id = 'p'): SvgPointNodeCommit {
+  return { source, ownerIdentity: svgPointNodeOwner(1, id), fontGeneration: 0,
+    shape: style.shape, size: style.size, requestIdentity, layout }
+}
+
+test('negative fitted axes keep PGF placement in pending/current/settled SVG and signed authored save/TikZ data', async () => {
+  for (const shape of ['ellipse', 'rectangle'] as const) {
+    for (const { source, dimensions, anchor, expected } of [
+      { source: '', dimensions: [-100, -100, 0, 0, -160, -160], anchor: 'east', expected: { x: -96, y: 0 } },
+      { source: '', dimensions: [-100, -100, 0, 0, -160, -160], anchor: 'north', expected: { x: 0, y: 96 } },
+      { source: 'x', dimensions: [-30, -30, 0, 0, -2, -5], anchor: 'east', expected: { x: -1.2, y: 0 } },
+      { source: 'x', dimensions: [-30, 2, 2, -20, -2, -5], anchor: 'east', expected: { x: 1.2, y: 0 } },
+    ]) {
+      const style = signedStyle(shape, anchor, dimensions)
+      const diagram = createEmptyDiagram({ ambientDimension: 2 })
+      const point = createPointStratum({ ambientDimension: 2, id: 'p', text: source, position: { x: 1, y: 2, z: 0 }, style })
+      diagram.strata = [point]
+      const before = structuredClone(point)
+      assert.equal(validateDiagram(diagram).valid, true)
+      const saved = serializeDiagram(diagram)
+      assert.equal((JSON.parse(saved) as { version: number }).version, 2)
+      const loaded = parseSavedDiagramJson(saved)
+      assert.ok(loaded.ok)
+      const loadedPoint = loaded.diagram.strata[0]
+      assert.equal(loadedPoint.geometricKind, 'point')
+      if (loadedPoint.geometricKind !== 'point') throw new Error('Expected loaded point')
+      assert.deepEqual(loadedPoint.style.layout, point.style.layout)
+      assert.equal(loadedPoint.style.layout?.units?.innerXSep?.source, ` ${dimensions[0]}pt `)
+      assert.deepEqual(loadedPoint.position, { x: 1, y: 2, z: 0 })
+      assert.equal(loadedPoint.text, source)
+      const captured = capture(source, point.style, signedRuntime)
+      const pending = initialSvgLabelState(captured, captured.runtime)
+      const [settled] = await settleSvgExportLabels([captured])
+      assert.equal(settled.status, 'ready')
+      for (const state of [pending, settled]) {
+        const layout = svgPointNodeLayout(point.style, state)
+        assert.equal(layout.geometry.limitation, undefined)
+        close(layout.selectedAnchor.x, expected.x)
+        close(layout.selectedAnchor.y, expected.y)
+        close(layout.placementOffset.x, -expected.x)
+        close(layout.placementOffset.y, -expected.y)
+        assert.ok(layout.geometry.bounds.minX <= layout.geometry.bounds.maxX && layout.geometry.bounds.minY <= layout.geometry.bounds.maxY)
+        const commits = new Map([['p', signedCommit(source, point.style, state.requestIdentity, layout)]])
+        assert.equal(currentSvgPointNodeLayout(point, commits, 1, 0), layout)
+        const preview = renderToStaticMarkup(createElement('svg', { xmlns: 'http://www.w3.org/2000/svg' },
+          createElement(SvgPointNodeView, { capture: captured, state })))
+        const exported = renderSettledSvgLabelDocument(captured, state)
+        assert.equal(preview, exported, 'preview and detached export share the same body/contour placement')
+        assert.ok(exported.includes(`data-point-anchor-offset="${layout.selectedAnchor.x} ${layout.selectedAnchor.y}"`))
+        assert.ok(exported.includes(`transform="translate(${layout.placementOffset.x} ${layout.placementOffset.y})"`))
+        assert.match(exported, /transform="translate\(123 87\)"/)
+      }
+      for (const exportMode of ['standalone', 'inlineMath'] as const) {
+        const tikz = generateTikz(loaded.diagram, { exportMode })
+        for (const [index, key] of ['inner xsep', 'inner ysep', 'outer xsep', 'outer ysep', 'minimum width', 'minimum height'].entries()) {
+          assert.ok(tikz.includes(`${key}=${dimensions[index]}pt`), `${shape} ${exportMode}: ${key}`)
+        }
+        assert.ok(tikz.includes(`anchor=${anchor}`))
+        assert.match(tikz, /at \(1,2\)/)
+        assert.ok(tikz.includes(`{${source}}`), 'raw source keeps its existing TikZ convention')
+      }
+      assert.deepEqual(point, before, 'placement and export leave the model and authored signed values untouched')
+    }
+  }
+})
+
+test('negative ellipse paint is pickable at the review oblique point, empty center and dominant mixed axes in 2D/3D', async () => {
+  const cases: { ambientDimension: 2 | 3; source: string; dimensions: number[]; localPoint: Vec2; plane: WorkPlane }[] = [
+    { ambientDimension: 2, source: 'x', dimensions: [-100, -100, 0, 0, -160, -160], localPoint: { x: 67.2, y: -67.2 }, plane: { kind: 'xy', z: 7 } },
+    { ambientDimension: 3, source: '', dimensions: [-100, -100, 0, 0, -160, -160], localPoint: { x: 0, y: 0 }, plane: { kind: 'xy', z: 3 } },
+    { ambientDimension: 3, source: 'x', dimensions: [-100, 2, 0, 0, -160, -160], localPoint: { x: 67.2, y: -6 }, plane: { kind: 'xz', y: 2 } },
+    { ambientDimension: 2, source: '', dimensions: [2, -100, 0, 0, -160, -160], localPoint: { x: 1.5, y: -67.2 }, plane: { kind: 'xy', z: 0 } },
+  ]
+  for (const { ambientDimension, source, dimensions, localPoint, plane } of cases) {
+    const diagram = createEmptyDiagram({ ambientDimension })
+    diagram.camera = diagram.camera.mode === '2d'
+      ? { ...diagram.camera, scale: 43, origin: { x: 7, y: -4 } }
+      : { ...diagram.camera, thetaDeg: 31, phiDeg: 27, zoom: 43, pan: { x: 7, y: -4 } }
+    const point = createPointStratum({ ambientDimension, id: 'p', text: source,
+      position: { x: 1, y: 2, z: ambientDimension === 3 ? 3 : 0 }, style: signedStyle('ellipse', 'center', dimensions) })
+    diagram.strata = [point]
+    const captured = capture(source, point.style, signedRuntime)
+    const [state] = await settleSvgExportLabels([captured])
+    const layout = svgPointNodeLayout(point.style, state)
+    assert.equal(layout.geometry.limitation, undefined)
+    assert.ok(layout.geometry.solution)
+    const center = projectToSvgPoint(diagram.camera, point.position, 360)
+    const inverse = svgPointToModelOnWorkPlane(diagram.camera, center, 360, plane)
+    close(inverse.x, point.position.x); close(inverse.y, point.position.y); close(inverse.z, point.position.z)
+    if (ambientDimension === 2) assert.equal(inverse.z, 0, '2D cursor coordinates remain on z=0')
+    const entry = signedCommit(source, point.style, state.requestIdentity, layout)
+    const pointCommits = new Map([['p', entry]])
+    const options = { diagram, camera: diagram.camera, viewportHeight: 360, pointCommits,
+      pointDocumentRevision: 1, pointFontGeneration: 0, showCoordinateAnchors: false }
+    const hit = { x: center.x + localPoint.x, y: center.y + localPoint.y }
+    assert.equal(collectSvgPreviewSelectionCandidates({ ...options, point: hit })[0]?.id, 'p')
+    const outside = { x: center.x + layout.geometry.bounds.maxX + 9, y: center.y }
+    assert.deepEqual(collectSvgPreviewSelectionCandidates({ ...options, point: outside }), [], 'existing six-unit clearance excludes genuinely outside paint')
+    assert.deepEqual(collectSvgPreviewSelectionCandidates({ ...options, point: hit, pointDocumentRevision: 2 }), [], 'obsolete owner cannot pick')
+    assert.deepEqual(collectSvgPreviewSelectionCandidates({ ...options, point: hit, pointFontGeneration: 1 }), [], 'obsolete font cannot pick')
+    assert.equal(currentSvgPointNodeLayout({ ...point, text: `${source}changed` }, pointCommits, 1, 0), null, 'obsolete source cannot restore the contour')
+    assert.equal(currentSvgPointNodeLayout({ ...point, style: { ...point.style, layout: { ...point.style.layout, minimumWidth: -2 } } }, pointCommits, 1, 0), null, 'obsolete layout cannot restore the contour')
+    assert.deepEqual(collectSvgPreviewSelectionCandidates({ ...options, point: hit, layerFilter: { kind: 'layer', layer: 1 } }), [], 'filter remains authoritative')
+    assert.deepEqual(collectSvgPreviewSelectionCandidates({ ...options, point: hit, visibility: { hiddenPointIds: new Set(['p']) } }), [], 'hidden owner remains excluded')
+    diagram.layers = [{ value: 0, name: 'Points', locked: true }]
+    assert.deepEqual(collectSvgPreviewSelectionCandidates({ ...options, point: hit }), [], 'locked layer remains excluded')
+    diagram.layers = [{ value: 0, name: 'Points', visible: false }]
+    assert.deepEqual(collectSvgPreviewSelectionCandidates({ ...options, point: hit }), [], 'hidden layer remains excluded')
+    diagram.layers = [{ value: 0, name: 'Points' }]
+    const overlap = { ...structuredClone(point), id: 'overlap' }
+    diagram.strata.push(overlap)
+    pointCommits.set('overlap', signedCommit(source, overlap.style, state.requestIdentity, layout, 'overlap'))
+    const candidates = collectSvgPreviewSelectionCandidates({ ...options, point: hit })
+    assert.deepEqual(new Set(candidates.map(candidate => candidate.id)), new Set(['p', 'overlap']))
+    // Pure production cycling verifies the candidate contract. Native Alt
+    // success is established only by the required browser workflow.
+    const first = nextSvgPreviewSelectionCycle(null, hit, candidates)
+    const second = nextSvgPreviewSelectionCycle(first.state, hit, candidates)
+    assert.deepEqual(new Set([first.candidate?.id, second.candidate?.id]), new Set(['p', 'overlap']))
+    assert.equal(first.count, 2); assert.equal(second.count, 2)
+    assert.deepEqual(point.position, { x: 1, y: 2, z: ambientDimension === 3 ? 3 : 0 })
+    assert.equal(point.codim, ambientDimension)
+  }
 })

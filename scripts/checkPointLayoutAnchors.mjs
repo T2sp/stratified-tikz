@@ -3,7 +3,8 @@ import { readFile, writeFile } from 'node:fs/promises'
 import { resolve } from 'node:path'
 import { pathToFileURL } from 'node:url'
 import { layoutAnchorGroup as group, layoutShapes, layoutRegimes, layoutForShapeRegime, pointAnchorsForShape,
-  layoutShapeParameters, layoutAnchorArtifacts, assertLayoutAnchorEvidence, assertPointTikzSourceByMode } from './pointLayoutAnchorsContract.mjs'
+  layoutShapeParameters, layoutAnchorArtifacts, assertLayoutAnchorEvidence, assertPointTikzSourceByMode,
+  signedAnchorCases, signedPickingCases } from './pointLayoutAnchorsContract.mjs'
 import { layoutImportCases as importCases } from './pointLayoutAnchorsContract.mjs'
 import { createOwnedAppPage } from './ownedAppPage.mjs'
 import { ownPageEvent } from './ownedPageEvent.mjs'
@@ -44,18 +45,20 @@ export async function observeLayoutPoint(page, id = 'app-point') {
     const pair = (name) => { const values = node.getAttribute(name)?.trim().split(/\s+/).map(Number); return values?.length === 2 ? { x: values[0], y: values[1] } : null }
     const coordinate = (point) => ({ x: point.x, y: point.y })
     const anchorOffset = pair('data-point-anchor-offset'), matrix = contour.getScreenCTM(), inkMatrix = body.getScreenCTM()
-    const local = node.getCTM().inverse().multiply(body.getCTM()), bounds = contour.getBBox()
+    const local = node.getCTM().inverse().multiply(body.getCTM()), contourLocal = node.getCTM().inverse().multiply(contour.getCTM()), bounds = contour.getBBox()
+    const screenBounds = contour.getBoundingClientRect()
     const at = contour.getPointAtLength(contour.getTotalLength() * .23).matrixTransform(matrix)
     const clean = (element) => ({ tag: element.localName, attributes: Object.fromEntries([...element.attributes]
       .filter(({ name }) => !name.startsWith('data-') && name !== 'pointer-events').map(({ name, value }) => [name, value])) })
     return { source: body.getAttribute('data-label-source'), state: body.getAttribute('data-label-state'),
       shape: node.getAttribute('data-point-shape'), anchor: node.getAttribute('data-point-anchor'),
       layout: JSON.parse(node.getAttribute('data-point-layout')), pointRequest: node.getAttribute('data-point-request'), bodyRequest: body.getAttribute('data-label-request'),
-      anchorOffset, bodyOrigin: pair('data-point-body-origin'), baseline: Number(node.getAttribute('data-point-body-baseline')),
+      anchorOffset, placementOffset: { x: contourLocal.e, y: contourLocal.f }, bodyOrigin: pair('data-point-body-origin'), baseline: Number(node.getAttribute('data-point-body-baseline')),
       placement: coordinate(new DOMPoint().matrixTransform(node.getScreenCTM())),
       placedAnchor: anchorOffset && coordinate(new DOMPoint(anchorOffset.x, anchorOffset.y).matrixTransform(matrix)),
       boundary: coordinate(at), center: coordinate(at), contour: clean(contour), nodeTransform: node.getAttribute('transform'), bodyTransform: body.getAttribute('transform'),
       bounds: { x: bounds.x, y: bounds.y, width: bounds.width, height: bounds.height },
+      contourScreenBounds: { x: screenBounds.x, y: screenBounds.y, width: screenBounds.width, height: screenBounds.height },
       shapeBounds: node.getAttribute('data-point-shape-bounds'), paintedBounds: node.getAttribute('data-point-painted-bounds'),
       bodyBounds: node.getAttribute('data-point-body-bounds'), anchorBounds: node.getAttribute('data-point-anchor-bounds'),
       contourLength: contour.getTotalLength(), math: body.querySelectorAll('[data-label-math]').length,
@@ -637,7 +640,27 @@ export async function runPointLayoutAnchorChecks({ browser, origin, artifactDir,
         bodyOverflowCases.push(entry); await observe(scenario + `-body-overflow-${ambientDimension}d`, { group, entry })
       }
     }
-    await save({ cases: interactions, bodyOverflowCases })
+    const signedAnchors = [], signedPicking = []
+    for (const spec of signedAnchorCases) {
+      const input = await document(spec.shape, spec.layout, spec.source, spec.ambientDimension)
+      await load(input); await settle()
+      signedAnchors.push(await observeEntry(input, { key: spec.key, ambientDimension: spec.ambientDimension, state: await state() }))
+    }
+    for (const spec of signedPickingCases) {
+      const input = await document(spec.shape, spec.layout, spec.source, spec.ambientDimension)
+      input.diagram.strata.push({ ...structuredClone(input.diagram.strata[0]), id: 'signed-overlap' })
+      await load(input); await settle()
+      const rendered = await select('signed-overlap')
+      // Both exact owners have distance zero on the native SVG .23 boundary.
+      // A sparse four-cardinal contour misses this oblique paint by >6 units;
+      // native selection and both planned cycles must therefore reach the
+      // corrected production contour before this evidence can be accepted.
+      const ownerCycleStart = await cycleOwner('signed-overlap', 'signed-overlap')
+      const ownerCycle = await cycleOwner('signed-overlap', 'app-point')
+      signedPicking.push(await observeEntry(input, { key: spec.key, ambientDimension: spec.ambientDimension,
+        state: await state(), rendered, ownerCycleStart, ownerCycle }, 'signed-overlap'))
+    }
+    await save({ cases: interactions, bodyOverflowCases, signedAnchorCases: signedAnchors, signedPickingCases: signedPicking })
 
     for (const background of ['transparent', 'white']) {
       scenario = `point-layout-pending-${background}-${background === 'transparent' ? 'edit' : 'load'}`

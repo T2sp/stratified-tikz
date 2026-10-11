@@ -1,5 +1,55 @@
 # Phase 32 Plan: Point-node math, paint, geometric shapes, and layout
 
+Signed-axis/picking/report follow-up (2026-10-11): the actual starting tree is
+clean at `f9893fad1fa0586260d614e832ffb99b00ce513f`, fingerprint
+`1ea95cbae3ee30bf7ca5f1ed5d8d807ac705e8052854cc5f30880c427730abeb`.
+The preceding six-file resolved-preview/native `110` provenance fix is already
+tracked and preserved. The newer browser-capable parent `kpMSxP` accepted all
+eighteen cumulative groups, both pending transparent/white SVG downloads/TikZ,
+external reopening/complete PNG and final standalone exports on the earlier
+matching tree. Its subsequent independent review returned `needs_changes` for
+two production geometry defects and one full-suite reliability defect; build
+passed, full tests failed 6,360/6,361. That rejection supersedes the child's
+startup-only disposition as the earlier tree's completion blocker. The review
+also authenticated the documented diamond exception; older open-diamond entries
+below are historical.
+
+The scoped correction retains signed ellipse/rectangle fitted axes for anchors,
+uses arc radius magnitudes only for sampling density, and isolates ordinary
+report writes from the stalled fixture's unchanged 20ms deadline. Production
+diagnostic priority/ownership and all completed model/native/view/pending/inline/
+capture contracts remain. Additive authenticated negative-case references and
+registered production/native policy regressions must accompany the fixes.
+The implemented additive bundle has eight actual PGF boxes/192 anchors with
+engine/source/compiler-version authentication and the complete retained review
+bundle. Original 32C/32D references and tolerances remain unchanged. Production
+regressions cover signed placement/provenance and oblique/empty/mixed-axis
+picking in both ambient dimensions; the existing native interaction scenario
+now requires two empty signed east cases and two signed ellipse selection/Alt
+cases with actual current CTM/hit/owner records. A narrow `.gitignore` exception
+includes the retained review log in the exact-tree inventory.
+
+Fresh child full tests passed 6,425/6,425 with zero skips, normal concurrency;
+focused geometry/model/TikZ/runner passed 489, preserved contracts 347,
+cumulative policy/ownership 1,308 and isolated runner/process/evidence 51.
+Build, changed-file strict TypeScript/lint/syntax and diff passed. Reproduced
+baseline script/layer lint and eleven layer TypeScript diagnostics remain
+failed. Both configured direct browser commands stopped at fresh-server
+`listen EPERM` before Chrome: zero native groups/downloads ran, all eighteen
+groups remain unexecuted for the changed tree. Static label assets alone passed.
+These direct attempts precede the final results documentation update; fresh
+strict final-tree verification results belong to the handoff below. Current
+completion review remains unstarted while native verification is unavailable;
+the earlier `needs_changes` review is not a current pass.
+
+Exact changed-tree commands, hashes, raw artifacts and final handoff belong to
+`/private/tmp/stz-32d-signed-fix-20261011/` and the
+[implementation audit](PHASE_32D_IMPLEMENTATION.md). Fresh strict verification
+of all predecessors plus the complete 32D matrix/downloads must pass before
+matching independent read-only completion review and the parent's post-review
+identity guard. Phase 32 remains **incomplete**; no commit/push follows failed
+or partial verification. The entries below retain their historical results.
+
 Resolved preview/native-edit provenance correction (2026-10-11): the actual
 starting checkout is clean at `8067dea1c9e43a1387a7b6083ff2d1805e4c9752`,
 fingerprint `832a100ce9dff7908961f6c3cbd5f2db9967f37f72590142249d06bcc463e58b`.

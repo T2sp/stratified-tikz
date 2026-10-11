@@ -6,7 +6,7 @@ import test from 'node:test'
 import { allPointNodeScenarios, pointNodeScenarioArtifacts, validateBrowserEvidence } from '../../scripts/automation/phase-verification.mjs'
 import { layoutAnchorGroup, layoutAnchorScenarios, layoutAnchorArtifacts, layoutShapes, layoutRegimes, layoutForShapeRegime,
   pointAnchorsForShape, layoutImportCases, assertLayoutAnchorEvidence, assertObservedPointPlacement, assertPointTikzSourceByMode,
-  assertLayoutStandaloneEvidence, assertLayoutPostClickViewDiagnostic } from '../../scripts/pointLayoutAnchorsContract.mjs'
+  assertLayoutStandaloneEvidence, assertLayoutPostClickViewDiagnostic, signedAnchorCases, signedPickingCases } from '../../scripts/pointLayoutAnchorsContract.mjs'
 import { syntheticStandalonePointDownload, syntheticPendingLayoutPreparation } from './standalonePointDownloadFixture.mjs'
 import { syntheticPendingLayoutViewEvidence } from './pointLayoutPendingViewFixture.mjs'
 import { syntheticUnsupportedDiagnosticEvidence } from './pointUnsupportedDiagnosticFixture.mjs'
@@ -32,17 +32,24 @@ function unsupportedNativeCases() {
     syntheticUnsupportedDiagnosticEvidence({ ambientDimension, shape })))
 }
 
-function syntheticOwnerCycle(selectedId, expectedId, initial = false) {
+function syntheticOwnerCycle(selectedId, expectedId, initial = false, suppliedState) {
   const raw = syntheticPointNativeDragEvidence({ id: selectedId })
   const target = { tag: 'path', pointId: selectedId, drawer: false, svg: true, canvas: true }
-  const selection = { kind: 'stratum', id: selectedId }, stateBefore = structuredClone(raw.stateBefore)
+  const selection = { kind: 'stratum', id: selectedId }, stateBefore = structuredClone(suppliedState ?? raw.stateBefore)
+  stateBefore.selection = selection
   const runtime = JSON.parse(stateBefore.runtimeDiagramJson)
-  runtime.strata.push({ ...structuredClone(runtime.strata[0]), id: 'app-point' })
+  if (!suppliedState) runtime.strata.push({ ...structuredClone(runtime.strata[0]), id: 'app-point' })
   stateBefore.runtimeDiagramJson = JSON.stringify(runtime)
   stateBefore.json = JSON.stringify({ version: 2, diagram: runtime })
   stateBefore.history = JSON.stringify({ past: [], present: runtime, future: [] })
   const preparation = structuredClone(raw.preparation)
   for (const key of ['stateBefore', 'stateAfter', 'statePrepared']) preparation[key] = stateBefore
+  for (const key of ['inherited', 'closed', 'prepared']) {
+    preparation[key].modelPoint = structuredClone(runtime.strata.find(({ id }) => id === selectedId))
+    preparation[key].camera = structuredClone(runtime.camera)
+    preparation[key].selection = selection
+    preparation[key].labelDocumentRevision = stateBefore.labelDocumentRevision
+  }
   const stateAfter = { ...stateBefore, selection: { kind: 'stratum', id: initial ? selectedId : expectedId } }
   const selectionRaw = syntheticGeometricSelectionEvidence({ id: selectedId, state: stateBefore, initialSelection: selection })
   const requestedClick = selectionRaw.requestedClick
@@ -53,7 +60,7 @@ function syntheticOwnerCycle(selectedId, expectedId, initial = false) {
     action.stateBefore = stateAfter; action.stateAfter = stateAfter
     action.before.selection = stateAfter.selection; action.after.selection = stateAfter.selection
   }
-  return { selectedId, expectedId, preparation, stateBefore, stateAfter,
+  const result = { selectedId, expectedId, preparation, stateBefore, stateAfter,
     toolbarPreparation: selectionRaw.toolbarPreparation, toolbarRestoration,
     secondaryErrors: [], droppedEvents: 0, requestedClick, rendered: selectionRaw.rendered,
     before: { ...selectionRaw.before, elementFromPoint: target, elementsFromPoint: [target, { canvasRoot: true }] },
@@ -61,6 +68,53 @@ function syntheticOwnerCycle(selectedId, expectedId, initial = false) {
       altKey: true, pointerId: 1, button: 0, buttons: type === 'pointerdown' ? 1 : 0, client: requestedClick, target, selection,
       labelDocumentRevision: stateBefore.labelDocumentRevision,
       path: [target, { canvasRoot: true }] })) }
+  if (suppliedState) setSyntheticSignedBoundary(result)
+  return result
+}
+function syntheticSignedState(spec, overlap = false) {
+  const diagram = createEmptyDiagram({ ambientDimension: spec.ambientDimension })
+  diagram.strata = [createPointStratum({ id: 'app-point', ambientDimension: spec.ambientDimension, text: spec.source,
+    position: { x: 3, y: 3, z: spec.ambientDimension === 3 ? .5 : 0 },
+    style: { kind: 'pointStyle', shape: spec.shape, size: 8, color: '#203040', opacity: 1, fill: 'filled', layout: structuredClone(spec.layout) } })]
+  if (overlap) diagram.strata.push({ ...structuredClone(diagram.strata[0]), id: 'signed-overlap' })
+  return { json: JSON.stringify({ version: 2, diagram }), runtimeDiagramJson: JSON.stringify(diagram),
+    history: JSON.stringify({ past: [], present: diagram, future: [] }), labelDocumentRevision: 100, uiSettings: '{}', selection: null }
+}
+// Deliberately fabricated geometry exercises raw-policy rejection only. Real
+// .23 SVG arclength/CTM measurements and trusted input come from the App runner.
+function setSyntheticSignedBoundary(record, local = { x: -96 * Math.cos(.23 * 2 * Math.PI), y: -96 * Math.sin(.23 * 2 * Math.PI) }) {
+  const matrix = { a: 1, b: 0, c: 0, d: 1, e: 310, f: 290 }
+  const boundary = { x: matrix.e + local.x, y: matrix.f + local.y }
+  const visit = (value) => {
+    if (!value || typeof value !== 'object') return
+    if (value.geometry?.contour) Object.assign(value.geometry.contour, { localBoundary: structuredClone(local), boundary: structuredClone(boundary),
+      screenCTM: structuredClone(matrix), CTM: structuredClone(matrix), fraction: .23, bounds: { x: 214, y: 194, width: 192, height: 192 } })
+    if (Object.hasOwn(value, 'contourLength')) value.contourScreenBounds = { x: 214, y: 194, width: 192, height: 192 }
+    if (Object.hasOwn(value, 'boundary')) value.boundary = structuredClone(boundary)
+    if (Object.hasOwn(value, 'requestedClick') && value.requestedClick) value.requestedClick = structuredClone(boundary)
+    if (value.type && ['pointerdown', 'pointerup', 'click'].includes(value.type)) value.client = structuredClone(boundary)
+    for (const child of Object.values(value)) visit(child)
+  }
+  visit(record)
+}
+function syntheticSignedPlacement(spec, picking = false) {
+  const state = syntheticSignedState(spec, picking), entry = placement(spec.shape, spec.layout.anchor, {
+    key: spec.key, ambientDimension: spec.ambientDimension, source: spec.source, layout: structuredClone(spec.layout), state })
+  Object.assign(entry.rendered, { source: spec.source, layout: structuredClone(spec.layout), anchorOffset: { x: picking ? 0 : -96, y: 0 },
+    placementOffset: { x: picking ? 0 : 96, y: 0 }, bounds: { x: -96, y: -96, width: 192, height: 192 },
+    contour: { tag: 'path', attributes: picking ? { d: 'M -96 0 A -96 -96 0 0 0 96 0 A -96 -96 0 0 0 -96 0 Z' }
+      : { transform: 'translate(96 0)' } } })
+  if (picking) {
+    const selectedState = { ...state, selection: { kind: 'stratum', id: 'signed-overlap' } }
+    entry.rendered.nativeSelection = syntheticGeometricSelectionEvidence({ scenario: 'point-layout-native-interaction-2d-3d',
+      id: 'signed-overlap', state, ambientDimension: spec.ambientDimension, shape: spec.shape })
+    setSyntheticSignedBoundary(entry.rendered.nativeSelection)
+    entry.rendered.boundary = entry.rendered.nativeSelection.requestedClick
+    entry.rendered.contourScreenBounds = entry.rendered.nativeSelection.rendered.contourScreenBounds
+    entry.ownerCycleStart = syntheticOwnerCycle('signed-overlap', 'signed-overlap', true, selectedState)
+    entry.ownerCycle = syntheticOwnerCycle('signed-overlap', 'app-point', false, selectedState)
+  }
+  return entry
 }
 test('synthetic equal-distance point owner cycling records initial overlap then app-point continuation', () => {
   for (const overlap of ['overlap-point', 'overflow-overlap']) {
@@ -115,7 +169,9 @@ function evidence(name) {
       Object.assign(entry.rendered, { boundary: nativeSelection.requestedClick, nativeSelection,
         bodyOverflow: { localBodyClick: { x: 2, y: 3 }, characterBounds: { x: 0, y: 0, width: 5, height: 6 }, clickInContour: { x: -30, y: 0 }, contourBounds: { x: -20, y: -10, width: 40, height: 20 }, distance: 10, selectionRing: { radius: 50, inkRadius: 45 } } })
       return entry
-    }) }
+    }),
+    signedAnchorCases: signedAnchorCases.map((spec) => syntheticSignedPlacement(spec)),
+    signedPickingCases: signedPickingCases.map((spec) => syntheticSignedPlacement(spec, true)) }
   if (name === 'point-layout-import-order-units') return { ...common,
     cases: layoutImportCases.map(({ key, expected }) => ({ result: 'passed', key, actual: expected, expected, sourcePreserved: true })),
     nativeImport: true, saveReloadRestored: true, standaloneTikz: true, inlineTikz: true, unsupportedTextMetricsDiagnosed: true }
@@ -145,6 +201,69 @@ test('32D named group and every artifact are registered cumulatively', () => {
     assertLayoutAnchorEvidence(evidence(name), name)
   }
 })
+for (const spec of signedAnchorCases) for (const fault of ['missing', 'duplicate', 'wrong-sign-with-correct-paint',
+  'wrong-ctm-offset', 'wrong-transform', 'absolute-resolved-minimum', 'absolute-authored-minimum', 'edited-source', 'edited-position']) {
+  test(`synthetic 32D signed ${spec.key} policy rejects ${fault}`, () => {
+    const name = 'point-layout-native-interaction-2d-3d', current = evidence(name)
+    const entry = current.signedAnchorCases.find(({ key }) => key === spec.key)
+    if (fault === 'missing') current.signedAnchorCases = current.signedAnchorCases.filter(({ key }) => key !== spec.key)
+    if (fault === 'duplicate') current.signedAnchorCases.push(structuredClone(entry))
+    if (fault === 'wrong-sign-with-correct-paint') {
+      entry.rendered.anchorOffset.x = 96; entry.rendered.placementOffset.x = -96
+      entry.rendered.contour.attributes.transform = 'translate(-96 0)'
+      assert.deepEqual(entry.rendered.bounds, { x: -96, y: -96, width: 192, height: 192 })
+    }
+    if (fault === 'wrong-ctm-offset') entry.rendered.placementOffset.x = -96
+    if (fault === 'wrong-transform') entry.rendered.contour.attributes.transform = 'translate(-96 0)'
+    if (fault === 'absolute-resolved-minimum') entry.rendered.layout.minimumWidth = 160
+    if (fault === 'absolute-authored-minimum') entry.layout.minimumWidth = 160
+    if (fault === 'edited-source' || fault === 'edited-position') {
+      const runtime = JSON.parse(entry.state.runtimeDiagramJson)
+      if (fault === 'edited-source') runtime.strata[0].text = 'changed'
+      else runtime.strata[0].position.x += 1
+      entry.state.runtimeDiagramJson = JSON.stringify(runtime)
+      entry.state.json = JSON.stringify({ version: 2, diagram: runtime })
+      entry.state.history = JSON.stringify({ past: [], present: runtime, future: [] })
+    }
+    assert.throws(() => assertLayoutAnchorEvidence(current, name))
+  })
+}
+for (const spec of signedPickingCases) for (const fault of ['missing', 'wrong-source', 'wrong-dimension', 'cardinal-click',
+  'wrong-radius', 'absolute-path-radius', 'wrong-paint-bounds', 'missing-screen-bounds', 'local-bounds-in-screen-frame',
+  'cycle-screen-bounds', 'missing-native-selection', 'missing-cycle',
+  'untrusted-cycle', 'wrong-cycle-owner', 'stale-cycle-revision', 'changed-cycle-layout']) {
+  test(`synthetic 32D signed ${spec.key} picking policy rejects ${fault}`, () => {
+    const name = 'point-layout-native-interaction-2d-3d', current = evidence(name)
+    const entry = current.signedPickingCases.find(({ key }) => key === spec.key)
+    if (fault === 'missing') current.signedPickingCases = current.signedPickingCases.filter(({ key }) => key !== spec.key)
+    if (fault === 'wrong-source') entry.source = spec.source === '' ? 'x' : ''
+    if (fault === 'wrong-dimension') entry.ambientDimension = spec.ambientDimension === 2 ? 3 : 2
+    if (fault === 'absolute-path-radius') entry.rendered.contour.attributes.d = entry.rendered.contour.attributes.d.replaceAll('A -96 -96', 'A 96 96')
+    if (fault === 'wrong-paint-bounds') entry.rendered.bounds.width = 96
+    if (fault === 'missing-screen-bounds') delete entry.rendered.contourScreenBounds
+    if (fault === 'local-bounds-in-screen-frame') entry.rendered.contourScreenBounds = structuredClone(entry.rendered.bounds)
+    if (fault === 'cycle-screen-bounds') entry.ownerCycle.rendered.contourScreenBounds = structuredClone(entry.rendered.bounds)
+    if (fault === 'cardinal-click' || fault === 'wrong-radius') {
+      const local = fault === 'cardinal-click' ? { x: -96, y: 0 } : { x: -48, y: -48 }
+      setSyntheticSignedBoundary(entry.rendered.nativeSelection, local)
+      entry.rendered.boundary = entry.rendered.nativeSelection.requestedClick
+      // Raw native-selection policy accepts this coherent fabricated projection;
+      // the signed regression must additionally require the original oblique gap.
+      assertGeometricSelectionEvidence(entry.rendered.nativeSelection, 'signed-overlap')
+    }
+    if (fault === 'missing-native-selection') delete entry.rendered.nativeSelection
+    if (fault === 'missing-cycle') delete entry.ownerCycle
+    if (fault === 'untrusted-cycle') entry.ownerCycle.events[0].trusted = false
+    if (fault === 'wrong-cycle-owner') entry.ownerCycle.stateAfter.selection.id = 'signed-overlap'
+    if (fault === 'stale-cycle-revision') entry.ownerCycle.events[0].labelDocumentRevision += 1
+    if (fault === 'changed-cycle-layout') {
+      const runtime = JSON.parse(entry.ownerCycle.stateBefore.runtimeDiagramJson)
+      runtime.strata[0].style.layout.minimumWidth = 160
+      entry.ownerCycle.stateBefore.runtimeDiagramJson = JSON.stringify(runtime)
+    }
+    assert.throws(() => assertLayoutAnchorEvidence(current, name))
+  })
+}
 test('32D post-click view raw artifact is mandatory only for the transparent pending edit', () => {
   assert.ok(layoutAnchorArtifacts('point-layout-pending-transparent-edit').includes('point-layout-pending-transparent-edit-post-click-view.json'))
   assert.ok(!layoutAnchorArtifacts('point-layout-pending-white-load').some((file) => file.endsWith('-post-click-view.json')))

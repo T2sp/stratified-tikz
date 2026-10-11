@@ -13,6 +13,11 @@ const directory = new URL('../fixtures/point-node-anchors/', import.meta.url)
 const fixture = JSON.parse(readFileSync(new URL('references.json', directory), 'utf8')) as {
   schema: string; pgfVersion: string; sourceHashes: Record<string, string>; sourceTexSha256: string; geometrySha256: string; cases: Reference[]; failures: FailureReference[]
 }
+const signedDirectory = new URL('signed-axes/', directory)
+const signedFixture = JSON.parse(readFileSync(new URL('references.json', signedDirectory), 'utf8')) as {
+  schema: string; pgfVersion: string; engine: string; command: string[]; exitCode: number; sourceHashes: Record<string, string>;
+  sourceTexSha256: string; geometrySha256: string; compilationSha256: string; generatorSha256: string; cases: Reference[]
+}
 // Retain 32C's 0.025 TeX-pt precision. It includes fixed-point trigonometric
 // tables, miter/intersection arithmetic and the PGF cubic-circle approximation.
 const tolerance = .025
@@ -137,4 +142,85 @@ test('independent controls reject incorrect circle diameter, independently stret
   const omitted = { ...outer, outerXSep: 0, outerYSep: 0 }
   const omittedShape = solvePointNodeShape(omitted)
   assert.throws(() => compareAnchor(resolvePointNodeAnchor(omitted, omittedShape, 'top left corner').position, outer.expectedAnchors['top left corner']!, 'ignored outer sep'))
+})
+
+test('additive signed-axis PGF evidence authenticates the retained review and eight boxes with 192 independent anchors', () => {
+  assert.equal(signedFixture.schema, 'stz-pgf-signed-basic-axes-v1')
+  assert.equal(signedFixture.pgfVersion, fixture.pgfVersion)
+  assert.equal(signedFixture.engine, 'pdfTeX 3.141592653-2.6-1.40.29 (TeX Live 2026)')
+  assert.deepEqual(signedFixture.sourceHashes, fixture.sourceHashes)
+  assert.deepEqual(signedFixture.command, ['/Library/TeX/texbin/pdflatex', '-no-shell-escape', '-interaction=nonstopmode', '-halt-on-error', 'fixed-box.tex'])
+  assert.equal(signedFixture.exitCode, 0)
+  assert.ok(readFileSync(new URL('compilation.txt', signedDirectory), 'utf8').includes(`STZ PGF VERSION ${signedFixture.pgfVersion}`))
+  for (const [file, expected] of [['fixed-box.tex', signedFixture.sourceTexSha256], ['geometry.txt', signedFixture.geometrySha256],
+    ['compilation.txt', signedFixture.compilationSha256], ['generate.mjs', signedFixture.generatorSha256]]) {
+    assert.equal(createHash('sha256').update(readFileSync(new URL(file!, signedDirectory))).digest('hex'), expected, file)
+  }
+  const reviewDirectory = new URL('review/', signedDirectory)
+  const review = JSON.parse(readFileSync(new URL('manifest.json', reviewDirectory), 'utf8')) as {
+    engine: string; PGFVersion: string; sourceHashes: Record<string, string>; artifactHashes: Record<string, string>; exitCodes: Record<string, number>
+  }
+  assert.equal(review.engine, signedFixture.engine)
+  assert.equal(review.PGFVersion, signedFixture.pgfVersion)
+  assert.deepEqual(review.sourceHashes, signedFixture.sourceHashes)
+  assert.equal(review.exitCodes.PGF, 0)
+  for (const [file, expected] of Object.entries(review.artifactHashes)) {
+    assert.equal(createHash('sha256').update(readFileSync(new URL(file, reviewDirectory))).digest('hex'), expected, file)
+  }
+  assert.equal(signedFixture.cases.length, 8)
+  assert.equal(new Set(signedFixture.cases.map(({ id }) => id)).size, 8)
+  assert.equal(signedFixture.cases.reduce((count, entry) => count + entry.anchors.length, 0), 192)
+  const raw = readFileSync(new URL('geometry.txt', signedDirectory), 'utf8')
+  for (const entry of signedFixture.cases) {
+    const observations = raw.split(`CASE ${entry.id}\n`)[1]!.split('CASE ')[0]!
+    for (const name of entry.anchors) {
+      const line = observations.split('\n').find((value) => value.startsWith(`ANCHOR ${name}; `))!
+      const [, x, y] = /; (-?[\d.]+)pt,(-?[\d.]+)pt$/.exec(line)!
+      assert.deepEqual(entry.expectedAnchors[name], { x: Number(x) || 0, y: -Number(y) || 0 }, `${entry.id}/${name}: exactly one Y conversion`)
+    }
+  }
+})
+
+for (const entry of signedFixture.cases) test(`additive PGF signed fitted axes: ${entry.id}`, () => {
+  const actual = solvePointNodeShape(entry)
+  const independent = samples(entry.paints[0]!.tokens)[0]!
+  compare([...actual.contours[0]!.vertices, actual.contours[0]!.vertices[0]!], independent, `${entry.id} painted contour`)
+  for (const name of entry.anchors) {
+    const anchor = resolvePointNodeAnchor(entry, actual, name)
+    assert.equal(anchor.supported, true, `${entry.id}/${name}: ${anchor.diagnostic}`)
+    compareAnchor(anchor.position, entry.expectedAnchors[name]!, `${entry.id}/${name}`)
+  }
+  assert.ok(actual.signedFittedAxes!.x < 0, 'Negative minimum dominates the still-more-negative padded x axis')
+  assert.ok(actual.bounds.minX <= actual.bounds.maxX && actual.bounds.minY <= actual.bounds.maxY, 'Painted envelope remains ordered')
+  const scale = 1.2
+  const scaledInput = { ...entry, anchor: 'east', unitScale: scale,
+    body: { width: entry.body.width * scale, height: entry.body.height * scale, depth: entry.body.depth * scale },
+    innerXSep: entry.innerXSep * scale, innerYSep: entry.innerYSep * scale, outerXSep: entry.outerXSep * scale, outerYSep: entry.outerYSep * scale,
+    minimumWidth: entry.minimumWidth * scale, minimumHeight: entry.minimumHeight * scale,
+    lineWidth: entry.lineWidth! * scale, fontContext: { em: entry.fontContext!.em * scale, ex: entry.fontContext!.ex * scale } }
+  const scaled = solvePointNodeShape(scaledInput)
+  compareAnchor({ x: scaled.placementAnchor.x / scale, y: scaled.placementAnchor.y / scale }, entry.expectedAnchors.east!, `${entry.id}: SVG scale placement`)
+  assert.equal(scaled.anchorDiagnostic, undefined)
+  for (const name of ['north', 'north east', 'base east', '45', '13']) {
+    const point = resolvePointNodeAnchor(scaledInput, scaled, name).position
+    compareAnchor({ x: point.x / scale, y: point.y / scale }, entry.expectedAnchors[name]!, `${entry.id}/${name}: SVG units converted to TeX pt`)
+  }
+})
+
+test('signed-axis controls reject unsigned anchors even with correct absolute painted bounds', () => {
+  for (const id of ['ellipse-empty-strong', 'rectangle-empty-strong', 'ellipse-small-minima', 'rectangle-small-minima',
+    'ellipse-mixed-axes', 'rectangle-mixed-axes', 'ellipse-outer-crossing', 'rectangle-outer-crossing']) {
+    const entry = signedFixture.cases.find((item) => item.id === id)!
+    const actual = solvePointNodeShape(entry)
+    const unsigned = { ...actual, signedFittedAxes: { x: Math.abs(actual.signedFittedAxes!.x), y: Math.abs(actual.signedFittedAxes!.y) } }
+    assert.deepEqual(unsigned.bounds, actual.bounds)
+    assert.deepEqual(unsigned.contours, actual.contours)
+    assert.throws(() => compareAnchor(resolvePointNodeAnchor(entry, unsigned, 'east').position, entry.expectedAnchors.east!, `${id}: abs fitted axes`))
+    assert.throws(() => compareAnchor({ x: -entry.expectedAnchors.east!.x, y: 0 }, entry.expectedAnchors.east!, `${id}: wrong sign`))
+  }
+  for (const id of ['ellipse-small-minima', 'ellipse-mixed-axes', 'ellipse-outer-crossing']) {
+    const entry = signedFixture.cases.find((item) => item.id === id)!
+    assert.throws(() => compareAnchor(entry.expectedAnchors['north east']!, entry.expectedAnchors['45']!, `${id}: eccentric compass substituted for radial numeric`))
+    assert.throws(() => compareAnchor(entry.expectedAnchors['base east']!, entry.expectedAnchors.east!, `${id}: baseline-side substituted for compass`))
+  }
 })

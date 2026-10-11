@@ -1,0 +1,36 @@
+{
+  "engine": "pdfTeX 3.141592653-2.6-1.40.29 (TeX Live 2026)",
+  "PGFVersion": "3.1.11a",
+  "node": "v26.9.0",
+  "command": [
+    "/Library/TeX/texbin/pdflatex",
+    "-no-shell-escape",
+    "-interaction=nonstopmode",
+    "-halt-on-error",
+    "negative-minima.tex"
+  ],
+  "nodeCommand": "PATH=/opt/homebrew/bin:$PATH node /private/tmp/stz32d-review-layout/reproduce-layout.mjs",
+  "workingDirectory": "/private/tmp/stz32d-review-layout",
+  "exitCodes": {
+    "PGF": 0,
+    "production-repro": 0
+  },
+  "units": "TeX pt; production SVG1.2 units/TeX pt; PGF+Y up, SVG+Y down",
+  "sourceHashes": {
+    "/usr/local/texlive/2026/texmf-dist/tex/generic/pgf/libraries/shapes/pgflibraryshapes.geometric.code.tex": "bbd6abe9df51153e2f4f61cca3ad669de34a6648cf37795df44da931402b69ee",
+    "/usr/local/texlive/2026/texmf-dist/tex/generic/pgf/modules/pgfmoduleshapes.code.tex": "01dd81e3f2c56a8db7864916ada1a5036964aff2e8176aafd4773244e236bb27",
+    "/usr/local/texlive/2026/texmf-dist/tex/generic/pgf/basiclayer/pgfcorepoints.code.tex": "7533dd80c95a5124726b0a617a5f458226d4a7490bcd209e3fd7e717e24dc127",
+    "/usr/local/texlive/2026/texmf-dist/tex/generic/pgf/math/pgfmathcalc.code.tex": "58fcc94547646458470315a6d10953a9729e7962e3def5273633b06fb444a5aa",
+    "/usr/local/texlive/2026/texmf-dist/tex/generic/pgf/math/pgfmathfunctions.trigonometric.code.tex": "1c8834abe00807467a52d31ef96032d5084b2560eea45995018084d13a3cde3c",
+    "/usr/local/texlive/2026/texmf-dist/tex/generic/pgf/math/pgfmathfunctions.basic.code.tex": "c94abbd89ad0556546d9e5053af16b58ce7f38d19c379b27309e5fefd23908f8",
+    "/usr/local/texlive/2026/texmf-dist/tex/generic/pgf/basiclayer/pgfcoretransformations.code.tex": "bdea875774b4ad7a1e12debc67c46286245031f5c2e287c9e192f3ca4b6193b6"
+  },
+  "artifactHashes": {
+    "negative-minima.tex": "845701ec88047b53a0565be4838e22fa0b3fdefbe16b621682c37a409f1c8a89",
+    "geometry.txt": "33989cc89e03049a073293cf17efaa6ce19c80794c2ab6ab8b766abb94953c01",
+    "compilation.txt": "8c7eaf79f64ce4550ed32fd6992489616e030a6467d018f58b155f5f0a6ce0ab",
+    "reproduce-layout.mjs": "cd673d25ceaab9b4a964c453a20291886ddf1c33ee0c67025d466abe3d733aff",
+    "production-results.json": "28530ed351cde28375ee02f6d959832239c753655567f5a79fc1d1084d07a93b",
+    "production-command.log": "376b47828236f76794a374120e7b6e590581b2685d1ea7eadcb741851a1eb3d9"
+  }
+}
