@@ -1,234 +1,275 @@
-# Phase 32D Fix for authenticated zero-axis outside input
+# Phase 32D Fix for unobstructed native zero-axis paint capture
 
 ## Objective and scope
 
-Continue from the implemented signed polygonal fitting/clearance and faithful
-zero-axis ellipse traversal. The newest exact-tree parent run stops before its
-first zero-axis outside click because the harness requires the hit target itself
-to be the SVG root. Production has an explicitly marked SVG background rect.
+Continue from the implemented signed polygonal/zero-axis geometry and fresh
+root/background authentication, trusted capture-event validation and measured
+coincident-contour clearance. The latest parent now completes all five2D
+zero-axis native actions, then fails the live PNG extrema assertion.
 
-Correct this scoped observation/contract/fixture mismatch. Authenticate the
-actual current root or production background in fresh hit-stack and trusted
-event evidence, then complete the mandatory 2D/3D zero-axis sequence, live paint,
-polygonal placement and downloaded/reopened SVG/PNG acceptance.
-Retain all implemented geometry, references, predecessors and pending contracts.
+The retained screenshot shows the restored expanded toolbar covering the upper
+stroke. Correct the scoped live-capture preparation/lifecycle and raw evidence:
+measure the entire current stroke, remove the observed obstruction through
+owned native UI controls, capture once with fresh geometry, and restore the
+inherited UI afterward. Keep the unchanged pixel oracle strict.
 
-Limit changes to the evidenced native observation, zero-axis assertions,
-faithful fixtures/regressions, necessary isolated runner copies and Phase32
-status documentation. Do not change production geometry, paths, picking,
-minimum fitting, camera, authored units, saved version2 or reference expectations
-to pass this harness condition.
+Limit changes to this live capture, its observations/contracts, faithful
+regressions, necessary isolated runner copies and Phase32 status documentation.
+Preserve production geometry, paths, picking, camera/model coordinates,
+authored units, saved version2 and every authenticated reference byte.
+Do not repeat the resolved root-only fix or infer a new production paint defect
+from the partially covered raster.
 Any later production change needs separately retained fresh independent evidence.
 
 Read `AGENTS.md`, `prompts/phase-32d-implement.md`,
 `prompts/phase-32d-review.md`, `docs/PHASE_32D_IMPLEMENTATION.md` and
-`docs/PHASE_32_PLAN.md`. Inspect the exact source and raw failure first.
+`docs/PHASE_32_PLAN.md`. Inspect the actual PNG and matching raw records first.
 Maintain cumulative strict verification, verification-before-review/commit and
 the post-review matching-tree guard. Phase32 remains incomplete.
 
 ## Latest handoff, parent failure and identity
 
-Implemented polygonal/zero-axis handoff:
-`/private/tmp/stz-32d-polygon-zero-fix-20261011/HANDOFF.json`.
-Child cumulative report:
-`/var/folders/vk/7kf940pd4bx8f6cg3rzlmtc80000gn/T/stz-phase32d-manual-dNz3ov/verification.json`.
+Implemented background fix:
+`/private/tmp/stz-32d-background-fix-20261011/HANDOFF.json`, including preservation
+audit, precursor coordinate evidence, exact inventory/hashes and logs.
+Child strict report:
+`/var/folders/vk/7kf940pd4bx8f6cg3rzlmtc80000gn/T/stz-phase32d-manual-QWbS9S/verification.json`.
 
 Newest parent verifier:
-`/var/folders/vk/7kf940pd4bx8f6cg3rzlmtc80000gn/T/stz-phase-verifier-nbIe6k/response.json`.
+`/var/folders/vk/7kf940pd4bx8f6cg3rzlmtc80000gn/T/stz-phase-verifier-khe3zT/response.json`.
 Strict report:
-`/var/folders/vk/7kf940pd4bx8f6cg3rzlmtc80000gn/T/stz-phase32d-before-review-Ab9guh/verification.json`.
-Browser evidence:
-`/var/folders/vk/7kf940pd4bx8f6cg3rzlmtc80000gn/T/stz-phase32d-before-review-Ab9guh/05-check-free-labels/artifacts/free-labels-evidence.json`,
-and its sibling artifacts, especially `point-layout-failure.json`,
-`point-layout-app-failure.json` and the retained complete failure DOM.
+`/var/folders/vk/7kf940pd4bx8f6cg3rzlmtc80000gn/T/stz-phase32d-before-review-qsihsK/verification.json`.
+All current browser evidence is under its
+`05-check-free-labels/artifacts/`, especially:
+
+- `free-labels-evidence.json` and the raw before-capture/bytes/native diagnostics.
+- `point-layout-signed-polygonal-zero-axis-2d-native.json`.
+- `point-layout-signed-polygonal-zero-axis-2d-live.png`.
+- `point-layout-failure.json` and `point-layout-app-failure.json`,
+  including complete failure DOM and screenshot.
 
 Branch: `phase/32d-margin-minsize-anchor`.
-HEAD: `be2aabe55e578d036672960f3ba741af4008564f`.
+HEAD: `09cd6a7e8a7e2226acb4c04634b36dbd166f0858`.
 Pre-prompt tree matches the parent report's before/after checkout:
 
 ~~~text
-6a572c7c45328aa82733a077fdab46118c3c35ad7c244edc7b1df8fb46fcde30
+d8bebf0f986e24235a7de02e56c138115ce3265937a8037ad60068449eb79a2c
 ~~~
 
 Tracked-diff SHA256:
-`e2aabcb391f41fb56b37dcfc8d8d3d0833083d76b836a75381ee0dbf20b2103e`.
-Preserve fourteen modified tracked files: `.gitignore`; both Phase32 documents;
-`package.json`; `scripts/automation/phase-verification.mjs`;
-`scripts/checkPointLayoutAnchors.mjs`; `scripts/pointLayoutAnchorsContract.mjs`;
-`src/geometry/pointNodeShapes/README.md`, `anchors.ts`, `contours.ts`,
-`pgfMath.ts`, `solve.ts`, `types.ts`;
-`tests/scripts/phase32dVerification.test.mjs`.
-Preserve all494 untracked files:490 additive reference/evidence files under
-`tests/fixtures/point-node-anchors/signed-polygonal/` and `zero-axis/`, plus
-the four registered `pointNodeDegeneratePaths`, `pointNodePolygonalSignedReferences`,
-`svgPointNodeDegeneratePaths` and `svgPointNodePolygonalSigned` test files.
-Use the handoff's exact inventory/hashes. Keep prior tracked references too.
+`cc0ce90fff0c2b494f4f8b2e2bf2d74342ce0aee6bc648dca39275a36589a9a7`.
+Preserve the six modified tracked files:
+`scripts/pointGeometricSelection.mjs`, `scripts/checkPointLayoutAnchors.mjs`,
+`scripts/pointLayoutAnchorsContract.mjs`,
+`tests/scripts/phase32dVerification.test.mjs` and both Phase32 status documents.
+Current untracked count is zero. The prior494-file evidence/test inventory is
+retained in the current HEAD; it is not the current untracked count.
+Preserve its bytes and every prior production/reference change.
 The prompt changes identity: capture actual current tracked/untracked bytes
 rather than treating this historical fingerprint as future acceptance.
 
 | Retained evidence | Actual result |
 | --- | --- |
-| Latest implementation child | 6,655/6,655 registered tests passed, zero failures/skips; build/diff and focused TypeScript/lint/syntax passed. Four inherited lint errors remain. Strict/direct browser attempts stopped at localhost EPERM before Chrome. |
-| Ab9guh parent | Tests/build/diff/label-assets passed; free-labels failed in combined32D layout. Sixteen cumulative groups completed; combined layout is incomplete and final standalone is unexecuted. PageErrors is empty. |
-| Current layout progress | First six named32D scenarios passed. Six2D signed polygonal selected-anchor observations were retained, then2D zero-axis outside-clear preparation failed. The new scenario, its3D cases/downloads, both pending scenarios and final standalone have no completed fresh acceptance. |
-| Completion | No new independent completion review, commit or push. The prior needs_changes findings led to the implemented geometry fixes; successful synthetic checks do not establish final review or native completion. |
+| Latest implementation child | 6,710/6,710 tests passed, zero failures/skips; build/diff, focused policy/geometry/runner/capture/pending, strict TypeScript/lint/syntax passed.55 new regression controls. Focused sweeps overlap. Four inherited lint errors remain. Browser checks stopped at localhost EPERM before Chrome. |
+| qsihsK parent | Tests/build/diff/label-assets passed; free-labels failed at live zero-axis PNG extrema. Sixteen of18 cumulative groups completed;17 started. Combined layout is incomplete, final standalone unexecuted, pageErrors empty. |
+| Current layout progress | Six predecessor32D scenarios passed. Six2D polygonal selected-anchor observations retained. All five2D zero-axis gestures, native selection/cycle assertions and owned cleanup completed before live raster failure. The new scenario has no terminal pass. |
+| Remaining | New2D standalone download,3D polygonal/zero-axis/live/download cases, both existing pending scenarios and final standalone remain unexecuted. Independent completion review has not started; no child commit/push. |
 
-Earlier HMy8AM acceptance/review and historical geometry probes remain evidence
-history only. They cannot replace fresh acceptance of this geometry tree.
-Distinguish child startup EPERM from the parent's actual pre-input assertion.
-Do not report the parent as blocked before Chrome.
+Earlier Ab9guh root-only rejection and HMy8AM acceptance/review remain history.
+The newest parent did launch Chrome and execute trusted zero-axis input.
+Distinguish that from child startup EPERM and from unperformed3D/download work.
+Historical or partial acceptance cannot establish completion of the next tree.
 
-## Exact observed failure
+## Exact observed raster failure
 
-Read diagnostic
-`point-layout-signed-polygonal-zero-axis-zero-axis-outside-clear-before-native-input`
-and its `...-zero-axis-finished` record in `free-labels-evidence.json`.
+In `point-layout-signed-polygonal-zero-axis-2d-native.json`, the five action keys
+are `outside-clear`, `ordinary-axis`, `alt-start`, `alt-next`, `outside-final`.
+Each retains three trusted events, droppedEvents0 and actual after-state.
+Selection IDs are `null → zero-overlap → zero-overlap → app-point → null`.
+Outside input reaches the authenticated background rect at pointerdown, then
+the current SVG root at captured pointerup/click. The completed records retain
+model/history/revision/uiSettings invariance and Alt/observer cleanup.
+Do not revert this capture retargeting to identical-target assertions.
 
-The first action is `outside-clear`:
-local(12,20) projects through the current connected contour screenCTM
-(a=d3.1,b=c0,e1296.4,f268.975) to
-screen(1333.6000000000001,330.97499999999997).
-Current owner is `["point-node",437,"zero-overlap"]`, source is empty,
-layout ready, contour length135.76449584960938, Inspector closed and
-owned toolbar collapsed.
+`zeroAxisInput` restores the inherited expanded toolbar in its finally block
+before the separate live screenshot. Its preparation/restoration is successful.
+Both live snapshots report `toolbar.collapsed:false` and Inspector closed.
+Current owner is `["point-node",437,"zero-overlap"]`, empty source, ready body,
+matching current request/bodyRequest and unchanged geometry.
 
-Fresh `elementFromPoint` is an SVG rect with `canvas:true`,
-`canvasRoot:false`, `pointId:null` and drawer/handle/toolbar/history/quickStyle false.
-The first hit-stack element is that rect; the next is the actual
-`svg.svg-diagram` root with `canvasRoot:true`.
-The contract at `scripts/pointLayoutAnchorsContract.mjs:626` requires
-`target.canvasRoot === true`, producing:
+The actual path is:
 
 ~~~text
-Outside input reaches the actual canvas beyond all current point contours
-false !== true
+M 0 0 L 0 -33.941125496954 L 0 0 L 0 33.941125496954 L 0 0 Z
 ~~~
 
-`zeroAxisInput` at `scripts/checkPointLayoutAnchors.mjs:353` calls that assertion
-after persisting the before-input observation and before `page.mouse.click`.
-There is no first-action stateAfter/after/event evidence.
-Ordinary-axis, Alt-start/next and outside-final did not execute.
-This record establishes a harness root-target assumption, not a production
-outside-selection or zero-axis paint failure.
+Its native arclength is135.76449584960938.
+Fresh pre/post contour screenCTM remains
+(a=d3.1,b=c0,e1296.4,f268.975).
+Projected geometric y extrema are approximately163.7575 and374.1925 screen px.
+The actual native screenshot contains1700×1300 pixels and56,406 bytes,
+SHA256:
 
-`src/rendering/SvgDiagram.tsx:915` emits
-`rect[data-svg-background="true"]`, and `isSvgBackgroundTarget` recognizes
-the marker on an SVG element. Root click handling accepts bubbled background
-input. The complete DOM/source/stack support the background interpretation,
-but the retained target descriptor does not record the marker.
-Do not retrofit `svgBackground:true` into historical evidence or claim its
-exact attribute was already authenticated by the raw target record.
-Observe it freshly in the next run.
+~~~text
+0564067bd15143ff9ea591bb12f2fa62b0c380b21e29e88df5a2313e7daee10e
+~~~
 
-## Scoped background observation and contract fix
+The oracle finds582 magenta pixels with local bounds:
+x−0.2903225806451906..0.35483870967739,
+y−28.54032258064515..33.71774193548388.
+Expected y extrema are ±33.941125496954 with the unchanged1.5/screen-scale
+raster allowance. The upper stroke is covered by the expanded floating toolbar
+in the actual PNG; the lower extremum is within the existing allowance.
 
-Inspect `observeGeometricSelection` and the event descriptors in
-`scripts/pointGeometricSelection.mjs`, the owned zero-axis observer in
-`scripts/checkPointLayoutAnchors.mjs`, `assertFreshZeroAxisAction` and
+`assertZeroAxisPixelEvidence` at `scripts/pointLayoutAnchorsContract.mjs:591`
+correctly rejects that partially hidden raster, called at
+`scripts/checkPointLayoutAnchors.mjs:830` after image bytes/raw native evidence
+have been saved.
+This is supported evidence of a capture obstruction; the next run must freshly
+authenticate the whole stroke's visibility and demonstrate unchanged paint.
+Do not reinterpret the snapshot as proof that native drawing failed, or that
+a reduced/occluded raster should pass.
+
+## Scoped owned live-capture preparation
+
+Inspect the live capture block in `scripts/checkPointLayoutAnchors.mjs`,
+`observeGeometricSelection`, owned native toolbar preparation/restoration
+patterns, `observeZeroAxisPixels`, `assertZeroAxisPixelEvidence` and
 `assertZeroAxisNativeCase` in `scripts/pointLayoutAnchorsContract.mjs`.
-Use a small explicit predicate with raw observations consistent across the
-before-hit stack, after observations, native events and parent validation.
 
-For the two outside actions accept the actual current canvas root, or its
-unique connected direct-child background rect with exact
-`data-svg-background="true"`. Freshly retain the background attribute/predicate
-and current-canvas relationship; authenticate that observed identity rather than
-accepting any rect/SVG descendant merely because it sits under the canvas.
-Require SVG/canvas membership, no point owner, connected current root and
-matching hit-stack/composed-path root.
-Reject stale/wrong-canvas, unmarked or wrong-marker children, point contours,
-drag handles, overlays, toolbar/history/quick-style/drawer targets.
-An authenticated root needs no background marker; retain its actual null/false
-marker observation. Exact marker=true is mandatory for the rect branch only.
-Retain the selected point's source/request/bodyRequest/owner/revision,
-model/camera, finite invertible current contour/point/canvas CTMs and measured
-click projection. Keep hit-stack head equal to the observed target.
+Preserve the completed native interaction workflow, including its own
+Inspector/toolbar restoration and five-action evidence. Add a separate bounded
+capture lifecycle after that restoration, with an explicit inherited baseline.
+Do not leave interaction cleanup unfinished to obtain a clean screenshot.
 
-Keep outside local(12,20), ordinary/Alt local(0,20), the unchanged stroke width
-and greater-than-six-unit contour clearance. Prove the current coincident
-point contours are still the intended fixture; a background DOM target alone
-does not prove geometric distance beyond production picking tolerance.
-Do not move the click arbitrarily, seek a root-only location, enlarge tolerance,
-disable the background rect or bypass the real native gesture.
-If fresh geometry/obstruction invalidates a coordinate, preserve the observation
-and fail explicitly rather than retrying until selection looks correct.
+Before any capture preparation, persist actual state, current source/request/
+owner/revision, coincident contour geometry, finite invertible canvas/point/
+contour CTMs, viewport/visual viewport/scroll, toolbar/control/overlay bounds
+and visibility measurements for the complete projected stroke footprint,
+including both extrema and stroke width.
+Measure actual current overlay/hit-stack ownership where obstruction is tested.
+A clear local.23 click point or correct DOM path length does not establish that
+both extrema/all paint are visible.
+Use the independently known zero-axis extrema and real native traversal,
+not observed truncated raster bounds, to define the required capture region.
 
-Require one trusted pointerdown→pointerup→click for each action, actual current
-canvas path, correct button/buttons/pointerId/Alt and precise native coordinate
-propagation. Pointerdown must reach the freshly observed target. Validate outside
-event targets against the authenticated background/root predicate too; do not
-leave events as an arbitrary non-point canvas-child check.
-Keep real browser capture/retargeting observations rather than fabricating events.
+If the expanded toolbar obstructs that footprint, use one unique normal native
+Collapse preview toolbar control. Retain the observed reason, control identity/
+count, actual action and fresh resulting UI/state/geometry.
+For an already clear/inherited-collapsed case, retain an explicit no-action
+record. Do not expand/select/collapse repeatedly or change the selected owner.
+Reuse small existing native ownership/diagnostic patterns where useful without
+weakening the completed geometric-selection contracts.
+The existing geometric-toolbar validator requires one Select action and a
+click-specific obstruction; do not apply it unchanged to capture preparation.
+Use a separate small capture contract without another Select action, preserving
+the existing native control/state-invariance/restoration behavior.
 
-Preserve the five-action order:
-`outside-clear` → `ordinary-axis` → `alt-start` → `alt-next` → `outside-final`.
-Required selection IDs remain
-`null` → `zero-overlap` → `zero-overlap` → `app-point` → `null`.
-Require real model/history/revision/uiSettings invariance, continuity between
-actions and the same current source/request/owner at each boundary.
-The inside hit must remain the actual visible path owned by `zero-overlap`.
-No DEV selection mutation, forced/DOM click, larger proximity budget,
-synthetic acceptance flag or skip may substitute for native selection.
+After the transition, freshly measure both endpoints, full stroke footprint,
+current canvas/contours and overlays. Require the stroke inside the actual
+viewport/canvas and unobstructed by toolbar, Inspector, history, quick-style,
+selection decorations or other UI. Unexpected stale geometry, remaining
+occlusion or unsupported scroll/viewport conditions must retain evidence and
+fail explicitly. Do not change camera/zoom/model positions or use arbitrary
+coordinate shifts to avoid the observed toolbar.
 
-Keep bounded evidence persistence before every validation/input and after
-input before assertions/image work, owned Inspector/toolbar preparation and
-restoration, primary error precedence, Alt/listener registry cleanup and
-bounded secondary diagnostics. Failure cleanup must remain observable.
-Do not turn a pre-input record into a success or erase missing after evidence.
+Capture exactly one actual live PNG using the existing bounded non-full-page
+CSS-pixel screenshot approach. Keep normal fonts and the current magenta
+stroke; no screenshot retry, DOM/CSS hiding, reconstructed image, forced click,
+export-only substitute, crop that omits an extremum or softened color/extent
+threshold may establish live acceptance.
+Bind screenshot coordinates to the actual viewport origin and fresh screenCTM;
+retain scroll/visual-viewport/device-scale observations so root/contour CTMs
+are interpreted in the correct coordinate frame.
+The current screenCTM already reflects page scroll; do not subtract the retained
+scrollY129 again or reuse pre-preparation matrices in a changed capture frame.
 
-## Faithful regressions and required acceptance
+Persist PNG path/bytes/hash/dimensions before image inspection and assertions.
+Retain fresh before/after state, source/owner/request and canvas/point/contour
+CTMs around that single capture. Validate stable geometry/viewport and unchanged
+model/history/selection/revision/uiSettings.
+Continue using the unchanged magenta pixel replay and existing raster allowance
+to require both extrema and narrow stroke width.
+Keep PNG byte/file identity and parent replay validation; success flags or
+geometry-only extrema cannot substitute for real screenshot pixels.
 
-`tests/scripts/phase32dVerification.test.mjs:184–204` currently synthesizes
-outside targets as root `svg` with `canvasRoot:true`. Add a faithful marked
-background-rect success fixture through both fresh-action and complete parent
-raw-evidence validation; retain genuine root success as a separate case.
-Make fixture events/hit stacks/current canvas/marker observations agree,
-and preserve authentic target differences between input/capture events.
+Restore the capture's inherited toolbar/UI state in owned bounded finally
+cleanup after the image attempt, including screenshot/oracle/persistence failure.
+Restore only what this capture changed; preserve primary error identity and
+retain bounded secondary/restoration evidence.
+Do not take an extra failure screenshot.
+Require no model/history/selection/document/UI-setting changes and no leaked
+observer/listener/Alt/owned resources.
 
-Add focused failures for missing/false/wrong marker on the background-rect
-branch, arbitrary SVG child,
-wrong canvas/root/path, point/handle/overlay ownership, stale owner/request/
-revision/CTM, mismatched measured click, dropped/untrusted/wrong events,
-wrong selection/cycle order and changed model/history/UI.
-An unchanged old root-only assertion must reject the faithful rect fixture;
-an overbroad canvas-descendant predicate must fail the negative controls.
-Use compact meaningful cases, not a redundant parameter cross product.
+Update `assertZeroAxisNativeCase`'s lifecycle binding explicitly:
+native action end → completed interaction toolbar restoration → capture inherited
+baseline → optional measured native collapse → prepared pre-image snapshot →
+single image/post-image snapshot → capture restoration.
+Retain exact model/state/owner continuity at each boundary; do not replace
+existing checks with broad metadata stripping or mere equality to an arbitrary
+new baseline.
+Allow legitimate measured DOM/viewport matrices before versus after native UI
+preparation, while requiring stable capture-frame matrices/viewport around PNG
+bytes and exact restoration/state invariants afterward.
+Keep the same current model geometry/source/request and actual canvas throughout.
 
-Update schema/artifact/raw-policy assertions and isolated runner dependencies
-only as needed for the added observations. Keep all prior fixtures, negative
-controls, required group/scenario counts and failure evidence.
-Do not make raw marker/current-canvas observations optional in new outside
-records; the rect branch requires the exact true marker, while authenticated
-root records retain the actual absent/false marker.
+## Faithful regressions and remaining acceptance
 
-The nine required32D scenarios include
-`point-layout-signed-polygonal-zero-axis` between the six predecessor scenarios
-and the two pending scenarios. Require all twelve polygonal selected-anchor
-cases across2D/3D and both zero-axis native sequences.
-Retain actual native live PNG bytes/hash/dimensions, fresh before/after CTMs/state
-and magenta stroke pixel extents along both turning extrema.
-Require both new transparent signed-polygonal/zero-axis standalone downloads
-with all six polygonal nodes plus the zero-axis node, exact file identity,
-external SVG reopening and complete PNG validation.
-Preserve both existing pending transparent/white workflows and final cumulative
-standalone acceptance. None is optional because the child lacks browser startup.
+Update the live fixture at `tests/scripts/phase32dVerification.test.mjs:243–252`,
+which currently clones a final-action snapshot rather than modeling the capture
+UI lifecycle. Add a faithful restored-expanded-toolbar fixture whose upper
+stroke is covered after the earlier valid collapsed native input workflow.
+It must require capture preparation and complete restoration while retaining
+that earlier input/picking proof separately.
+Add an inherited-collapsed or already-unobstructed no-action success case.
+Keep their current control identity, target/overlay bounds, viewport/CTMs,
+native action evidence and PNG byte/extent records consistent.
 
-Keep authenticated reference bundles byte-for-byte:
+Add meaningful failures for missing/wrong/duplicate capture controls, stale or
+foreign root/owner/request/revision/CTM, an endpoint outside the viewport,
+occlusion remaining after collapse, clear.23 but covered extremum, changed
+model/history/selection/UI, fabricated/no action, mismatched screenshot frame,
+truncated/blank/short-stroke PNG, altered raw/file identity and absent/failed
+restoration. Preserve primary image/evidence failures when cleanup also fails.
+Exercise both ambient dimensions and the complete parent raw/native-file policy,
+not only a local success summary. Avoid redundant test multiplication.
+
+Keep all55 new background regression controls and their authentic root/rect
+branch distinction, raw exact marker/current-canvas observation, measured
+coincident-contour clearance and trusted capture-event propagation.
+Retain outside local(12,20), ordinary/Alt local(0,20), greater-than-six-unit
+clearance, precise binary32 pointer/integer click propagation, five-action
+selection order, source/request/owner consistency and complete cleanup.
+Do not loosen or rerun those corrections as a substitute for live paint proof.
+
+Update new live preparation/restoration records, required raw-policy validation,
+artifact inventories and isolated runner copies as needed.
+Keep absent new capture proof fail-closed. Preserve historical reports unchanged.
+
+Require all nine named32D scenarios, including
+`point-layout-signed-polygonal-zero-axis` with twelve polygonal selected-anchor
+cases and both zero-axis native sequences/live PNGs.
+Require both new transparent standalone downloads, all six polygonal nodes plus
+the zero-axis node, exact file identity, external SVG reopening and complete PNG.
+Keep the shared zero-axis pixel oracle strict for standalone callers too.
+Do not alter the completed complete-root capture helper or presume the live
+toolbar obstruction also exists in standalone SVG.
+Preserve both retained fifteen-entry pending transparent/white download/reopening/
+complete PNG/TikZ workflows and final cumulative standalone acceptance.
+
+Preserve byte-for-byte all authenticated references:
 original172 boxes/4,925 anchors/11 failure controls; signed-basic8 boxes/
 192 anchors;54 polygonal boxes/1,386 anchors;12 direct arithmetic controls;
 four dart fitting traces; one singular boundary control;
 eleven zero-axis PGF paths and37 independent rendering records.
-Keep existing32C reference files and490 additive polygonal/zero-axis artifacts.
-Do not regenerate oracle expected values or loosen0.025pt anchor/0.03pt contour
-tolerances,0.005-unit sampling precision or2048 finite-work budget.
-
-Preserve signed fitted radii/isosceles angle distinctions/dart parameter-defined
-miter and narrow reciprocal branch corrections, ordered collapsed-axis traversal
-including partial/reversed/rotated extrema and zero-area fill.
-Keep production path/dash/cap/join/closure, painted bounds and picking conformance.
-Retain all registered geometry/reference/rendering/model/TikZ regressions,
+Keep original32C files and490 additive polygonal/zero-axis evidence files.
+Do not regenerate expected values or loosen0.025pt anchor/0.03pt contour
+tolerances,0.005 sampling precision or2048 finite-work budget.
+Preserve signed fitting/clearance, narrow reciprocal math, faithful ordered
+collapsed-axis/partial/reversed/rotated traversal, zero-area fill and
+dash/cap/join/closure behavior.
+Retain all registered geometry/rendering/reference/model/TikZ tests,
 both TikZ modes and2D z=0/3D active-work-plane semantics.
-This fix adds native evidence fidelity without reopening those geometry branches.
 
 ## Preserve completed corrections and contracts
 
@@ -239,7 +280,7 @@ Retain deterministic stalled-report injected ordinary-write recorder,20ms
 deadline, exact primary Error/nativeChecks count, two stalled failure writes,
 late rejection ownership and complete listener/page/browser/server cleanup.
 The earlier full6,425 test pass cleared that prior review failure; the latest
-registered suite passes6,655 tests. Do not loosen this deterministic control.
+registered suite passes6,710 tests. Do not loosen this deterministic control.
 
 Keep explicit resolved preview schema (six dimensions, anchor, effective font
 context) separate from exact authored units/source/context.
@@ -297,12 +338,13 @@ byte validation, artifact inventories, raw-policy checks and runner copies.
 
 Use strict TypeScript without `any`; keep module separation, codim convention,
 raw user text and model coordinates. Add no dependency without explaining why.
-Update Phase32 status documents with the actual background-target correction,
-retained reference inventory and observed results. Preserve evidence history.
+Update Phase32 status documents to the actual capture-preparation scope and
+current results, preserving completed background and geometry evidence.
+Count overlapping focused sweeps honestly.
 
-Use Homebrew Node>=22.12.0. Run focused fresh-action/native-event/parent-policy
-and faithful-fixture checks, applicable runner and preserved geometry/path/
-capture/pending controls. Count overlapping focused sweeps honestly.
+Use Homebrew Node>=22.12.0. Run focused live-capture lifecycle/faithful fixture/
+pixel replay/parent policy/runner checks and applicable preserved native,
+geometry/reference, pending, standalone and deterministic stalled-report controls.
 Run all required commands:
 
 ~~~bash
@@ -316,8 +358,8 @@ PATH=/opt/homebrew/bin:$PATH npm run check:free-labels
 Run applicable focused strict TypeScript/lint and changed-script syntax checks.
 Four inherited lint errors remain: two geometric-caller no-unsafe-finally errors,
 verifier unused _role and layers unused defaultCurveStyle.
-Preserve/report reproduced failed baseline checks separately from passing
-changed-file checks; avoid unrelated cleanup or claiming unperformed checks.
+Report reproduced failed baseline checks separately from passing changed-file
+checks. Avoid unrelated cleanup or claiming unperformed checks.
 The earlier stalled-report full-suite race is resolved.
 
 Use a fresh owned browser-capable parent process/server, supported Playwright/
@@ -327,37 +369,36 @@ Chrome and actual current tracked/untracked tree without committing:
 PATH=/opt/homebrew/bin:$PATH node scripts/automation/run-phase.mjs 32D verify
 ~~~
 
-Require all18 cumulative groups as registered by the runner: twelve31F groups
-(already including final standalone), three32A groups and one group each for
-32B paint/import,32C shapes/visibility/downloads and combined32D layout.
-Require all nine named32D scenarios, the new twelve polygonal cases/both
-zero-axis sequences/live paint/downloads, all retained signed cases, both
-pending downloads/reopening/complete PNG/TikZ, native history/JSON persistence,
+Require all18 cumulative groups: twelve31F groups (already including final
+standalone), three32A groups and one each for32B paint/import,32C shapes/
+visibility/downloads and combined32D layout.
+Require all nine named32D scenarios, both fresh zero-axis native/live cases,
+all twelve polygonal cases/new downloads, retained signed cases, both pending
+downloads/reopening/complete PNG/TikZ, native history/JSON persistence,
 valid exact artifacts and no page errors.
-Do not substitute Ab9guh's partial result, historical HMy8AM, a scoped report,
-synthetic tests or cleanup captures for fresh complete acceptance.
+Do not reuse qsihsK's partial result, Ab9guh/HMy8AM history, scoped reports,
+synthetic tests or cleanup captures as complete native acceptance.
 Do not skip predecessors or defer supported cases.
 
 Preserve implementation/fix clean-tree rules; do not reset/stash/discard/commit
 unfinished work to bypass them.
-If child browser startup encounters EPERM, retain exact startup failure/tree
-and pending parent work without weakening acceptance. Obtain approved
-browser-capable execution where available; do not endlessly repeat blocked
-startup or confuse it with the parent's assertion.
-If a later native boundary fails, persist raw pre/after input/current geometry
-before interpreting it and report the next concrete blocker.
+If child startup encounters EPERM, retain failure/exact tree and pending parent
+native work without weakening acceptance. Obtain approved browser-capable
+execution where available.
+If another native/capture boundary fails, persist raw current geometry/input/
+frame/file evidence before interpretation and report the next concrete blocker.
 
 After fresh required verification passes, obtain independent read-only completion
 review of the exact matching tracked/untracked tree using
 `prompts/phase-32d-review.md` and inspect actual reports/artifacts.
-Require the prior geometry findings independently resolved, faithful outside
-background/native owner proof, paint/placement conformance, full-suite success
-and fresh cumulative acceptance. Keep post-review identity guard.
+Require prior geometry findings independently resolved, faithful background/
+native capture proof, unobstructed live paint/placement conformance, full-suite
+success and complete fresh cumulative acceptance. Keep post-review identity guard.
 Failed/incomplete verification stops before review/commit; needs_changes blocks
 completion/commit even when required tests/browser checks pass.
 
-Report the scoped observation/contract fix, meaningful fixture controls,
-preserved production/reference bytes, changed files, focused/full checks,
-baseline failures, exact tree/report identity and independent review result.
+Report the scoped capture fix, meaningful regression controls, unchanged
+production/reference bytes, changed files, focused/full checks, baseline
+failures, exact tree/report identity and independent review result.
 Keep Phase32 incomplete until every gate passes.
 Leave commit/push to the parent after verification and review.

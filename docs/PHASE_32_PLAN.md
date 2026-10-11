@@ -1,5 +1,45 @@
 # Phase 32 Plan: Point-node math, paint, geometric shapes, and layout
 
+Authenticated zero-axis outside-input follow-up (2026-10-11): the actual starting
+checkout is clean at `09cd6a7e8a7e2226acb4c04634b36dbd166f0858`, fingerprint
+`ab87d2e864a94b4f7ad4ae38767165b71869a401699f7cc0d0a581c203c29a53`.
+The preceding fourteen changed files/all 494 additive files are now tracked;
+all handoff inventory hashes match. This fix changes observation/contracts/
+fixtures and status docs only; production and reference bytes remain intact.
+
+The newest `Ab9guh` parent launched Chrome and passed tests/build/diff/label-assets,
+sixteen cumulative groups and six predecessor 32D scenarios. Six 2D polygonal
+observations preceded a harness assertion at the first outside-clear preparation:
+the real target was the background rect, followed by the actual canvas root;
+the assertion required root-only input. No first native input or after/event
+record exists, and the old descriptor lacks the marker. Historical evidence is
+not retrofitted. The scenario, 3D/new downloads, both pending scenarios and final
+standalone acceptance remain unaccepted for the current tree.
+
+Fresh descriptors now authenticate the unique connected current root or its
+unique exact-marked direct-child SVG background, across hit stacks, after
+observations and trusted composed paths. Actual rect input/root capture targets,
+raw absent root marker, both measured coincident contours, unchanged fixed
+coordinates/stroke/six-unit clearance, exact native coordinate propagation,
+five-action selection/cycle/state continuity and owned cleanup are mandatory.
+Faithful root/background success and meaningful corruption controls pass
+598/598 focused policy checks; retained geometry/model/TikZ/reference checks pass
+368/368. Focused strict TypeScript/changed-script lint pass; four inherited lint
+errors were reproduced separately. Focused sweeps overlap the full suite.
+
+Configured child browser checks fail at owned-server localhost EPERM before
+Chrome, separately from the parent's real pre-input assertion. Full frozen-tree
+required-command/cumulative results, identity and preservation audit are retained
+in `/private/tmp/stz-32d-background-fix-20261011/HANDOFF.json`; startup or synthetic
+checks supply no native acceptance. The detailed [implementation audit](PHASE_32D_IMPLEMENTATION.md)
+retains all original/signed-basic/polygonal/zero-axis inventory counts and history.
+All eighteen groups/nine scenarios, twelve polygonal cases, both zero-axis native
+sequences/live PNG/new transparent downloads, both fifteen-entry pending
+workflows/reopening/complete PNG/TikZ and final standalone remain mandatory.
+Phase 32 remains **incomplete**. Failed/incomplete verification stops before
+independent matching-tree completion review/commit; the post-review guard and
+parent commit/push ownership are unchanged. Earlier entries follow as history.
+
 Signed polygonal/zero-axis follow-up (2026-10-11): the actual prompt checkout
 is clean at `be2aabe55e578d036672960f3ba741af4008564f`, fingerprint
 `e9f127caf56c8fc58ed78b5ac0fa00e8d7d956cbd9a310c223535ee1d7957495`.

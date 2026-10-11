@@ -10,7 +10,7 @@ import { layoutAnchorGroup, layoutAnchorScenarios, layoutAnchorArtifacts, layout
   pointAnchorsForShape, layoutImportCases, assertLayoutAnchorEvidence, assertObservedPointPlacement, assertPointTikzSourceByMode,
   assertLayoutStandaloneEvidence, assertLayoutPostClickViewDiagnostic, signedAnchorCases, signedPickingCases,
   signedPolygonalScenario, signedPolygonalCases, zeroAxisLayout, zeroAxisHalfExtent,
-  observeZeroAxisPixels, assertSignedPolygonalStandaloneEvidence } from '../../scripts/pointLayoutAnchorsContract.mjs'
+  observeZeroAxisPixels, assertFreshZeroAxisAction, assertZeroAxisNativeAction, assertSignedPolygonalStandaloneEvidence } from '../../scripts/pointLayoutAnchorsContract.mjs'
 import { syntheticStandalonePointDownload, syntheticPendingLayoutPreparation } from './standalonePointDownloadFixture.mjs'
 import { syntheticPendingLayoutViewEvidence } from './pointLayoutPendingViewFixture.mjs'
 import { syntheticUnsupportedDiagnosticEvidence } from './pointUnsupportedDiagnosticFixture.mjs'
@@ -163,7 +163,28 @@ function syntheticZeroPixels(ctm) {
   return { method: 'actual-native-PNG-magenta-stroke-pixel-centers', sha256: 'a'.repeat(64), bytes: 100,
     width: 700, height: 700, ctm, pixels: 68, bounds: { minX: -.2, maxX: .2, minY: -zeroAxisHalfExtent, maxY: zeroAxisHalfExtent } }
 }
-function syntheticZeroNative(ambientDimension) {
+function syntheticZeroCanvas(ambientDimension) {
+  const common = { id: '', class: null, pointId: null, drawer: false, ariaLabel: null, svg: true, canvas: true,
+    pointHandle: false, creationToolbar: false, toolbarOverlay: false, quickStyle: false, history: false,
+    connected: true, currentCanvas: true }
+  const root = { ...common, tag: 'svg', class: 'svg-diagram', ariaLabel: `${ambientDimension}D StratifiedTikZ example`,
+    canvasRoot: true, currentCanvasRoot: true, canvasDirectChild: false, svgBackgroundAttribute: null, svgBackground: false }
+  const background = { ...common, tag: 'rect', canvasRoot: false, currentCanvasRoot: false, canvasDirectChild: true,
+    svgBackgroundAttribute: 'true', svgBackground: true }
+  return { rootCount: 1, backgroundCount: 1, root, background }
+}
+function syntheticZeroCoincidentContours(snapshot, ctm) {
+  const rendered = syntheticZeroRendered()
+  return ['app-point', 'zero-overlap'].map((id) => ({ id, count: 1, currentCanvas: true,
+    owner: JSON.stringify(['point-node', snapshot.labelDocumentRevision, id]),
+    request: `request:${snapshot.labelDocumentRevision}:${id}`, bodyRequest: `request:${snapshot.labelDocumentRevision}:${id}`,
+    source: '', state: 'ready', shape: 'ellipse', parameters: snapshot.layout.parameters,
+    layout: { ...structuredClone(zeroAxisLayout), fontContext: { fontSizePt: 10, xHeightPt: 4.30554 } },
+    pointScreenCTM: structuredClone(ctm), contour: { connected: true, tag: 'path', attributes: structuredClone(rendered.contour.attributes),
+      bounds: structuredClone(rendered.bounds), length: rendered.contourLength, traversal: structuredClone(rendered.nativeTraversal),
+      CTM: structuredClone(ctm), screenCTM: structuredClone(ctm) } }))
+}
+function syntheticZeroNative(ambientDimension, outsideTarget = 'background') {
   const spec = { source: '', shape: 'ellipse', layout: zeroAxisLayout, ambientDimension }, state = syntheticSignedState(spec)
   for (const field of ['json', 'runtimeDiagramJson', 'history']) {
     const value = JSON.parse(state[field]), diagram = field === 'json' ? value.diagram : field === 'history' ? value.present : value
@@ -181,6 +202,7 @@ function syntheticZeroNative(ambientDimension) {
     toolbarPreparation: prepared.toolbarPreparation, toolbarRestoration: prepared.toolbarRestoration, actions: [] }
   let current = structuredClone(state)
   const ctm = prepared.before.geometry.contour.screenCTM
+  const canvasObservation = syntheticZeroCanvas(ambientDimension)
   for (const [index, key] of ['outside-clear', 'ordinary-axis', 'alt-start', 'alt-next', 'outside-final'].entries()) {
     const inside = index > 0 && index < 4, local = { x: inside ? 0 : 12, y: 20 }
     const click = { x: ctm.a * local.x + ctm.c * local.y + ctm.e, y: ctm.b * local.x + ctm.d * local.y + ctm.f }
@@ -189,33 +211,49 @@ function syntheticZeroNative(ambientDimension) {
     const before = structuredClone(prepared.before), after = structuredClone(prepared.after)
     for (const [snapshot, snapshotState] of [[before, stateBefore], [after, current]]) {
       snapshot.selection = structuredClone(snapshotState.selection); snapshot.requestedClick = click
+      snapshot.events = []; snapshot.droppedEvents = null
       snapshot.layout.parameters = '{"borderRotate":0}'
       snapshot.geometry.contour.length = 4 * zeroAxisHalfExtent
-      snapshot.geometry.canvas = { connected: true, screenCTM: ctm }
-      snapshot.geometry.point.screenCTM = ctm
+      snapshot.geometry.canvas = { connected: true, currentCanvas: true, screenCTM: structuredClone(ctm), CTM: structuredClone(ctm) }
+      for (const kind of ['point', 'contour']) Object.assign(snapshot.geometry[kind],
+        { currentCanvas: true, screenCTM: structuredClone(ctm), CTM: structuredClone(ctm) })
+      snapshot.canvasObservation = structuredClone(canvasObservation)
+      snapshot.coincidentContours = syntheticZeroCoincidentContours(snapshot, ctm)
     }
-    const target = { ...structuredClone(prepared.before.elementFromPoint), tag: inside ? 'path' : 'svg', pointId: inside ? 'zero-overlap' : null, canvasRoot: !inside }
-    before.elementFromPoint = target; before.elementsFromPoint = [target, { canvasRoot: true }]
+    const target = inside ? { ...structuredClone(prepared.before.elementFromPoint), connected: true, currentCanvas: true,
+      currentCanvasRoot: false, canvasDirectChild: false, svgBackgroundAttribute: null, svgBackground: false }
+      : structuredClone(canvasObservation[outsideTarget === 'root' ? 'root' : 'background'])
+    for (const snapshot of [before, after]) {
+      snapshot.elementFromPoint = structuredClone(target)
+      snapshot.elementsFromPoint = target.canvasRoot ? [structuredClone(target)] : [structuredClone(target), structuredClone(canvasObservation.root)]
+    }
     const altKey = index === 2 || index === 3
     workflow.actions.push({ key, local, altKey, click, stateBefore, stateAfter: structuredClone(current), before, after,
       droppedEvents: 0, events: ['pointerdown', 'pointerup', 'click'].map((type) => ({ type, trusted: true, altKey,
-        labelDocumentRevision: state.labelDocumentRevision, layout: { owner: before.layout.owner, request: before.layout.request, source: '' },
+        labelDocumentRevision: state.labelDocumentRevision, layout: { owner: before.layout.owner, request: before.layout.request,
+          bodyRequest: before.layout.bodyRequest, source: '', shape: 'ellipse', state: 'ready' },
         button: 0, buttons: type === 'pointerdown' ? 1 : 0, pointerId: 1, selection: structuredClone(stateBefore.selection),
-        target, path: [target, { canvasRoot: true }], client: type === 'click' ? { x: Math.trunc(click.x), y: Math.trunc(click.y) } : click })) })
+        canvasObservation: structuredClone(canvasObservation), canvasHasPointerCapture: !inside && outsideTarget === 'background' && type === 'pointerup',
+        target: structuredClone(inside || type === 'pointerdown' ? target : canvasObservation.root),
+        path: inside || (type === 'pointerdown' && !target.canvasRoot)
+          ? [structuredClone(target), structuredClone(canvasObservation.root)] : [structuredClone(canvasObservation.root)],
+        client: type === 'click' ? { x: Math.trunc(click.x), y: Math.trunc(click.y) }
+          : { x: Math.fround(click.x), y: Math.fround(click.y) } })) })
   }
   for (const field of ['stateBefore', 'stateAfter']) workflow.toolbarRestoration[field] = structuredClone(current)
   for (const field of ['before', 'after']) {
     workflow.toolbarRestoration[field].selection = null
     workflow.toolbarRestoration[field].toolbar.quickStyleCount = 0
   }
+  workflow.cleanup = { altKeyUp: 'completed', observer: { tokenPresent: false, registryPresent: false, remaining: 0 } }
   const liveObservation = { state: structuredClone(current), snapshot: structuredClone(workflow.actions.at(-1).after),
     afterState: structuredClone(current), afterSnapshot: structuredClone(workflow.actions.at(-1).after) }
   return { ambientDimension, layout: structuredClone(zeroAxisLayout), state, rendered: { ...syntheticZeroRendered(), nativeSelection: selection },
     axisInteraction: workflow, liveObservation, livePaint: syntheticZeroPixels(ctm) }
 }
-function syntheticPolygonalEvidence() {
+function syntheticPolygonalEvidence(outsideTarget = 'background') {
   const polygonalCases = [2, 3].flatMap((ambientDimension) => signedPolygonalCases.map((spec) => syntheticPolygonalPlacement(spec, ambientDimension)))
-  const zeroAxisCases = [2, 3].map(syntheticZeroNative)
+  const zeroAxisCases = [2, 3].map((ambientDimension) => syntheticZeroNative(ambientDimension, outsideTarget))
   const downloads = [2, 3].map((ambientDimension) => {
     const expected = signedPolygonalCases.map((spec) => syntheticPolygonalPlacement(spec, ambientDimension, `signed-${spec.key}`))
     expected.push({ result: 'passed', id: 'signed-zero-axis', source: '', shape: 'ellipse', anchor: 'center', layout: structuredClone(zeroAxisLayout),
@@ -335,8 +373,8 @@ function syntheticZeroPng(ctm, paint = true) {
   const header = Buffer.alloc(13); header.writeUInt32BE(width); header.writeUInt32BE(height, 4); header[8] = 8; header[9] = 6
   return Buffer.concat([Buffer.from([137, 80, 78, 71, 13, 10, 26, 10]), chunk('IHDR', header), chunk('IDAT', deflateSync(scanlines)), chunk('IEND', Buffer.alloc(0))])
 }
-function syntheticSignedStandalone(directory, ambientDimension = 2) {
-  const evidence = syntheticPolygonalEvidence(), download = evidence.downloads.find((entry) => entry.ambientDimension === ambientDimension)
+function syntheticSignedStandalone(directory, ambientDimension = 2, outsideTarget = 'background') {
+  const evidence = syntheticPolygonalEvidence(outsideTarget), download = evidence.downloads.find((entry) => entry.ambientDimension === ambientDimension)
   const stem = download.scenario, svgPath = join(directory, `${stem}.svg`), pngPath = join(directory, `${stem}.png`), fileUrl = pathToFileURL(svgPath).href
   const ctm = { a: 1, b: 0, c: 0, d: 1, e: 310, f: 290 }, png = syntheticZeroPng(ctm)
   const reopened = download.expected.map((entry) => ({ source: '', shape: entry.shape, contour: structuredClone(entry.rendered.contour),
@@ -368,6 +406,129 @@ function syntheticSignedStandalone(directory, ambientDimension = 2) {
   writeFileSync(join(directory, `${stem}-saved.json`), download.savedJson)
   for (const [mode, source] of Object.entries(download.outputs)) writeFileSync(join(directory, `${stem}-${mode}.tex`), source)
   return { evidence, download, raw, native, png, livePng, svgPath, pngPath }
+}
+for (const outsideTarget of ['background', 'root']) {
+  test(`synthetic authenticated zero-axis ${outsideTarget} accepts fresh actions and complete parent raw records in both dimensions`, (t) => {
+    for (const ambientDimension of [2, 3]) {
+      const directory = mkdtempSync(join(tmpdir(), 'stz-zero-outside-policy-')); t.after(() => rmSync(directory, { recursive: true, force: true }))
+      const { evidence, raw } = syntheticSignedStandalone(directory, ambientDimension, outsideTarget)
+      const zero = evidence.zeroAxisCases.find((entry) => entry.ambientDimension === ambientDimension)
+      for (const action of zero.axisInteraction.actions) {
+        assertFreshZeroAxisAction(action); assertZeroAxisNativeAction(action)
+      }
+      const outside = zero.axisInteraction.actions[0]
+      assert.equal(outside.before.elementFromPoint.canvasRoot, outsideTarget === 'root')
+      assert.equal(outside.before.elementFromPoint.svgBackgroundAttribute, outsideTarget === 'root' ? null : 'true')
+      assert.equal(outside.before.elementFromPoint.svgBackground, outsideTarget === 'background')
+      assert.equal(outside.events[0].target.tag, outsideTarget === 'root' ? 'svg' : 'rect')
+      assert.equal(outside.events[1].target.tag, 'svg'); assert.equal(outside.events[1].canvasHasPointerCapture, outsideTarget === 'background')
+      assert.equal(outside.events[2].target.tag, 'svg'); assert.equal(outside.events[2].canvasHasPointerCapture, false)
+      if (outsideTarget === 'background') {
+        assert.throws(() => assert.equal(outside.before.elementFromPoint.canvasRoot, true),
+          'The obsolete root-only assertion rejects the faithful production background fixture')
+        assert.notDeepEqual(outside.events[0].target, outside.events[1].target,
+          'Fresh background input and root-retargeted capture retain their distinct actual targets')
+      }
+      assertSignedPolygonalStandaloneEvidence(evidence, raw, directory, ambientDimension)
+    }
+  })
+}
+function mutateOutsideHit(action, mutate) {
+  mutate(action.before.elementFromPoint)
+  action.before.elementsFromPoint[0] = structuredClone(action.before.elementFromPoint)
+}
+const freshOutsideFaults = [
+  ['missing-marker', (action) => mutateOutsideHit(action, (target) => { delete target.svgBackgroundAttribute; target.svgBackground = false })],
+  ['false-marker', (action) => mutateOutsideHit(action, (target) => { target.svgBackgroundAttribute = 'false'; target.svgBackground = false })],
+  ['wrong-marker', (action) => mutateOutsideHit(action, (target) => { target.svgBackgroundAttribute = 'TRUE'; target.svgBackground = false })],
+  ['arbitrary-SVG-child', (action) => mutateOutsideHit(action, (target) => { target.tag = 'g'; target.svgBackgroundAttribute = null; target.svgBackground = false })],
+  ['wrong-current-canvas', (action) => mutateOutsideHit(action, (target) => { target.currentCanvas = false; target.svgBackground = false })],
+  ['nested-marked-rect', (action) => mutateOutsideHit(action, (target) => { target.canvasDirectChild = false; target.svgBackground = false })],
+  ['disconnected-background', (action) => mutateOutsideHit(action, (target) => { target.connected = false; target.svgBackground = false })],
+  ['wrong-hit-stack-root', (action) => { action.before.elementsFromPoint[1].currentCanvasRoot = false }],
+  ['disconnected-current-root', (action) => { action.before.canvasObservation.root.connected = false }],
+  ['missing-current-canvas-observation', (action) => { delete action.before.canvasObservation }],
+  ['ambiguous-background', (action) => { action.before.canvasObservation.backgroundCount = 2 }],
+  ['point-owner', (action) => mutateOutsideHit(action, (target) => { target.pointId = 'app-point' })],
+  ['drag-handle', (action) => mutateOutsideHit(action, (target) => { target.pointHandle = true })],
+  ['drawer', (action) => mutateOutsideHit(action, (target) => { target.drawer = true })],
+  ['creation-toolbar', (action) => mutateOutsideHit(action, (target) => { target.creationToolbar = true })],
+  ['toolbar-overlay', (action) => mutateOutsideHit(action, (target) => { target.toolbarOverlay = true })],
+  ['history-overlay', (action) => mutateOutsideHit(action, (target) => { target.history = true })],
+  ['quick-style', (action) => mutateOutsideHit(action, (target) => { target.quickStyle = true })],
+  ['stale-current-owner', (action) => { action.before.layout.owner = '["point-node",99,"zero-overlap"]' }],
+  ['stale-current-request', (action) => { action.before.layout.request = action.before.layout.bodyRequest = 'obsolete-request' }],
+  ['stale-current-revision', (action) => { action.before.labelDocumentRevision++ }],
+  ['stale-contour-CTM', (action) => { action.before.geometry.contour.screenCTM.e += 1 }],
+  ['mismatched-measured-click', (action) => { action.click.x += .00001 }],
+  ['missing-coincident-contour', (action) => { action.before.coincidentContours.pop() }],
+  ['changed-coincident-path', (action) => { action.before.coincidentContours[0].contour.attributes.d = 'M 0 -20 L 0 20' }],
+  ['displaced-coincident-contour', (action) => { action.before.coincidentContours[0].contour.screenCTM.e += 1 }],
+  ['changed-resolved-font-context', (action) => { action.before.coincidentContours[0].layout.fontContext.xHeightPt += .1 }],
+]
+for (const [fault, mutate] of freshOutsideFaults) {
+  test(`synthetic authenticated zero-axis fresh and complete raw policy rejects ${fault}`, (t) => {
+    const directory = mkdtempSync(join(tmpdir(), 'stz-zero-outside-policy-')); t.after(() => rmSync(directory, { recursive: true, force: true }))
+    const { evidence, raw, native, download } = syntheticSignedStandalone(directory)
+    const action = native.zeroAxisCase.axisInteraction.actions[0]
+    mutate(action)
+    assert.throws(() => assertFreshZeroAxisAction(action))
+    // Keep the persisted native record identical to the complete evidence so
+    // rejection must come from the shared policy, rather than file disagreement.
+    writeFileSync(join(directory, `${download.scenario}-native.json`), JSON.stringify(native))
+    assert.throws(() => assertSignedPolygonalStandaloneEvidence(evidence, raw, directory, 2))
+  })
+}
+const outsideNativeFaults = [
+  ['unmarked-event-rect', (workflow) => { const event = workflow.actions[0].events[1]
+    event.target = { ...structuredClone(workflow.actions[0].before.elementFromPoint), svgBackgroundAttribute: null, svgBackground: false }
+    event.path = [structuredClone(event.target), structuredClone(event.canvasObservation.root)] }],
+  ['arbitrary-SVG-event-child', (workflow) => { const event = workflow.actions[0].events[1]
+    event.target = { ...structuredClone(workflow.actions[0].before.elementFromPoint), tag: 'g', svgBackgroundAttribute: null, svgBackground: false }
+    event.path = [structuredClone(event.target), structuredClone(event.canvasObservation.root)] }],
+  ['point-owned-outside-event', (workflow) => { const event = workflow.actions[0].events[1]
+    event.target.pointId = 'app-point'; event.path[0] = structuredClone(event.target) }],
+  ['handle-outside-event', (workflow) => { const event = workflow.actions[0].events[1]
+    event.target.pointHandle = true; event.path[0] = structuredClone(event.target) }],
+  ['overlay-outside-event', (workflow) => { const event = workflow.actions[0].events[1]
+    event.target.toolbarOverlay = true; event.path[0] = structuredClone(event.target) }],
+  ['wrong-event-canvas', (workflow) => { workflow.actions[0].events[1].canvasObservation.root.currentCanvasRoot = false }],
+  ['wrong-composed-path-root', (workflow) => { workflow.actions[0].events[2].path[0].currentCanvasRoot = false }],
+  ['wrong-composed-path-head', (workflow) => { workflow.actions[0].events[1].path.unshift(workflow.actions[0].events[0].target) }],
+  ['wrong-pointerdown-target', (workflow) => { const event = workflow.actions[0].events[0]
+    event.target = structuredClone(event.canvasObservation.root); event.path = [structuredClone(event.target)] }],
+  ['missing-pointerup', (workflow) => { workflow.actions[0].events.splice(1, 1) }],
+  ['dropped-events', (workflow) => { workflow.actions[0].droppedEvents = 1 }],
+  ['untrusted-click', (workflow) => { workflow.actions[0].events[2].trusted = false }],
+  ['small-forged-pointer-coordinate', (workflow) => { workflow.actions[0].events[0].client.x += .01 }],
+  ['root-input-spurious-capture', (workflow) => { workflow.actions[0].events[1].canvasHasPointerCapture = true }],
+  ['wrong-Alt-provenance', (workflow) => { workflow.actions[2].events[0].altKey = false }],
+  ['wrong-event-body-request', (workflow) => { workflow.actions[0].events[1].layout.bodyRequest = 'obsolete-request' }],
+  ['wrong-post-input-current-request', (workflow) => { const snapshot = workflow.actions[0].after
+    snapshot.layout.request = snapshot.layout.bodyRequest = 'obsolete-request' }],
+  ['missing-after-observation', (workflow) => { delete workflow.actions[0].after }],
+  ['wrong-five-action-order', (workflow) => { [workflow.actions[2], workflow.actions[3]] = [workflow.actions[3], workflow.actions[2]] }],
+  ['wrong-outside-selection', (workflow) => { workflow.actions[0].stateAfter.selection = { kind: 'stratum', id: 'app-point' } }],
+  ['wrong-Alt-cycle', (workflow) => { workflow.actions[3].stateAfter.selection = { kind: 'stratum', id: 'zero-overlap' } }],
+  ['changed-model', (workflow) => { const state = workflow.actions[0].stateAfter, model = JSON.parse(state.runtimeDiagramJson)
+    model.strata[0].position.x += 1; state.runtimeDiagramJson = JSON.stringify(model) }],
+  ['changed-history', (workflow) => { workflow.actions[0].stateAfter.history += ' ' }],
+  ['changed-UI-settings', (workflow) => { workflow.actions[0].stateAfter.uiSettings = '{"changed":true}' }],
+  ['discontinuous-boundary', (workflow) => { workflow.actions[1].stateBefore.selection = { kind: 'stratum', id: 'app-point' } }],
+  ['missing-owned-cleanup', (workflow) => { delete workflow.cleanup }],
+]
+for (const [fault, mutate] of outsideNativeFaults) {
+  test(`synthetic authenticated zero-axis complete native raw policy rejects ${fault}`, (t) => {
+    const directory = mkdtempSync(join(tmpdir(), 'stz-zero-outside-policy-')); t.after(() => rmSync(directory, { recursive: true, force: true }))
+    const { evidence, raw, native, download } = syntheticSignedStandalone(directory, 3,
+      fault === 'root-input-spurious-capture' ? 'root' : 'background')
+    mutate(native.zeroAxisCase.axisInteraction)
+    if (!['wrong-five-action-order', 'missing-owned-cleanup'].includes(fault)) assert.throws(() => {
+      for (const action of native.zeroAxisCase.axisInteraction.actions) assertZeroAxisNativeAction(action)
+    })
+    writeFileSync(join(directory, `${download.scenario}-native.json`), JSON.stringify(native))
+    assert.throws(() => assertSignedPolygonalStandaloneEvidence(evidence, raw, directory, 3))
+  })
 }
 for (const ambientDimension of [2, 3]) for (const fault of ['missing-polygon', 'duplicate-polygon', 'absolute-clearance', 'wrong-ctm', 'edited-model-source',
   'edited-model-coordinate', 'apex-only-iso', 'missing-zero', 'coincident-arcs', 'shortened-path', 'wrong-order', 'nonzero-fill-area',

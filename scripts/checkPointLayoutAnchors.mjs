@@ -5,7 +5,7 @@ import { pathToFileURL } from 'node:url'
 import { layoutAnchorGroup as group, layoutShapes, layoutRegimes, layoutForShapeRegime, pointAnchorsForShape,
   layoutShapeParameters, layoutAnchorArtifacts, assertLayoutAnchorEvidence, assertPointTikzSourceByMode,
   signedAnchorCases, signedPickingCases, signedPolygonalScenario, signedPolygonalCases, zeroAxisLayout,
-  assertZeroAxisTraversal, observeZeroAxisPixels, assertZeroAxisPixelEvidence, assertFreshZeroAxisAction } from './pointLayoutAnchorsContract.mjs'
+  assertZeroAxisTraversal, observeZeroAxisPixels, assertZeroAxisPixelEvidence, assertFreshZeroAxisAction, assertZeroAxisNativeAction } from './pointLayoutAnchorsContract.mjs'
 import { layoutImportCases as importCases } from './pointLayoutAnchorsContract.mjs'
 import { createOwnedAppPage } from './ownedAppPage.mjs'
 import { ownPageEvent } from './ownedPageEvent.mjs'
@@ -295,7 +295,7 @@ export async function runPointLayoutAnchorChecks({ browser, origin, artifactDir,
     return entry
   }
   async function zeroAxisInput() {
-    const id = 'zero-overlap', workflow = { result: 'observed', actions: [], secondaryErrors: [], toolbarPreparation: { actions: [] }, toolbarRestoration: {} }
+    const id = 'zero-overlap', workflow = { result: 'observed', actions: [], secondaryErrors: [], cleanup: {}, toolbarPreparation: { actions: [] }, toolbarRestoration: {} }
     const retain = async (boundary) => {
       try { await boundedPointDiagnostic(() => observe(`${scenario}-zero-axis-${boundary}`, { group, result: 'observed', axisInteraction: structuredClone(workflow) }), `Zero-axis ${boundary} evidence`, 5000) }
       catch (error) {
@@ -315,23 +315,52 @@ export async function runPointLayoutAnchorChecks({ browser, origin, artifactDir,
         diagnostic: async (name, operation) => boundedPointDiagnostic(operation, `Zero-axis ${name}`, 5000), evidence: retain })
       await page.evaluate(({ token, id }) => {
         const registry = window.__stzZeroAxisInputs ??= new Map()
-        const describe = (element) => element instanceof Element ? { tag: element.localName, id: element.id, class: element.getAttribute('class'),
-          pointId: element.closest('[data-point-id]')?.getAttribute('data-point-id') ?? null,
-          canvas: !!element.closest('svg.svg-diagram'), canvasRoot: element.matches('svg.svg-diagram'),
-          drawer: !!element.closest('#preview-inspector-drawer'), ariaLabel: element.getAttribute('aria-label'), svg: element instanceof SVGElement,
-          pointHandle: element.matches('circle.svg-geometry-handle') && !!element.closest('[aria-label="Selected point drag handles"]'),
-          creationToolbar: !!element.closest('.preview-floating-toolbar'), toolbarOverlay: !!element.closest('.preview-toolbar-overlay-stack'),
-          quickStyle: !!element.closest('.context-quick-style-bar'), history: !!element.closest('.preview-history-overlay') } : null
+        const currentCanvas = () => {
+          const roots = [...document.querySelectorAll('svg.svg-diagram')], root = roots[0] ?? null
+          const backgrounds = root ? [...root.children].filter((element) => element instanceof SVGElement
+            && element.localName === 'rect' && element.getAttribute('data-svg-background') === 'true') : []
+          return { roots, root, backgrounds }
+        }
+        const describe = (element) => {
+          if (!(element instanceof Element)) return null
+          const { roots, root, backgrounds } = currentCanvas()
+          const current = roots.length === 1 && root.isConnected
+          return { tag: element.localName, id: element.id, class: element.getAttribute('class'),
+            pointId: element.closest('[data-point-id]')?.getAttribute('data-point-id') ?? null,
+            drawer: !!element.closest('#preview-inspector-drawer'), ariaLabel: element.getAttribute('aria-label'),
+            svg: element instanceof SVGElement, canvas: !!element.closest('svg.svg-diagram'),
+            canvasRoot: element.matches('svg.svg-diagram'), connected: element.isConnected,
+            svgBackgroundAttribute: element.getAttribute('data-svg-background'),
+            currentCanvas: current && element.closest('svg.svg-diagram') === root,
+            currentCanvasRoot: current && element.isConnected && element === root,
+            canvasDirectChild: root !== null && element.parentElement === root,
+            svgBackground: current && element instanceof SVGElement && element.isConnected && element.localName === 'rect'
+              && element.getAttribute('data-svg-background') === 'true' && element.parentElement === root
+              && backgrounds.length === 1 && element === backgrounds[0],
+            pointHandle: element.matches('circle.svg-geometry-handle') && !!element.closest('[aria-label="Selected point drag handles"]'),
+            creationToolbar: !!element.closest('.preview-floating-toolbar'), toolbarOverlay: !!element.closest('.preview-toolbar-overlay-stack'),
+            quickStyle: !!element.closest('.context-quick-style-bar'), history: !!element.closest('.preview-history-overlay') }
+        }
+        const canvasObservation = () => {
+          const { roots, root, backgrounds } = currentCanvas()
+          return { rootCount: roots.length, backgroundCount: backgrounds.length,
+            root: describe(root), background: describe(backgrounds[0]) }
+        }
         const owned = { events: [], droppedEvents: 0 }
         owned.listener = (event) => {
           if (owned.events.length >= 16) { owned.droppedEvents++; return }
           const current = window.stzAppLabels.state(), node = document.querySelector(`[data-point-id="${CSS.escape(id)}"] [data-point-node]`)
           owned.events.push({ type: event.type, trusted: event.isTrusted, altKey: event.altKey,
             pointerId: event.pointerId ?? null, button: event.button, buttons: event.buttons,
+            canvasObservation: canvasObservation(),
+            canvasHasPointerCapture: typeof event.pointerId === 'number'
+              && (document.querySelector('svg.svg-diagram')?.hasPointerCapture(event.pointerId) ?? false),
             client: { x: event.clientX, y: event.clientY }, target: describe(event.target),
             path: event.composedPath().slice(0, 16).map(describe), selection: current.selection,
             labelDocumentRevision: current.labelDocumentRevision,
             layout: { owner: node.getAttribute('data-point-node'), request: node.getAttribute('data-point-request'),
+              bodyRequest: node.querySelector('[data-label-source]').getAttribute('data-label-request'),
+              shape: node.getAttribute('data-point-shape'), state: node.querySelector('[data-label-source]').getAttribute('data-label-state'),
               source: node.querySelector('[data-label-source]').getAttribute('data-label-source') } })
         }
         registry.set(token, owned)
@@ -347,7 +376,7 @@ export async function runPointLayoutAnchorChecks({ browser, origin, artifactDir,
           const projected = new DOMPoint(local.x, local.y).matrixTransform(contour.getScreenCTM())
           return { x: projected.x, y: projected.y }
         }, { id, local: action.local })
-        action.before = await page.evaluate(observeGeometricSelection, { id, click: action.click, token: null })
+        action.before = await page.evaluate(observeGeometricSelection, { id, click: action.click, token: null, coincidentIds: ['app-point', id] })
         await retain(`${key}-before-native-input`)
         if (primary) throw primary
         assertFreshZeroAxisAction(action)
@@ -355,7 +384,7 @@ export async function runPointLayoutAnchorChecks({ browser, origin, artifactDir,
         await page.mouse.click(action.click.x, action.click.y)
         if (action.altKey) await page.keyboard.up('Alt')
         action.stateAfter = await state()
-        action.after = await page.evaluate(observeGeometricSelection, { id, click: action.click, token: null })
+        action.after = await page.evaluate(observeGeometricSelection, { id, click: action.click, token: null, coincidentIds: ['app-point', id] })
         Object.assign(action, await page.evaluate((token) => {
           const owned = window.__stzZeroAxisInputs.get(token)
           const result = { events: [...owned.events], droppedEvents: owned.droppedEvents }
@@ -364,17 +393,21 @@ export async function runPointLayoutAnchorChecks({ browser, origin, artifactDir,
         }, token))
         await retain(`${key}-after-native-input-before-assertion`)
         if (primary) throw primary
-        assert.equal(action.stateAfter.selection?.id ?? null, [null, id, id, 'app-point', null][index])
-        for (const field of ['json', 'runtimeDiagramJson', 'history', 'labelDocumentRevision', 'uiSettings']) assert.deepEqual(action.stateAfter[field], action.stateBefore[field])
+        assertZeroAxisNativeAction(action)
       }
     } catch (error) { primary ??= error }
     finally {
-      try { await boundedPointDiagnostic(() => page.keyboard.up('Alt'), 'Zero-axis Alt cleanup', 5000) } catch (error) { primary ??= error; workflow.secondaryErrors.push({ operation: 'Alt cleanup', message: error.message }) }
+      try {
+        await boundedPointDiagnostic(() => page.keyboard.up('Alt'), 'Zero-axis Alt cleanup', 5000)
+        workflow.cleanup.altKeyUp = 'completed'
+      } catch (error) { primary ??= error; workflow.secondaryErrors.push({ operation: 'Alt cleanup', message: error.message }) }
       if (installed) try {
-        await boundedPointDiagnostic(() => page.evaluate((token) => {
+        workflow.cleanup.observer = await boundedPointDiagnostic(() => page.evaluate((token) => {
           const registry = window.__stzZeroAxisInputs, owned = registry?.get(token)
           if (owned) for (const type of ['pointerdown', 'pointerup', 'click']) document.removeEventListener(type, owned.listener, true)
           registry?.delete(token); if (registry?.size === 0) delete window.__stzZeroAxisInputs
+          return { tokenPresent: window.__stzZeroAxisInputs?.has(token) ?? false,
+            registryPresent: window.__stzZeroAxisInputs !== undefined, remaining: window.__stzZeroAxisInputs?.size ?? 0 }
         }, token), 'Zero-axis observer cleanup', 5000)
       } catch (error) { primary ??= error; workflow.secondaryErrors.push({ operation: 'observer cleanup', message: error.message }) }
       try {

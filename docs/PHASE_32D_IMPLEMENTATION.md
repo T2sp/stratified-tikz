@@ -1,5 +1,105 @@
 # Phase 32D spacing, minima, anchors, and combined audit
 
+## Authenticated zero-axis outside-input observation follow-up (2026-10-11)
+
+The actual starting checkout is clean at
+`09cd6a7e8a7e2226acb4c04634b36dbd166f0858`, fingerprint
+`ab87d2e864a94b4f7ad4ae38767165b71869a401699f7cc0d0a581c203c29a53`.
+The prompt commit already tracks the preceding fourteen modified files and all
+494 formerly untracked files, including all 490 additive reference/evidence
+artifacts. Their bytes were captured before this fix. All 494 hashes in the
+polygonal/zero-axis handoff match this checkout. The historical `be2aabe` tree
+fingerprint is retained as history, not used as this invocation's identity.
+
+The newest browser-capable parent `Ab9guh` actually launched Chrome. Tests,
+build, diff and label-assets passed; sixteen cumulative groups and the first
+six named 32D scenarios completed with no page errors. Six 2D polygonal
+selected-anchor observations were retained. The first zero-axis `outside-clear`
+action stopped at `assertFreshZeroAxisAction`, before mouse input: local(12,20)
+projected through the connected current contour to
+(1333.6000000000001,330.97499999999997); the first hit was an SVG rect and the
+next was the current `svg.svg-diagram` root. The obsolete assertion required
+the target itself to be the root. The historical descriptor does **not** record
+the background marker; no marker or missing after/event success has been added
+to that evidence. This is a harness contract mismatch, not evidence of a
+production outside-selection or paint failure. The new scenario's 3D cases,
+zero-axis gestures/live paint/downloads, both pending scenarios and final
+standalone acceptance remained incomplete or unexecuted.
+
+This correction changes native observation, assertions and faithful policy
+fixtures only. Every descriptor freshly retains connection, exact raw
+`data-svg-background` attribute, unique-current-canvas membership, root/direct-
+child relationship and the background predicate. Before/after hit stacks and
+trusted event composed paths retain the same unique connected root/background
+context. Outside input accepts the actual root with its observed null/false
+marker or the unique connected direct-child SVG rect with exact marker `true`.
+It rejects arbitrary descendants, wrong/stale canvases, point/handle ownership
+and UI overlays. Hit-stack and composed-path heads stay bound to their targets;
+all paths must contain the observed current root. Production camera capture
+explains faithful rect pointerdown versus root pointerup/click. Capture is read
+from the real browser, never fabricated by the runner.
+
+Both current coincident point contours are independently measured before and
+after every gesture: source/body request/owner/revision, resolved preview layout
+including effective font context, shape parameters, path/paint, BBox/arclength/
+ordered extrema and finite invertible contour/point/canvas matrices. The fixed
+local(12,20) input must exceed both measured contours plus unchanged half-stroke
+and six-unit picking clearance. Local(0,20), the five-action order and selection
+sequence null → zero-overlap → zero-overlap → app-point → null stay fixed.
+One trusted down/up/click sequence must preserve exact binary32 pointer and
+integer click coordinates, button/buttons/pointer identity/Alt, model/history/UI
+and current boundary continuity. After evidence is persisted, this same native
+action assertion runs immediately before subsequent actions or image work.
+Alt/listener cleanup now also retains its actual completion/registry observation;
+primary failures and incomplete pre-input records remain failures.
+
+The policy fixture retains genuine-root success separately from marked-background
+success, including actual absent root markers and capture target differences.
+The focused suite passes **598/598**, zero failures/skips: 543 predecessor checks
+and 55 added tests. Both branches exercise direct fresh/native assertions and
+complete parent raw validation; compact coherent corruption controls cover
+marker/current-root/path/ownership, coincident geometry/request/CTM/projection,
+events/capture, selection/cycle order, state invariance and cleanup. Synthetic
+records are schema tests, not native acceptance. Shared contract enforcement
+already reaches cumulative/raw/artifact policy and the existing isolated runner
+copies; no policy dependency or registered group/scenario was removed.
+
+The preserved geometry/model/TikZ/reference sweep passes 368/368; these focused
+sweeps overlap the full registered suite and are not extra cumulative cases.
+Focused strict TypeScript for the retained five geometry modules/four new suites
+and recommended changed-script ESLint pass. The four inherited lint errors were
+reproduced separately: two geometric-caller `no-unsafe-finally`, verifier unused
+`_role`, and layer-test unused `defaultCurveStyle`. Repository-wide lint was not
+run. No dependency, production geometry/path/picking/camera/unit/saved-version-2
+change or oracle regeneration is part of this fix.
+
+All reference inventories remain byte-preserved: original 172 boxes/4,925
+anchors/11 controls, signed-basic eight boxes/192 anchors, 54 polygonal boxes/
+1,386 anchors, twelve arithmetic controls, four dart fitting traces, one singular
+control, eleven zero-axis PGF paths and 37 independent rendering records, plus
+prior 32C references. The .025pt/.03pt tolerances, .005-unit sampling precision
+and 2048-work budget stay unchanged. The accepted diamond exception and every
+signed fitted-axis/polygonal/reciprocal/traversal correction remain intact.
+
+Homebrew-first Node v26.9.0 is used. Initial unconfigured browser attempts retain
+missing-Playwright diagnostics; configured attempts use the existing external
+Playwright and Chrome and fail at fresh owned-server `listen EPERM 127.0.0.1`
+before Chrome. Label-assets passes its static graph only. No current native
+acceptance is claimed. Exact bytes, precursor coordinate evidence, focused logs,
+configured startup failures and final strict-verification disposition/identity
+are retained under `/private/tmp/stz-32d-background-fix-20261011/`, with final
+results in `HANDOFF.json`. Required verification of the frozen final tree must
+still be checked independently by the browser-capable parent: all eighteen
+groups, all nine named 32D scenarios, twelve polygonal cases/both zero-axis
+sequences/live PNG and both new downloads, both retained fifteen-entry pending
+workflows, external reopening/complete PNG/TikZ and final standalone acceptance.
+
+Phase 32 remains **incomplete**. Failed/incomplete verification stops before
+independent completion review; no review is substituted by this implementation
+audit or historical parent evidence. The fresh required verification and exact
+matching-tree/post-review guards remain in force. Commit/push remain with the
+parent after every gate passes. Earlier entries below are retained history.
+
 ## Signed polygonal clearance and zero-axis ellipse follow-up (2026-10-11)
 
 The actual starting checkout is clean at

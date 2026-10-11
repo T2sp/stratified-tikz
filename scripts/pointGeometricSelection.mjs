@@ -6,18 +6,37 @@ import { boundedPointDiagnostic } from './pointCheckDiagnostics.mjs'
 export function installGeometricSelectionObserver({ token, id }) {
   const registry = window.__stzGeometricSelectionObservers ??= new Map()
   if (registry.has(token)) throw new Error(`Selection observer already owned: ${token}`)
-  const describe = (element) => element instanceof Element ? {
-    tag: element.localName, id: element.id, class: element.getAttribute('class'),
-    pointId: element.closest('[data-point-id]')?.getAttribute('data-point-id') ?? null,
-    drawer: !!element.closest('#preview-inspector-drawer'),
-    ariaLabel: element.getAttribute('aria-label'),
-    svg: element instanceof SVGElement, canvas: !!element.closest('svg.svg-diagram'),
-    canvasRoot: element.matches('svg.svg-diagram'),
-    pointHandle: element.matches('circle.svg-geometry-handle') && !!element.closest('[aria-label="Selected point drag handles"]'),
-    creationToolbar: !!element.closest('.preview-floating-toolbar'),
-    toolbarOverlay: !!element.closest('.preview-toolbar-overlay-stack'),
-    quickStyle: !!element.closest('.context-quick-style-bar'), history: !!element.closest('.preview-history-overlay'),
-  } : null
+  const currentCanvas = () => {
+    const roots = [...document.querySelectorAll('svg.svg-diagram')], root = roots[0] ?? null
+    const backgrounds = root ? [...root.children].filter((element) => element instanceof SVGElement
+      && element.localName === 'rect' && element.getAttribute('data-svg-background') === 'true') : []
+    return { roots, root, backgrounds }
+  }
+  const describe = (element) => {
+    if (!(element instanceof Element)) return null
+    const { roots, root, backgrounds } = currentCanvas()
+    const current = roots.length === 1 && root.isConnected
+    return { tag: element.localName, id: element.id, class: element.getAttribute('class'),
+      pointId: element.closest('[data-point-id]')?.getAttribute('data-point-id') ?? null,
+      drawer: !!element.closest('#preview-inspector-drawer'), ariaLabel: element.getAttribute('aria-label'),
+      svg: element instanceof SVGElement, canvas: !!element.closest('svg.svg-diagram'),
+      canvasRoot: element.matches('svg.svg-diagram'), connected: element.isConnected,
+      svgBackgroundAttribute: element.getAttribute('data-svg-background'),
+      currentCanvas: current && element.closest('svg.svg-diagram') === root,
+      currentCanvasRoot: current && element.isConnected && element === root,
+      canvasDirectChild: root !== null && element.parentElement === root,
+      svgBackground: current && element instanceof SVGElement && element.isConnected && element.localName === 'rect'
+        && element.getAttribute('data-svg-background') === 'true' && element.parentElement === root
+        && backgrounds.length === 1 && element === backgrounds[0],
+      pointHandle: element.matches('circle.svg-geometry-handle') && !!element.closest('[aria-label="Selected point drag handles"]'),
+      creationToolbar: !!element.closest('.preview-floating-toolbar'), toolbarOverlay: !!element.closest('.preview-toolbar-overlay-stack'),
+      quickStyle: !!element.closest('.context-quick-style-bar'), history: !!element.closest('.preview-history-overlay') }
+  }
+  const canvasObservation = () => {
+    const { roots, root, backgrounds } = currentCanvas()
+    return { rootCount: roots.length, backgroundCount: backgrounds.length,
+      root: describe(root), background: describe(backgrounds[0]) }
+  }
   const owned = { events: [], droppedEvents: 0, errors: [] }
   owned.listener = (event) => {
     if (owned.events.length === 16) { owned.droppedEvents++; return }
@@ -28,6 +47,7 @@ export function installGeometricSelectionObserver({ token, id }) {
     const body = node?.querySelector('[data-label-state]')
     const select = [...document.querySelectorAll('button')].find((element) => element.textContent.trim() === 'Select')
     owned.events.push({ type: event.type, trusted: event.isTrusted, at: performance.now(),
+      altKey: event.altKey, buttons: event.buttons, canvasObservation: canvasObservation(),
       client: { x: event.clientX, y: event.clientY }, page: { x: event.pageX, y: event.pageY },
       screen: { x: event.screenX, y: event.screenY }, button: event.button,
       pointerType: event.pointerType ?? null, target: describe(event.target),
@@ -44,7 +64,7 @@ export function installGeometricSelectionObserver({ token, id }) {
   for (const type of ['pointerdown', 'pointerup', 'click']) document.addEventListener(type, owned.listener, true)
 }
 
-export function observeGeometricSelection({ id, click, token }) {
+export function observeGeometricSelection({ id, click, token, coincidentIds = [] }) {
   const errors = []
   const safe = (name, operation) => {
     try { return operation() } catch (error) { errors.push({ name, message: error.message }); return null }
@@ -58,15 +78,37 @@ export function observeGeometricSelection({ id, click, token }) {
     const value = element?.[method]?.()
     return value ? Object.fromEntries(['a', 'b', 'c', 'd', 'e', 'f'].map((key) => [key, value[key]])) : null
   }
-  const describe = (element) => element ? { tag: element.localName, id: element.id,
-    class: element.getAttribute('class'), pointId: element.closest('[data-point-id]')?.getAttribute('data-point-id') ?? null,
-    drawer: !!element.closest('#preview-inspector-drawer'), ariaLabel: element.getAttribute('aria-label'),
-    svg: element instanceof SVGElement, canvas: !!element.closest('svg.svg-diagram'),
-    canvasRoot: element.matches('svg.svg-diagram'),
-    pointHandle: element.matches('circle.svg-geometry-handle') && !!element.closest('[aria-label="Selected point drag handles"]'),
-    creationToolbar: !!element.closest('.preview-floating-toolbar'),
-    toolbarOverlay: !!element.closest('.preview-toolbar-overlay-stack'),
-    quickStyle: !!element.closest('.context-quick-style-bar'), history: !!element.closest('.preview-history-overlay') } : null
+  const currentCanvas = () => {
+    const roots = [...document.querySelectorAll('svg.svg-diagram')], root = roots[0] ?? null
+    const backgrounds = root ? [...root.children].filter((element) => element instanceof SVGElement
+      && element.localName === 'rect' && element.getAttribute('data-svg-background') === 'true') : []
+    return { roots, root, backgrounds }
+  }
+  const describe = (element) => {
+    if (!(element instanceof Element)) return null
+    const { roots, root, backgrounds } = currentCanvas()
+    const current = roots.length === 1 && root.isConnected
+    return { tag: element.localName, id: element.id, class: element.getAttribute('class'),
+      pointId: element.closest('[data-point-id]')?.getAttribute('data-point-id') ?? null,
+      drawer: !!element.closest('#preview-inspector-drawer'), ariaLabel: element.getAttribute('aria-label'),
+      svg: element instanceof SVGElement, canvas: !!element.closest('svg.svg-diagram'),
+      canvasRoot: element.matches('svg.svg-diagram'), connected: element.isConnected,
+      svgBackgroundAttribute: element.getAttribute('data-svg-background'),
+      currentCanvas: current && element.closest('svg.svg-diagram') === root,
+      currentCanvasRoot: current && element.isConnected && element === root,
+      canvasDirectChild: root !== null && element.parentElement === root,
+      svgBackground: current && element instanceof SVGElement && element.isConnected && element.localName === 'rect'
+        && element.getAttribute('data-svg-background') === 'true' && element.parentElement === root
+        && backgrounds.length === 1 && element === backgrounds[0],
+      pointHandle: element.matches('circle.svg-geometry-handle') && !!element.closest('[aria-label="Selected point drag handles"]'),
+      creationToolbar: !!element.closest('.preview-floating-toolbar'), toolbarOverlay: !!element.closest('.preview-toolbar-overlay-stack'),
+      quickStyle: !!element.closest('.context-quick-style-bar'), history: !!element.closest('.preview-history-overlay') }
+  }
+  const canvasObservation = () => {
+    const { roots, root, backgrounds } = currentCanvas()
+    return { rootCount: roots.length, backgroundCount: backgrounds.length,
+      root: describe(root), background: describe(backgrounds[0]) }
+  }
   const outer = document.querySelector(`[data-point-id="${CSS.escape(id)}"]`)
   const node = outer?.querySelector('[data-point-node]'), contour = node?.querySelector('[data-point-contour]')
   const body = node?.querySelector('[data-label-state]'), canvas = document.querySelector('svg.svg-diagram')
@@ -108,7 +150,27 @@ export function observeGeometricSelection({ id, click, token }) {
   const center = safe('point screen center', () => {
     const point = new DOMPoint().matrixTransform(node.getScreenCTM()); return { x: point.x, y: point.y }
   })
-  return { at: performance.now(), requestedClick: click, readyState: document.readyState, toolbar, workPlaneControls,
+  const coincidentContours = coincidentIds.map((pointId) => {
+    const nodes = [...document.querySelectorAll(`[data-point-id="${CSS.escape(pointId)}"] [data-point-node]`)]
+    const point = nodes[0], path = point?.querySelector('[data-point-contour]'), label = point?.querySelector('[data-label-state]')
+    const box = safe(`${pointId} contour bounds`, () => path.getBBox())
+    const length = safe(`${pointId} contour length`, () => path.getTotalLength())
+    return { id: pointId, count: nodes.length, currentCanvas: describe(point)?.currentCanvas === true && describe(path)?.currentCanvas === true, owner: point?.getAttribute('data-point-node') ?? null,
+      request: point?.getAttribute('data-point-request') ?? null, bodyRequest: label?.getAttribute('data-label-request') ?? null,
+      source: label?.getAttribute('data-label-source') ?? null, state: label?.getAttribute('data-label-state') ?? null,
+      shape: point?.getAttribute('data-point-shape') ?? null, parameters: point?.getAttribute('data-point-shape-parameters') ?? null,
+      layout: safe(`${pointId} layout`, () => JSON.parse(point.getAttribute('data-point-layout'))),
+      pointScreenCTM: safe(`${pointId} point screenCTM`, () => matrix(point, 'getScreenCTM')),
+      contour: { connected: path?.isConnected ?? false, tag: path?.localName ?? null,
+        attributes: path ? Object.fromEntries([...path.attributes].filter(({ name }) => !name.startsWith('data-') && name !== 'pointer-events')
+          .map(({ name, value }) => [name, value])) : null,
+        bounds: box ? { x: box.x, y: box.y, width: box.width, height: box.height } : null, length,
+        traversal: safe(`${pointId} contour traversal`, () => [0, .25, .5, .75, 1].map((fraction) => {
+          const value = path.getPointAtLength(length * fraction); return { x: value.x, y: value.y }
+        })), CTM: safe(`${pointId} contour CTM`, () => matrix(path, 'getCTM')),
+        screenCTM: safe(`${pointId} contour screenCTM`, () => matrix(path, 'getScreenCTM')) } }
+  })
+  return { canvasObservation: canvasObservation(), coincidentContours, at: performance.now(), requestedClick: click, readyState: document.readyState, toolbar, workPlaneControls,
     workPlaneStatus: [...document.querySelectorAll('.work-plane-status,.preview-work-plane-status,.work-plane-summary')].map((element) => element.textContent),
     viewport: { width: innerWidth, height: innerHeight, devicePixelRatio,
       scrollX, scrollY, visual: visualViewport ? { width: visualViewport.width, height: visualViewport.height,
@@ -126,7 +188,7 @@ export function observeGeometricSelection({ id, click, token }) {
       bounds: safe(`${name} bounds`, () => rect(element)),
       screenCTM: safe(`${name} screenCTM`, () => matrix(element, 'getScreenCTM')),
       CTM: safe(`${name} CTM`, () => matrix(element, 'getCTM')),
-      connected: element?.isConnected ?? false,
+      connected: element?.isConnected ?? false, currentCanvas: describe(element)?.currentCanvas ?? false,
       ...(name === 'contour' ? { length: contourLength, fraction: .23, localBoundary, boundary } : {}),
       ...(name === 'point' ? { center } : {}),
     }])), scrollAncestors,

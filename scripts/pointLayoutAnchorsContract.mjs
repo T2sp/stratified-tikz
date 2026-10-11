@@ -592,8 +592,83 @@ export function assertZeroAxisPixelEvidence(pixels) {
     'Actual native raster visibly reaches both zero-axis PGF stroke extrema')
   assert.ok(Math.abs(pixels.bounds.minX) <= .24 + pixelCell && Math.abs(pixels.bounds.maxX) <= .24 + pixelCell)
 }
+// Outside input is owned only by the currently connected canvas itself or its
+// unique production background, never by an arbitrary SVG descendant.
+function assertCurrentCanvasObservation(observation) {
+  assert.equal(observation.rootCount, 1); assert.equal(observation.backgroundCount, 1)
+  const root = observation.root, background = observation.background
+  for (const target of [root, background]) {
+    assert.equal(target.connected, true); assert.equal(target.svg, true); assert.equal(target.canvas, true)
+    assert.equal(target.currentCanvas, true); assert.equal(target.pointId, null)
+    for (const flag of ['drawer', 'pointHandle', 'creationToolbar', 'toolbarOverlay', 'quickStyle', 'history']) assert.equal(target[flag], false)
+  }
+  assert.ok(typeof root.class === 'string' && root.class.split(/\s+/u).includes('svg-diagram'))
+  assert.equal(root.tag, 'svg'); assert.equal(root.canvasRoot, true); assert.equal(root.currentCanvasRoot, true)
+  assert.equal(root.canvasDirectChild, false); assert.equal(root.svgBackground, false)
+  assert.equal(root.svgBackgroundAttribute, null, 'Current root retains its actual absent background marker')
+  assert.equal(background.tag, 'rect'); assert.equal(background.canvasRoot, false); assert.equal(background.currentCanvasRoot, false)
+  assert.equal(background.canvasDirectChild, true); assert.equal(background.svgBackgroundAttribute, 'true'); assert.equal(background.svgBackground, true)
+}
+function assertCurrentCanvasPath(target, path, observation) {
+  assertCurrentCanvasObservation(observation)
+  assert.ok(Array.isArray(path)); assert.deepEqual(path[0], target, 'Hit stack / composed path begins at the actual observed target')
+  const roots = path.filter((element) => element?.canvasRoot === true)
+  assert.equal(roots.length, 1); assert.deepEqual(roots[0], observation.root, 'Input path reaches the unique actual current canvas root')
+  assert.equal(target.connected, true); assert.equal(target.svg, true); assert.equal(target.canvas, true); assert.equal(target.currentCanvas, true)
+  for (const flag of ['drawer', 'pointHandle', 'creationToolbar', 'toolbarOverlay', 'quickStyle', 'history']) assert.equal(target[flag], false)
+}
+function assertOutsideCanvasTarget(target, path, observation) {
+  assertCurrentCanvasPath(target, path, observation)
+  assert.equal(target.pointId, null)
+  if (target.currentCanvasRoot === true) assert.deepEqual(target, observation.root)
+  else {
+    assert.equal(target.tag, 'rect'); assert.equal(target.canvasRoot, false); assert.equal(target.canvasDirectChild, true)
+    assert.equal(target.svgBackgroundAttribute, 'true', 'Background branch retains the exact raw production marker')
+    assert.equal(target.svgBackground, true); assert.deepEqual(target, observation.background)
+  }
+}
+function assertInvertibleZeroAxisMatrix(matrix) {
+  assert.ok(matrix && ['a', 'b', 'c', 'd', 'e', 'f'].every((key) => Number.isFinite(matrix[key])))
+  assert.ok(Math.abs(matrix.a * matrix.d - matrix.b * matrix.c) > 1e-12)
+}
+function assertCurrentCoincidentZeroAxisContours(snapshot, state) {
+  const runtime = JSON.parse(state.runtimeDiagramJson), ids = ['app-point', 'zero-overlap']
+  assert.deepEqual(snapshot.coincidentContours.map(({ id }) => id), ids)
+  const position = { x: 3, y: 3, z: runtime.ambientDimension === 3 ? .5 : 0 }
+  for (const entry of snapshot.coincidentContours) {
+    assertCurrentEmptyPoint(state, entry.id, runtime.ambientDimension, 'ellipse', zeroAxisLayout, position)
+    assert.equal(entry.count, 1); assert.equal(entry.currentCanvas, true)
+    assert.deepEqual(JSON.parse(entry.owner), ['point-node', state.labelDocumentRevision, entry.id])
+    assert.ok(entry.request); assert.equal(entry.request, entry.bodyRequest); assert.equal(entry.source, '')
+    assert.equal(entry.state, 'ready'); assert.equal(entry.shape, 'ellipse'); assert.deepEqual(entry.layout, { ...zeroAxisLayout, fontContext: { fontSizePt: 10, xHeightPt: 4.30554 } })
+    assert.deepEqual(JSON.parse(entry.parameters), JSON.parse(snapshot.layout.parameters))
+    assert.equal(entry.contour.connected, true)
+    assertInvertibleZeroAxisMatrix(entry.pointScreenCTM)
+    for (const key of ['CTM', 'screenCTM']) assertInvertibleZeroAxisMatrix(entry.contour[key])
+    assert.deepEqual(entry.pointScreenCTM, snapshot.geometry.point.screenCTM)
+    assert.deepEqual(entry.contour.screenCTM, snapshot.geometry.contour.screenCTM)
+    assert.deepEqual(entry.contour.CTM, snapshot.geometry.contour.CTM)
+    assert.equal(entry.contour.bounds.x, 0)
+    assertZeroAxisTraversal({ shape: entry.shape, source: entry.source, state: entry.state, anchorOffset: { x: 0, y: 0 },
+      contour: { tag: entry.contour.tag, attributes: entry.contour.attributes }, bounds: entry.contour.bounds,
+      contourLength: entry.contour.length, nativeTraversal: entry.contour.traversal })
+    const point = runtime.strata.find(({ id }) => id === entry.id)
+    assert.equal(point.style.paint.fill.enabled, false)
+    assert.deepEqual(point.style.paint.stroke, { enabled: true, color: '#B000C0', opacity: 1, width: .4,
+      lineStyle: 'solid', dashPhase: 0, lineCap: 'butt', lineJoin: 'miter' })
+    if (entry.id === 'zero-overlap') {
+      for (const key of ['owner', 'request', 'bodyRequest', 'source', 'state', 'shape', 'parameters']) assert.equal(entry[key], snapshot.layout[key])
+    }
+  }
+  assert.deepEqual(snapshot.coincidentContours[0].contour, snapshot.coincidentContours[1].contour,
+    'Both current independently observed contours remain the intended coincident fixture')
+}
 export function assertFreshZeroAxisAction(action) {
   const snapshot = action.before, state = action.stateBefore
+  assert.ok(['outside-clear', 'ordinary-axis', 'alt-start', 'alt-next', 'outside-final'].includes(action.key))
+  const inside = !action.key.startsWith('outside-')
+  assert.deepEqual(action.local, { x: inside ? 0 : 12, y: 20 })
+  assert.equal(action.altKey, action.key === 'alt-start' || action.key === 'alt-next')
   assert.deepEqual(snapshot.errors, [])
   assert.equal(snapshot.labelDocumentRevision, state.labelDocumentRevision)
   assert.deepEqual(snapshot.selection, state.selection)
@@ -606,10 +681,11 @@ export function assertFreshZeroAxisAction(action) {
   const parameters = JSON.parse(snapshot.layout.parameters)
   assert.equal(parameters.borderRotate, 0)
   for (const kind of ['canvas', 'point', 'contour']) {
-    const geometry = snapshot.geometry[kind], matrix = geometry.screenCTM
-    assert.equal(geometry.connected, true); assert.ok(matrix && Object.values(matrix).every(Number.isFinite))
-    assert.ok(Math.abs(matrix.a * matrix.d - matrix.b * matrix.c) > 1e-12)
+    const geometry = snapshot.geometry[kind]
+    assert.equal(geometry.connected, true); assert.equal(geometry.currentCanvas, true)
+    assertInvertibleZeroAxisMatrix(geometry.screenCTM); assertInvertibleZeroAxisMatrix(geometry.CTM)
   }
+  assertCurrentCoincidentZeroAxisContours(snapshot, state)
   assert.deepEqual(snapshot.requestedClick, action.click)
   const matrix = snapshot.geometry.contour.screenCTM
   const expected = { x: matrix.a * action.local.x + matrix.c * action.local.y + matrix.e,
@@ -617,13 +693,79 @@ export function assertFreshZeroAxisAction(action) {
   for (const axis of ['x', 'y']) assert.ok(Math.abs(expected[axis] - action.click[axis]) < 1e-7)
   assert.equal(snapshot.inspector.open, false)
   const target = snapshot.elementFromPoint
-  assert.equal(target.svg, true); assert.equal(target.canvas, true); assert.equal(target.drawer, false)
-  assert.deepEqual(snapshot.elementsFromPoint[0], target)
-  if (action.local.x === 0) {
+  assertCurrentCanvasPath(target, snapshot.elementsFromPoint, snapshot.canvasObservation)
+  if (inside) {
     assert.equal(target.tag, 'path'); assert.equal(target.pointId, 'zero-overlap')
   } else {
-    assert.equal(action.local.x, 12); assert.equal(target.pointId, null)
-    assert.equal(target.canvasRoot, true, 'Outside input reaches the actual canvas beyond all current point contours')
+    assertOutsideCanvasTarget(target, snapshot.elementsFromPoint, snapshot.canvasObservation)
+    for (const entry of snapshot.coincidentContours) assert.ok(action.local.x - entry.contour.bounds.x
+      - entry.contour.bounds.width - Number(entry.contour.attributes['stroke-width']) / 2 > 6,
+    'Fixed outside input exceeds every current coincident contour and unchanged six-unit picking tolerance')
+  }
+}
+export function assertZeroAxisNativeAction(action) {
+  const inside = !action.key.startsWith('outside-')
+  assertFreshZeroAxisAction(action)
+  assertFreshZeroAxisAction({ ...action, before: action.after, stateBefore: action.stateAfter })
+  assert.deepEqual(action.after.errors, [])
+  assert.deepEqual(action.after.layout, action.before.layout)
+  assert.deepEqual(action.after.canvasObservation, action.before.canvasObservation)
+  assert.deepEqual(action.after.coincidentContours, action.before.coincidentContours)
+  for (const kind of ['canvas', 'point', 'contour']) for (const matrix of ['CTM', 'screenCTM']) {
+    assert.deepEqual(action.after.geometry[kind][matrix], action.before.geometry[kind][matrix])
+  }
+  assert.equal(action.before.inspector.open, false)
+  assert.equal(action.before.tool.selectPressed, action.before.toolbar.collapsed ? null : 'true')
+  assert.equal(action.before.geometry.contour.connected, true)
+  assert.ok(Math.abs(action.before.geometry.contour.length - 4 * zeroAxisHalfExtent) < .005)
+  assert.deepEqual(action.before.requestedClick, action.click)
+  const matrix = action.before.geometry.contour.screenCTM
+  for (const axis of ['x', 'y']) {
+    const expected = axis === 'x' ? matrix.a * action.local.x + matrix.c * action.local.y + matrix.e
+      : matrix.b * action.local.x + matrix.d * action.local.y + matrix.f
+    assert.ok(Math.abs(action.click[axis] - expected) < 1e-7)
+  }
+  const actualSelection = action.stateAfter.selection
+  assert.equal(actualSelection?.id ?? null, { 'outside-clear': null, 'ordinary-axis': 'zero-overlap', 'alt-start': 'zero-overlap', 'alt-next': 'app-point', 'outside-final': null }[action.key], 'Actual trusted native input selects/cycles only the current axis owner')
+  for (const field of ['json', 'runtimeDiagramJson', 'history', 'labelDocumentRevision', 'uiSettings']) {
+    assert.deepEqual(action.stateAfter[field], action.stateBefore[field], `Native zero-axis input preserves ${field}`)
+  }
+  for (const [snapshot, state] of [[action.before, action.stateBefore], [action.after, action.stateAfter]]) {
+    assert.equal(snapshot.labelDocumentRevision, state.labelDocumentRevision)
+    assert.deepEqual(snapshot.selection, state.selection)
+    assert.deepEqual(JSON.parse(snapshot.layout.owner), ['point-node', action.stateBefore.labelDocumentRevision, 'zero-overlap'])
+    assert.equal(snapshot.layout.request, snapshot.layout.bodyRequest); assert.equal(snapshot.layout.source, '')
+    assert.deepEqual(snapshot.model, JSON.parse(action.stateBefore.runtimeDiagramJson).strata.find(({ id }) => id === 'zero-overlap'))
+  }
+  assert.equal(action.events.length, 3); assert.equal(action.droppedEvents, 0)
+  let pointerId
+  for (const [eventIndex, type] of ['pointerdown', 'pointerup', 'click'].entries()) {
+    const event = action.events[eventIndex]
+    assert.equal(event.type, type); assert.equal(event.trusted, true); assert.equal(event.altKey, action.altKey)
+    assert.equal(event.button, 0); assert.equal(event.buttons, type === 'pointerdown' ? 1 : 0)
+    if (type === 'pointerdown') { pointerId = event.pointerId; assert.ok(Number.isInteger(pointerId)); assert.deepEqual(event.selection, action.stateBefore.selection) }
+    else assert.ok(event.pointerId === pointerId || (type === 'click' && event.pointerId === null))
+    assert.equal(event.labelDocumentRevision, action.stateBefore.labelDocumentRevision)
+    assert.equal(event.layout.owner, action.before.layout.owner); assert.equal(event.layout.request, action.before.layout.request)
+    assert.equal(event.layout.source, ''); assert.equal(event.layout.shape, 'ellipse'); assert.equal(event.layout.state, 'ready')
+    assert.equal(event.layout.bodyRequest, action.before.layout.bodyRequest)
+    assert.deepEqual(event.canvasObservation, action.before.canvasObservation)
+    assertCurrentCanvasPath(event.target, event.path, event.canvasObservation)
+    assert.equal(typeof event.canvasHasPointerCapture, 'boolean')
+    if (!inside) assertOutsideCanvasTarget(event.target, event.path, event.canvasObservation)
+    if (type === 'pointerdown') assert.deepEqual(event.target, action.before.elementFromPoint, 'Trusted pointerdown reaches the freshly observed hit-stack owner')
+    if (inside) {
+      assert.equal(event.target.tag, 'path'); assert.equal(event.target.pointId, 'zero-overlap', 'Native axis input reaches the actual visible stroke')
+      assert.equal(event.canvasHasPointerCapture, false)
+    } else if (type === 'pointerdown' || type === 'click') assert.equal(event.canvasHasPointerCapture, false)
+    if (!inside && type === 'pointerup') {
+      assert.equal(event.canvasHasPointerCapture, action.before.elementFromPoint.svgBackground)
+      if (event.canvasHasPointerCapture) assert.deepEqual(event.target, action.before.canvasObservation.root)
+    }
+    for (const axis of ['x', 'y']) {
+      if (type === 'click') assert.equal(event.client[axis], Math.trunc(action.click[axis]), 'Native click preserves browser integer coordinate propagation')
+      else assert.equal(event.client[axis], Math.fround(action.click[axis]), 'Native pointer input preserves precise browser binary32 coordinate propagation')
+    }
   }
 }
 function assertZeroAxisNativeCase(entry, ambientDimension) {
@@ -640,56 +782,25 @@ function assertZeroAxisNativeCase(entry, ambientDimension) {
   assert.equal(entry.rendered.nativeSelection.scenario, signedPolygonalScenario)
   const workflow = entry.axisInteraction
   assert.equal(workflow.result, 'observed'); assert.equal(workflow.primary, undefined); assert.deepEqual(workflow.secondaryErrors, [])
+  assert.deepEqual(workflow.cleanup, { altKeyUp: 'completed', observer: { tokenPresent: false, registryPresent: false, remaining: 0 } })
   assertPointCanvasPreparation(workflow.preparation, 'zero-overlap')
   assertPointToolbarPreparation(workflow.toolbarPreparation, workflow.toolbarRestoration, 'zero-overlap')
   assert.deepEqual(workflow.actions.map(({ key }) => key), ['outside-clear', 'ordinary-axis', 'alt-start', 'alt-next', 'outside-final'])
-  const expectedIds = [null, 'zero-overlap', 'zero-overlap', 'app-point', null]
+  for (const field of ['json', 'runtimeDiagramJson', 'history', 'labelDocumentRevision']) assert.deepEqual(workflow.preparation.stateBefore[field], entry.state[field])
+  for (const field of ['json', 'runtimeDiagramJson', 'history', 'selection', 'labelDocumentRevision', 'uiSettings']) {
+    assert.deepEqual(workflow.actions[0].stateBefore[field], workflow.toolbarPreparation.statePrepared[field], 'First input continues the owned native preparation')
+    assert.deepEqual(workflow.toolbarRestoration.stateBefore[field], workflow.actions.at(-1).stateAfter[field], 'Owned restoration follows the final native input')
+  }
   for (const [index, action] of workflow.actions.entries()) {
     const inside = index > 0 && index < 4, local = inside ? { x: 0, y: 20 } : { x: 12, y: 20 }
     assert.deepEqual(action.local, local); assert.equal(action.altKey, index === 2 || index === 3)
-    assertFreshZeroAxisAction(action); assert.deepEqual(action.after.errors, [])
-    assert.equal(action.before.inspector.open, false)
-    assert.equal(action.before.tool.selectPressed, action.before.toolbar.collapsed ? null : 'true')
-    assert.equal(action.before.geometry.contour.connected, true)
-    assert.ok(Math.abs(action.before.geometry.contour.length - entry.rendered.contourLength) < .005)
-    assert.deepEqual(action.before.requestedClick, action.click)
-    const matrix = action.before.geometry.contour.screenCTM
-    for (const axis of ['x', 'y']) {
-      const expected = axis === 'x' ? matrix.a * local.x + matrix.c * local.y + matrix.e
-        : matrix.b * local.x + matrix.d * local.y + matrix.f
-      assert.ok(Math.abs(action.click[axis] - expected) < 1e-7)
-    }
-    const actualSelection = action.stateAfter.selection
-    assert.equal(actualSelection?.id ?? null, expectedIds[index], 'Actual trusted native input selects/cycles only the current axis owner')
-    for (const field of ['json', 'runtimeDiagramJson', 'history', 'labelDocumentRevision', 'uiSettings']) {
-      assert.deepEqual(action.stateAfter[field], action.stateBefore[field], `Native zero-axis input preserves ${field}`)
-    }
-    for (const [snapshot, state] of [[action.before, action.stateBefore], [action.after, action.stateAfter]]) {
-      assert.equal(snapshot.labelDocumentRevision, state.labelDocumentRevision)
-      assert.deepEqual(snapshot.selection, state.selection)
-      assert.deepEqual(JSON.parse(snapshot.layout.owner), ['point-node', action.stateBefore.labelDocumentRevision, 'zero-overlap'])
-      assert.equal(snapshot.layout.request, snapshot.layout.bodyRequest); assert.equal(snapshot.layout.source, '')
-      assert.deepEqual(snapshot.model, JSON.parse(action.stateBefore.runtimeDiagramJson).strata.find(({ id }) => id === 'zero-overlap'))
-    }
-    assert.equal(action.events.length, 3); assert.equal(action.droppedEvents, 0)
-    let pointerId
-    for (const [eventIndex, type] of ['pointerdown', 'pointerup', 'click'].entries()) {
-      const event = action.events[eventIndex]
-      assert.equal(event.type, type); assert.equal(event.trusted, true); assert.equal(event.altKey, action.altKey)
-      assert.equal(event.button, 0); assert.equal(event.buttons, type === 'pointerdown' ? 1 : 0)
-      if (type === 'pointerdown') { pointerId = event.pointerId; assert.ok(Number.isInteger(pointerId)); assert.deepEqual(event.selection, action.stateBefore.selection) }
-      else assert.ok(event.pointerId === pointerId || (type === 'click' && event.pointerId === null))
-      assert.equal(event.labelDocumentRevision, action.stateBefore.labelDocumentRevision)
-      assert.equal(event.layout.owner, action.before.layout.owner); assert.equal(event.layout.request, action.before.layout.request)
-      assert.equal(event.layout.source, '')
-      assert.equal(event.target.canvas, true); assert.equal(event.target.drawer, false)
-      assert.ok(event.path.some((item) => item?.canvasRoot === true))
-      if (type === 'pointerdown') assert.deepEqual(event.target, action.before.elementFromPoint, 'Trusted pointerdown reaches the freshly observed hit-stack owner')
-      if (inside) assert.equal(event.target.pointId, 'zero-overlap', 'Native axis input reaches the actual visible stroke')
-      for (const axis of ['x', 'y']) {
-        if (type === 'click') assert.equal(event.client[axis], Math.trunc(action.click[axis]), 'Native click preserves browser integer coordinate propagation')
-        else assert.ok(Math.abs(event.client[axis] - action.click[axis]) < .05)
-      }
+    assertZeroAxisNativeAction(action)
+    if (index) {
+      const previous = workflow.actions[index - 1]
+      assert.deepEqual(action.before.layout, previous.after.layout)
+      assert.deepEqual(action.before.canvasObservation, previous.after.canvasObservation)
+      assert.deepEqual(action.before.coincidentContours, previous.after.coincidentContours)
+      for (const kind of ['canvas', 'point', 'contour']) for (const matrix of ['CTM', 'screenCTM']) assert.deepEqual(action.before.geometry[kind][matrix], previous.after.geometry[kind][matrix])
     }
     if (index) for (const field of ['json', 'runtimeDiagramJson', 'history', 'selection', 'labelDocumentRevision', 'uiSettings']) {
       assert.deepEqual(action.stateBefore[field], workflow.actions[index - 1].stateAfter[field])
