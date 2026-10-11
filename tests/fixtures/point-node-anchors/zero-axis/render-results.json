@@ -1,0 +1,2290 @@
+{
+  "schema": "stz-independent-zero-axis-render-v1",
+  "evidenceKind": "Actual librsvg render of emitted production and independently parsed authenticated PGF paths; not native browser acceptance",
+  "partialReferenceNormalization": "Only partial PGF cubics are subdivided exactly at derivative roots by independent de Casteljau interpolation; unmodified raw PGF SVG/PNG retained separately because Cairo drops solid coincident-endpoint cubic interior. Full ellipse PGF paths are unmodified.",
+  "rendererVersion": "rsvg-convert version 2.63.0\n\nlibraries used:\n  cairo 1.18.4\n  pango 1.58.2\n  harfbuzz 14.4.0\n  fontconfig 2.18.3",
+  "referenceSha256": "e2ad2c6fd2180a7e92bc219be60846050241409bea0d5decf658517e37510054",
+  "rendererScriptSha256": "01411ac86d45ffa320edc07c4ed9dcb3a5f7534b6907c9519da5cdc515c0abcb",
+  "artifactHashes": {
+    "renders/zero-x-positive-butt-miter-production.svg": "0fb7d3eb866fb770885c3de2ed5faece4ef70ae65d6e34d5cb1bf84700299cdb",
+    "renders/zero-x-positive-butt-miter-production.png": "c02c620854fc303c7446c14b37399f0f285a9ba99a2388895f2127052d7e4836",
+    "renders/zero-x-positive-butt-miter-pgf.svg": "8800f949dd70f34a73f983d7718724fec9d28b8857f5006648044c3319fad601",
+    "renders/zero-x-positive-butt-miter-pgf.png": "1693606339930c8ec38195bcf23d117f8e51c6b5a6e39c815779b694fe38a538",
+    "renders/zero-x-positive-round-round-production.svg": "47683cf3c8c6c0fac7b5217c6d9d1bacc73f4da5bc8e0d16a826e7b851188348",
+    "renders/zero-x-positive-round-round-production.png": "7841c5de92a3c6c2ab22794ea5b00cb8459ca366c6cd31a5f0ceb707039b0475",
+    "renders/zero-x-positive-round-round-pgf.svg": "d26d0375d3d5555f92bc555c0109d59555ec1e9322a8d0e178d689bb083e253c",
+    "renders/zero-x-positive-round-round-pgf.png": "7841c5de92a3c6c2ab22794ea5b00cb8459ca366c6cd31a5f0ceb707039b0475",
+    "renders/zero-x-positive-square-bevel-dashed-production.svg": "603adcdd31b76363e3d42691cae155088f15d538560a8feca3e46c12813e3947",
+    "renders/zero-x-positive-square-bevel-dashed-production.png": "e7c7ad58431090d21dbdae13ec2ef7dd31cb9816fef7a6149a0b30dcec44e68a",
+    "renders/zero-x-positive-square-bevel-dashed-pgf.svg": "062a2dd45f6c6f5ba0ae29ea38e19ef0427c08c751ba4e878a8802622449d580",
+    "renders/zero-x-positive-square-bevel-dashed-pgf.png": "e6493dd5864e9b31c966a49418b24d9cca035a7564bebff46c487bcb9006ade8",
+    "renders/zero-x-positive-round-round-dashed-production.svg": "ca1750dc90335faf9d7f4d19a48a229a81113dca7e53cf166cd82e2c6d93856f",
+    "renders/zero-x-positive-round-round-dashed-production.png": "e4554a3428db8dde6c7e047e269526b27a21620d5e606d2f284f3b865994cdb3",
+    "renders/zero-x-positive-round-round-dashed-pgf.svg": "605faceeef6411011717b06c246bc2b760c185c3b1f1c0d92ceac983de1873b2",
+    "renders/zero-x-positive-round-round-dashed-pgf.png": "e4554a3428db8dde6c7e047e269526b27a21620d5e606d2f284f3b865994cdb3",
+    "renders/zero-x-positive-zero-area-fill-production.svg": "1ef7dbe11e1221b0e0eea70b1a7962fed02dac133cc9b996d8faff136d03e197",
+    "renders/zero-x-positive-zero-area-fill-production.png": "5eb16caa8b1cf11859f27ba9e28fd226bd94c402222ebb2ff03d66e99b368ada",
+    "renders/zero-x-positive-zero-area-fill-pgf.svg": "74e0e5a7a3c70444609f43e4cca6e6a086abe7ae2c50f27b7993b87d5f7d73f9",
+    "renders/zero-x-positive-zero-area-fill-pgf.png": "5eb16caa8b1cf11859f27ba9e28fd226bd94c402222ebb2ff03d66e99b368ada",
+    "renders/zero-y-positive-butt-miter-production.svg": "a35482b953b63aa5637eb0cf4438ff7a94b0874aa75ea4a358ae567fb5f59d4a",
+    "renders/zero-y-positive-butt-miter-production.png": "20f0a219e66ad1288da364727f25444b7d13227904d0c8280ed9bea9261d90c1",
+    "renders/zero-y-positive-butt-miter-pgf.svg": "559d67f6e015d1ef0a4d8c7d951fd8cc475c4c146d7c3d33cf8a53f2b7c6d595",
+    "renders/zero-y-positive-butt-miter-pgf.png": "a0600ae2b651c3b880a7454c7663eda603ea3d7598a664f9cb53b899dd9d37a5",
+    "renders/zero-y-positive-round-round-production.svg": "b963f848a1b08c14f0cfc2601571b07b396e170a9abdbd6e977963653518a55b",
+    "renders/zero-y-positive-round-round-production.png": "7d03fee673d070aff229a0c851d6e4d72e9ba9b600a90454645a46d5e193c7dc",
+    "renders/zero-y-positive-round-round-pgf.svg": "5174bbf60b2997ffbcee8de0334170c260bb892bfb34cec438f2eb1b86996d6d",
+    "renders/zero-y-positive-round-round-pgf.png": "7d03fee673d070aff229a0c851d6e4d72e9ba9b600a90454645a46d5e193c7dc",
+    "renders/zero-y-positive-square-bevel-dashed-production.svg": "c4e815e430ba82bf98b51f6ff3dfdb79cbae7fa64fb43fa556033d1dc926bbb9",
+    "renders/zero-y-positive-square-bevel-dashed-production.png": "8bbde900e40ace3e44b2c770ebef4434a387be2960a48621757714ac8dcd0c3a",
+    "renders/zero-y-positive-square-bevel-dashed-pgf.svg": "73871953089d1939968b15b832699ea6d8e797e6c138ed2cb10a1faf823d8b8a",
+    "renders/zero-y-positive-square-bevel-dashed-pgf.png": "8bbde900e40ace3e44b2c770ebef4434a387be2960a48621757714ac8dcd0c3a",
+    "renders/zero-y-positive-round-round-dashed-production.svg": "1a642e84a06f2f4e6cf317470f346319cf0b8748a708738a3ed1b4bc77a59bd8",
+    "renders/zero-y-positive-round-round-dashed-production.png": "9195d507ee5bd8d9093a35b381f0ac77e9a286a17114d5f1485a106ea1427b58",
+    "renders/zero-y-positive-round-round-dashed-pgf.svg": "624a724b962e4ac76d06529cfc5c170903645c08afa39f540a9834770afa1336",
+    "renders/zero-y-positive-round-round-dashed-pgf.png": "9195d507ee5bd8d9093a35b381f0ac77e9a286a17114d5f1485a106ea1427b58",
+    "renders/zero-y-positive-zero-area-fill-production.svg": "fe8948434b519556618b72ccf61a3a4573a344f321178e5822f8b654c54bb32c",
+    "renders/zero-y-positive-zero-area-fill-production.png": "5eb16caa8b1cf11859f27ba9e28fd226bd94c402222ebb2ff03d66e99b368ada",
+    "renders/zero-y-positive-zero-area-fill-pgf.svg": "cfbabe091ef78c512346063323c26717eae15f97c9c525ceea33d26cd5c2f8d8",
+    "renders/zero-y-positive-zero-area-fill-pgf.png": "5eb16caa8b1cf11859f27ba9e28fd226bd94c402222ebb2ff03d66e99b368ada",
+    "renders/both-zero-butt-miter-production.svg": "67fd76cc638a79531c502da5604ba92a34580b2a9729c632a30ceaf67607b150",
+    "renders/both-zero-butt-miter-production.png": "5eb16caa8b1cf11859f27ba9e28fd226bd94c402222ebb2ff03d66e99b368ada",
+    "renders/both-zero-butt-miter-pgf.svg": "5b438db3163a2b2b2d3881452a51129c0c2c9037e1f2937a8eb2003067703974",
+    "renders/both-zero-butt-miter-pgf.png": "5eb16caa8b1cf11859f27ba9e28fd226bd94c402222ebb2ff03d66e99b368ada",
+    "renders/both-zero-round-round-production.svg": "bbfece47310fd67ff49ac5186d0f3e45b654c5335b896729570325e6270e72f4",
+    "renders/both-zero-round-round-production.png": "f4c2cdd5f7da9d3472e6fb73f009e36320a740b6f18ba5bd4d466ce6be1e18cd",
+    "renders/both-zero-round-round-pgf.svg": "3683ad762b58a6d239587ba8ea6b18ea50d15af13bf42f6b3081f24a51e02bc2",
+    "renders/both-zero-round-round-pgf.png": "f4c2cdd5f7da9d3472e6fb73f009e36320a740b6f18ba5bd4d466ce6be1e18cd",
+    "renders/both-zero-square-bevel-dashed-production.svg": "a72a46d2331a82c0d4d32a1cd084cc755381b76f884c23c724e6a23ea3680cc5",
+    "renders/both-zero-square-bevel-dashed-production.png": "45525f0c22cef160edb49e596a545f245ae7fdc7b59672c6543c1f4b4104797f",
+    "renders/both-zero-square-bevel-dashed-pgf.svg": "5d04dd396bdbbefaa5904d9b6c1da818bb17c8aa8d9678af006127c94b7905ae",
+    "renders/both-zero-square-bevel-dashed-pgf.png": "45525f0c22cef160edb49e596a545f245ae7fdc7b59672c6543c1f4b4104797f",
+    "renders/both-zero-round-round-dashed-production.svg": "ff389d22f9831b6925fc18605304ade08612f484efee50da3d3390737f9c8afa",
+    "renders/both-zero-round-round-dashed-production.png": "5eb16caa8b1cf11859f27ba9e28fd226bd94c402222ebb2ff03d66e99b368ada",
+    "renders/both-zero-round-round-dashed-pgf.svg": "a3cc02d2ff511930d29829e2c09b7ae78ee9f6f2ae93fb59beb34decdbd592bb",
+    "renders/both-zero-round-round-dashed-pgf.png": "5eb16caa8b1cf11859f27ba9e28fd226bd94c402222ebb2ff03d66e99b368ada",
+    "renders/both-zero-zero-area-fill-production.svg": "53af5a8a31f9170d887121c22b02e3d2dab6bf01e84c184a074a52d4c8e46930",
+    "renders/both-zero-zero-area-fill-production.png": "5eb16caa8b1cf11859f27ba9e28fd226bd94c402222ebb2ff03d66e99b368ada",
+    "renders/both-zero-zero-area-fill-pgf.svg": "2e69c421cfc5fd7bf1e258f76527cec7e3ee9ec381193811bde4c41b9791d5b7",
+    "renders/both-zero-zero-area-fill-pgf.png": "5eb16caa8b1cf11859f27ba9e28fd226bd94c402222ebb2ff03d66e99b368ada",
+    "renders/zero-x-negative-butt-miter-production.svg": "8d78b34c000408e65a05962f048e21b11b52627c4c68aa87db723479c954034f",
+    "renders/zero-x-negative-butt-miter-production.png": "c02c620854fc303c7446c14b37399f0f285a9ba99a2388895f2127052d7e4836",
+    "renders/zero-x-negative-butt-miter-pgf.svg": "b4343025d0c1368b1aeca937f1f3a89f353f199fa217c7b1848105976a9a8c4a",
+    "renders/zero-x-negative-butt-miter-pgf.png": "1693606339930c8ec38195bcf23d117f8e51c6b5a6e39c815779b694fe38a538",
+    "renders/zero-x-negative-round-round-production.svg": "360159b528f41055fbab19310fb1c251fd6405f1e6d911f92073adb84fa4f151",
+    "renders/zero-x-negative-round-round-production.png": "7841c5de92a3c6c2ab22794ea5b00cb8459ca366c6cd31a5f0ceb707039b0475",
+    "renders/zero-x-negative-round-round-pgf.svg": "f8be186a9bccf8fa2d733a41fdf43ab83d626163ff0d14e55571ff63803f86e8",
+    "renders/zero-x-negative-round-round-pgf.png": "7841c5de92a3c6c2ab22794ea5b00cb8459ca366c6cd31a5f0ceb707039b0475",
+    "renders/zero-x-negative-square-bevel-dashed-production.svg": "ed837e76efe2633301d0f7dba850f0ba21166489af02db9663c745636c69d6bf",
+    "renders/zero-x-negative-square-bevel-dashed-production.png": "60be822370c20b8ffa30d51e111bf2eb38f64332d74878f3fdca613062289c1d",
+    "renders/zero-x-negative-square-bevel-dashed-pgf.svg": "ebfe4f8b84fc550c8d2db44fe1b7e530c3ee977d3b325c8f1cfc8adb8bed2156",
+    "renders/zero-x-negative-square-bevel-dashed-pgf.png": "ab28c49c57cd3ccb50cf5a56fdbb0013bcc1eaf88d86959e70a4a30698ef5274",
+    "renders/zero-x-negative-round-round-dashed-production.svg": "d31bb06290cfc3225aa4843de0fad623301c7b5e39033d973844312eb843b2d0",
+    "renders/zero-x-negative-round-round-dashed-production.png": "0944cfabd35edd59820c6f9f263a7785c4c199842cc1c3785026cbdd56ca9042",
+    "renders/zero-x-negative-round-round-dashed-pgf.svg": "ba91098c83b8114eb88f46296c8a72881d013d05586390a10c90d1d3c9487e41",
+    "renders/zero-x-negative-round-round-dashed-pgf.png": "0944cfabd35edd59820c6f9f263a7785c4c199842cc1c3785026cbdd56ca9042",
+    "renders/zero-x-negative-zero-area-fill-production.svg": "41e96326d20b95b11603503a1c1a4597845b5e57c25a42e3aba97dfbaed7dd52",
+    "renders/zero-x-negative-zero-area-fill-production.png": "5eb16caa8b1cf11859f27ba9e28fd226bd94c402222ebb2ff03d66e99b368ada",
+    "renders/zero-x-negative-zero-area-fill-pgf.svg": "3b9b575b8f6a9b6bb7900845b16efc74fdf0414999d7c6a4d510b22734a76aff",
+    "renders/zero-x-negative-zero-area-fill-pgf.png": "5eb16caa8b1cf11859f27ba9e28fd226bd94c402222ebb2ff03d66e99b368ada",
+    "renders/zero-y-negative-butt-miter-production.svg": "8374f34d275d9f971add9308345ebba21d1cc16bb150990a4d27371e082ba546",
+    "renders/zero-y-negative-butt-miter-production.png": "20f0a219e66ad1288da364727f25444b7d13227904d0c8280ed9bea9261d90c1",
+    "renders/zero-y-negative-butt-miter-pgf.svg": "94bfa6e34e438bbdae5dfeaa200347d91e2113cb29e1daf4d6f14b5fe1a33360",
+    "renders/zero-y-negative-butt-miter-pgf.png": "a0600ae2b651c3b880a7454c7663eda603ea3d7598a664f9cb53b899dd9d37a5",
+    "renders/zero-y-negative-round-round-production.svg": "06e58b156ed9ab916e1eba205df2d07ea433106964358764aebf34e4b756f9ab",
+    "renders/zero-y-negative-round-round-production.png": "7d03fee673d070aff229a0c851d6e4d72e9ba9b600a90454645a46d5e193c7dc",
+    "renders/zero-y-negative-round-round-pgf.svg": "bdf3c2b6ab445c33ce237350e2d9e0176909428dd33aa44ccff76aa6c3433f43",
+    "renders/zero-y-negative-round-round-pgf.png": "7d03fee673d070aff229a0c851d6e4d72e9ba9b600a90454645a46d5e193c7dc",
+    "renders/zero-y-negative-square-bevel-dashed-production.svg": "8ce93885998613ae377d7acb6dc803b3c64f0100234ef075e8b46508f2d57314",
+    "renders/zero-y-negative-square-bevel-dashed-production.png": "ae5cdcc998f1a10dd1f79e248551f9d8a94868606d6829eaf8812d1f1b059c1a",
+    "renders/zero-y-negative-square-bevel-dashed-pgf.svg": "59f61fcbcf0ea81bdf2e8e590e3449795255bbde02b05aedb3803d196edc5a68",
+    "renders/zero-y-negative-square-bevel-dashed-pgf.png": "ae5cdcc998f1a10dd1f79e248551f9d8a94868606d6829eaf8812d1f1b059c1a",
+    "renders/zero-y-negative-round-round-dashed-production.svg": "8246b6599bf6bd72e4bfeeb8a1a713a6859896429e7e31d34891336966e11cfe",
+    "renders/zero-y-negative-round-round-dashed-production.png": "70895cb93184c85fe86a041a8a559c265a6cd65ee1d69d08ada163df1a69fbba",
+    "renders/zero-y-negative-round-round-dashed-pgf.svg": "b78cf3c23f22743e9c1222cc5945a39fd4fe4d225ec6a5c8663358245d1f4878",
+    "renders/zero-y-negative-round-round-dashed-pgf.png": "70895cb93184c85fe86a041a8a559c265a6cd65ee1d69d08ada163df1a69fbba",
+    "renders/zero-y-negative-zero-area-fill-production.svg": "f2fee61be7498138800b7a148a2f51e92b5a3834759c9c804ff3e7b625f19a28",
+    "renders/zero-y-negative-zero-area-fill-production.png": "5eb16caa8b1cf11859f27ba9e28fd226bd94c402222ebb2ff03d66e99b368ada",
+    "renders/zero-y-negative-zero-area-fill-pgf.svg": "b816aa5e7b539ea53cd5ba23cc7da7cac03d89414bc1a084afbc9cea2a836aab",
+    "renders/zero-y-negative-zero-area-fill-pgf.png": "5eb16caa8b1cf11859f27ba9e28fd226bd94c402222ebb2ff03d66e99b368ada",
+    "renders/partial-zero-x-turn-butt-miter-production.svg": "bee43a400a66b9316f0f078545e59cdc3e4de504a65d4c0adc5cde9118a6a98b",
+    "renders/partial-zero-x-turn-butt-miter-production.png": "8a4a13c8867846d6bb55d719232cd1fac060804a06cba0a08cb3fbda31247a7a",
+    "renders/partial-zero-x-turn-butt-miter-pgf.svg": "701a3264f39e11234b230668377cdb777af6b177068a4fa2de20d32078375417",
+    "renders/partial-zero-x-turn-butt-miter-pgf.png": "616a0506f05f46ccdd2db74accbd2e5ec3ac188f4dc13d29b5e2f733b5292ca7",
+    "renders/partial-zero-x-turn-butt-miter-pgf-raw.svg": "4c9f7578751de12f3d6da2ac624ae30f720e414a15abcf1c7c271464363ec400",
+    "renders/partial-zero-x-turn-butt-miter-pgf-raw.png": "eb18bfad542eb415f947ce4caae594eded0368ef4a99ee254fd88c81081b66dd",
+    "renders/partial-zero-x-turn-round-round-dashed-production.svg": "600f7c6a939e9e1302d91a12ac596b8668269d99fcd7e74df892ea7fad955d01",
+    "renders/partial-zero-x-turn-round-round-dashed-production.png": "872108b619fbf58aaf92b57dd7eb77a5d732f36307e09c370fea6aa74c5e0486",
+    "renders/partial-zero-x-turn-round-round-dashed-pgf.svg": "6609b95f8d235d91bb5c00d04a916c9109d6be74c784ea5df9c524430a55250b",
+    "renders/partial-zero-x-turn-round-round-dashed-pgf.png": "872108b619fbf58aaf92b57dd7eb77a5d732f36307e09c370fea6aa74c5e0486",
+    "renders/partial-zero-x-turn-round-round-dashed-pgf-raw.svg": "02b29942f396ebd5248b0b633cfd301faabe54948b4517e014e5fcf2903fa025",
+    "renders/partial-zero-x-turn-round-round-dashed-pgf-raw.png": "55935f6491fbaa17bddcea82ef19a52f535f6bbe150080f6e9ca99f5c6b64585",
+    "renders/partial-zero-x-reversed-butt-miter-production.svg": "bee43a400a66b9316f0f078545e59cdc3e4de504a65d4c0adc5cde9118a6a98b",
+    "renders/partial-zero-x-reversed-butt-miter-production.png": "8a4a13c8867846d6bb55d719232cd1fac060804a06cba0a08cb3fbda31247a7a",
+    "renders/partial-zero-x-reversed-butt-miter-pgf.svg": "701a3264f39e11234b230668377cdb777af6b177068a4fa2de20d32078375417",
+    "renders/partial-zero-x-reversed-butt-miter-pgf.png": "616a0506f05f46ccdd2db74accbd2e5ec3ac188f4dc13d29b5e2f733b5292ca7",
+    "renders/partial-zero-x-reversed-butt-miter-pgf-raw.svg": "4c9f7578751de12f3d6da2ac624ae30f720e414a15abcf1c7c271464363ec400",
+    "renders/partial-zero-x-reversed-butt-miter-pgf-raw.png": "eb18bfad542eb415f947ce4caae594eded0368ef4a99ee254fd88c81081b66dd",
+    "renders/partial-zero-x-reversed-round-round-dashed-production.svg": "600f7c6a939e9e1302d91a12ac596b8668269d99fcd7e74df892ea7fad955d01",
+    "renders/partial-zero-x-reversed-round-round-dashed-production.png": "872108b619fbf58aaf92b57dd7eb77a5d732f36307e09c370fea6aa74c5e0486",
+    "renders/partial-zero-x-reversed-round-round-dashed-pgf.svg": "6609b95f8d235d91bb5c00d04a916c9109d6be74c784ea5df9c524430a55250b",
+    "renders/partial-zero-x-reversed-round-round-dashed-pgf.png": "872108b619fbf58aaf92b57dd7eb77a5d732f36307e09c370fea6aa74c5e0486",
+    "renders/partial-zero-x-reversed-round-round-dashed-pgf-raw.svg": "02b29942f396ebd5248b0b633cfd301faabe54948b4517e014e5fcf2903fa025",
+    "renders/partial-zero-x-reversed-round-round-dashed-pgf-raw.png": "55935f6491fbaa17bddcea82ef19a52f535f6bbe150080f6e9ca99f5c6b64585",
+    "renders/partial-zero-x-signed-rotated-butt-miter-production.svg": "8226eaf0803017a29602492f962bf37a692a4bf0b8780df0eea2ba860ffb3e14",
+    "renders/partial-zero-x-signed-rotated-butt-miter-production.png": "47fbfd8879f4d567ce77def8ac146e09e2226815562f5502e7eb7c2099618d50",
+    "renders/partial-zero-x-signed-rotated-butt-miter-pgf.svg": "32cda0a64805d68c1dc921d67b4d4a50a81ccf3799cf39b31babf2bfa09d050f",
+    "renders/partial-zero-x-signed-rotated-butt-miter-pgf.png": "9ed848c30870f8610c99fdeb4bb02e5065e12763637e38eddb36b8473a4210aa",
+    "renders/partial-zero-x-signed-rotated-butt-miter-pgf-raw.svg": "744313ffa9da6c9c19db45f2fd30a74f39ec6a2f1be2adff5fb975330d2ed5ae",
+    "renders/partial-zero-x-signed-rotated-butt-miter-pgf-raw.png": "65c4c9669180e0e6e1ea5db6876a63bfafdef81614746b37800a39cce9515aab",
+    "renders/partial-zero-x-signed-rotated-round-round-dashed-production.svg": "455a797d1c5a9a45506cc4aa31827ee958e9922dd325aa436bf4adceed191322",
+    "renders/partial-zero-x-signed-rotated-round-round-dashed-production.png": "151ef5402d7ca91c8d00ee79d1a75ba658f841d413588ab5444392cc00af3c6f",
+    "renders/partial-zero-x-signed-rotated-round-round-dashed-pgf.svg": "6518b040ef84b3153d59d75f47f726c0e7e3f7503b78c19eddf3f72340141c0a",
+    "renders/partial-zero-x-signed-rotated-round-round-dashed-pgf.png": "543d624c480dd89bfded24941687c59b8f1a6ab157b864a6c094ec99956da34d",
+    "renders/partial-zero-x-signed-rotated-round-round-dashed-pgf-raw.svg": "09adf0c84717d6464a0713cc9a084f883d67856757af4a5ae6221280644d6e36",
+    "renders/partial-zero-x-signed-rotated-round-round-dashed-pgf-raw.png": "151ef5402d7ca91c8d00ee79d1a75ba658f841d413588ab5444392cc00af3c6f",
+    "renders/partial-zero-y-turn-butt-miter-production.svg": "331e827615559482b59f8b31569997121a23ace2fb7e9b14c0ab0b0eab8807bb",
+    "renders/partial-zero-y-turn-butt-miter-production.png": "cf0b44e81fca54658d04c06f7ec0d3e57a0e216b38649d2d935de1b6b74d64d4",
+    "renders/partial-zero-y-turn-butt-miter-pgf.svg": "a1256907419433d1dcf3a2938f42d9f710bdf5298316c8819ddc5c8543f0e6db",
+    "renders/partial-zero-y-turn-butt-miter-pgf.png": "52b8cceef926ae08d462caf95596b0fa4ce83bbfed88f1edbf0b44a43aaf3d67",
+    "renders/partial-zero-y-turn-butt-miter-pgf-raw.svg": "4b5f72bc13ab7e48cbefeb4200798dd8626f216dc90fab3be4566062db981abd",
+    "renders/partial-zero-y-turn-butt-miter-pgf-raw.png": "23d655502830d5a8785603d5ba9d0aa82d0bb1b3790a5a0ed0ac0e449bfcdc5b",
+    "renders/partial-zero-y-turn-round-round-dashed-production.svg": "69a05b3db6f4e8459b1bd80eed1921c113a8d0dd93b468a78bd50f3a83f53cef",
+    "renders/partial-zero-y-turn-round-round-dashed-production.png": "1067dd1cff575390f2e98084fc5589eb7fc2ea65629d88b15d4319053a3c1311",
+    "renders/partial-zero-y-turn-round-round-dashed-pgf.svg": "1ff31321b7ff48bf32daae41c093238717208001608e1269c7b3cfe552919d43",
+    "renders/partial-zero-y-turn-round-round-dashed-pgf.png": "1067dd1cff575390f2e98084fc5589eb7fc2ea65629d88b15d4319053a3c1311",
+    "renders/partial-zero-y-turn-round-round-dashed-pgf-raw.svg": "646d0b2bc313e8644ebd5e80e6fc03b0b5fceb4ba710fe73d874c7d317b24e77",
+    "renders/partial-zero-y-turn-round-round-dashed-pgf-raw.png": "1067dd1cff575390f2e98084fc5589eb7fc2ea65629d88b15d4319053a3c1311",
+    "renders/partial-zero-y-signed-reversed-butt-miter-production.svg": "929c6b9455da4e9bc8ee5388e7301ddbae47505df1ed263d96a9952f1f7e69d9",
+    "renders/partial-zero-y-signed-reversed-butt-miter-production.png": "c05627df02db3506b53a06d39635df1c95b3d1610374cd5284c99c8561aae77f",
+    "renders/partial-zero-y-signed-reversed-butt-miter-pgf.svg": "1285abacc402166832f399a58a2060aa8241195f94a20833115fe0b65eee473a",
+    "renders/partial-zero-y-signed-reversed-butt-miter-pgf.png": "e537c43f82f27a8f35698e3abce8b4f9e22f1c5f21f0f6cadd1827f417e10bbc",
+    "renders/partial-zero-y-signed-reversed-butt-miter-pgf-raw.svg": "90be78745f9763718b024a6883132cbe811499e55b1fe72d1c139f6af368b75b",
+    "renders/partial-zero-y-signed-reversed-butt-miter-pgf-raw.png": "e54e537190fab03d799f05ae450c20324f00ab4e3ec09d525ec68c8d4b0a7c25",
+    "renders/partial-zero-y-signed-reversed-round-round-dashed-production.svg": "ffa6a26dd9d1d9f545da27be9c7b3f3505932f8fd8ede92ea0785b8be0295eab",
+    "renders/partial-zero-y-signed-reversed-round-round-dashed-production.png": "23c11d2b5eb1e813d1d15f330d334cdab5e2e4e3ad2f363fb6e3a2275237773a",
+    "renders/partial-zero-y-signed-reversed-round-round-dashed-pgf.svg": "594954ed3e210f1601bec5d27119e240e448f6884c2bcda1e89838e30b333b51",
+    "renders/partial-zero-y-signed-reversed-round-round-dashed-pgf.png": "437bc2b8fd165b748767f29a8471a6c84e267ccae70607e9fb8b708806902766",
+    "renders/partial-zero-y-signed-reversed-round-round-dashed-pgf-raw.svg": "8195beeb4dd7e1ebc5636f451b4568c711f8de4c7deea5ab429506389d39c97b",
+    "renders/partial-zero-y-signed-reversed-round-round-dashed-pgf-raw.png": "437bc2b8fd165b748767f29a8471a6c84e267ccae70607e9fb8b708806902766",
+    "renders/partial-zero-x-extra-cycle-butt-miter-production.svg": "66cc0258547efeba69b920220b1e2ec2a02eaca6e7093837782fe2dcbd2ec1ac",
+    "renders/partial-zero-x-extra-cycle-butt-miter-production.png": "a0e32b5375b179af97619cb8bcee012ee06df89a2acb07bb1f55915c52525be8",
+    "renders/partial-zero-x-extra-cycle-butt-miter-pgf.svg": "4991a5c106820dcbc32dab9bee308db6cc7f431ded72ad04cdcb058754d32fe3",
+    "renders/partial-zero-x-extra-cycle-butt-miter-pgf.png": "df503e2fd9fee53104625c89da52718bfc7e1009c52bff824907e7ac2d7f3065",
+    "renders/partial-zero-x-extra-cycle-butt-miter-pgf-raw.svg": "29c3c8d12f99043c60551f3e75700a990421a1e601402c33bba4f8ff34ab634b",
+    "renders/partial-zero-x-extra-cycle-butt-miter-pgf-raw.png": "95bc5c5922b809deeb4e6f94a36e2e93a9531c09b6392f2cce14306b54cceac9",
+    "renders/partial-zero-x-extra-cycle-round-round-dashed-production.svg": "113285e4f35d636663f4bc6f5e3d426de6d2bc5ffbc0948b9b9d20d4b9c03a66",
+    "renders/partial-zero-x-extra-cycle-round-round-dashed-production.png": "0c47e8aa776a21dd5f2df390397f1ab5698011272af17032a510ed8687941c5a",
+    "renders/partial-zero-x-extra-cycle-round-round-dashed-pgf.svg": "cc71d4a774c9acecd182c723abea3c755b56114a706a6a357974284aec7aa7b1",
+    "renders/partial-zero-x-extra-cycle-round-round-dashed-pgf.png": "6ff872fc40f049683e737733c92572b4544006702bf47a6cb7f612bbf9269ff3",
+    "renders/partial-zero-x-extra-cycle-round-round-dashed-pgf-raw.svg": "45a920eda28926fffd22960fcc1bc5da4ff51e87ae825f8b7e332a50f69b1f20",
+    "renders/partial-zero-x-extra-cycle-round-round-dashed-pgf-raw.png": "fe9bbc0bf2a932e3722a531a9c9f6808ab4fec2bff27b9d477760dc314410d80"
+  },
+  "records": [
+    {
+      "id": "zero-x-positive-butt-miter",
+      "caseId": "zero-x-positive",
+      "style": {
+        "id": "butt-miter",
+        "attributes": "fill=\"none\" stroke=\"black\" stroke-width=\".4\" stroke-linecap=\"butt\" stroke-linejoin=\"miter\""
+      },
+      "observations": {
+        "production": {
+          "path": "M 0 0 L 0 -28.284271247462 L 0 0 L 0 28.284271247462 L 0 0 Z",
+          "svg": "renders/zero-x-positive-butt-miter-production.svg",
+          "png": "renders/zero-x-positive-butt-miter-production.png",
+          "command": [
+            "/opt/homebrew/bin/rsvg-convert",
+            "--output",
+            "/Users/takamatoshinori/Desktop/stratified-tikz/tests/fixtures/point-node-anchors/zero-axis/renders/zero-x-positive-butt-miter-production.png",
+            "/Users/takamatoshinori/Desktop/stratified-tikz/tests/fixtures/point-node-anchors/zero-axis/renders/zero-x-positive-butt-miter-production.svg"
+          ],
+          "exitCode": 0,
+          "width": 800,
+          "height": 800,
+          "blackPixelCount": 2264,
+          "bounds": {
+            "minX": 398,
+            "minY": 117,
+            "maxX": 401,
+            "maxY": 682
+          }
+        },
+        "pgf": {
+          "path": "M 0 0 C 0 -15.62119 0 -28.2843 0 -28.2843 C 0 -28.2843 0 -15.62119 0 0 C 0 15.62119 0 28.2843 0 28.2843 C 0 28.2843 0 15.62119 0 0 Z M 0 0",
+          "svg": "renders/zero-x-positive-butt-miter-pgf.svg",
+          "png": "renders/zero-x-positive-butt-miter-pgf.png",
+          "command": [
+            "/opt/homebrew/bin/rsvg-convert",
+            "--output",
+            "/Users/takamatoshinori/Desktop/stratified-tikz/tests/fixtures/point-node-anchors/zero-axis/renders/zero-x-positive-butt-miter-pgf.png",
+            "/Users/takamatoshinori/Desktop/stratified-tikz/tests/fixtures/point-node-anchors/zero-axis/renders/zero-x-positive-butt-miter-pgf.svg"
+          ],
+          "exitCode": 0,
+          "width": 800,
+          "height": 800,
+          "blackPixelCount": 2264,
+          "bounds": {
+            "minX": 398,
+            "minY": 117,
+            "maxX": 401,
+            "maxY": 682
+          }
+        }
+      }
+    },
+    {
+      "id": "zero-x-positive-round-round",
+      "caseId": "zero-x-positive",
+      "style": {
+        "id": "round-round",
+        "attributes": "fill=\"none\" stroke=\"black\" stroke-width=\".4\" stroke-linecap=\"round\" stroke-linejoin=\"round\""
+      },
+      "observations": {
+        "production": {
+          "path": "M 0 0 L 0 -28.284271247462 L 0 0 L 0 28.284271247462 L 0 0 Z",
+          "svg": "renders/zero-x-positive-round-round-production.svg",
+          "png": "renders/zero-x-positive-round-round-production.png",
+          "command": [
+            "/opt/homebrew/bin/rsvg-convert",
+            "--output",
+            "/Users/takamatoshinori/Desktop/stratified-tikz/tests/fixtures/point-node-anchors/zero-axis/renders/zero-x-positive-round-round-production.png",
+            "/Users/takamatoshinori/Desktop/stratified-tikz/tests/fixtures/point-node-anchors/zero-axis/renders/zero-x-positive-round-round-production.svg"
+          ],
+          "exitCode": 0,
+          "width": 800,
+          "height": 800,
+          "blackPixelCount": 2276,
+          "bounds": {
+            "minX": 398,
+            "minY": 115,
+            "maxX": 401,
+            "maxY": 684
+          }
+        },
+        "pgf": {
+          "path": "M 0 0 C 0 -15.62119 0 -28.2843 0 -28.2843 C 0 -28.2843 0 -15.62119 0 0 C 0 15.62119 0 28.2843 0 28.2843 C 0 28.2843 0 15.62119 0 0 Z M 0 0",
+          "svg": "renders/zero-x-positive-round-round-pgf.svg",
+          "png": "renders/zero-x-positive-round-round-pgf.png",
+          "command": [
+            "/opt/homebrew/bin/rsvg-convert",
+            "--output",
+            "/Users/takamatoshinori/Desktop/stratified-tikz/tests/fixtures/point-node-anchors/zero-axis/renders/zero-x-positive-round-round-pgf.png",
+            "/Users/takamatoshinori/Desktop/stratified-tikz/tests/fixtures/point-node-anchors/zero-axis/renders/zero-x-positive-round-round-pgf.svg"
+          ],
+          "exitCode": 0,
+          "width": 800,
+          "height": 800,
+          "blackPixelCount": 2276,
+          "bounds": {
+            "minX": 398,
+            "minY": 115,
+            "maxX": 401,
+            "maxY": 684
+          }
+        }
+      }
+    },
+    {
+      "id": "zero-x-positive-square-bevel-dashed",
+      "caseId": "zero-x-positive",
+      "style": {
+        "id": "square-bevel-dashed",
+        "attributes": "fill=\"none\" stroke=\"black\" stroke-width=\".4\" stroke-linecap=\"square\" stroke-linejoin=\"bevel\" stroke-dasharray=\"3 2 1 2\" stroke-dashoffset=\"1.3\""
+      },
+      "observations": {
+        "production": {
+          "path": "M 0 0 L 0 -28.284271247462 L 0 0 L 0 28.284271247462 L 0 0 Z",
+          "svg": "renders/zero-x-positive-square-bevel-dashed-production.svg",
+          "png": "renders/zero-x-positive-square-bevel-dashed-production.png",
+          "command": [
+            "/opt/homebrew/bin/rsvg-convert",
+            "--output",
+            "/Users/takamatoshinori/Desktop/stratified-tikz/tests/fixtures/point-node-anchors/zero-axis/renders/zero-x-positive-square-bevel-dashed-production.png",
+            "/Users/takamatoshinori/Desktop/stratified-tikz/tests/fixtures/point-node-anchors/zero-axis/renders/zero-x-positive-square-bevel-dashed-production.svg"
+          ],
+          "exitCode": 0,
+          "width": 800,
+          "height": 800,
+          "blackPixelCount": 1788,
+          "bounds": {
+            "minX": 398,
+            "minY": 117,
+            "maxX": 401,
+            "maxY": 682
+          }
+        },
+        "pgf": {
+          "path": "M 0 0 C 0 -15.62119 0 -28.2843 0 -28.2843 C 0 -28.2843 0 -15.62119 0 0 C 0 15.62119 0 28.2843 0 28.2843 C 0 28.2843 0 15.62119 0 0 Z M 0 0",
+          "svg": "renders/zero-x-positive-square-bevel-dashed-pgf.svg",
+          "png": "renders/zero-x-positive-square-bevel-dashed-pgf.png",
+          "command": [
+            "/opt/homebrew/bin/rsvg-convert",
+            "--output",
+            "/Users/takamatoshinori/Desktop/stratified-tikz/tests/fixtures/point-node-anchors/zero-axis/renders/zero-x-positive-square-bevel-dashed-pgf.png",
+            "/Users/takamatoshinori/Desktop/stratified-tikz/tests/fixtures/point-node-anchors/zero-axis/renders/zero-x-positive-square-bevel-dashed-pgf.svg"
+          ],
+          "exitCode": 0,
+          "width": 800,
+          "height": 800,
+          "blackPixelCount": 1788,
+          "bounds": {
+            "minX": 398,
+            "minY": 117,
+            "maxX": 401,
+            "maxY": 682
+          }
+        }
+      }
+    },
+    {
+      "id": "zero-x-positive-round-round-dashed",
+      "caseId": "zero-x-positive",
+      "style": {
+        "id": "round-round-dashed",
+        "attributes": "fill=\"none\" stroke=\"black\" stroke-width=\".4\" stroke-linecap=\"round\" stroke-linejoin=\"round\" stroke-dasharray=\"2 5\" stroke-dashoffset=\"-2.7\""
+      },
+      "observations": {
+        "production": {
+          "path": "M 0 0 L 0 -28.284271247462 L 0 0 L 0 28.284271247462 L 0 0 Z",
+          "svg": "renders/zero-x-positive-round-round-dashed-production.svg",
+          "png": "renders/zero-x-positive-round-round-dashed-production.png",
+          "command": [
+            "/opt/homebrew/bin/rsvg-convert",
+            "--output",
+            "/Users/takamatoshinori/Desktop/stratified-tikz/tests/fixtures/point-node-anchors/zero-axis/renders/zero-x-positive-round-round-dashed-production.png",
+            "/Users/takamatoshinori/Desktop/stratified-tikz/tests/fixtures/point-node-anchors/zero-axis/renders/zero-x-positive-round-round-dashed-production.svg"
+          ],
+          "exitCode": 0,
+          "width": 800,
+          "height": 800,
+          "blackPixelCount": 984,
+          "bounds": {
+            "minX": 398,
+            "minY": 139,
+            "maxX": 401,
+            "maxY": 665
+          }
+        },
+        "pgf": {
+          "path": "M 0 0 C 0 -15.62119 0 -28.2843 0 -28.2843 C 0 -28.2843 0 -15.62119 0 0 C 0 15.62119 0 28.2843 0 28.2843 C 0 28.2843 0 15.62119 0 0 Z M 0 0",
+          "svg": "renders/zero-x-positive-round-round-dashed-pgf.svg",
+          "png": "renders/zero-x-positive-round-round-dashed-pgf.png",
+          "command": [
+            "/opt/homebrew/bin/rsvg-convert",
+            "--output",
+            "/Users/takamatoshinori/Desktop/stratified-tikz/tests/fixtures/point-node-anchors/zero-axis/renders/zero-x-positive-round-round-dashed-pgf.png",
+            "/Users/takamatoshinori/Desktop/stratified-tikz/tests/fixtures/point-node-anchors/zero-axis/renders/zero-x-positive-round-round-dashed-pgf.svg"
+          ],
+          "exitCode": 0,
+          "width": 800,
+          "height": 800,
+          "blackPixelCount": 984,
+          "bounds": {
+            "minX": 398,
+            "minY": 139,
+            "maxX": 401,
+            "maxY": 665
+          }
+        }
+      }
+    },
+    {
+      "id": "zero-x-positive-zero-area-fill",
+      "caseId": "zero-x-positive",
+      "style": {
+        "id": "zero-area-fill",
+        "attributes": "fill=\"black\" stroke=\"none\""
+      },
+      "observations": {
+        "production": {
+          "path": "M 0 0 L 0 -28.284271247462 L 0 0 L 0 28.284271247462 L 0 0 Z",
+          "svg": "renders/zero-x-positive-zero-area-fill-production.svg",
+          "png": "renders/zero-x-positive-zero-area-fill-production.png",
+          "command": [
+            "/opt/homebrew/bin/rsvg-convert",
+            "--output",
+            "/Users/takamatoshinori/Desktop/stratified-tikz/tests/fixtures/point-node-anchors/zero-axis/renders/zero-x-positive-zero-area-fill-production.png",
+            "/Users/takamatoshinori/Desktop/stratified-tikz/tests/fixtures/point-node-anchors/zero-axis/renders/zero-x-positive-zero-area-fill-production.svg"
+          ],
+          "exitCode": 0,
+          "width": 800,
+          "height": 800,
+          "blackPixelCount": 0,
+          "bounds": null
+        },
+        "pgf": {
+          "path": "M 0 0 C 0 -15.62119 0 -28.2843 0 -28.2843 C 0 -28.2843 0 -15.62119 0 0 C 0 15.62119 0 28.2843 0 28.2843 C 0 28.2843 0 15.62119 0 0 Z M 0 0",
+          "svg": "renders/zero-x-positive-zero-area-fill-pgf.svg",
+          "png": "renders/zero-x-positive-zero-area-fill-pgf.png",
+          "command": [
+            "/opt/homebrew/bin/rsvg-convert",
+            "--output",
+            "/Users/takamatoshinori/Desktop/stratified-tikz/tests/fixtures/point-node-anchors/zero-axis/renders/zero-x-positive-zero-area-fill-pgf.png",
+            "/Users/takamatoshinori/Desktop/stratified-tikz/tests/fixtures/point-node-anchors/zero-axis/renders/zero-x-positive-zero-area-fill-pgf.svg"
+          ],
+          "exitCode": 0,
+          "width": 800,
+          "height": 800,
+          "blackPixelCount": 0,
+          "bounds": null
+        }
+      }
+    },
+    {
+      "id": "zero-y-positive-butt-miter",
+      "caseId": "zero-y-positive",
+      "style": {
+        "id": "butt-miter",
+        "attributes": "fill=\"none\" stroke=\"black\" stroke-width=\".4\" stroke-linecap=\"butt\" stroke-linejoin=\"miter\""
+      },
+      "observations": {
+        "production": {
+          "path": "M 28.284271247462 0 L 0 0 L -28.284271247462 0 L 0 0 L 28.284271247462 0 Z",
+          "svg": "renders/zero-y-positive-butt-miter-production.svg",
+          "png": "renders/zero-y-positive-butt-miter-production.png",
+          "command": [
+            "/opt/homebrew/bin/rsvg-convert",
+            "--output",
+            "/Users/takamatoshinori/Desktop/stratified-tikz/tests/fixtures/point-node-anchors/zero-axis/renders/zero-y-positive-butt-miter-production.png",
+            "/Users/takamatoshinori/Desktop/stratified-tikz/tests/fixtures/point-node-anchors/zero-axis/renders/zero-y-positive-butt-miter-production.svg"
+          ],
+          "exitCode": 0,
+          "width": 800,
+          "height": 800,
+          "blackPixelCount": 2264,
+          "bounds": {
+            "minX": 117,
+            "minY": 398,
+            "maxX": 682,
+            "maxY": 401
+          }
+        },
+        "pgf": {
+          "path": "M 28.2843 0 C 28.2843 0 15.62119 0 0 0 C -15.62119 0 -28.2843 0 -28.2843 0 C -28.2843 0 -15.62119 0 0 0 C 15.62119 0 28.2843 0 28.2843 0 Z M 0 0",
+          "svg": "renders/zero-y-positive-butt-miter-pgf.svg",
+          "png": "renders/zero-y-positive-butt-miter-pgf.png",
+          "command": [
+            "/opt/homebrew/bin/rsvg-convert",
+            "--output",
+            "/Users/takamatoshinori/Desktop/stratified-tikz/tests/fixtures/point-node-anchors/zero-axis/renders/zero-y-positive-butt-miter-pgf.png",
+            "/Users/takamatoshinori/Desktop/stratified-tikz/tests/fixtures/point-node-anchors/zero-axis/renders/zero-y-positive-butt-miter-pgf.svg"
+          ],
+          "exitCode": 0,
+          "width": 800,
+          "height": 800,
+          "blackPixelCount": 2264,
+          "bounds": {
+            "minX": 117,
+            "minY": 398,
+            "maxX": 682,
+            "maxY": 401
+          }
+        }
+      }
+    },
+    {
+      "id": "zero-y-positive-round-round",
+      "caseId": "zero-y-positive",
+      "style": {
+        "id": "round-round",
+        "attributes": "fill=\"none\" stroke=\"black\" stroke-width=\".4\" stroke-linecap=\"round\" stroke-linejoin=\"round\""
+      },
+      "observations": {
+        "production": {
+          "path": "M 28.284271247462 0 L 0 0 L -28.284271247462 0 L 0 0 L 28.284271247462 0 Z",
+          "svg": "renders/zero-y-positive-round-round-production.svg",
+          "png": "renders/zero-y-positive-round-round-production.png",
+          "command": [
+            "/opt/homebrew/bin/rsvg-convert",
+            "--output",
+            "/Users/takamatoshinori/Desktop/stratified-tikz/tests/fixtures/point-node-anchors/zero-axis/renders/zero-y-positive-round-round-production.png",
+            "/Users/takamatoshinori/Desktop/stratified-tikz/tests/fixtures/point-node-anchors/zero-axis/renders/zero-y-positive-round-round-production.svg"
+          ],
+          "exitCode": 0,
+          "width": 800,
+          "height": 800,
+          "blackPixelCount": 2276,
+          "bounds": {
+            "minX": 115,
+            "minY": 398,
+            "maxX": 684,
+            "maxY": 401
+          }
+        },
+        "pgf": {
+          "path": "M 28.2843 0 C 28.2843 0 15.62119 0 0 0 C -15.62119 0 -28.2843 0 -28.2843 0 C -28.2843 0 -15.62119 0 0 0 C 15.62119 0 28.2843 0 28.2843 0 Z M 0 0",
+          "svg": "renders/zero-y-positive-round-round-pgf.svg",
+          "png": "renders/zero-y-positive-round-round-pgf.png",
+          "command": [
+            "/opt/homebrew/bin/rsvg-convert",
+            "--output",
+            "/Users/takamatoshinori/Desktop/stratified-tikz/tests/fixtures/point-node-anchors/zero-axis/renders/zero-y-positive-round-round-pgf.png",
+            "/Users/takamatoshinori/Desktop/stratified-tikz/tests/fixtures/point-node-anchors/zero-axis/renders/zero-y-positive-round-round-pgf.svg"
+          ],
+          "exitCode": 0,
+          "width": 800,
+          "height": 800,
+          "blackPixelCount": 2276,
+          "bounds": {
+            "minX": 115,
+            "minY": 398,
+            "maxX": 684,
+            "maxY": 401
+          }
+        }
+      }
+    },
+    {
+      "id": "zero-y-positive-square-bevel-dashed",
+      "caseId": "zero-y-positive",
+      "style": {
+        "id": "square-bevel-dashed",
+        "attributes": "fill=\"none\" stroke=\"black\" stroke-width=\".4\" stroke-linecap=\"square\" stroke-linejoin=\"bevel\" stroke-dasharray=\"3 2 1 2\" stroke-dashoffset=\"1.3\""
+      },
+      "observations": {
+        "production": {
+          "path": "M 28.284271247462 0 L 0 0 L -28.284271247462 0 L 0 0 L 28.284271247462 0 Z",
+          "svg": "renders/zero-y-positive-square-bevel-dashed-production.svg",
+          "png": "renders/zero-y-positive-square-bevel-dashed-production.png",
+          "command": [
+            "/opt/homebrew/bin/rsvg-convert",
+            "--output",
+            "/Users/takamatoshinori/Desktop/stratified-tikz/tests/fixtures/point-node-anchors/zero-axis/renders/zero-y-positive-square-bevel-dashed-production.png",
+            "/Users/takamatoshinori/Desktop/stratified-tikz/tests/fixtures/point-node-anchors/zero-axis/renders/zero-y-positive-square-bevel-dashed-production.svg"
+          ],
+          "exitCode": 0,
+          "width": 800,
+          "height": 800,
+          "blackPixelCount": 1816,
+          "bounds": {
+            "minX": 117,
+            "minY": 398,
+            "maxX": 682,
+            "maxY": 401
+          }
+        },
+        "pgf": {
+          "path": "M 28.2843 0 C 28.2843 0 15.62119 0 0 0 C -15.62119 0 -28.2843 0 -28.2843 0 C -28.2843 0 -15.62119 0 0 0 C 15.62119 0 28.2843 0 28.2843 0 Z M 0 0",
+          "svg": "renders/zero-y-positive-square-bevel-dashed-pgf.svg",
+          "png": "renders/zero-y-positive-square-bevel-dashed-pgf.png",
+          "command": [
+            "/opt/homebrew/bin/rsvg-convert",
+            "--output",
+            "/Users/takamatoshinori/Desktop/stratified-tikz/tests/fixtures/point-node-anchors/zero-axis/renders/zero-y-positive-square-bevel-dashed-pgf.png",
+            "/Users/takamatoshinori/Desktop/stratified-tikz/tests/fixtures/point-node-anchors/zero-axis/renders/zero-y-positive-square-bevel-dashed-pgf.svg"
+          ],
+          "exitCode": 0,
+          "width": 800,
+          "height": 800,
+          "blackPixelCount": 1816,
+          "bounds": {
+            "minX": 117,
+            "minY": 398,
+            "maxX": 682,
+            "maxY": 401
+          }
+        }
+      }
+    },
+    {
+      "id": "zero-y-positive-round-round-dashed",
+      "caseId": "zero-y-positive",
+      "style": {
+        "id": "round-round-dashed",
+        "attributes": "fill=\"none\" stroke=\"black\" stroke-width=\".4\" stroke-linecap=\"round\" stroke-linejoin=\"round\" stroke-dasharray=\"2 5\" stroke-dashoffset=\"-2.7\""
+      },
+      "observations": {
+        "production": {
+          "path": "M 28.284271247462 0 L 0 0 L -28.284271247462 0 L 0 0 L 28.284271247462 0 Z",
+          "svg": "renders/zero-y-positive-round-round-dashed-production.svg",
+          "png": "renders/zero-y-positive-round-round-dashed-production.png",
+          "command": [
+            "/opt/homebrew/bin/rsvg-convert",
+            "--output",
+            "/Users/takamatoshinori/Desktop/stratified-tikz/tests/fixtures/point-node-anchors/zero-axis/renders/zero-y-positive-round-round-dashed-production.png",
+            "/Users/takamatoshinori/Desktop/stratified-tikz/tests/fixtures/point-node-anchors/zero-axis/renders/zero-y-positive-round-round-dashed-production.svg"
+          ],
+          "exitCode": 0,
+          "width": 800,
+          "height": 800,
+          "blackPixelCount": 976,
+          "bounds": {
+            "minX": 137,
+            "minY": 398,
+            "maxX": 657,
+            "maxY": 401
+          }
+        },
+        "pgf": {
+          "path": "M 28.2843 0 C 28.2843 0 15.62119 0 0 0 C -15.62119 0 -28.2843 0 -28.2843 0 C -28.2843 0 -15.62119 0 0 0 C 15.62119 0 28.2843 0 28.2843 0 Z M 0 0",
+          "svg": "renders/zero-y-positive-round-round-dashed-pgf.svg",
+          "png": "renders/zero-y-positive-round-round-dashed-pgf.png",
+          "command": [
+            "/opt/homebrew/bin/rsvg-convert",
+            "--output",
+            "/Users/takamatoshinori/Desktop/stratified-tikz/tests/fixtures/point-node-anchors/zero-axis/renders/zero-y-positive-round-round-dashed-pgf.png",
+            "/Users/takamatoshinori/Desktop/stratified-tikz/tests/fixtures/point-node-anchors/zero-axis/renders/zero-y-positive-round-round-dashed-pgf.svg"
+          ],
+          "exitCode": 0,
+          "width": 800,
+          "height": 800,
+          "blackPixelCount": 976,
+          "bounds": {
+            "minX": 137,
+            "minY": 398,
+            "maxX": 657,
+            "maxY": 401
+          }
+        }
+      }
+    },
+    {
+      "id": "zero-y-positive-zero-area-fill",
+      "caseId": "zero-y-positive",
+      "style": {
+        "id": "zero-area-fill",
+        "attributes": "fill=\"black\" stroke=\"none\""
+      },
+      "observations": {
+        "production": {
+          "path": "M 28.284271247462 0 L 0 0 L -28.284271247462 0 L 0 0 L 28.284271247462 0 Z",
+          "svg": "renders/zero-y-positive-zero-area-fill-production.svg",
+          "png": "renders/zero-y-positive-zero-area-fill-production.png",
+          "command": [
+            "/opt/homebrew/bin/rsvg-convert",
+            "--output",
+            "/Users/takamatoshinori/Desktop/stratified-tikz/tests/fixtures/point-node-anchors/zero-axis/renders/zero-y-positive-zero-area-fill-production.png",
+            "/Users/takamatoshinori/Desktop/stratified-tikz/tests/fixtures/point-node-anchors/zero-axis/renders/zero-y-positive-zero-area-fill-production.svg"
+          ],
+          "exitCode": 0,
+          "width": 800,
+          "height": 800,
+          "blackPixelCount": 0,
+          "bounds": null
+        },
+        "pgf": {
+          "path": "M 28.2843 0 C 28.2843 0 15.62119 0 0 0 C -15.62119 0 -28.2843 0 -28.2843 0 C -28.2843 0 -15.62119 0 0 0 C 15.62119 0 28.2843 0 28.2843 0 Z M 0 0",
+          "svg": "renders/zero-y-positive-zero-area-fill-pgf.svg",
+          "png": "renders/zero-y-positive-zero-area-fill-pgf.png",
+          "command": [
+            "/opt/homebrew/bin/rsvg-convert",
+            "--output",
+            "/Users/takamatoshinori/Desktop/stratified-tikz/tests/fixtures/point-node-anchors/zero-axis/renders/zero-y-positive-zero-area-fill-pgf.png",
+            "/Users/takamatoshinori/Desktop/stratified-tikz/tests/fixtures/point-node-anchors/zero-axis/renders/zero-y-positive-zero-area-fill-pgf.svg"
+          ],
+          "exitCode": 0,
+          "width": 800,
+          "height": 800,
+          "blackPixelCount": 0,
+          "bounds": null
+        }
+      }
+    },
+    {
+      "id": "both-zero-butt-miter",
+      "caseId": "both-zero",
+      "style": {
+        "id": "butt-miter",
+        "attributes": "fill=\"none\" stroke=\"black\" stroke-width=\".4\" stroke-linecap=\"butt\" stroke-linejoin=\"miter\""
+      },
+      "observations": {
+        "production": {
+          "path": "M 0 0 L 0 0 L 0 0 L 0 0 L 0 0 Z",
+          "svg": "renders/both-zero-butt-miter-production.svg",
+          "png": "renders/both-zero-butt-miter-production.png",
+          "command": [
+            "/opt/homebrew/bin/rsvg-convert",
+            "--output",
+            "/Users/takamatoshinori/Desktop/stratified-tikz/tests/fixtures/point-node-anchors/zero-axis/renders/both-zero-butt-miter-production.png",
+            "/Users/takamatoshinori/Desktop/stratified-tikz/tests/fixtures/point-node-anchors/zero-axis/renders/both-zero-butt-miter-production.svg"
+          ],
+          "exitCode": 0,
+          "width": 800,
+          "height": 800,
+          "blackPixelCount": 0,
+          "bounds": null
+        },
+        "pgf": {
+          "path": "M 0 0 C 0 0 0 0 0 0 C 0 0 0 0 0 0 C 0 0 0 0 0 0 C 0 0 0 0 0 0 Z M 0 0",
+          "svg": "renders/both-zero-butt-miter-pgf.svg",
+          "png": "renders/both-zero-butt-miter-pgf.png",
+          "command": [
+            "/opt/homebrew/bin/rsvg-convert",
+            "--output",
+            "/Users/takamatoshinori/Desktop/stratified-tikz/tests/fixtures/point-node-anchors/zero-axis/renders/both-zero-butt-miter-pgf.png",
+            "/Users/takamatoshinori/Desktop/stratified-tikz/tests/fixtures/point-node-anchors/zero-axis/renders/both-zero-butt-miter-pgf.svg"
+          ],
+          "exitCode": 0,
+          "width": 800,
+          "height": 800,
+          "blackPixelCount": 0,
+          "bounds": null
+        }
+      }
+    },
+    {
+      "id": "both-zero-round-round",
+      "caseId": "both-zero",
+      "style": {
+        "id": "round-round",
+        "attributes": "fill=\"none\" stroke=\"black\" stroke-width=\".4\" stroke-linecap=\"round\" stroke-linejoin=\"round\""
+      },
+      "observations": {
+        "production": {
+          "path": "M 0 0 L 0 0 L 0 0 L 0 0 L 0 0 Z",
+          "svg": "renders/both-zero-round-round-production.svg",
+          "png": "renders/both-zero-round-round-production.png",
+          "command": [
+            "/opt/homebrew/bin/rsvg-convert",
+            "--output",
+            "/Users/takamatoshinori/Desktop/stratified-tikz/tests/fixtures/point-node-anchors/zero-axis/renders/both-zero-round-round-production.png",
+            "/Users/takamatoshinori/Desktop/stratified-tikz/tests/fixtures/point-node-anchors/zero-axis/renders/both-zero-round-round-production.svg"
+          ],
+          "exitCode": 0,
+          "width": 800,
+          "height": 800,
+          "blackPixelCount": 12,
+          "bounds": {
+            "minX": 398,
+            "minY": 398,
+            "maxX": 401,
+            "maxY": 401
+          }
+        },
+        "pgf": {
+          "path": "M 0 0 C 0 0 0 0 0 0 C 0 0 0 0 0 0 C 0 0 0 0 0 0 C 0 0 0 0 0 0 Z M 0 0",
+          "svg": "renders/both-zero-round-round-pgf.svg",
+          "png": "renders/both-zero-round-round-pgf.png",
+          "command": [
+            "/opt/homebrew/bin/rsvg-convert",
+            "--output",
+            "/Users/takamatoshinori/Desktop/stratified-tikz/tests/fixtures/point-node-anchors/zero-axis/renders/both-zero-round-round-pgf.png",
+            "/Users/takamatoshinori/Desktop/stratified-tikz/tests/fixtures/point-node-anchors/zero-axis/renders/both-zero-round-round-pgf.svg"
+          ],
+          "exitCode": 0,
+          "width": 800,
+          "height": 800,
+          "blackPixelCount": 12,
+          "bounds": {
+            "minX": 398,
+            "minY": 398,
+            "maxX": 401,
+            "maxY": 401
+          }
+        }
+      }
+    },
+    {
+      "id": "both-zero-square-bevel-dashed",
+      "caseId": "both-zero",
+      "style": {
+        "id": "square-bevel-dashed",
+        "attributes": "fill=\"none\" stroke=\"black\" stroke-width=\".4\" stroke-linecap=\"square\" stroke-linejoin=\"bevel\" stroke-dasharray=\"3 2 1 2\" stroke-dashoffset=\"1.3\""
+      },
+      "observations": {
+        "production": {
+          "path": "M 0 0 L 0 0 L 0 0 L 0 0 L 0 0 Z",
+          "svg": "renders/both-zero-square-bevel-dashed-production.svg",
+          "png": "renders/both-zero-square-bevel-dashed-production.png",
+          "command": [
+            "/opt/homebrew/bin/rsvg-convert",
+            "--output",
+            "/Users/takamatoshinori/Desktop/stratified-tikz/tests/fixtures/point-node-anchors/zero-axis/renders/both-zero-square-bevel-dashed-production.png",
+            "/Users/takamatoshinori/Desktop/stratified-tikz/tests/fixtures/point-node-anchors/zero-axis/renders/both-zero-square-bevel-dashed-production.svg"
+          ],
+          "exitCode": 0,
+          "width": 800,
+          "height": 800,
+          "blackPixelCount": 16,
+          "bounds": {
+            "minX": 398,
+            "minY": 398,
+            "maxX": 401,
+            "maxY": 401
+          }
+        },
+        "pgf": {
+          "path": "M 0 0 C 0 0 0 0 0 0 C 0 0 0 0 0 0 C 0 0 0 0 0 0 C 0 0 0 0 0 0 Z M 0 0",
+          "svg": "renders/both-zero-square-bevel-dashed-pgf.svg",
+          "png": "renders/both-zero-square-bevel-dashed-pgf.png",
+          "command": [
+            "/opt/homebrew/bin/rsvg-convert",
+            "--output",
+            "/Users/takamatoshinori/Desktop/stratified-tikz/tests/fixtures/point-node-anchors/zero-axis/renders/both-zero-square-bevel-dashed-pgf.png",
+            "/Users/takamatoshinori/Desktop/stratified-tikz/tests/fixtures/point-node-anchors/zero-axis/renders/both-zero-square-bevel-dashed-pgf.svg"
+          ],
+          "exitCode": 0,
+          "width": 800,
+          "height": 800,
+          "blackPixelCount": 16,
+          "bounds": {
+            "minX": 398,
+            "minY": 398,
+            "maxX": 401,
+            "maxY": 401
+          }
+        }
+      }
+    },
+    {
+      "id": "both-zero-round-round-dashed",
+      "caseId": "both-zero",
+      "style": {
+        "id": "round-round-dashed",
+        "attributes": "fill=\"none\" stroke=\"black\" stroke-width=\".4\" stroke-linecap=\"round\" stroke-linejoin=\"round\" stroke-dasharray=\"2 5\" stroke-dashoffset=\"-2.7\""
+      },
+      "observations": {
+        "production": {
+          "path": "M 0 0 L 0 0 L 0 0 L 0 0 L 0 0 Z",
+          "svg": "renders/both-zero-round-round-dashed-production.svg",
+          "png": "renders/both-zero-round-round-dashed-production.png",
+          "command": [
+            "/opt/homebrew/bin/rsvg-convert",
+            "--output",
+            "/Users/takamatoshinori/Desktop/stratified-tikz/tests/fixtures/point-node-anchors/zero-axis/renders/both-zero-round-round-dashed-production.png",
+            "/Users/takamatoshinori/Desktop/stratified-tikz/tests/fixtures/point-node-anchors/zero-axis/renders/both-zero-round-round-dashed-production.svg"
+          ],
+          "exitCode": 0,
+          "width": 800,
+          "height": 800,
+          "blackPixelCount": 0,
+          "bounds": null
+        },
+        "pgf": {
+          "path": "M 0 0 C 0 0 0 0 0 0 C 0 0 0 0 0 0 C 0 0 0 0 0 0 C 0 0 0 0 0 0 Z M 0 0",
+          "svg": "renders/both-zero-round-round-dashed-pgf.svg",
+          "png": "renders/both-zero-round-round-dashed-pgf.png",
+          "command": [
+            "/opt/homebrew/bin/rsvg-convert",
+            "--output",
+            "/Users/takamatoshinori/Desktop/stratified-tikz/tests/fixtures/point-node-anchors/zero-axis/renders/both-zero-round-round-dashed-pgf.png",
+            "/Users/takamatoshinori/Desktop/stratified-tikz/tests/fixtures/point-node-anchors/zero-axis/renders/both-zero-round-round-dashed-pgf.svg"
+          ],
+          "exitCode": 0,
+          "width": 800,
+          "height": 800,
+          "blackPixelCount": 0,
+          "bounds": null
+        }
+      }
+    },
+    {
+      "id": "both-zero-zero-area-fill",
+      "caseId": "both-zero",
+      "style": {
+        "id": "zero-area-fill",
+        "attributes": "fill=\"black\" stroke=\"none\""
+      },
+      "observations": {
+        "production": {
+          "path": "M 0 0 L 0 0 L 0 0 L 0 0 L 0 0 Z",
+          "svg": "renders/both-zero-zero-area-fill-production.svg",
+          "png": "renders/both-zero-zero-area-fill-production.png",
+          "command": [
+            "/opt/homebrew/bin/rsvg-convert",
+            "--output",
+            "/Users/takamatoshinori/Desktop/stratified-tikz/tests/fixtures/point-node-anchors/zero-axis/renders/both-zero-zero-area-fill-production.png",
+            "/Users/takamatoshinori/Desktop/stratified-tikz/tests/fixtures/point-node-anchors/zero-axis/renders/both-zero-zero-area-fill-production.svg"
+          ],
+          "exitCode": 0,
+          "width": 800,
+          "height": 800,
+          "blackPixelCount": 0,
+          "bounds": null
+        },
+        "pgf": {
+          "path": "M 0 0 C 0 0 0 0 0 0 C 0 0 0 0 0 0 C 0 0 0 0 0 0 C 0 0 0 0 0 0 Z M 0 0",
+          "svg": "renders/both-zero-zero-area-fill-pgf.svg",
+          "png": "renders/both-zero-zero-area-fill-pgf.png",
+          "command": [
+            "/opt/homebrew/bin/rsvg-convert",
+            "--output",
+            "/Users/takamatoshinori/Desktop/stratified-tikz/tests/fixtures/point-node-anchors/zero-axis/renders/both-zero-zero-area-fill-pgf.png",
+            "/Users/takamatoshinori/Desktop/stratified-tikz/tests/fixtures/point-node-anchors/zero-axis/renders/both-zero-zero-area-fill-pgf.svg"
+          ],
+          "exitCode": 0,
+          "width": 800,
+          "height": 800,
+          "blackPixelCount": 0,
+          "bounds": null
+        }
+      }
+    },
+    {
+      "id": "zero-x-negative-butt-miter",
+      "caseId": "zero-x-negative",
+      "style": {
+        "id": "butt-miter",
+        "attributes": "fill=\"none\" stroke=\"black\" stroke-width=\".4\" stroke-linecap=\"butt\" stroke-linejoin=\"miter\""
+      },
+      "observations": {
+        "production": {
+          "path": "M 0 0 L 0 28.284271247462 L 0 0 L 0 -28.284271247462 L 0 0 Z",
+          "svg": "renders/zero-x-negative-butt-miter-production.svg",
+          "png": "renders/zero-x-negative-butt-miter-production.png",
+          "command": [
+            "/opt/homebrew/bin/rsvg-convert",
+            "--output",
+            "/Users/takamatoshinori/Desktop/stratified-tikz/tests/fixtures/point-node-anchors/zero-axis/renders/zero-x-negative-butt-miter-production.png",
+            "/Users/takamatoshinori/Desktop/stratified-tikz/tests/fixtures/point-node-anchors/zero-axis/renders/zero-x-negative-butt-miter-production.svg"
+          ],
+          "exitCode": 0,
+          "width": 800,
+          "height": 800,
+          "blackPixelCount": 2264,
+          "bounds": {
+            "minX": 398,
+            "minY": 117,
+            "maxX": 401,
+            "maxY": 682
+          }
+        },
+        "pgf": {
+          "path": "M 0 0 C 0 15.62119 0 28.2843 0 28.2843 C 0 28.2843 0 15.62119 0 0 C 0 -15.62119 0 -28.2843 0 -28.2843 C 0 -28.2843 0 -15.62119 0 0 Z M 0 0",
+          "svg": "renders/zero-x-negative-butt-miter-pgf.svg",
+          "png": "renders/zero-x-negative-butt-miter-pgf.png",
+          "command": [
+            "/opt/homebrew/bin/rsvg-convert",
+            "--output",
+            "/Users/takamatoshinori/Desktop/stratified-tikz/tests/fixtures/point-node-anchors/zero-axis/renders/zero-x-negative-butt-miter-pgf.png",
+            "/Users/takamatoshinori/Desktop/stratified-tikz/tests/fixtures/point-node-anchors/zero-axis/renders/zero-x-negative-butt-miter-pgf.svg"
+          ],
+          "exitCode": 0,
+          "width": 800,
+          "height": 800,
+          "blackPixelCount": 2264,
+          "bounds": {
+            "minX": 398,
+            "minY": 117,
+            "maxX": 401,
+            "maxY": 682
+          }
+        }
+      }
+    },
+    {
+      "id": "zero-x-negative-round-round",
+      "caseId": "zero-x-negative",
+      "style": {
+        "id": "round-round",
+        "attributes": "fill=\"none\" stroke=\"black\" stroke-width=\".4\" stroke-linecap=\"round\" stroke-linejoin=\"round\""
+      },
+      "observations": {
+        "production": {
+          "path": "M 0 0 L 0 28.284271247462 L 0 0 L 0 -28.284271247462 L 0 0 Z",
+          "svg": "renders/zero-x-negative-round-round-production.svg",
+          "png": "renders/zero-x-negative-round-round-production.png",
+          "command": [
+            "/opt/homebrew/bin/rsvg-convert",
+            "--output",
+            "/Users/takamatoshinori/Desktop/stratified-tikz/tests/fixtures/point-node-anchors/zero-axis/renders/zero-x-negative-round-round-production.png",
+            "/Users/takamatoshinori/Desktop/stratified-tikz/tests/fixtures/point-node-anchors/zero-axis/renders/zero-x-negative-round-round-production.svg"
+          ],
+          "exitCode": 0,
+          "width": 800,
+          "height": 800,
+          "blackPixelCount": 2276,
+          "bounds": {
+            "minX": 398,
+            "minY": 115,
+            "maxX": 401,
+            "maxY": 684
+          }
+        },
+        "pgf": {
+          "path": "M 0 0 C 0 15.62119 0 28.2843 0 28.2843 C 0 28.2843 0 15.62119 0 0 C 0 -15.62119 0 -28.2843 0 -28.2843 C 0 -28.2843 0 -15.62119 0 0 Z M 0 0",
+          "svg": "renders/zero-x-negative-round-round-pgf.svg",
+          "png": "renders/zero-x-negative-round-round-pgf.png",
+          "command": [
+            "/opt/homebrew/bin/rsvg-convert",
+            "--output",
+            "/Users/takamatoshinori/Desktop/stratified-tikz/tests/fixtures/point-node-anchors/zero-axis/renders/zero-x-negative-round-round-pgf.png",
+            "/Users/takamatoshinori/Desktop/stratified-tikz/tests/fixtures/point-node-anchors/zero-axis/renders/zero-x-negative-round-round-pgf.svg"
+          ],
+          "exitCode": 0,
+          "width": 800,
+          "height": 800,
+          "blackPixelCount": 2276,
+          "bounds": {
+            "minX": 398,
+            "minY": 115,
+            "maxX": 401,
+            "maxY": 684
+          }
+        }
+      }
+    },
+    {
+      "id": "zero-x-negative-square-bevel-dashed",
+      "caseId": "zero-x-negative",
+      "style": {
+        "id": "square-bevel-dashed",
+        "attributes": "fill=\"none\" stroke=\"black\" stroke-width=\".4\" stroke-linecap=\"square\" stroke-linejoin=\"bevel\" stroke-dasharray=\"3 2 1 2\" stroke-dashoffset=\"1.3\""
+      },
+      "observations": {
+        "production": {
+          "path": "M 0 0 L 0 28.284271247462 L 0 0 L 0 -28.284271247462 L 0 0 Z",
+          "svg": "renders/zero-x-negative-square-bevel-dashed-production.svg",
+          "png": "renders/zero-x-negative-square-bevel-dashed-production.png",
+          "command": [
+            "/opt/homebrew/bin/rsvg-convert",
+            "--output",
+            "/Users/takamatoshinori/Desktop/stratified-tikz/tests/fixtures/point-node-anchors/zero-axis/renders/zero-x-negative-square-bevel-dashed-production.png",
+            "/Users/takamatoshinori/Desktop/stratified-tikz/tests/fixtures/point-node-anchors/zero-axis/renders/zero-x-negative-square-bevel-dashed-production.svg"
+          ],
+          "exitCode": 0,
+          "width": 800,
+          "height": 800,
+          "blackPixelCount": 1788,
+          "bounds": {
+            "minX": 398,
+            "minY": 117,
+            "maxX": 401,
+            "maxY": 682
+          }
+        },
+        "pgf": {
+          "path": "M 0 0 C 0 15.62119 0 28.2843 0 28.2843 C 0 28.2843 0 15.62119 0 0 C 0 -15.62119 0 -28.2843 0 -28.2843 C 0 -28.2843 0 -15.62119 0 0 Z M 0 0",
+          "svg": "renders/zero-x-negative-square-bevel-dashed-pgf.svg",
+          "png": "renders/zero-x-negative-square-bevel-dashed-pgf.png",
+          "command": [
+            "/opt/homebrew/bin/rsvg-convert",
+            "--output",
+            "/Users/takamatoshinori/Desktop/stratified-tikz/tests/fixtures/point-node-anchors/zero-axis/renders/zero-x-negative-square-bevel-dashed-pgf.png",
+            "/Users/takamatoshinori/Desktop/stratified-tikz/tests/fixtures/point-node-anchors/zero-axis/renders/zero-x-negative-square-bevel-dashed-pgf.svg"
+          ],
+          "exitCode": 0,
+          "width": 800,
+          "height": 800,
+          "blackPixelCount": 1788,
+          "bounds": {
+            "minX": 398,
+            "minY": 117,
+            "maxX": 401,
+            "maxY": 682
+          }
+        }
+      }
+    },
+    {
+      "id": "zero-x-negative-round-round-dashed",
+      "caseId": "zero-x-negative",
+      "style": {
+        "id": "round-round-dashed",
+        "attributes": "fill=\"none\" stroke=\"black\" stroke-width=\".4\" stroke-linecap=\"round\" stroke-linejoin=\"round\" stroke-dasharray=\"2 5\" stroke-dashoffset=\"-2.7\""
+      },
+      "observations": {
+        "production": {
+          "path": "M 0 0 L 0 28.284271247462 L 0 0 L 0 -28.284271247462 L 0 0 Z",
+          "svg": "renders/zero-x-negative-round-round-dashed-production.svg",
+          "png": "renders/zero-x-negative-round-round-dashed-production.png",
+          "command": [
+            "/opt/homebrew/bin/rsvg-convert",
+            "--output",
+            "/Users/takamatoshinori/Desktop/stratified-tikz/tests/fixtures/point-node-anchors/zero-axis/renders/zero-x-negative-round-round-dashed-production.png",
+            "/Users/takamatoshinori/Desktop/stratified-tikz/tests/fixtures/point-node-anchors/zero-axis/renders/zero-x-negative-round-round-dashed-production.svg"
+          ],
+          "exitCode": 0,
+          "width": 800,
+          "height": 800,
+          "blackPixelCount": 984,
+          "bounds": {
+            "minX": 398,
+            "minY": 134,
+            "maxX": 401,
+            "maxY": 660
+          }
+        },
+        "pgf": {
+          "path": "M 0 0 C 0 15.62119 0 28.2843 0 28.2843 C 0 28.2843 0 15.62119 0 0 C 0 -15.62119 0 -28.2843 0 -28.2843 C 0 -28.2843 0 -15.62119 0 0 Z M 0 0",
+          "svg": "renders/zero-x-negative-round-round-dashed-pgf.svg",
+          "png": "renders/zero-x-negative-round-round-dashed-pgf.png",
+          "command": [
+            "/opt/homebrew/bin/rsvg-convert",
+            "--output",
+            "/Users/takamatoshinori/Desktop/stratified-tikz/tests/fixtures/point-node-anchors/zero-axis/renders/zero-x-negative-round-round-dashed-pgf.png",
+            "/Users/takamatoshinori/Desktop/stratified-tikz/tests/fixtures/point-node-anchors/zero-axis/renders/zero-x-negative-round-round-dashed-pgf.svg"
+          ],
+          "exitCode": 0,
+          "width": 800,
+          "height": 800,
+          "blackPixelCount": 984,
+          "bounds": {
+            "minX": 398,
+            "minY": 134,
+            "maxX": 401,
+            "maxY": 660
+          }
+        }
+      }
+    },
+    {
+      "id": "zero-x-negative-zero-area-fill",
+      "caseId": "zero-x-negative",
+      "style": {
+        "id": "zero-area-fill",
+        "attributes": "fill=\"black\" stroke=\"none\""
+      },
+      "observations": {
+        "production": {
+          "path": "M 0 0 L 0 28.284271247462 L 0 0 L 0 -28.284271247462 L 0 0 Z",
+          "svg": "renders/zero-x-negative-zero-area-fill-production.svg",
+          "png": "renders/zero-x-negative-zero-area-fill-production.png",
+          "command": [
+            "/opt/homebrew/bin/rsvg-convert",
+            "--output",
+            "/Users/takamatoshinori/Desktop/stratified-tikz/tests/fixtures/point-node-anchors/zero-axis/renders/zero-x-negative-zero-area-fill-production.png",
+            "/Users/takamatoshinori/Desktop/stratified-tikz/tests/fixtures/point-node-anchors/zero-axis/renders/zero-x-negative-zero-area-fill-production.svg"
+          ],
+          "exitCode": 0,
+          "width": 800,
+          "height": 800,
+          "blackPixelCount": 0,
+          "bounds": null
+        },
+        "pgf": {
+          "path": "M 0 0 C 0 15.62119 0 28.2843 0 28.2843 C 0 28.2843 0 15.62119 0 0 C 0 -15.62119 0 -28.2843 0 -28.2843 C 0 -28.2843 0 -15.62119 0 0 Z M 0 0",
+          "svg": "renders/zero-x-negative-zero-area-fill-pgf.svg",
+          "png": "renders/zero-x-negative-zero-area-fill-pgf.png",
+          "command": [
+            "/opt/homebrew/bin/rsvg-convert",
+            "--output",
+            "/Users/takamatoshinori/Desktop/stratified-tikz/tests/fixtures/point-node-anchors/zero-axis/renders/zero-x-negative-zero-area-fill-pgf.png",
+            "/Users/takamatoshinori/Desktop/stratified-tikz/tests/fixtures/point-node-anchors/zero-axis/renders/zero-x-negative-zero-area-fill-pgf.svg"
+          ],
+          "exitCode": 0,
+          "width": 800,
+          "height": 800,
+          "blackPixelCount": 0,
+          "bounds": null
+        }
+      }
+    },
+    {
+      "id": "zero-y-negative-butt-miter",
+      "caseId": "zero-y-negative",
+      "style": {
+        "id": "butt-miter",
+        "attributes": "fill=\"none\" stroke=\"black\" stroke-width=\".4\" stroke-linecap=\"butt\" stroke-linejoin=\"miter\""
+      },
+      "observations": {
+        "production": {
+          "path": "M -28.284271247462 0 L 0 0 L 28.284271247462 0 L 0 0 L -28.284271247462 0 Z",
+          "svg": "renders/zero-y-negative-butt-miter-production.svg",
+          "png": "renders/zero-y-negative-butt-miter-production.png",
+          "command": [
+            "/opt/homebrew/bin/rsvg-convert",
+            "--output",
+            "/Users/takamatoshinori/Desktop/stratified-tikz/tests/fixtures/point-node-anchors/zero-axis/renders/zero-y-negative-butt-miter-production.png",
+            "/Users/takamatoshinori/Desktop/stratified-tikz/tests/fixtures/point-node-anchors/zero-axis/renders/zero-y-negative-butt-miter-production.svg"
+          ],
+          "exitCode": 0,
+          "width": 800,
+          "height": 800,
+          "blackPixelCount": 2264,
+          "bounds": {
+            "minX": 117,
+            "minY": 398,
+            "maxX": 682,
+            "maxY": 401
+          }
+        },
+        "pgf": {
+          "path": "M -28.2843 0 C -28.2843 0 -15.62119 0 0 0 C 15.62119 0 28.2843 0 28.2843 0 C 28.2843 0 15.62119 0 0 0 C -15.62119 0 -28.2843 0 -28.2843 0 Z M 0 0",
+          "svg": "renders/zero-y-negative-butt-miter-pgf.svg",
+          "png": "renders/zero-y-negative-butt-miter-pgf.png",
+          "command": [
+            "/opt/homebrew/bin/rsvg-convert",
+            "--output",
+            "/Users/takamatoshinori/Desktop/stratified-tikz/tests/fixtures/point-node-anchors/zero-axis/renders/zero-y-negative-butt-miter-pgf.png",
+            "/Users/takamatoshinori/Desktop/stratified-tikz/tests/fixtures/point-node-anchors/zero-axis/renders/zero-y-negative-butt-miter-pgf.svg"
+          ],
+          "exitCode": 0,
+          "width": 800,
+          "height": 800,
+          "blackPixelCount": 2264,
+          "bounds": {
+            "minX": 117,
+            "minY": 398,
+            "maxX": 682,
+            "maxY": 401
+          }
+        }
+      }
+    },
+    {
+      "id": "zero-y-negative-round-round",
+      "caseId": "zero-y-negative",
+      "style": {
+        "id": "round-round",
+        "attributes": "fill=\"none\" stroke=\"black\" stroke-width=\".4\" stroke-linecap=\"round\" stroke-linejoin=\"round\""
+      },
+      "observations": {
+        "production": {
+          "path": "M -28.284271247462 0 L 0 0 L 28.284271247462 0 L 0 0 L -28.284271247462 0 Z",
+          "svg": "renders/zero-y-negative-round-round-production.svg",
+          "png": "renders/zero-y-negative-round-round-production.png",
+          "command": [
+            "/opt/homebrew/bin/rsvg-convert",
+            "--output",
+            "/Users/takamatoshinori/Desktop/stratified-tikz/tests/fixtures/point-node-anchors/zero-axis/renders/zero-y-negative-round-round-production.png",
+            "/Users/takamatoshinori/Desktop/stratified-tikz/tests/fixtures/point-node-anchors/zero-axis/renders/zero-y-negative-round-round-production.svg"
+          ],
+          "exitCode": 0,
+          "width": 800,
+          "height": 800,
+          "blackPixelCount": 2276,
+          "bounds": {
+            "minX": 115,
+            "minY": 398,
+            "maxX": 684,
+            "maxY": 401
+          }
+        },
+        "pgf": {
+          "path": "M -28.2843 0 C -28.2843 0 -15.62119 0 0 0 C 15.62119 0 28.2843 0 28.2843 0 C 28.2843 0 15.62119 0 0 0 C -15.62119 0 -28.2843 0 -28.2843 0 Z M 0 0",
+          "svg": "renders/zero-y-negative-round-round-pgf.svg",
+          "png": "renders/zero-y-negative-round-round-pgf.png",
+          "command": [
+            "/opt/homebrew/bin/rsvg-convert",
+            "--output",
+            "/Users/takamatoshinori/Desktop/stratified-tikz/tests/fixtures/point-node-anchors/zero-axis/renders/zero-y-negative-round-round-pgf.png",
+            "/Users/takamatoshinori/Desktop/stratified-tikz/tests/fixtures/point-node-anchors/zero-axis/renders/zero-y-negative-round-round-pgf.svg"
+          ],
+          "exitCode": 0,
+          "width": 800,
+          "height": 800,
+          "blackPixelCount": 2276,
+          "bounds": {
+            "minX": 115,
+            "minY": 398,
+            "maxX": 684,
+            "maxY": 401
+          }
+        }
+      }
+    },
+    {
+      "id": "zero-y-negative-square-bevel-dashed",
+      "caseId": "zero-y-negative",
+      "style": {
+        "id": "square-bevel-dashed",
+        "attributes": "fill=\"none\" stroke=\"black\" stroke-width=\".4\" stroke-linecap=\"square\" stroke-linejoin=\"bevel\" stroke-dasharray=\"3 2 1 2\" stroke-dashoffset=\"1.3\""
+      },
+      "observations": {
+        "production": {
+          "path": "M -28.284271247462 0 L 0 0 L 28.284271247462 0 L 0 0 L -28.284271247462 0 Z",
+          "svg": "renders/zero-y-negative-square-bevel-dashed-production.svg",
+          "png": "renders/zero-y-negative-square-bevel-dashed-production.png",
+          "command": [
+            "/opt/homebrew/bin/rsvg-convert",
+            "--output",
+            "/Users/takamatoshinori/Desktop/stratified-tikz/tests/fixtures/point-node-anchors/zero-axis/renders/zero-y-negative-square-bevel-dashed-production.png",
+            "/Users/takamatoshinori/Desktop/stratified-tikz/tests/fixtures/point-node-anchors/zero-axis/renders/zero-y-negative-square-bevel-dashed-production.svg"
+          ],
+          "exitCode": 0,
+          "width": 800,
+          "height": 800,
+          "blackPixelCount": 1816,
+          "bounds": {
+            "minX": 117,
+            "minY": 398,
+            "maxX": 682,
+            "maxY": 401
+          }
+        },
+        "pgf": {
+          "path": "M -28.2843 0 C -28.2843 0 -15.62119 0 0 0 C 15.62119 0 28.2843 0 28.2843 0 C 28.2843 0 15.62119 0 0 0 C -15.62119 0 -28.2843 0 -28.2843 0 Z M 0 0",
+          "svg": "renders/zero-y-negative-square-bevel-dashed-pgf.svg",
+          "png": "renders/zero-y-negative-square-bevel-dashed-pgf.png",
+          "command": [
+            "/opt/homebrew/bin/rsvg-convert",
+            "--output",
+            "/Users/takamatoshinori/Desktop/stratified-tikz/tests/fixtures/point-node-anchors/zero-axis/renders/zero-y-negative-square-bevel-dashed-pgf.png",
+            "/Users/takamatoshinori/Desktop/stratified-tikz/tests/fixtures/point-node-anchors/zero-axis/renders/zero-y-negative-square-bevel-dashed-pgf.svg"
+          ],
+          "exitCode": 0,
+          "width": 800,
+          "height": 800,
+          "blackPixelCount": 1816,
+          "bounds": {
+            "minX": 117,
+            "minY": 398,
+            "maxX": 682,
+            "maxY": 401
+          }
+        }
+      }
+    },
+    {
+      "id": "zero-y-negative-round-round-dashed",
+      "caseId": "zero-y-negative",
+      "style": {
+        "id": "round-round-dashed",
+        "attributes": "fill=\"none\" stroke=\"black\" stroke-width=\".4\" stroke-linecap=\"round\" stroke-linejoin=\"round\" stroke-dasharray=\"2 5\" stroke-dashoffset=\"-2.7\""
+      },
+      "observations": {
+        "production": {
+          "path": "M -28.284271247462 0 L 0 0 L 28.284271247462 0 L 0 0 L -28.284271247462 0 Z",
+          "svg": "renders/zero-y-negative-round-round-dashed-production.svg",
+          "png": "renders/zero-y-negative-round-round-dashed-production.png",
+          "command": [
+            "/opt/homebrew/bin/rsvg-convert",
+            "--output",
+            "/Users/takamatoshinori/Desktop/stratified-tikz/tests/fixtures/point-node-anchors/zero-axis/renders/zero-y-negative-round-round-dashed-production.png",
+            "/Users/takamatoshinori/Desktop/stratified-tikz/tests/fixtures/point-node-anchors/zero-axis/renders/zero-y-negative-round-round-dashed-production.svg"
+          ],
+          "exitCode": 0,
+          "width": 800,
+          "height": 800,
+          "blackPixelCount": 976,
+          "bounds": {
+            "minX": 142,
+            "minY": 398,
+            "maxX": 662,
+            "maxY": 401
+          }
+        },
+        "pgf": {
+          "path": "M -28.2843 0 C -28.2843 0 -15.62119 0 0 0 C 15.62119 0 28.2843 0 28.2843 0 C 28.2843 0 15.62119 0 0 0 C -15.62119 0 -28.2843 0 -28.2843 0 Z M 0 0",
+          "svg": "renders/zero-y-negative-round-round-dashed-pgf.svg",
+          "png": "renders/zero-y-negative-round-round-dashed-pgf.png",
+          "command": [
+            "/opt/homebrew/bin/rsvg-convert",
+            "--output",
+            "/Users/takamatoshinori/Desktop/stratified-tikz/tests/fixtures/point-node-anchors/zero-axis/renders/zero-y-negative-round-round-dashed-pgf.png",
+            "/Users/takamatoshinori/Desktop/stratified-tikz/tests/fixtures/point-node-anchors/zero-axis/renders/zero-y-negative-round-round-dashed-pgf.svg"
+          ],
+          "exitCode": 0,
+          "width": 800,
+          "height": 800,
+          "blackPixelCount": 976,
+          "bounds": {
+            "minX": 142,
+            "minY": 398,
+            "maxX": 662,
+            "maxY": 401
+          }
+        }
+      }
+    },
+    {
+      "id": "zero-y-negative-zero-area-fill",
+      "caseId": "zero-y-negative",
+      "style": {
+        "id": "zero-area-fill",
+        "attributes": "fill=\"black\" stroke=\"none\""
+      },
+      "observations": {
+        "production": {
+          "path": "M -28.284271247462 0 L 0 0 L 28.284271247462 0 L 0 0 L -28.284271247462 0 Z",
+          "svg": "renders/zero-y-negative-zero-area-fill-production.svg",
+          "png": "renders/zero-y-negative-zero-area-fill-production.png",
+          "command": [
+            "/opt/homebrew/bin/rsvg-convert",
+            "--output",
+            "/Users/takamatoshinori/Desktop/stratified-tikz/tests/fixtures/point-node-anchors/zero-axis/renders/zero-y-negative-zero-area-fill-production.png",
+            "/Users/takamatoshinori/Desktop/stratified-tikz/tests/fixtures/point-node-anchors/zero-axis/renders/zero-y-negative-zero-area-fill-production.svg"
+          ],
+          "exitCode": 0,
+          "width": 800,
+          "height": 800,
+          "blackPixelCount": 0,
+          "bounds": null
+        },
+        "pgf": {
+          "path": "M -28.2843 0 C -28.2843 0 -15.62119 0 0 0 C 15.62119 0 28.2843 0 28.2843 0 C 28.2843 0 15.62119 0 0 0 C -15.62119 0 -28.2843 0 -28.2843 0 Z M 0 0",
+          "svg": "renders/zero-y-negative-zero-area-fill-pgf.svg",
+          "png": "renders/zero-y-negative-zero-area-fill-pgf.png",
+          "command": [
+            "/opt/homebrew/bin/rsvg-convert",
+            "--output",
+            "/Users/takamatoshinori/Desktop/stratified-tikz/tests/fixtures/point-node-anchors/zero-axis/renders/zero-y-negative-zero-area-fill-pgf.png",
+            "/Users/takamatoshinori/Desktop/stratified-tikz/tests/fixtures/point-node-anchors/zero-axis/renders/zero-y-negative-zero-area-fill-pgf.svg"
+          ],
+          "exitCode": 0,
+          "width": 800,
+          "height": 800,
+          "blackPixelCount": 0,
+          "bounds": null
+        }
+      }
+    },
+    {
+      "id": "partial-zero-x-turn-butt-miter",
+      "caseId": "partial-zero-x-turn",
+      "style": {
+        "id": "butt-miter",
+        "attributes": "fill=\"none\" stroke=\"black\" stroke-width=\".4\" stroke-linecap=\"butt\" stroke-linejoin=\"miter\""
+      },
+      "observations": {
+        "production": {
+          "path": "M 0 -14.142135623731 L 0 -20 L 0 -14.142135623731",
+          "svg": "renders/partial-zero-x-turn-butt-miter-production.svg",
+          "png": "renders/partial-zero-x-turn-butt-miter-production.png",
+          "command": [
+            "/opt/homebrew/bin/rsvg-convert",
+            "--output",
+            "/Users/takamatoshinori/Desktop/stratified-tikz/tests/fixtures/point-node-anchors/zero-axis/renders/partial-zero-x-turn-butt-miter-production.png",
+            "/Users/takamatoshinori/Desktop/stratified-tikz/tests/fixtures/point-node-anchors/zero-axis/renders/partial-zero-x-turn-butt-miter-production.svg"
+          ],
+          "exitCode": 0,
+          "width": 800,
+          "height": 800,
+          "blackPixelCount": 236,
+          "bounds": {
+            "minX": 398,
+            "minY": 200,
+            "maxX": 401,
+            "maxY": 258
+          }
+        },
+        "pgf": {
+          "path": "M 0 -14.14215 C 0 -18.047445 0 -20.0000925 0 -20.0000925 C 0 -20.0000925 0 -18.047445 0 -14.14215",
+          "svg": "renders/partial-zero-x-turn-butt-miter-pgf.svg",
+          "png": "renders/partial-zero-x-turn-butt-miter-pgf.png",
+          "command": [
+            "/opt/homebrew/bin/rsvg-convert",
+            "--output",
+            "/Users/takamatoshinori/Desktop/stratified-tikz/tests/fixtures/point-node-anchors/zero-axis/renders/partial-zero-x-turn-butt-miter-pgf.png",
+            "/Users/takamatoshinori/Desktop/stratified-tikz/tests/fixtures/point-node-anchors/zero-axis/renders/partial-zero-x-turn-butt-miter-pgf.svg"
+          ],
+          "exitCode": 0,
+          "width": 800,
+          "height": 800,
+          "blackPixelCount": 236,
+          "bounds": {
+            "minX": 398,
+            "minY": 200,
+            "maxX": 401,
+            "maxY": 258
+          }
+        },
+        "pgf-raw": {
+          "path": "M 0 -14.14215 C 0 -21.95274 0 -21.95274 0 -14.14215",
+          "svg": "renders/partial-zero-x-turn-butt-miter-pgf-raw.svg",
+          "png": "renders/partial-zero-x-turn-butt-miter-pgf-raw.png",
+          "command": [
+            "/opt/homebrew/bin/rsvg-convert",
+            "--output",
+            "/Users/takamatoshinori/Desktop/stratified-tikz/tests/fixtures/point-node-anchors/zero-axis/renders/partial-zero-x-turn-butt-miter-pgf-raw.png",
+            "/Users/takamatoshinori/Desktop/stratified-tikz/tests/fixtures/point-node-anchors/zero-axis/renders/partial-zero-x-turn-butt-miter-pgf-raw.svg"
+          ],
+          "exitCode": 0,
+          "width": 800,
+          "height": 800,
+          "blackPixelCount": 8,
+          "bounds": {
+            "minX": 398,
+            "minY": 257,
+            "maxX": 401,
+            "maxY": 258
+          }
+        }
+      }
+    },
+    {
+      "id": "partial-zero-x-turn-round-round-dashed",
+      "caseId": "partial-zero-x-turn",
+      "style": {
+        "id": "round-round-dashed",
+        "attributes": "fill=\"none\" stroke=\"black\" stroke-width=\".4\" stroke-linecap=\"round\" stroke-linejoin=\"round\" stroke-dasharray=\"2 5\" stroke-dashoffset=\"-2.7\""
+      },
+      "observations": {
+        "production": {
+          "path": "M 0 -14.142135623731 L 0 -20 L 0 -14.142135623731",
+          "svg": "renders/partial-zero-x-turn-round-round-dashed-production.svg",
+          "png": "renders/partial-zero-x-turn-round-round-dashed-production.png",
+          "command": [
+            "/opt/homebrew/bin/rsvg-convert",
+            "--output",
+            "/Users/takamatoshinori/Desktop/stratified-tikz/tests/fixtures/point-node-anchors/zero-axis/renders/partial-zero-x-turn-round-round-dashed-production.png",
+            "/Users/takamatoshinori/Desktop/stratified-tikz/tests/fixtures/point-node-anchors/zero-axis/renders/partial-zero-x-turn-round-round-dashed-production.svg"
+          ],
+          "exitCode": 0,
+          "width": 800,
+          "height": 800,
+          "blackPixelCount": 184,
+          "bounds": {
+            "minX": 398,
+            "minY": 210,
+            "maxX": 401,
+            "maxY": 259
+          }
+        },
+        "pgf": {
+          "path": "M 0 -14.14215 C 0 -18.047445 0 -20.0000925 0 -20.0000925 C 0 -20.0000925 0 -18.047445 0 -14.14215",
+          "svg": "renders/partial-zero-x-turn-round-round-dashed-pgf.svg",
+          "png": "renders/partial-zero-x-turn-round-round-dashed-pgf.png",
+          "command": [
+            "/opt/homebrew/bin/rsvg-convert",
+            "--output",
+            "/Users/takamatoshinori/Desktop/stratified-tikz/tests/fixtures/point-node-anchors/zero-axis/renders/partial-zero-x-turn-round-round-dashed-pgf.png",
+            "/Users/takamatoshinori/Desktop/stratified-tikz/tests/fixtures/point-node-anchors/zero-axis/renders/partial-zero-x-turn-round-round-dashed-pgf.svg"
+          ],
+          "exitCode": 0,
+          "width": 800,
+          "height": 800,
+          "blackPixelCount": 184,
+          "bounds": {
+            "minX": 398,
+            "minY": 210,
+            "maxX": 401,
+            "maxY": 259
+          }
+        },
+        "pgf-raw": {
+          "path": "M 0 -14.14215 C 0 -21.95274 0 -21.95274 0 -14.14215",
+          "svg": "renders/partial-zero-x-turn-round-round-dashed-pgf-raw.svg",
+          "png": "renders/partial-zero-x-turn-round-round-dashed-pgf-raw.png",
+          "command": [
+            "/opt/homebrew/bin/rsvg-convert",
+            "--output",
+            "/Users/takamatoshinori/Desktop/stratified-tikz/tests/fixtures/point-node-anchors/zero-axis/renders/partial-zero-x-turn-round-round-dashed-pgf-raw.png",
+            "/Users/takamatoshinori/Desktop/stratified-tikz/tests/fixtures/point-node-anchors/zero-axis/renders/partial-zero-x-turn-round-round-dashed-pgf-raw.svg"
+          ],
+          "exitCode": 0,
+          "width": 800,
+          "height": 800,
+          "blackPixelCount": 184,
+          "bounds": {
+            "minX": 398,
+            "minY": 210,
+            "maxX": 401,
+            "maxY": 259
+          }
+        }
+      }
+    },
+    {
+      "id": "partial-zero-x-reversed-butt-miter",
+      "caseId": "partial-zero-x-reversed",
+      "style": {
+        "id": "butt-miter",
+        "attributes": "fill=\"none\" stroke=\"black\" stroke-width=\".4\" stroke-linecap=\"butt\" stroke-linejoin=\"miter\""
+      },
+      "observations": {
+        "production": {
+          "path": "M 0 -14.142135623731 L 0 -20 L 0 -14.142135623731",
+          "svg": "renders/partial-zero-x-reversed-butt-miter-production.svg",
+          "png": "renders/partial-zero-x-reversed-butt-miter-production.png",
+          "command": [
+            "/opt/homebrew/bin/rsvg-convert",
+            "--output",
+            "/Users/takamatoshinori/Desktop/stratified-tikz/tests/fixtures/point-node-anchors/zero-axis/renders/partial-zero-x-reversed-butt-miter-production.png",
+            "/Users/takamatoshinori/Desktop/stratified-tikz/tests/fixtures/point-node-anchors/zero-axis/renders/partial-zero-x-reversed-butt-miter-production.svg"
+          ],
+          "exitCode": 0,
+          "width": 800,
+          "height": 800,
+          "blackPixelCount": 236,
+          "bounds": {
+            "minX": 398,
+            "minY": 200,
+            "maxX": 401,
+            "maxY": 258
+          }
+        },
+        "pgf": {
+          "path": "M 0 -14.14215 C 0 -18.047445 0 -20.0000925 0 -20.0000925 C 0 -20.0000925 0 -18.047445 0 -14.14215",
+          "svg": "renders/partial-zero-x-reversed-butt-miter-pgf.svg",
+          "png": "renders/partial-zero-x-reversed-butt-miter-pgf.png",
+          "command": [
+            "/opt/homebrew/bin/rsvg-convert",
+            "--output",
+            "/Users/takamatoshinori/Desktop/stratified-tikz/tests/fixtures/point-node-anchors/zero-axis/renders/partial-zero-x-reversed-butt-miter-pgf.png",
+            "/Users/takamatoshinori/Desktop/stratified-tikz/tests/fixtures/point-node-anchors/zero-axis/renders/partial-zero-x-reversed-butt-miter-pgf.svg"
+          ],
+          "exitCode": 0,
+          "width": 800,
+          "height": 800,
+          "blackPixelCount": 236,
+          "bounds": {
+            "minX": 398,
+            "minY": 200,
+            "maxX": 401,
+            "maxY": 258
+          }
+        },
+        "pgf-raw": {
+          "path": "M 0 -14.14215 C 0 -21.95274 0 -21.95274 0 -14.14215",
+          "svg": "renders/partial-zero-x-reversed-butt-miter-pgf-raw.svg",
+          "png": "renders/partial-zero-x-reversed-butt-miter-pgf-raw.png",
+          "command": [
+            "/opt/homebrew/bin/rsvg-convert",
+            "--output",
+            "/Users/takamatoshinori/Desktop/stratified-tikz/tests/fixtures/point-node-anchors/zero-axis/renders/partial-zero-x-reversed-butt-miter-pgf-raw.png",
+            "/Users/takamatoshinori/Desktop/stratified-tikz/tests/fixtures/point-node-anchors/zero-axis/renders/partial-zero-x-reversed-butt-miter-pgf-raw.svg"
+          ],
+          "exitCode": 0,
+          "width": 800,
+          "height": 800,
+          "blackPixelCount": 8,
+          "bounds": {
+            "minX": 398,
+            "minY": 257,
+            "maxX": 401,
+            "maxY": 258
+          }
+        }
+      }
+    },
+    {
+      "id": "partial-zero-x-reversed-round-round-dashed",
+      "caseId": "partial-zero-x-reversed",
+      "style": {
+        "id": "round-round-dashed",
+        "attributes": "fill=\"none\" stroke=\"black\" stroke-width=\".4\" stroke-linecap=\"round\" stroke-linejoin=\"round\" stroke-dasharray=\"2 5\" stroke-dashoffset=\"-2.7\""
+      },
+      "observations": {
+        "production": {
+          "path": "M 0 -14.142135623731 L 0 -20 L 0 -14.142135623731",
+          "svg": "renders/partial-zero-x-reversed-round-round-dashed-production.svg",
+          "png": "renders/partial-zero-x-reversed-round-round-dashed-production.png",
+          "command": [
+            "/opt/homebrew/bin/rsvg-convert",
+            "--output",
+            "/Users/takamatoshinori/Desktop/stratified-tikz/tests/fixtures/point-node-anchors/zero-axis/renders/partial-zero-x-reversed-round-round-dashed-production.png",
+            "/Users/takamatoshinori/Desktop/stratified-tikz/tests/fixtures/point-node-anchors/zero-axis/renders/partial-zero-x-reversed-round-round-dashed-production.svg"
+          ],
+          "exitCode": 0,
+          "width": 800,
+          "height": 800,
+          "blackPixelCount": 184,
+          "bounds": {
+            "minX": 398,
+            "minY": 210,
+            "maxX": 401,
+            "maxY": 259
+          }
+        },
+        "pgf": {
+          "path": "M 0 -14.14215 C 0 -18.047445 0 -20.0000925 0 -20.0000925 C 0 -20.0000925 0 -18.047445 0 -14.14215",
+          "svg": "renders/partial-zero-x-reversed-round-round-dashed-pgf.svg",
+          "png": "renders/partial-zero-x-reversed-round-round-dashed-pgf.png",
+          "command": [
+            "/opt/homebrew/bin/rsvg-convert",
+            "--output",
+            "/Users/takamatoshinori/Desktop/stratified-tikz/tests/fixtures/point-node-anchors/zero-axis/renders/partial-zero-x-reversed-round-round-dashed-pgf.png",
+            "/Users/takamatoshinori/Desktop/stratified-tikz/tests/fixtures/point-node-anchors/zero-axis/renders/partial-zero-x-reversed-round-round-dashed-pgf.svg"
+          ],
+          "exitCode": 0,
+          "width": 800,
+          "height": 800,
+          "blackPixelCount": 184,
+          "bounds": {
+            "minX": 398,
+            "minY": 210,
+            "maxX": 401,
+            "maxY": 259
+          }
+        },
+        "pgf-raw": {
+          "path": "M 0 -14.14215 C 0 -21.95274 0 -21.95274 0 -14.14215",
+          "svg": "renders/partial-zero-x-reversed-round-round-dashed-pgf-raw.svg",
+          "png": "renders/partial-zero-x-reversed-round-round-dashed-pgf-raw.png",
+          "command": [
+            "/opt/homebrew/bin/rsvg-convert",
+            "--output",
+            "/Users/takamatoshinori/Desktop/stratified-tikz/tests/fixtures/point-node-anchors/zero-axis/renders/partial-zero-x-reversed-round-round-dashed-pgf-raw.png",
+            "/Users/takamatoshinori/Desktop/stratified-tikz/tests/fixtures/point-node-anchors/zero-axis/renders/partial-zero-x-reversed-round-round-dashed-pgf-raw.svg"
+          ],
+          "exitCode": 0,
+          "width": 800,
+          "height": 800,
+          "blackPixelCount": 184,
+          "bounds": {
+            "minX": 398,
+            "minY": 210,
+            "maxX": 401,
+            "maxY": 259
+          }
+        }
+      }
+    },
+    {
+      "id": "partial-zero-x-signed-rotated-butt-miter",
+      "caseId": "partial-zero-x-signed-rotated",
+      "style": {
+        "id": "butt-miter",
+        "attributes": "fill=\"none\" stroke=\"black\" stroke-width=\".4\" stroke-linecap=\"butt\" stroke-linejoin=\"miter\""
+      },
+      "observations": {
+        "production": {
+          "path": "M 8.510949677815 11.294411697016 L 12.036300463041 15.972710200946 L 8.510949677815 11.294411697016",
+          "svg": "renders/partial-zero-x-signed-rotated-butt-miter-production.svg",
+          "png": "renders/partial-zero-x-signed-rotated-butt-miter-production.png",
+          "command": [
+            "/opt/homebrew/bin/rsvg-convert",
+            "--output",
+            "/Users/takamatoshinori/Desktop/stratified-tikz/tests/fixtures/point-node-anchors/zero-axis/renders/partial-zero-x-signed-rotated-butt-miter-production.png",
+            "/Users/takamatoshinori/Desktop/stratified-tikz/tests/fixtures/point-node-anchors/zero-axis/renders/partial-zero-x-signed-rotated-butt-miter-production.svg"
+          ],
+          "exitCode": 0,
+          "width": 800,
+          "height": 800,
+          "blackPixelCount": 234,
+          "bounds": {
+            "minX": 484,
+            "minY": 512,
+            "maxX": 521,
+            "maxY": 560
+          }
+        },
+        "pgf": {
+          "path": "M 8.51105 11.29456 C 10.861335 14.4135 12.0364775 15.97297 12.0364775 15.97297 C 12.0364775 15.97297 10.861335 14.4135 8.51105 11.29456",
+          "svg": "renders/partial-zero-x-signed-rotated-butt-miter-pgf.svg",
+          "png": "renders/partial-zero-x-signed-rotated-butt-miter-pgf.png",
+          "command": [
+            "/opt/homebrew/bin/rsvg-convert",
+            "--output",
+            "/Users/takamatoshinori/Desktop/stratified-tikz/tests/fixtures/point-node-anchors/zero-axis/renders/partial-zero-x-signed-rotated-butt-miter-pgf.png",
+            "/Users/takamatoshinori/Desktop/stratified-tikz/tests/fixtures/point-node-anchors/zero-axis/renders/partial-zero-x-signed-rotated-butt-miter-pgf.svg"
+          ],
+          "exitCode": 0,
+          "width": 800,
+          "height": 800,
+          "blackPixelCount": 234,
+          "bounds": {
+            "minX": 484,
+            "minY": 512,
+            "maxX": 521,
+            "maxY": 560
+          }
+        },
+        "pgf-raw": {
+          "path": "M 8.51105 11.29456 C 13.21162 17.53244 13.21162 17.53244 8.51105 11.29456",
+          "svg": "renders/partial-zero-x-signed-rotated-butt-miter-pgf-raw.svg",
+          "png": "renders/partial-zero-x-signed-rotated-butt-miter-pgf-raw.png",
+          "command": [
+            "/opt/homebrew/bin/rsvg-convert",
+            "--output",
+            "/Users/takamatoshinori/Desktop/stratified-tikz/tests/fixtures/point-node-anchors/zero-axis/renders/partial-zero-x-signed-rotated-butt-miter-pgf-raw.png",
+            "/Users/takamatoshinori/Desktop/stratified-tikz/tests/fixtures/point-node-anchors/zero-axis/renders/partial-zero-x-signed-rotated-butt-miter-pgf-raw.svg"
+          ],
+          "exitCode": 0,
+          "width": 800,
+          "height": 800,
+          "blackPixelCount": 6,
+          "bounds": {
+            "minX": 484,
+            "minY": 512,
+            "maxX": 486,
+            "maxY": 514
+          }
+        }
+      }
+    },
+    {
+      "id": "partial-zero-x-signed-rotated-round-round-dashed",
+      "caseId": "partial-zero-x-signed-rotated",
+      "style": {
+        "id": "round-round-dashed",
+        "attributes": "fill=\"none\" stroke=\"black\" stroke-width=\".4\" stroke-linecap=\"round\" stroke-linejoin=\"round\" stroke-dasharray=\"2 5\" stroke-dashoffset=\"-2.7\""
+      },
+      "observations": {
+        "production": {
+          "path": "M 8.510949677815 11.294411697016 L 12.036300463041 15.972710200946 L 8.510949677815 11.294411697016",
+          "svg": "renders/partial-zero-x-signed-rotated-round-round-dashed-production.svg",
+          "png": "renders/partial-zero-x-signed-rotated-round-round-dashed-production.png",
+          "command": [
+            "/opt/homebrew/bin/rsvg-convert",
+            "--output",
+            "/Users/takamatoshinori/Desktop/stratified-tikz/tests/fixtures/point-node-anchors/zero-axis/renders/partial-zero-x-signed-rotated-round-round-dashed-production.png",
+            "/Users/takamatoshinori/Desktop/stratified-tikz/tests/fixtures/point-node-anchors/zero-axis/renders/partial-zero-x-signed-rotated-round-round-dashed-production.svg"
+          ],
+          "exitCode": 0,
+          "width": 800,
+          "height": 800,
+          "blackPixelCount": 183,
+          "bounds": {
+            "minX": 483,
+            "minY": 511,
+            "maxX": 514,
+            "maxY": 551
+          }
+        },
+        "pgf": {
+          "path": "M 8.51105 11.29456 C 10.861335 14.4135 12.0364775 15.97297 12.0364775 15.97297 C 12.0364775 15.97297 10.861335 14.4135 8.51105 11.29456",
+          "svg": "renders/partial-zero-x-signed-rotated-round-round-dashed-pgf.svg",
+          "png": "renders/partial-zero-x-signed-rotated-round-round-dashed-pgf.png",
+          "command": [
+            "/opt/homebrew/bin/rsvg-convert",
+            "--output",
+            "/Users/takamatoshinori/Desktop/stratified-tikz/tests/fixtures/point-node-anchors/zero-axis/renders/partial-zero-x-signed-rotated-round-round-dashed-pgf.png",
+            "/Users/takamatoshinori/Desktop/stratified-tikz/tests/fixtures/point-node-anchors/zero-axis/renders/partial-zero-x-signed-rotated-round-round-dashed-pgf.svg"
+          ],
+          "exitCode": 0,
+          "width": 800,
+          "height": 800,
+          "blackPixelCount": 183,
+          "bounds": {
+            "minX": 483,
+            "minY": 511,
+            "maxX": 514,
+            "maxY": 551
+          }
+        },
+        "pgf-raw": {
+          "path": "M 8.51105 11.29456 C 13.21162 17.53244 13.21162 17.53244 8.51105 11.29456",
+          "svg": "renders/partial-zero-x-signed-rotated-round-round-dashed-pgf-raw.svg",
+          "png": "renders/partial-zero-x-signed-rotated-round-round-dashed-pgf-raw.png",
+          "command": [
+            "/opt/homebrew/bin/rsvg-convert",
+            "--output",
+            "/Users/takamatoshinori/Desktop/stratified-tikz/tests/fixtures/point-node-anchors/zero-axis/renders/partial-zero-x-signed-rotated-round-round-dashed-pgf-raw.png",
+            "/Users/takamatoshinori/Desktop/stratified-tikz/tests/fixtures/point-node-anchors/zero-axis/renders/partial-zero-x-signed-rotated-round-round-dashed-pgf-raw.svg"
+          ],
+          "exitCode": 0,
+          "width": 800,
+          "height": 800,
+          "blackPixelCount": 183,
+          "bounds": {
+            "minX": 483,
+            "minY": 511,
+            "maxX": 514,
+            "maxY": 551
+          }
+        }
+      }
+    },
+    {
+      "id": "partial-zero-y-turn-butt-miter",
+      "caseId": "partial-zero-y-turn",
+      "style": {
+        "id": "butt-miter",
+        "attributes": "fill=\"none\" stroke=\"black\" stroke-width=\".4\" stroke-linecap=\"butt\" stroke-linejoin=\"miter\""
+      },
+      "observations": {
+        "production": {
+          "path": "M 14.142135623731 0 L 20 0 L 14.142135623731 0",
+          "svg": "renders/partial-zero-y-turn-butt-miter-production.svg",
+          "png": "renders/partial-zero-y-turn-butt-miter-production.png",
+          "command": [
+            "/opt/homebrew/bin/rsvg-convert",
+            "--output",
+            "/Users/takamatoshinori/Desktop/stratified-tikz/tests/fixtures/point-node-anchors/zero-axis/renders/partial-zero-y-turn-butt-miter-production.png",
+            "/Users/takamatoshinori/Desktop/stratified-tikz/tests/fixtures/point-node-anchors/zero-axis/renders/partial-zero-y-turn-butt-miter-production.svg"
+          ],
+          "exitCode": 0,
+          "width": 800,
+          "height": 800,
+          "blackPixelCount": 236,
+          "bounds": {
+            "minX": 541,
+            "minY": 398,
+            "maxX": 599,
+            "maxY": 401
+          }
+        },
+        "pgf": {
+          "path": "M 14.14215 0 C 18.047445 0 20.0000925 0 20.0000925 0 C 20.0000925 0 18.047445 0 14.14215 0",
+          "svg": "renders/partial-zero-y-turn-butt-miter-pgf.svg",
+          "png": "renders/partial-zero-y-turn-butt-miter-pgf.png",
+          "command": [
+            "/opt/homebrew/bin/rsvg-convert",
+            "--output",
+            "/Users/takamatoshinori/Desktop/stratified-tikz/tests/fixtures/point-node-anchors/zero-axis/renders/partial-zero-y-turn-butt-miter-pgf.png",
+            "/Users/takamatoshinori/Desktop/stratified-tikz/tests/fixtures/point-node-anchors/zero-axis/renders/partial-zero-y-turn-butt-miter-pgf.svg"
+          ],
+          "exitCode": 0,
+          "width": 800,
+          "height": 800,
+          "blackPixelCount": 236,
+          "bounds": {
+            "minX": 541,
+            "minY": 398,
+            "maxX": 599,
+            "maxY": 401
+          }
+        },
+        "pgf-raw": {
+          "path": "M 14.14215 0 C 21.95274 0 21.95274 0 14.14215 0",
+          "svg": "renders/partial-zero-y-turn-butt-miter-pgf-raw.svg",
+          "png": "renders/partial-zero-y-turn-butt-miter-pgf-raw.png",
+          "command": [
+            "/opt/homebrew/bin/rsvg-convert",
+            "--output",
+            "/Users/takamatoshinori/Desktop/stratified-tikz/tests/fixtures/point-node-anchors/zero-axis/renders/partial-zero-y-turn-butt-miter-pgf-raw.png",
+            "/Users/takamatoshinori/Desktop/stratified-tikz/tests/fixtures/point-node-anchors/zero-axis/renders/partial-zero-y-turn-butt-miter-pgf-raw.svg"
+          ],
+          "exitCode": 0,
+          "width": 800,
+          "height": 800,
+          "blackPixelCount": 8,
+          "bounds": {
+            "minX": 541,
+            "minY": 398,
+            "maxX": 542,
+            "maxY": 401
+          }
+        }
+      }
+    },
+    {
+      "id": "partial-zero-y-turn-round-round-dashed",
+      "caseId": "partial-zero-y-turn",
+      "style": {
+        "id": "round-round-dashed",
+        "attributes": "fill=\"none\" stroke=\"black\" stroke-width=\".4\" stroke-linecap=\"round\" stroke-linejoin=\"round\" stroke-dasharray=\"2 5\" stroke-dashoffset=\"-2.7\""
+      },
+      "observations": {
+        "production": {
+          "path": "M 14.142135623731 0 L 20 0 L 14.142135623731 0",
+          "svg": "renders/partial-zero-y-turn-round-round-dashed-production.svg",
+          "png": "renders/partial-zero-y-turn-round-round-dashed-production.png",
+          "command": [
+            "/opt/homebrew/bin/rsvg-convert",
+            "--output",
+            "/Users/takamatoshinori/Desktop/stratified-tikz/tests/fixtures/point-node-anchors/zero-axis/renders/partial-zero-y-turn-round-round-dashed-production.png",
+            "/Users/takamatoshinori/Desktop/stratified-tikz/tests/fixtures/point-node-anchors/zero-axis/renders/partial-zero-y-turn-round-round-dashed-production.svg"
+          ],
+          "exitCode": 0,
+          "width": 800,
+          "height": 800,
+          "blackPixelCount": 184,
+          "bounds": {
+            "minX": 540,
+            "minY": 398,
+            "maxX": 589,
+            "maxY": 401
+          }
+        },
+        "pgf": {
+          "path": "M 14.14215 0 C 18.047445 0 20.0000925 0 20.0000925 0 C 20.0000925 0 18.047445 0 14.14215 0",
+          "svg": "renders/partial-zero-y-turn-round-round-dashed-pgf.svg",
+          "png": "renders/partial-zero-y-turn-round-round-dashed-pgf.png",
+          "command": [
+            "/opt/homebrew/bin/rsvg-convert",
+            "--output",
+            "/Users/takamatoshinori/Desktop/stratified-tikz/tests/fixtures/point-node-anchors/zero-axis/renders/partial-zero-y-turn-round-round-dashed-pgf.png",
+            "/Users/takamatoshinori/Desktop/stratified-tikz/tests/fixtures/point-node-anchors/zero-axis/renders/partial-zero-y-turn-round-round-dashed-pgf.svg"
+          ],
+          "exitCode": 0,
+          "width": 800,
+          "height": 800,
+          "blackPixelCount": 184,
+          "bounds": {
+            "minX": 540,
+            "minY": 398,
+            "maxX": 589,
+            "maxY": 401
+          }
+        },
+        "pgf-raw": {
+          "path": "M 14.14215 0 C 21.95274 0 21.95274 0 14.14215 0",
+          "svg": "renders/partial-zero-y-turn-round-round-dashed-pgf-raw.svg",
+          "png": "renders/partial-zero-y-turn-round-round-dashed-pgf-raw.png",
+          "command": [
+            "/opt/homebrew/bin/rsvg-convert",
+            "--output",
+            "/Users/takamatoshinori/Desktop/stratified-tikz/tests/fixtures/point-node-anchors/zero-axis/renders/partial-zero-y-turn-round-round-dashed-pgf-raw.png",
+            "/Users/takamatoshinori/Desktop/stratified-tikz/tests/fixtures/point-node-anchors/zero-axis/renders/partial-zero-y-turn-round-round-dashed-pgf-raw.svg"
+          ],
+          "exitCode": 0,
+          "width": 800,
+          "height": 800,
+          "blackPixelCount": 184,
+          "bounds": {
+            "minX": 540,
+            "minY": 398,
+            "maxX": 589,
+            "maxY": 401
+          }
+        }
+      }
+    },
+    {
+      "id": "partial-zero-y-signed-reversed-butt-miter",
+      "caseId": "partial-zero-y-signed-reversed",
+      "style": {
+        "id": "butt-miter",
+        "attributes": "fill=\"none\" stroke=\"black\" stroke-width=\".4\" stroke-linecap=\"butt\" stroke-linejoin=\"miter\""
+      },
+      "observations": {
+        "production": {
+          "path": "M -13.017904479827 -5.525772611509 L -18.410097069049 -7.814622569785 L -13.017904479827 -5.525772611509",
+          "svg": "renders/partial-zero-y-signed-reversed-butt-miter-production.svg",
+          "png": "renders/partial-zero-y-signed-reversed-butt-miter-production.png",
+          "command": [
+            "/opt/homebrew/bin/rsvg-convert",
+            "--output",
+            "/Users/takamatoshinori/Desktop/stratified-tikz/tests/fixtures/point-node-anchors/zero-axis/renders/partial-zero-y-signed-reversed-butt-miter-production.png",
+            "/Users/takamatoshinori/Desktop/stratified-tikz/tests/fixtures/point-node-anchors/zero-axis/renders/partial-zero-y-signed-reversed-butt-miter-production.svg"
+          ],
+          "exitCode": 0,
+          "width": 800,
+          "height": 800,
+          "blackPixelCount": 233,
+          "bounds": {
+            "minX": 215,
+            "minY": 320,
+            "maxX": 269,
+            "maxY": 345
+          }
+        },
+        "pgf": {
+          "path": "M -13.01787 -5.52579 C -16.612695 -7.051705 -18.4101075 -7.8146625 -18.4101075 -7.8146625 C -18.4101075 -7.8146625 -16.612695 -7.051705 -13.01787 -5.52579",
+          "svg": "renders/partial-zero-y-signed-reversed-butt-miter-pgf.svg",
+          "png": "renders/partial-zero-y-signed-reversed-butt-miter-pgf.png",
+          "command": [
+            "/opt/homebrew/bin/rsvg-convert",
+            "--output",
+            "/Users/takamatoshinori/Desktop/stratified-tikz/tests/fixtures/point-node-anchors/zero-axis/renders/partial-zero-y-signed-reversed-butt-miter-pgf.png",
+            "/Users/takamatoshinori/Desktop/stratified-tikz/tests/fixtures/point-node-anchors/zero-axis/renders/partial-zero-y-signed-reversed-butt-miter-pgf.svg"
+          ],
+          "exitCode": 0,
+          "width": 800,
+          "height": 800,
+          "blackPixelCount": 234,
+          "bounds": {
+            "minX": 215,
+            "minY": 320,
+            "maxX": 269,
+            "maxY": 345
+          }
+        },
+        "pgf-raw": {
+          "path": "M -13.01787 -5.52579 C -20.20752 -8.57762 -20.20752 -8.57762 -13.01787 -5.52579",
+          "svg": "renders/partial-zero-y-signed-reversed-butt-miter-pgf-raw.svg",
+          "png": "renders/partial-zero-y-signed-reversed-butt-miter-pgf-raw.png",
+          "command": [
+            "/opt/homebrew/bin/rsvg-convert",
+            "--output",
+            "/Users/takamatoshinori/Desktop/stratified-tikz/tests/fixtures/point-node-anchors/zero-axis/renders/partial-zero-y-signed-reversed-butt-miter-pgf-raw.png",
+            "/Users/takamatoshinori/Desktop/stratified-tikz/tests/fixtures/point-node-anchors/zero-axis/renders/partial-zero-y-signed-reversed-butt-miter-pgf-raw.svg"
+          ],
+          "exitCode": 0,
+          "width": 800,
+          "height": 800,
+          "blackPixelCount": 5,
+          "bounds": {
+            "minX": 268,
+            "minY": 343,
+            "maxX": 269,
+            "maxY": 345
+          }
+        }
+      }
+    },
+    {
+      "id": "partial-zero-y-signed-reversed-round-round-dashed",
+      "caseId": "partial-zero-y-signed-reversed",
+      "style": {
+        "id": "round-round-dashed",
+        "attributes": "fill=\"none\" stroke=\"black\" stroke-width=\".4\" stroke-linecap=\"round\" stroke-linejoin=\"round\" stroke-dasharray=\"2 5\" stroke-dashoffset=\"-2.7\""
+      },
+      "observations": {
+        "production": {
+          "path": "M -13.017904479827 -5.525772611509 L -18.410097069049 -7.814622569785 L -13.017904479827 -5.525772611509",
+          "svg": "renders/partial-zero-y-signed-reversed-round-round-dashed-production.svg",
+          "png": "renders/partial-zero-y-signed-reversed-round-round-dashed-production.png",
+          "command": [
+            "/opt/homebrew/bin/rsvg-convert",
+            "--output",
+            "/Users/takamatoshinori/Desktop/stratified-tikz/tests/fixtures/point-node-anchors/zero-axis/renders/partial-zero-y-signed-reversed-round-round-dashed-production.png",
+            "/Users/takamatoshinori/Desktop/stratified-tikz/tests/fixtures/point-node-anchors/zero-axis/renders/partial-zero-y-signed-reversed-round-round-dashed-production.svg"
+          ],
+          "exitCode": 0,
+          "width": 800,
+          "height": 800,
+          "blackPixelCount": 184,
+          "bounds": {
+            "minX": 225,
+            "minY": 324,
+            "maxX": 271,
+            "maxY": 346
+          }
+        },
+        "pgf": {
+          "path": "M -13.01787 -5.52579 C -16.612695 -7.051705 -18.4101075 -7.8146625 -18.4101075 -7.8146625 C -18.4101075 -7.8146625 -16.612695 -7.051705 -13.01787 -5.52579",
+          "svg": "renders/partial-zero-y-signed-reversed-round-round-dashed-pgf.svg",
+          "png": "renders/partial-zero-y-signed-reversed-round-round-dashed-pgf.png",
+          "command": [
+            "/opt/homebrew/bin/rsvg-convert",
+            "--output",
+            "/Users/takamatoshinori/Desktop/stratified-tikz/tests/fixtures/point-node-anchors/zero-axis/renders/partial-zero-y-signed-reversed-round-round-dashed-pgf.png",
+            "/Users/takamatoshinori/Desktop/stratified-tikz/tests/fixtures/point-node-anchors/zero-axis/renders/partial-zero-y-signed-reversed-round-round-dashed-pgf.svg"
+          ],
+          "exitCode": 0,
+          "width": 800,
+          "height": 800,
+          "blackPixelCount": 184,
+          "bounds": {
+            "minX": 225,
+            "minY": 324,
+            "maxX": 271,
+            "maxY": 346
+          }
+        },
+        "pgf-raw": {
+          "path": "M -13.01787 -5.52579 C -20.20752 -8.57762 -20.20752 -8.57762 -13.01787 -5.52579",
+          "svg": "renders/partial-zero-y-signed-reversed-round-round-dashed-pgf-raw.svg",
+          "png": "renders/partial-zero-y-signed-reversed-round-round-dashed-pgf-raw.png",
+          "command": [
+            "/opt/homebrew/bin/rsvg-convert",
+            "--output",
+            "/Users/takamatoshinori/Desktop/stratified-tikz/tests/fixtures/point-node-anchors/zero-axis/renders/partial-zero-y-signed-reversed-round-round-dashed-pgf-raw.png",
+            "/Users/takamatoshinori/Desktop/stratified-tikz/tests/fixtures/point-node-anchors/zero-axis/renders/partial-zero-y-signed-reversed-round-round-dashed-pgf-raw.svg"
+          ],
+          "exitCode": 0,
+          "width": 800,
+          "height": 800,
+          "blackPixelCount": 184,
+          "bounds": {
+            "minX": 225,
+            "minY": 324,
+            "maxX": 271,
+            "maxY": 346
+          }
+        }
+      }
+    },
+    {
+      "id": "partial-zero-x-extra-cycle-butt-miter",
+      "caseId": "partial-zero-x-extra-cycle",
+      "style": {
+        "id": "butt-miter",
+        "attributes": "fill=\"none\" stroke=\"black\" stroke-width=\".4\" stroke-linecap=\"butt\" stroke-linejoin=\"miter\""
+      },
+      "observations": {
+        "production": {
+          "path": "M -8.510949677815 -11.294411697016 L -12.036300463041 -15.972710200946 L -8.510949677815 -11.294411697016",
+          "svg": "renders/partial-zero-x-extra-cycle-butt-miter-production.svg",
+          "png": "renders/partial-zero-x-extra-cycle-butt-miter-production.png",
+          "command": [
+            "/opt/homebrew/bin/rsvg-convert",
+            "--output",
+            "/Users/takamatoshinori/Desktop/stratified-tikz/tests/fixtures/point-node-anchors/zero-axis/renders/partial-zero-x-extra-cycle-butt-miter-production.png",
+            "/Users/takamatoshinori/Desktop/stratified-tikz/tests/fixtures/point-node-anchors/zero-axis/renders/partial-zero-x-extra-cycle-butt-miter-production.svg"
+          ],
+          "exitCode": 0,
+          "width": 800,
+          "height": 800,
+          "blackPixelCount": 234,
+          "bounds": {
+            "minX": 278,
+            "minY": 239,
+            "maxX": 315,
+            "maxY": 287
+          }
+        },
+        "pgf": {
+          "path": "M -8.51105 -11.29456 C -10.861335 -14.4135 -12.0364775 -15.97297 -12.0364775 -15.97297 C -12.0364775 -15.97297 -10.861335 -14.4135 -8.51105 -11.29456",
+          "svg": "renders/partial-zero-x-extra-cycle-butt-miter-pgf.svg",
+          "png": "renders/partial-zero-x-extra-cycle-butt-miter-pgf.png",
+          "command": [
+            "/opt/homebrew/bin/rsvg-convert",
+            "--output",
+            "/Users/takamatoshinori/Desktop/stratified-tikz/tests/fixtures/point-node-anchors/zero-axis/renders/partial-zero-x-extra-cycle-butt-miter-pgf.png",
+            "/Users/takamatoshinori/Desktop/stratified-tikz/tests/fixtures/point-node-anchors/zero-axis/renders/partial-zero-x-extra-cycle-butt-miter-pgf.svg"
+          ],
+          "exitCode": 0,
+          "width": 800,
+          "height": 800,
+          "blackPixelCount": 234,
+          "bounds": {
+            "minX": 278,
+            "minY": 239,
+            "maxX": 315,
+            "maxY": 287
+          }
+        },
+        "pgf-raw": {
+          "path": "M -8.51105 -11.29456 C -13.21162 -17.53244 -13.21162 -17.53244 -8.51105 -11.29456",
+          "svg": "renders/partial-zero-x-extra-cycle-butt-miter-pgf-raw.svg",
+          "png": "renders/partial-zero-x-extra-cycle-butt-miter-pgf-raw.png",
+          "command": [
+            "/opt/homebrew/bin/rsvg-convert",
+            "--output",
+            "/Users/takamatoshinori/Desktop/stratified-tikz/tests/fixtures/point-node-anchors/zero-axis/renders/partial-zero-x-extra-cycle-butt-miter-pgf-raw.png",
+            "/Users/takamatoshinori/Desktop/stratified-tikz/tests/fixtures/point-node-anchors/zero-axis/renders/partial-zero-x-extra-cycle-butt-miter-pgf-raw.svg"
+          ],
+          "exitCode": 0,
+          "width": 800,
+          "height": 800,
+          "blackPixelCount": 6,
+          "bounds": {
+            "minX": 313,
+            "minY": 285,
+            "maxX": 315,
+            "maxY": 287
+          }
+        }
+      }
+    },
+    {
+      "id": "partial-zero-x-extra-cycle-round-round-dashed",
+      "caseId": "partial-zero-x-extra-cycle",
+      "style": {
+        "id": "round-round-dashed",
+        "attributes": "fill=\"none\" stroke=\"black\" stroke-width=\".4\" stroke-linecap=\"round\" stroke-linejoin=\"round\" stroke-dasharray=\"2 5\" stroke-dashoffset=\"-2.7\""
+      },
+      "observations": {
+        "production": {
+          "path": "M -8.510949677815 -11.294411697016 L -12.036300463041 -15.972710200946 L -8.510949677815 -11.294411697016",
+          "svg": "renders/partial-zero-x-extra-cycle-round-round-dashed-production.svg",
+          "png": "renders/partial-zero-x-extra-cycle-round-round-dashed-production.png",
+          "command": [
+            "/opt/homebrew/bin/rsvg-convert",
+            "--output",
+            "/Users/takamatoshinori/Desktop/stratified-tikz/tests/fixtures/point-node-anchors/zero-axis/renders/partial-zero-x-extra-cycle-round-round-dashed-production.png",
+            "/Users/takamatoshinori/Desktop/stratified-tikz/tests/fixtures/point-node-anchors/zero-axis/renders/partial-zero-x-extra-cycle-round-round-dashed-production.svg"
+          ],
+          "exitCode": 0,
+          "width": 800,
+          "height": 800,
+          "blackPixelCount": 183,
+          "bounds": {
+            "minX": 285,
+            "minY": 248,
+            "maxX": 316,
+            "maxY": 288
+          }
+        },
+        "pgf": {
+          "path": "M -8.51105 -11.29456 C -10.861335 -14.4135 -12.0364775 -15.97297 -12.0364775 -15.97297 C -12.0364775 -15.97297 -10.861335 -14.4135 -8.51105 -11.29456",
+          "svg": "renders/partial-zero-x-extra-cycle-round-round-dashed-pgf.svg",
+          "png": "renders/partial-zero-x-extra-cycle-round-round-dashed-pgf.png",
+          "command": [
+            "/opt/homebrew/bin/rsvg-convert",
+            "--output",
+            "/Users/takamatoshinori/Desktop/stratified-tikz/tests/fixtures/point-node-anchors/zero-axis/renders/partial-zero-x-extra-cycle-round-round-dashed-pgf.png",
+            "/Users/takamatoshinori/Desktop/stratified-tikz/tests/fixtures/point-node-anchors/zero-axis/renders/partial-zero-x-extra-cycle-round-round-dashed-pgf.svg"
+          ],
+          "exitCode": 0,
+          "width": 800,
+          "height": 800,
+          "blackPixelCount": 183,
+          "bounds": {
+            "minX": 285,
+            "minY": 248,
+            "maxX": 316,
+            "maxY": 288
+          }
+        },
+        "pgf-raw": {
+          "path": "M -8.51105 -11.29456 C -13.21162 -17.53244 -13.21162 -17.53244 -8.51105 -11.29456",
+          "svg": "renders/partial-zero-x-extra-cycle-round-round-dashed-pgf-raw.svg",
+          "png": "renders/partial-zero-x-extra-cycle-round-round-dashed-pgf-raw.png",
+          "command": [
+            "/opt/homebrew/bin/rsvg-convert",
+            "--output",
+            "/Users/takamatoshinori/Desktop/stratified-tikz/tests/fixtures/point-node-anchors/zero-axis/renders/partial-zero-x-extra-cycle-round-round-dashed-pgf-raw.png",
+            "/Users/takamatoshinori/Desktop/stratified-tikz/tests/fixtures/point-node-anchors/zero-axis/renders/partial-zero-x-extra-cycle-round-round-dashed-pgf-raw.svg"
+          ],
+          "exitCode": 0,
+          "width": 800,
+          "height": 800,
+          "blackPixelCount": 183,
+          "bounds": {
+            "minX": 285,
+            "minY": 248,
+            "maxX": 316,
+            "maxY": 288
+          }
+        }
+      }
+    }
+  ]
+}

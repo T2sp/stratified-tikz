@@ -1,0 +1,581 @@
+{
+  "case": "isosceles-triangle-minus3",
+  "input": {
+    "shape": "isosceles triangle",
+    "body": {
+      "width": 0,
+      "height": 0,
+      "depth": 0
+    },
+    "innerXSep": -30,
+    "innerYSep": -30,
+    "outerXSep": -3,
+    "outerYSep": -3,
+    "minimumWidth": -20,
+    "minimumHeight": -20,
+    "lineWidth": 0.4,
+    "fontContext": {
+      "em": 10,
+      "ex": 4.30554
+    },
+    "anchor": "apex"
+  },
+  "command": [
+    "/Library/TeX/texbin/pdflatex",
+    "-no-shell-escape",
+    "-interaction=nonstopmode",
+    "-halt-on-error",
+    "fixed-box.tex"
+  ],
+  "exitCode": 0,
+  "pgfVersion": "3.1.11a",
+  "solverDiagnostic": null,
+  "production": {
+    "contours": [
+      {
+        "path": "M -21.115433639488 0 L -1.115433639488 8.28369140625 L -1.115433639488 -8.28369140625 Z",
+        "vertices": [
+          {
+            "x": -21.11543363948831,
+            "y": 0
+          },
+          {
+            "x": -1.1154336394883089,
+            "y": 8.28369140625
+          },
+          {
+            "x": -1.1154336394883089,
+            "y": -8.28369140625
+          }
+        ],
+        "closed": true,
+        "bounds": {
+          "minX": -21.11543363948831,
+          "minY": -8.28369140625,
+          "maxX": -1.1154336394883089,
+          "maxY": 8.28369140625
+        }
+      }
+    ],
+    "paintRegions": [
+      {
+        "path": "M -21.115433639488 0 L -1.115433639488 8.28369140625 L -1.115433639488 -8.28369140625 Z",
+        "vertices": [
+          {
+            "x": -21.11543363948831,
+            "y": 0
+          },
+          {
+            "x": -1.1154336394883089,
+            "y": 8.28369140625
+          },
+          {
+            "x": -1.1154336394883089,
+            "y": -8.28369140625
+          }
+        ],
+        "closed": true,
+        "bounds": {
+          "minX": -21.11543363948831,
+          "minY": -8.28369140625,
+          "maxX": -1.1154336394883089,
+          "maxY": 8.28369140625
+        },
+        "role": "body"
+      }
+    ],
+    "bounds": {
+      "minX": -21.11543363948831,
+      "minY": -8.28369140625,
+      "maxX": -1.1154336394883089,
+      "maxY": 8.28369140625
+    },
+    "bodyBounds": {
+      "minX": 0,
+      "minY": 0,
+      "maxX": 0,
+      "maxY": 0
+    },
+    "bodyOrigin": {
+      "x": 0,
+      "y": 0
+    },
+    "baseline": 0,
+    "anchorBounds": {
+      "minX": -28.954811428746567,
+      "minY": -6.279101799659838,
+      "maxX": 1.8845663605116911,
+      "maxY": 6.279101799659838
+    },
+    "rotation": 0,
+    "radius": 21.11543363948831,
+    "anchors": {
+      "center": {
+        "x": 0,
+        "y": 0
+      },
+      "text": {
+        "x": 0,
+        "y": 0
+      },
+      "base": {
+        "x": 0,
+        "y": 0
+      },
+      "mid": {
+        "x": 0,
+        "y": -2.15277
+      },
+      "east": {
+        "x": -28.955780029296875,
+        "y": 0
+      },
+      "north east": {
+        "x": 7.4015350341796875,
+        "y": -7.4015350341796875
+      },
+      "north": {
+        "x": 0,
+        "y": -5.895263671875
+      },
+      "north west": {
+        "x": -4.898651123046875,
+        "y": -4.898651123046875
+      },
+      "west": {
+        "x": -28.958038330078125,
+        "y": 0
+      },
+      "south west": {
+        "x": 7.4021148681640625,
+        "y": -7.4021148681640625
+      },
+      "south": {
+        "x": 0,
+        "y": -5.895263671875
+      },
+      "south east": {
+        "x": -4.898651123046875,
+        "y": -4.898651123046875
+      },
+      "base east": {
+        "x": -28.955780029296875,
+        "y": 0
+      },
+      "base west": {
+        "x": -28.958038330078125,
+        "y": 0
+      },
+      "mid east": {
+        "x": -18.3814697265625,
+        "y": -2.15283203125
+      },
+      "mid west": {
+        "x": -18.38372802734375,
+        "y": -2.15283203125
+      },
+      "apex": {
+        "x": -28.954811428746567,
+        "y": 0
+      },
+      "left corner": {
+        "x": 1.8845663605116911,
+        "y": 6.279101799659838
+      },
+      "right corner": {
+        "x": 1.8845663605116911,
+        "y": -6.279101799659838
+      },
+      "left side": {
+        "x": -13.535122534117438,
+        "y": 3.139550899829919
+      },
+      "right side": {
+        "x": -13.535122534117438,
+        "y": -3.139550899829919
+      },
+      "lower side": {
+        "x": 1.8845663605116911,
+        "y": 0
+      }
+    },
+    "placementAnchor": {
+      "x": -28.954811428746567,
+      "y": 0
+    },
+    "textCenter": {
+      "x": 0,
+      "y": 0
+    },
+    "shapeCenter": {
+      "x": 0,
+      "y": 0
+    }
+  },
+  "comparisons": {
+    "0": {
+      "expected": {
+        "x": -28.9557,
+        "y": 0
+      },
+      "actual": {
+        "supported": true,
+        "position": {
+          "x": -28.955780029296875,
+          "y": 0
+        }
+      },
+      "errorTeXpt": 0.000080029296874784
+    },
+    "13": {
+      "expected": {
+        "x": -65.42651,
+        "y": 15.10449
+      },
+      "actual": {
+        "supported": true,
+        "position": {
+          "x": 216.04074096679688,
+          "y": -49.87583923339844
+        }
+      },
+      "errorTeXpt": 288.87065713583075
+    },
+    "45": {
+      "expected": {
+        "x": 20.47173,
+        "y": -20.47173
+      },
+      "actual": {
+        "supported": true,
+        "position": {
+          "x": 7.4016876220703125,
+          "y": -7.4016876220703125
+        }
+      },
+      "errorTeXpt": 18.483831191659263
+    },
+    "90": {
+      "expected": {
+        "x": 0,
+        "y": -11.99326
+      },
+      "actual": {
+        "supported": true,
+        "position": {
+          "x": 0,
+          "y": -5.895263671875
+        }
+      },
+      "errorTeXpt": 6.097996328124999
+    },
+    "181": {
+      "expected": {
+        "x": -30.23042,
+        "y": 0.52776
+      },
+      "actual": {
+        "supported": true,
+        "position": {
+          "x": -31.672943115234375,
+          "y": 0.5529632568359375
+        }
+      },
+      "errorTeXpt": 1.4427432696570197
+    },
+    "270": {
+      "expected": {
+        "x": 0,
+        "y": -11.99326
+      },
+      "actual": {
+        "supported": true,
+        "position": {
+          "x": 0,
+          "y": -5.895263671875
+        }
+      },
+      "errorTeXpt": 6.097996328124999
+    },
+    "315": {
+      "expected": {
+        "x": -8.4811,
+        "y": -8.4811
+      },
+      "actual": {
+        "supported": true,
+        "position": {
+          "x": -4.8984222412109375,
+          "y": -4.8984222412109375
+        }
+      },
+      "errorTeXpt": 5.066671476091936
+    },
+    "center": {
+      "expected": {
+        "x": 0,
+        "y": 0
+      },
+      "actual": {
+        "supported": true,
+        "position": {
+          "x": 0,
+          "y": 0
+        }
+      },
+      "errorTeXpt": 0
+    },
+    "text": {
+      "expected": {
+        "x": 0,
+        "y": 0
+      },
+      "actual": {
+        "supported": true,
+        "position": {
+          "x": 0,
+          "y": 0
+        }
+      },
+      "errorTeXpt": 0
+    },
+    "base": {
+      "expected": {
+        "x": 0,
+        "y": 0
+      },
+      "actual": {
+        "supported": true,
+        "position": {
+          "x": 0,
+          "y": 0
+        }
+      },
+      "errorTeXpt": 0
+    },
+    "mid": {
+      "expected": {
+        "x": 0,
+        "y": -2.15277
+      },
+      "actual": {
+        "supported": true,
+        "position": {
+          "x": 0,
+          "y": -2.15277
+        }
+      },
+      "errorTeXpt": 0
+    },
+    "east": {
+      "expected": {
+        "x": -28.9557,
+        "y": 0
+      },
+      "actual": {
+        "supported": true,
+        "position": {
+          "x": -28.955780029296875,
+          "y": 0
+        }
+      },
+      "errorTeXpt": 0.000080029296874784
+    },
+    "west": {
+      "expected": {
+        "x": -28.95662,
+        "y": 0
+      },
+      "actual": {
+        "supported": true,
+        "position": {
+          "x": -28.958038330078125,
+          "y": 0
+        }
+      },
+      "errorTeXpt": 0.001418330078124086
+    },
+    "north": {
+      "expected": {
+        "x": 0,
+        "y": -11.99326
+      },
+      "actual": {
+        "supported": true,
+        "position": {
+          "x": 0,
+          "y": -5.895263671875
+        }
+      },
+      "errorTeXpt": 6.097996328124999
+    },
+    "south": {
+      "expected": {
+        "x": 0,
+        "y": -11.99326
+      },
+      "actual": {
+        "supported": true,
+        "position": {
+          "x": 0,
+          "y": -5.895263671875
+        }
+      },
+      "errorTeXpt": 6.097996328124999
+    },
+    "north east": {
+      "expected": {
+        "x": 20.47343,
+        "y": -20.47343
+      },
+      "actual": {
+        "supported": true,
+        "position": {
+          "x": 7.4015350341796875,
+          "y": -7.4015350341796875
+        }
+      },
+      "errorTeXpt": 18.486451146579675
+    },
+    "north west": {
+      "expected": {
+        "x": -8.48135,
+        "y": -8.48135
+      },
+      "actual": {
+        "supported": true,
+        "position": {
+          "x": -4.898651123046875,
+          "y": -4.898651123046875
+        }
+      },
+      "errorTeXpt": 5.066701341685968
+    },
+    "south east": {
+      "expected": {
+        "x": -8.48135,
+        "y": -8.48135
+      },
+      "actual": {
+        "supported": true,
+        "position": {
+          "x": -4.898651123046875,
+          "y": -4.898651123046875
+        }
+      },
+      "errorTeXpt": 5.066701341685968
+    },
+    "south west": {
+      "expected": {
+        "x": 20.47409,
+        "y": -20.47409
+      },
+      "actual": {
+        "supported": true,
+        "position": {
+          "x": 7.4021148681640625,
+          "y": -7.4021148681640625
+        }
+      },
+      "errorTeXpt": 18.48656451844621
+    },
+    "-30": {
+      "expected": {
+        "x": -12.09642,
+        "y": -6.9839
+      },
+      "actual": {
+        "supported": true,
+        "position": {
+          "x": -7.5495147705078125,
+          "y": -4.358734130859375
+        }
+      },
+      "errorTeXpt": 5.250318371916531
+    },
+    "apex": {
+      "expected": {
+        "x": -28.95543,
+        "y": 0
+      },
+      "actual": {
+        "supported": true,
+        "position": {
+          "x": -28.954811428746567,
+          "y": 0
+        }
+      },
+      "errorTeXpt": 0.000618571253433231
+    },
+    "left corner": {
+      "expected": {
+        "x": 1.8846,
+        "y": 12.7739
+      },
+      "actual": {
+        "supported": true,
+        "position": {
+          "x": 1.8845663605116911,
+          "y": 6.279101799659838
+        }
+      },
+      "errorTeXpt": 6.494798200427278
+    },
+    "right corner": {
+      "expected": {
+        "x": 1.8846,
+        "y": -12.7739
+      },
+      "actual": {
+        "supported": true,
+        "position": {
+          "x": 1.8845663605116911,
+          "y": -6.279101799659838
+        }
+      },
+      "errorTeXpt": 6.494798200427278
+    },
+    "left side": {
+      "expected": {
+        "x": -13.53542,
+        "y": 6.38695
+      },
+      "actual": {
+        "supported": true,
+        "position": {
+          "x": -13.535122534117438,
+          "y": 3.139550899829919
+        }
+      },
+      "errorTeXpt": 3.2473991137942066
+    },
+    "right side": {
+      "expected": {
+        "x": -13.53542,
+        "y": -6.38695
+      },
+      "actual": {
+        "supported": true,
+        "position": {
+          "x": -13.535122534117438,
+          "y": -3.139550899829919
+        }
+      },
+      "errorTeXpt": 3.2473991137942066
+    },
+    "lower side": {
+      "expected": {
+        "x": 1.8846,
+        "y": 0
+      },
+      "actual": {
+        "supported": true,
+        "position": {
+          "x": 1.8845663605116911,
+          "y": 0
+        }
+      },
+      "errorTeXpt": 0.00003363948830892305
+    }
+  }
+}

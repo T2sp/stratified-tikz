@@ -42,9 +42,12 @@ export function pgfReciprocal(value: number): number {
   if (value === 0) throw new RangeError('A zero value cannot be inverted by PGF.')
   const sign = Math.sign(value)
   // PGF parses TeX's printed five decimal digits, rather than the binary fraction.
+  const signedInteger = Math.trunc(value)
   value = Number(Math.abs(value).toFixed(5))
   if (Number.isInteger(value)) return sign * Math.trunc(65536 / value) / 65536
-  if (Math.trunc(value) > 100) return sign * Math.trunc(Math.trunc(1e9 / Math.trunc(value * 1000)) * 65536 / 1e6) / 65536
+  // Upstream tests the signed integer part before its positive-only >100 lane.
+  // Large negative nonintegers retain the four-decimal reciprocal branch.
+  if (signedInteger > 100) return sign * Math.trunc(Math.trunc(1e9 / Math.trunc(value * 1000)) * 65536 / 1e6) / 65536
   const inverse = Math.trunc(1e9 / Math.round(value * 100000))
   const whole = Math.trunc(inverse / 10000)
   let fraction = (inverse - whole * 10000) * 65536
@@ -72,7 +75,7 @@ export function pgfAsin(value: number): number {
   return Math.sign(value) * pgfRound(90 - pgfRound(first + pgfRound((next - first) * fraction)))
 }
 
-function pgfAtan(value: number): number {
+export function pgfAtan(value: number): number {
   value = pgfRound(value)
   const original = value
   value = Math.abs(value)

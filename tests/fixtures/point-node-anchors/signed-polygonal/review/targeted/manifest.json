@@ -1,0 +1,397 @@
+{
+  "engine": "pdfTeX 3.141592653-2.6-1.40.29 (TeX Live 2026)",
+  "sourceHashes": {
+    "/usr/local/texlive/2026/texmf-dist/tex/generic/pgf/libraries/shapes/pgflibraryshapes.geometric.code.tex": "bbd6abe9df51153e2f4f61cca3ad669de34a6648cf37795df44da931402b69ee",
+    "/usr/local/texlive/2026/texmf-dist/tex/generic/pgf/modules/pgfmoduleshapes.code.tex": "01dd81e3f2c56a8db7864916ada1a5036964aff2e8176aafd4773244e236bb27",
+    "/usr/local/texlive/2026/texmf-dist/tex/generic/pgf/basiclayer/pgfcorepoints.code.tex": "7533dd80c95a5124726b0a617a5f458226d4a7490bcd209e3fd7e717e24dc127",
+    "/usr/local/texlive/2026/texmf-dist/tex/generic/pgf/math/pgfmathcalc.code.tex": "58fcc94547646458470315a6d10953a9729e7962e3def5273633b06fb444a5aa",
+    "/usr/local/texlive/2026/texmf-dist/tex/generic/pgf/math/pgfmathfunctions.trigonometric.code.tex": "1c8834abe00807467a52d31ef96032d5084b2560eea45995018084d13a3cde3c",
+    "/usr/local/texlive/2026/texmf-dist/tex/generic/pgf/math/pgfmathfunctions.basic.code.tex": "c94abbd89ad0556546d9e5053af16b58ce7f38d19c379b27309e5fefd23908f8",
+    "/usr/local/texlive/2026/texmf-dist/tex/generic/pgf/basiclayer/pgfcoretransformations.code.tex": "bdea875774b4ad7a1e12debc67c46286245031f5c2e287c9e192f3ca4b6193b6"
+  },
+  "productionHashes": {
+    "src/geometry/pointNodeShapes/solve.ts": "78f8e0df3ccc87dc456dba714efd3be3a0e76999f483c1b15a0ac985ba46c0a8",
+    "src/geometry/pointNodeShapes/anchors.ts": "9e95550fcb2b6c36bf3f0509a3e36c628476eb3f6c738541f4bacfeac04c5082",
+    "src/model/pointNodeLayout.ts": "c6356ae7b36b02acc80617f16e9d7e2c0232ab77c4b8f2dfdb1befa9ee280898"
+  },
+  "dimensions": {
+    "inner": {
+      "source": "-30pt",
+      "unit": "pt",
+      "texPoints": -30
+    },
+    "minimum": {
+      "source": "-20pt",
+      "unit": "pt",
+      "texPoints": -20
+    },
+    "outer": {
+      "source": "3pt",
+      "unit": "pt",
+      "texPoints": 3
+    }
+  },
+  "layoutIssues": [],
+  "results": [
+    {
+      "case": "regular-polygon-0",
+      "selectedAnchor": "corner 1",
+      "selected": {
+        "expected": {
+          "x": 0,
+          "y": 10
+        },
+        "actual": {
+          "supported": true,
+          "position": {
+            "x": -6.123233995736766e-16,
+            "y": 10
+          }
+        },
+        "errorTeXpt": 6.123233995736766e-16
+      },
+      "maxError": 0.0011480194109799843,
+      "work": "/private/tmp/stz-32d-geometry-review/targeted/regular-polygon-0"
+    },
+    {
+      "case": "regular-polygon-3",
+      "selectedAnchor": "corner 1",
+      "selected": {
+        "expected": {
+          "x": 0,
+          "y": 6.29184
+        },
+        "actual": {
+          "supported": true,
+          "position": {
+            "x": -8.393854033997257e-16,
+            "y": 13.70820393249937
+          }
+        },
+        "errorTeXpt": 7.41636393249937
+      },
+      "maxError": 7.417204298178636,
+      "work": "/private/tmp/stz-32d-geometry-review/targeted/regular-polygon-3"
+    },
+    {
+      "case": "regular-polygon-minus3",
+      "selectedAnchor": "corner 1",
+      "selected": {
+        "expected": {
+          "x": 0,
+          "y": 13.70816
+        },
+        "actual": {
+          "supported": true,
+          "position": {
+            "x": -3.8526139574762756e-16,
+            "y": 6.291796067500631
+          }
+        },
+        "errorTeXpt": 7.416363932499369
+      },
+      "maxError": 7.417111001270435,
+      "work": "/private/tmp/stz-32d-geometry-review/targeted/regular-polygon-minus3"
+    },
+    {
+      "case": "square-0",
+      "selectedAnchor": "corner 1",
+      "selected": {
+        "expected": {
+          "x": -7.07108,
+          "y": 7.07108
+        },
+        "actual": {
+          "supported": true,
+          "position": {
+            "x": -7.0710678118654755,
+            "y": 7.071067811865475
+          }
+        },
+        "errorTeXpt": 0.000017236625145555496
+      },
+      "maxError": 0.000017236625145555496,
+      "work": "/private/tmp/stz-32d-geometry-review/targeted/square-0"
+    },
+    {
+      "case": "square-3",
+      "selectedAnchor": "corner 1",
+      "selected": {
+        "expected": {
+          "x": -4.07089,
+          "y": 4.07089
+        },
+        "actual": {
+          "supported": true,
+          "position": {
+            "x": -10.071067811865474,
+            "y": 10.071067811865474
+          }
+        },
+        "errorTeXpt": 8.485532838190274
+      },
+      "maxError": 8.48638496630161,
+      "work": "/private/tmp/stz-32d-geometry-review/targeted/square-3"
+    },
+    {
+      "case": "square-minus3",
+      "selectedAnchor": "corner 1",
+      "selected": {
+        "expected": {
+          "x": -10.07124,
+          "y": 10.07124
+        },
+        "actual": {
+          "supported": true,
+          "position": {
+            "x": -4.0710678118654755,
+            "y": 4.0710678118654755
+          }
+        },
+        "errorTeXpt": 8.485524885033694
+      },
+      "maxError": 8.486500622801875,
+      "work": "/private/tmp/stz-32d-geometry-review/targeted/square-minus3"
+    },
+    {
+      "case": "triangle-0",
+      "selectedAnchor": "corner 1",
+      "selected": {
+        "expected": {
+          "x": 0,
+          "y": 10
+        },
+        "actual": {
+          "supported": true,
+          "position": {
+            "x": -6.123233995736766e-16,
+            "y": 10
+          }
+        },
+        "errorTeXpt": 6.123233995736766e-16
+      },
+      "maxError": 0.0011173514378341072,
+      "work": "/private/tmp/stz-32d-geometry-review/targeted/triangle-0"
+    },
+    {
+      "case": "triangle-3",
+      "selectedAnchor": "corner 1",
+      "selected": {
+        "expected": {
+          "x": 0,
+          "y": 4
+        },
+        "actual": {
+          "supported": true,
+          "position": {
+            "x": -9.797174393178826e-16,
+            "y": 16
+          }
+        },
+        "errorTeXpt": 12
+      },
+      "maxError": 12.000560994552979,
+      "work": "/private/tmp/stz-32d-geometry-review/targeted/triangle-3"
+    },
+    {
+      "case": "triangle-minus3",
+      "selectedAnchor": "corner 1",
+      "selected": {
+        "expected": {
+          "x": 0,
+          "y": 16
+        },
+        "actual": {
+          "supported": true,
+          "position": {
+            "x": -2.449293598294707e-16,
+            "y": 4.000000000000001
+          }
+        },
+        "errorTeXpt": 12
+      },
+      "maxError": 12.000690194321816,
+      "work": "/private/tmp/stz-32d-geometry-review/targeted/triangle-minus3"
+    },
+    {
+      "case": "star-0",
+      "selectedAnchor": "outer point 1",
+      "selected": {
+        "expected": {
+          "x": 0,
+          "y": 10
+        },
+        "actual": {
+          "supported": true,
+          "position": {
+            "x": -6.123233995736766e-16,
+            "y": 10
+          }
+        },
+        "errorTeXpt": 6.123233995736766e-16
+      },
+      "maxError": 0.001196696633317991,
+      "work": "/private/tmp/stz-32d-geometry-review/targeted/star-0"
+    },
+    {
+      "case": "star-3",
+      "selectedAnchor": "outer point 1",
+      "selected": {
+        "expected": {
+          "x": 0,
+          "y": 5.37004
+        },
+        "actual": {
+          "supported": true,
+          "position": {
+            "x": -6.123233995736766e-16,
+            "y": 14.63008575528045
+          }
+        },
+        "errorTeXpt": 9.260045755280451
+      },
+      "maxError": 9.260045755280451,
+      "work": "/private/tmp/stz-32d-geometry-review/targeted/star-3"
+    },
+    {
+      "case": "star-minus3",
+      "selectedAnchor": "outer point 1",
+      "selected": {
+        "expected": {
+          "x": 0,
+          "y": 14.62996
+        },
+        "actual": {
+          "supported": true,
+          "position": {
+            "x": -6.123233995736766e-16,
+            "y": 5.369914244719548
+          }
+        },
+        "errorTeXpt": 9.260045755280451
+      },
+      "maxError": 9.260045755280451,
+      "work": "/private/tmp/stz-32d-geometry-review/targeted/star-minus3"
+    },
+    {
+      "case": "isosceles-triangle-0",
+      "selectedAnchor": "apex",
+      "selected": {
+        "expected": {
+          "x": -21.9054,
+          "y": 0
+        },
+        "actual": {
+          "supported": true,
+          "position": {
+            "x": -21.905405387783276,
+            "y": 0
+          }
+        },
+        "errorTeXpt": 0.000005387783275523361
+      },
+      "maxError": 0.00010562196354828861,
+      "work": "/private/tmp/stz-32d-geometry-review/targeted/isosceles-triangle-0"
+    },
+    {
+      "case": "isosceles-triangle-3",
+      "selectedAnchor": "apex",
+      "selected": {
+        "expected": {
+          "x": -14.06537,
+          "y": 0
+        },
+        "actual": {
+          "supported": true,
+          "position": {
+            "x": -14.066027598525018,
+            "y": 0
+          }
+        },
+        "errorTeXpt": 0.0006575985250183436
+      },
+      "maxError": 195.52228735110248,
+      "work": "/private/tmp/stz-32d-geometry-review/targeted/isosceles-triangle-3"
+    },
+    {
+      "case": "isosceles-triangle-minus3",
+      "selectedAnchor": "apex",
+      "selected": {
+        "expected": {
+          "x": -29.74542,
+          "y": 0
+        },
+        "actual": {
+          "supported": true,
+          "position": {
+            "x": -29.744783177041533,
+            "y": 0
+          }
+        },
+        "errorTeXpt": 0.0006368229584658991
+      },
+      "maxError": 296.74488206053655,
+      "work": "/private/tmp/stz-32d-geometry-review/targeted/isosceles-triangle-minus3"
+    },
+    {
+      "case": "dart-0",
+      "selectedAnchor": "tip",
+      "selected": {
+        "expected": {
+          "x": -13.14021,
+          "y": 0
+        },
+        "actual": {
+          "supported": true,
+          "position": {
+            "x": -13.21268629282713,
+            "y": 0
+          }
+        },
+        "errorTeXpt": 0.07247629282712964
+      },
+      "maxError": 0.16843567854200678,
+      "work": "/private/tmp/stz-32d-geometry-review/targeted/dart-0"
+    },
+    {
+      "case": "dart-3",
+      "selectedAnchor": "tip",
+      "selected": {
+        "expected": {
+          "x": -5.30019,
+          "y": 0
+        },
+        "actual": {
+          "supported": true,
+          "position": {
+            "x": -21.052322062089225,
+            "y": 0
+          }
+        },
+        "errorTeXpt": 15.752132062089224
+      },
+      "maxError": 36.52127549513435,
+      "work": "/private/tmp/stz-32d-geometry-review/targeted/dart-3"
+    },
+    {
+      "case": "dart-minus3",
+      "selectedAnchor": "tip",
+      "selected": {
+        "expected": {
+          "x": -20.98024,
+          "y": 0
+        },
+        "actual": {
+          "supported": true,
+          "position": {
+            "x": -5.373050523565032,
+            "y": 0
+          }
+        },
+        "errorTeXpt": 15.607189476434966
+      },
+      "maxError": 36.19289057637973,
+      "work": "/private/tmp/stz-32d-geometry-review/targeted/dart-minus3"
+    }
+  ]
+}

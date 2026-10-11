@@ -1,5 +1,127 @@
 # Phase 32D spacing, minima, anchors, and combined audit
 
+## Signed polygonal clearance and zero-axis ellipse follow-up (2026-10-11)
+
+The actual starting checkout is clean at
+`be2aabe55e578d036672960f3ba741af4008564f`, fingerprint
+`e9f127caf56c8fc58ed78b5ac0fa00e8d7d956cbd9a310c223535ee1d7957495`.
+This prompt commit already tracks the preceding fifteen-file signed-axis/report
+correction and thirteen signed-axis fixture files. Their accepted behavior and
+reference bytes are preserved. Initial tracked bytes, all predecessor fixture
+hashes and a complete immutable copy/hash inventory of the new independent
+geometry review were captured before edits under
+`/private/tmp/stz-32d-polygon-zero-fix-20261011/`.
+
+The matching browser-capable parent `HMy8AM` passed all five required commands,
+all eighteen cumulative groups and all eight original 32D scenarios, including
+90 sizing cases, 305 anchors, both pending transparent/white downloads, both
+TikZ modes, external reopening/complete PNG and final standalone acceptance.
+It retained the two signed-anchor and two signed-picking native cases with no
+page errors. Its exact-tree fingerprint was
+`8f0ffe266755d990a3a0abd284f012c714623a3399c75a8fa37cbc05c0033478`.
+The newest matching read-only review freshly passed **6,425/6,425** tests with
+zero failures/skips, build, focused strict TypeScript, changed-file lint,
+syntax and diff. The stalled-report race is resolved, not current test debt.
+Nevertheless, independently compiled PGF/librsvg probes found two Medium
+production defects: signed polygonal fitting/clearance and omitted zero-axis
+ellipse SVG paint. That review returned `needs_changes`,
+`ready_to_commit:false`; no commit followed it. Neither historical pass verifies
+this follow-up tree.
+
+The scoped production correction keeps signed fitting quantities independently
+of ordered paint envelopes. Regular polygon and legacy square/triangle retain
+the fitted radius and add PGF's declared signed miter length, preserving start
+angle/index/order and separate numeric border behavior. Star retains both
+signed radii and PGF's separate angular/cosecant adjustments, including height/
+ratio fitting and mixed signs. Isosceles triangle carries the original and
+effective half-angles; stretch uses divide then atan rather than a reconstructed
+atan2 quadrant, and its original apex cosecant stays distinct from effective
+corner angles. Dart keeps parameter-defined tip/tail miter vectors and fitted
+lengths, separation and offset. Its sequential scanned/truncated dimensional
+minimum products now follow PGF, including the reciprocal macro's signed integer
+branch before absolute value. The public radius remains a paint magnitude;
+clearance never becomes a hit region. These construction fields are runtime
+only; version 2, authored units/raw text, model coordinates and camera contracts
+are unchanged.
+
+The collapsed ellipse path retains the full signed angular traversal with every
+intervening quarter/turning extremum. For zero x and positive y it emits
+center → upper SVG extremum → center → lower extremum → center, then closes.
+Zero y, both-zero, negative surviving axes and signed/reversed/rotated partial
+sweeps use the same ordered traversal. Zero-area fill remains zero-area; no
+epsilon radius or substitute marker is introduced. Nondegenerate SVG arcs and
+magnitude-based sampling retain their 0.005-unit precision/2048 budget.
+
+Additive evidence lives separately under
+`tests/fixtures/point-node-anchors/signed-polygonal/` and `zero-axis/`.
+The polygonal bundle retains all eighteen empty and eighteen fixed-body review
+cases, their complete TeX inputs/raw geometry/compiler/PDF/failing production
+results and independent reproduction scripts. Every artifact is hashed, including
+previously unhashed inputs/raw/compiler/parsed observations. The complete additive inventory has 54 boxes/1,386 anchors (36 retained and
+18 purposeful), twelve direct math controls, four dart fitting traces and one
+authenticated singular boundary. New boxes cover sign transitions, body/minimum
+dominance, rotation/incircle/stretch, star height/ratio and mixed inner/outer
+radii; direct signed reciprocal controls are compiled independently. Oracle input/parsing imports no production
+solver, math or support tables. Retained production results are failing evidence,
+never oracle inputs. Original 32C, 172-box/4,925-anchor/11-failure and eight-box/
+192-anchor signed-basic references remain unchanged, with .025pt/.03pt tolerances
+and existing independent controls. Scoped log exceptions include only the retained
+review compiler artifacts in the tracked/untracked identity.
+
+The zero-axis bundle retains the original independently observed blank
+production raster/visible PGF paint, saved 2D/3D models and producer/picking/TikZ
+probes distinctly from native evidence. Eleven new authenticated PGF paths
+(five full ellipse nodes and six signed/reversed/rotated partial sweeps) and
+thirty-seven independent renderer records exercise emitted paths, stroke extents,
+closure/cap/join/dash phase and zero-area fill. The twenty-five full-node paint/
+control raster masks and extents match independently compiled PGF. A retained
+librsvg solid coincident-endpoint partial-cubic anomaly is explicitly recorded;
+raw paths remain intact and any derivative split is separately identified as an
+independent geometry-preserving renderer normalization.
+
+Registered fixed-metric geometry/rendering regressions inspect actual emitted
+paths and raster evidence, signed placement in current/pending/settled output,
+validation/version-2 reload, exact units/source, both TikZ modes, unchanged
+coordinates, active 3D work-plane projection and current owner/font/source/layout/
+filter/lock guards. These are pure/fixed-metric and independent-renderer results;
+they do not establish trusted native input or current standalone downloads.
+
+The existing cumulative workflow additionally requires the ninth named scenario
+`point-layout-signed-polygonal-zero-axis`, with selected-anchor placement for all
+six polygonal branches in both ambient dimensions (including the lower isosceles
+corner), native zero-axis visible-stroke raster evidence, ordinary local(0,20)
+click, Alt owner cycling and genuinely outside exclusion. Raw current model,
+source/request/owner/revision, controls, contour/root CTMs, input and selection
+observations are persisted before validation. Actual downloaded/reopened SVG and
+complete-root PNG in both dimensions must retain the corrected placement/stroke,
+background and file identity. The original eight scenarios, all eighteen groups,
+all fifteen pending-click entries, both pending downloads and unchanged capture/
+preparation/view/diagnostic/cleanup contracts stay mandatory. New raw artifacts
+and imported dependencies are included in parent policy and isolated fixtures;
+synthetic corruption controls are labelled as policy checks, never native passes.
+
+Homebrew-first Node v26.9.0 is used. The focused new authenticated/runtime
+sweep passed 118 checks; the geometry/model/TikZ/previous-axis sweep passed 493;
+the preserved view/preparation/pending/capture/ownership sweep passed 261. These
+are separate overlapping sweeps, not additional cumulative case counts. Focused
+strict TypeScript and configured changed-TypeScript lint passed. All 54 previous
+fixture files retain their initial hashes, and all 490 additive evidence files
+are included in the checkout inventory. Final required command results, baseline
+failures, actual browser startup/report artifacts and final tracked/untracked
+identity belong to the external handoff.
+The four inherited lint errors are separate failed baseline checks: two geometric
+caller `no-unsafe-finally`, verifier unused `_role`, and layer test unused
+`defaultCurveStyle`. Repository-wide lint is not run. No unrelated cleanup,
+production dependency, tolerance relaxation or deferred profile is added.
+
+Phase 32 remains **incomplete**. A fresh owned cumulative `32D verify` on the
+final tree must pass before independent read-only completion review using
+`prompts/phase-32d-review.md`, followed by the matching-tree guard. If child server
+startup is restricted, retain the failure and pending native work for the
+browser-capable parent. Failed/incomplete verification stops before review or
+commit; the earlier needs-changes review is not a current pass. Commit/push remain
+with the parent after verification and review. Entries below retain history.
+
 ## Signed axes, arc picking and deterministic report follow-up (2026-10-11)
 
 The actual starting tree is clean at

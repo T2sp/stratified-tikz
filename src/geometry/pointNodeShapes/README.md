@@ -26,6 +26,15 @@ body. Ellipse/diamond ignore the border keys as upstream does. Polygon/star
 always use their radius fitting; the remaining shapes honor their PGF incircle
 and restricted-rotation branches, including the upstream negative-angle order.
 
+Collapsed ellipse axes use ordered line traversal through every intervening
+quarter-angle and turning extremum. A full zero-x ellipse travels from its
+center to the upper SVG extremum, back through its center to the lower extremum,
+then returns to its center and closes. Signed surviving axes and reversed or
+rotated partial sweeps retain that order, retracing length and dash phase.
+Both-zero axes retain a closed zero-length path; fill area stays zero. SVG arcs
+with coincident endpoints cannot represent this traversal. Nondegenerate arcs,
+the magnitude-based sampling density, precision and work budget are unchanged.
+
 The implementation is a separately named TypeScript adaptation of algorithms in
 PGF **3.1.11a**, `pgflibraryshapes.geometric.code.tex`, copyright 2018 Till Tantau
 and Mark Wibrow, distributed under **LPPL 1.3c**. See
@@ -66,6 +75,16 @@ rectangle and `sqrt(2)` times that padded half-axis for ellipse. A negative mini
 dominates when this content candidate is more negative. The signed fitted axes
 remain authoritative for anchors; ordered painted bounds describe their envelope
 and cannot recover those signs.
+
+Runtime-only `polygonalFitting` similarly carries a regular polygon's signed
+radius, a star's separate signed inner/outer radii, the isosceles triangle's
+original/effective fitting angles, and dart's fitted lengths/parameter-defined
+miter vectors. Clearance consumes these quantities without recovering signs or
+angles from the paint envelope or winding. PGF's original apex cosecant remains
+distinct from stretched triangle corner angles. Dart minimum growth preserves
+sequential scanned/truncated dimensional products, including the signed integer
+test in PGF's reciprocal macro. These fields are never saved in version-2 models
+or history, and the public magnitude radius still describes painted geometry.
 
 ## Placement and anchors
 
@@ -152,3 +171,16 @@ diameter, independently stretched triangles, wrong body origin and ignored outer
 clearance. Eleven independent expected-failure artifacts cover actual PGF fitting
 and anchor singularities. Original 32C references retain their unchanged
 0.025pt comparison.
+
+Separate additive bundles retain the independent signed polygonal and collapsed
+ellipse review probes byte for byte. `signed-polygonal/` adds 54 fixed boxes
+(36 retained review cases and 18 purposeful cases), 1,386 anchors, twelve direct
+PGF arithmetic controls, four dart fitting traces and one authenticated singular
+boundary. `zero-axis/` adds eleven PGF paths and 37 independently rendered
+SVG/PNG records, including zero-area fill, signed/reversed/rotated partial sweeps
+and cap/join/dash-phase controls. Registered tests authenticate inputs, raw
+observations, compiler output, source hashes and actual raster bytes; production
+results from the rejected review are provenance only. The full-node PGF paths
+remain unmodified. A partial-cubic librsvg anomaly and separately normalized
+derivative splits are explicitly distinguished. These fixed-box/renderer probes
+do not establish the separately required native browser/download acceptance.

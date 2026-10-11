@@ -1,0 +1,25 @@
+CASE probe
+FONT 10.00002pt,4.30554pt
+PAINT stroke; PATH macro:->\pgfsyssoftpath@movetotoken {-7.07108pt}{-7.07108pt}\pgfsyssoftpath@linetotoken {7.07108pt}{-7.07108pt}\pgfsyssoftpath@linetotoken {7.07108pt}{7.07108pt}\pgfsyssoftpath@linetotoken {-7.07108pt}{7.07108pt}\pgfsyssoftpath@closepathtoken {-7.07108pt}{-7.07108pt}
+ANCHOR center; 0.0pt,0.0pt
+ANCHOR text; 0.0pt,0.0pt
+ANCHOR base; 0.0pt,0.0pt
+ANCHOR mid; 0.0pt,2.15277pt
+ANCHOR east; 4.07144pt,0.0pt
+ANCHOR west; -4.07144pt,0.0pt
+ANCHOR north; 0.0pt,4.07144pt
+ANCHOR south; 0.0pt,-4.07144pt
+ANCHOR north east; 4.07137pt,4.07137pt
+ANCHOR north west; -4.07137pt,4.07137pt
+ANCHOR south east; 4.07137pt,-4.07137pt
+ANCHOR south west; -4.07137pt,-4.07137pt
+ANCHOR 0; -4.07144pt,0.0pt
+ANCHOR 13; -4.07062pt,-0.93971pt
+ANCHOR 45; -4.07112pt,-4.07112pt
+ANCHOR 90; 0.0pt,-4.07144pt
+ANCHOR 181; 4.07162pt,0.07104pt
+ANCHOR 270; 0.0pt,4.07144pt
+ANCHOR 315; -4.07112pt,4.07112pt
+ANCHOR -30; -4.07092pt,2.35034pt
+ANCHOR corner 1; -4.07089pt,-4.07089pt
+ANCHOR side 1; 0.0pt,-4.07089pt

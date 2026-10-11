@@ -1,0 +1,41 @@
+\documentclass{article}
+\usepackage{tikz}
+\usetikzlibrary{shapes.geometric}
+\typeout{STZ PGF VERSION \pgfversion}
+\pagestyle{empty}
+\makeatletter
+\newwrite\fixtureout
+\immediate\openout\fixtureout=geometry.txt
+\newcommand\recordpaint{\pgfgetpath\fixturepath\immediate\write\fixtureout{PAINT stroke; PATH \meaning\fixturepath}\pgfusepath{stroke}}
+\newcommand\fixedellipse[5]{%
+\begin{pgfpicture}\begingroup\normalfont
+\pgfkeys{/pgf/inner xsep=#2pt,/pgf/inner ysep=#3pt,/pgf/outer xsep=0pt,/pgf/outer ysep=0pt,/pgf/minimum width=#4pt,/pgf/minimum height=#5pt}%
+\setbox\pgfnodeparttextbox=\hbox{}%
+\wd\pgfnodeparttextbox=0pt\ht\pgfnodeparttextbox=0pt\dp\pgfnodeparttextbox=0pt%
+\pgfsetlinewidth{.4pt}%
+\immediate\write\fixtureout{CASE #1}%
+\pgfmultipartnode{ellipse}{center}{fixture}{\recordpaint}%
+\foreach\anchorname in {center,north,south,east,west}{\pgfpointanchor{fixture}{\anchorname}\immediate\write\fixtureout{ANCHOR \anchorname; \the\pgf@x,\the\pgf@y}}%
+\endgroup\end{pgfpicture}\par}
+\newcommand\fixedarc[6]{%
+\begin{pgfpicture}\begingroup
+\pgfsetlinewidth{.4pt}\pgftransformrotate{#6}%
+\immediate\write\fixtureout{CASE #1}%
+\pgfpathmoveto{\pgfpointpolar{#4}{#2pt and #3pt}}%
+\pgfpatharc{#4}{#5}{#2pt and #3pt}%
+\recordpaint
+\endgroup\end{pgfpicture}\par}
+\makeatother
+\begin{document}
+\fixedellipse{zero-x-positive}{0}{20}{0}{0}
+\fixedellipse{zero-y-positive}{20}{0}{0}{0}
+\fixedellipse{both-zero}{0}{0}{0}{0}
+\fixedellipse{zero-x-negative}{0}{-20}{0}{-100}
+\fixedellipse{zero-y-negative}{-20}{0}{-100}{0}
+\fixedarc{partial-zero-x-turn}{0}{20}{45}{135}{0}
+\fixedarc{partial-zero-x-reversed}{0}{20}{135}{45}{0}
+\fixedarc{partial-zero-x-signed-rotated}{0}{-20}{45}{135}{37}
+\fixedarc{partial-zero-y-turn}{20}{0}{-45}{45}{0}
+\fixedarc{partial-zero-y-signed-reversed}{-20}{0}{45}{-45}{-23}
+\fixedarc{partial-zero-x-extra-cycle}{0}{20}{405}{495}{37}
+\end{document}

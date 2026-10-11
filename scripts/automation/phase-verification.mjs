@@ -1,7 +1,7 @@
 import { phase32cProfile, phase32cDeferrals, phase32cAuthorization, resolveVerificationProfile, deferredMechanismKey, mechanismNotRun, assertScopedMechanismEvidence, assertNamedStrict32BFailure } from './phase32c-profile.mjs';
 import { geometricShapeGroup, geometricShapeScenarios, geometricShapeArtifacts, assertGeometricShapeEvidence, assertGeometricStandaloneEvidence } from '../pointGeometricShapesContract.mjs';
 import { layoutAnchorGroup, layoutAnchorScenarios, layoutAnchorArtifacts, assertLayoutAnchorEvidence, assertLayoutStandaloneEvidence,
-  assertLayoutPostClickViewDiagnostic } from '../pointLayoutAnchorsContract.mjs';
+  assertLayoutPostClickViewDiagnostic, signedPolygonalScenario, assertSignedPolygonalStandaloneEvidence } from '../pointLayoutAnchorsContract.mjs';
 import {
   closeSync,
   existsSync,
@@ -285,6 +285,10 @@ function validateTargetedPaintEvidence(artifactDir, name, group, profile = "stri
   if (group === layoutAnchorGroup) {
     const evidence = evidenceObject(artifactDir, `${name}.json`);
     assertLayoutAnchorEvidence(evidence, name);
+    if (name === signedPolygonalScenario) for (const ambientDimension of [2, 3]) {
+      const raw = evidenceObject(artifactDir, `${name}-${ambientDimension}d-standalone.json`);
+      assertSignedPolygonalStandaloneEvidence(evidence, raw, artifactDir, ambientDimension);
+    }
     if (name.startsWith('point-layout-pending-')) {
       const standalone = evidenceObject(artifactDir, `${name}-standalone.json`);
       assertLayoutStandaloneEvidence(evidence, standalone, artifactDir);

@@ -1,5 +1,47 @@
 # Phase 32 Plan: Point-node math, paint, geometric shapes, and layout
 
+Signed polygonal/zero-axis follow-up (2026-10-11): the actual prompt checkout
+is clean at `be2aabe55e578d036672960f3ba741af4008564f`, fingerprint
+`e9f127caf56c8fc58ed78b5ac0fa00e8d7d956cbd9a310c223535ee1d7957495`.
+It already tracks the prior fifteen-file correction and thirteen signed-axis
+fixture files. The matching `HMy8AM` parent completed all eighteen groups/eight
+original 32D scenarios, both pending downloads/reopening/PNG/TikZ and final
+standalone acceptance. Its newest independent read-only review freshly passed
+6,425 tests/build/focused checks, clearing the earlier stalled-report race.
+It still returned `needs_changes` for signed polygonal fitting/clearance and
+zero-axis ellipse paint. Those two production defects, not historical browser
+startup or the resolved race, motivate this scoped follow-up.
+
+Runtime construction now preserves polygon/star signed radii, isosceles original/
+effective fitting angles and dart's parameter-defined lengths/miter vectors.
+PGF signed reciprocal branching/sequential dart minimum arithmetic is retained;
+paint bounds/public radius remain magnitudes. Collapsed ellipse paths preserve
+signed ordered retracing/extrema/closure and dash phase without epsilon radii,
+changed minima or enlarged picking. Saved version 2, raw source/units, coordinates,
+camera, accepted rectangle/ellipse axes/density and all native/pending/capture
+contracts stay intact.
+
+Separate authenticated polygonal and zero-axis bundles preserve complete review
+artifacts and add purposeful independent PGF/arithmetic/renderer controls. Old
+32C/original 172-box/4,925-anchor/11-failure and signed-basic eight-box/192-anchor
+references/tolerances are unchanged. Registered production regressions and the
+ninth required `point-layout-signed-polygonal-zero-axis` scenario extend the
+existing combined workflow with both-dimension native selected-anchor/stroke/
+ordinary-click/Alt/outside and real downloaded/reopened SVG/complete-root PNG.
+The original eight scenarios, all eighteen predecessor groups, 90 sizing/305
+anchor cases and both fifteen-entry pending downloads remain mandatory.
+
+Pure/fixed-metric, independent-renderer and real native evidence are distinguished
+in the [implementation audit](PHASE_32D_IMPLEMENTATION.md). Exact pre-edit bytes,
+review hashes, commands/logs, preservation checks and final identity/results are
+retained under `/private/tmp/stz-32d-polygon-zero-fix-20261011/`. Four unchanged
+baseline lint errors remain failed separately; repository-wide lint is not run.
+Fresh cumulative required verification of the final tracked/untracked tree must
+pass before independent read-only completion review and the post-review identity
+guard. Restricted child browser startup leaves native work pending for the parent;
+it supplies no pass. Phase 32 remains **incomplete**; no commit or push follows
+failed/incomplete verification or needs-changes review. Historical entries follow.
+
 Signed-axis/picking/report follow-up (2026-10-11): the actual starting tree is
 clean at `f9893fad1fa0586260d614e832ffb99b00ce513f`, fingerprint
 `1ea95cbae3ee30bf7ca5f1ed5d8d807ac705e8052854cc5f30880c427730abeb`.

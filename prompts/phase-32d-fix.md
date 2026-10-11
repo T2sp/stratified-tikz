@@ -1,272 +1,234 @@
-# Phase 32D Fix for signed polygonal clearance and zero-axis ellipse paint
+# Phase 32D Fix for authenticated zero-axis outside input
 
 ## Objective and scope
 
-Continue from the implemented Phase32D checkout and successful cumulative
-parent verification. The newest independent review returned needs_changes:
-two supported-layout defects remain despite6,425 passing registered tests.
+Continue from the implemented signed polygonal fitting/clearance and faithful
+zero-axis ellipse traversal. The newest exact-tree parent run stops before its
+first zero-axis outside click because the harness requires the hit target itself
+to be the SVG root. Production has an explicitly marked SVG background rect.
 
-Correct both issues:
+Correct this scoped observation/contract/fixture mismatch. Authenticate the
+actual current root or production background in fresh hit-stack and trusted
+event evidence, then complete the mandatory 2D/3D zero-axis sequence, live paint,
+polygonal placement and downloaded/reopened SVG/PNG acceptance.
+Retain all implemented geometry, references, predecessors and pending contracts.
 
-1. Preserve PGF signed polygonal fitting/clearance for regular polygon,
-   legacy square/triangle, star, isosceles triangle and dart.
-2. Emit faithful zero-axis ellipse paths so live/settled SVG paint and committed/
-   native picking agree.
-
-Keep the completed rectangle/ellipse signed-axis and negative-radius density
-corrections, additive authenticated references and deterministic stalled-report
-test. The newest review judged those corrections sound. Do not repeat resolved
-fixes, reopen the old test race or rewrite unrelated modules.
-
-Limit production work to the evidenced fitting/anchor/degenerate-path branches
-and small pure runtime state/helpers needed to preserve PGF semantics.
-Keep model validation, saved version2, authored units/raw text, camera and all
-current native/pending/download/capture contracts.
-Do not reject/clamp valid negative or zero dimensions to avoid these cases.
+Limit changes to the evidenced native observation, zero-axis assertions,
+faithful fixtures/regressions, necessary isolated runner copies and Phase32
+status documentation. Do not change production geometry, paths, picking,
+minimum fitting, camera, authored units, saved version2 or reference expectations
+to pass this harness condition.
+Any later production change needs separately retained fresh independent evidence.
 
 Read `AGENTS.md`, `prompts/phase-32d-implement.md`,
 `prompts/phase-32d-review.md`, `docs/PHASE_32D_IMPLEMENTATION.md` and
-`docs/PHASE_32_PLAN.md`. Inspect exact source and independent evidence first.
+`docs/PHASE_32_PLAN.md`. Inspect the exact source and raw failure first.
 Maintain cumulative strict verification, verification-before-review/commit and
 the post-review matching-tree guard. Phase32 remains incomplete.
 
-## Latest review, acceptance and identity
+## Latest handoff, parent failure and identity
 
-Newest review:
-`/Users/takamatoshinori/.codex/attachments/a475cffd-a3cc-40c7-a161-583203c56760/Pasted text.txt`.
-Read-only review records/logs:
-`/private/tmp/stz-phase32d-readonly-review-Zm4oWG/`, especially
-`review-observations.json`, before/after checkout identities, `npm-test.log`,
-`npm-build.log` and `baseline-reproduction.json`.
+Implemented polygonal/zero-axis handoff:
+`/private/tmp/stz-32d-polygon-zero-fix-20261011/HANDOFF.json`.
+Child cumulative report:
+`/var/folders/vk/7kf940pd4bx8f6cg3rzlmtc80000gn/T/stz-phase32d-manual-dNz3ov/verification.json`.
 
-Matching passed parent:
-`/var/folders/vk/7kf940pd4bx8f6cg3rzlmtc80000gn/T/stz-phase32d-before-review-HMy8AM/verification.json`.
-Native report and artifacts:
-`/var/folders/vk/7kf940pd4bx8f6cg3rzlmtc80000gn/T/stz-phase32d-before-review-HMy8AM/05-check-free-labels/artifacts/`.
-
-New independent reproductions:
-
-- `/private/tmp/stz-32d-geometry-review/empty/manifest.json` and all18 case
-  directories with complete TeX inputs/raw geometry/compiler/production results.
-- `/private/tmp/stz-32d-geometry-review/targeted/manifest.json` and its case
-  directories for additional anchors/body profiles.
-- `/private/tmp/stz-32d-geometry-review/zero-axis/view-results.json`,
-  `render-results.json`, complete PGF raw/input/compiler/PDF and actual production/
-  reference SVG/PNG files. Reproduction scripts are in the parent directory.
-- `/private/tmp/stz-32d-geometry-review/model-paths-results.json` and retained
-  saved2D/3D models/both TikZ modes.
+Newest parent verifier:
+`/var/folders/vk/7kf940pd4bx8f6cg3rzlmtc80000gn/T/stz-phase-verifier-nbIe6k/response.json`.
+Strict report:
+`/var/folders/vk/7kf940pd4bx8f6cg3rzlmtc80000gn/T/stz-phase32d-before-review-Ab9guh/verification.json`.
+Browser evidence:
+`/var/folders/vk/7kf940pd4bx8f6cg3rzlmtc80000gn/T/stz-phase32d-before-review-Ab9guh/05-check-free-labels/artifacts/free-labels-evidence.json`,
+and its sibling artifacts, especially `point-layout-failure.json`,
+`point-layout-app-failure.json` and the retained complete failure DOM.
 
 Branch: `phase/32d-margin-minsize-anchor`.
-HEAD: `f9893fad1fa0586260d614e832ffb99b00ce513f`.
-Pre-prompt tree matches parent/reviewer before/after:
+HEAD: `be2aabe55e578d036672960f3ba741af4008564f`.
+Pre-prompt tree matches the parent report's before/after checkout:
 
 ~~~text
-8f0ffe266755d990a3a0abd284f012c714623a3399c75a8fa37cbc05c0033478
+6a572c7c45328aa82733a077fdab46118c3c35ad7c244edc7b1df8fb46fcde30
 ~~~
 
-Preserve fifteen modified tracked files: `.gitignore`; both Phase32 documents;
+Tracked-diff SHA256:
+`e2aabcb391f41fb56b37dcfc8d8d3d0833083d76b836a75381ee0dbf20b2103e`.
+Preserve fourteen modified tracked files: `.gitignore`; both Phase32 documents;
+`package.json`; `scripts/automation/phase-verification.mjs`;
 `scripts/checkPointLayoutAnchors.mjs`; `scripts/pointLayoutAnchorsContract.mjs`;
-`src/geometry/pointNodeShapes/README.md`, `anchors.ts`, `contours.ts`, `solve.ts`,
-`types.ts`; `tests/geometry/pointNodeAnchorReferences.test.ts`;
-`tests/geometry/pointNodeShapes.test.ts`;
-`tests/rendering/svgPointNodeAnchors.test.ts`;
-`tests/scripts/phase32dVerification.test.mjs` and
-`tests/scripts/pointNativeFocused.test.mjs`.
-Preserve the13 untracked files under
-`tests/fixtures/point-node-anchors/signed-axes/`, including its complete generator/
-references/raw/compiler/README and retained review bundle.
-Keep their bytes and scoped artifact-inclusion rules.
+`src/geometry/pointNodeShapes/README.md`, `anchors.ts`, `contours.ts`,
+`pgfMath.ts`, `solve.ts`, `types.ts`;
+`tests/scripts/phase32dVerification.test.mjs`.
+Preserve all494 untracked files:490 additive reference/evidence files under
+`tests/fixtures/point-node-anchors/signed-polygonal/` and `zero-axis/`, plus
+the four registered `pointNodeDegeneratePaths`, `pointNodePolygonalSignedReferences`,
+`svgPointNodeDegeneratePaths` and `svgPointNodePolygonalSigned` test files.
+Use the handoff's exact inventory/hashes. Keep prior tracked references too.
 The prompt changes identity: capture actual current tracked/untracked bytes
-rather than treating a historical fingerprint as future acceptance.
+rather than treating this historical fingerprint as future acceptance.
 
 | Retained evidence | Actual result |
 | --- | --- |
-| HMy8AM parent | Required tests/build/diff/label-assets/free-labels passed. All18 cumulative groups and eight named32D scenarios complete, none incomplete/unexecuted, pageErrors empty. Node v26.9.0, Chrome154.0.8037.98, matching checkout identities. |
-| Latest read-only reviewer | Fresh6,425/6,425 tests, zero failures/skips; build, focused strict TypeScript, changed-file lint, syntax and diff passed. Independently inspected matching parent browser reports. Four unchanged-HEAD lint errors reproduced; whole-repository lint not run. |
-| Completion decision | needs_changes, zero Critical, two Medium, ready_to_commit:false. Independent PGF3.1.11a/librsvg probes exposed production defects missing from registered cases. No commit followed review. |
+| Latest implementation child | 6,655/6,655 registered tests passed, zero failures/skips; build/diff and focused TypeScript/lint/syntax passed. Four inherited lint errors remain. Strict/direct browser attempts stopped at localhost EPERM before Chrome. |
+| Ab9guh parent | Tests/build/diff/label-assets passed; free-labels failed in combined32D layout. Sixteen cumulative groups completed; combined layout is incomplete and final standalone is unexecuted. PageErrors is empty. |
+| Current layout progress | First six named32D scenarios passed. Six2D signed polygonal selected-anchor observations were retained, then2D zero-axis outside-clear preparation failed. The new scenario, its3D cases/downloads, both pending scenarios and final standalone have no completed fresh acceptance. |
+| Completion | No new independent completion review, commit or push. The prior needs_changes findings led to the implemented geometry fixes; successful synthetic checks do not establish final review or native completion. |
 
-Preserve authentic90 sizing/305 anchor cases, all other predecessors,
-both pending transparent/white downloaded/reopened SVG/complete PNG/TikZ and
-final standalone acceptance. The native interaction record additionally contains
-two signedAnchorCases and two signedPickingCases from the previous correction.
-These accepted cases do not cover the new polygonal/zero-axis defects.
-Historical passes cannot replace fresh verification of the next geometry tree.
-The old full-suite test race is resolved; the current blocker is production
-conformance, not browser startup or unexecuted pending downloads.
+Earlier HMy8AM acceptance/review and historical geometry probes remain evidence
+history only. They cannot replace fresh acceptance of this geometry tree.
+Distinguish child startup EPERM from the parent's actual pre-input assertion.
+Do not report the parent as blocked before Chrome.
 
-## Signed polygonal fitting and clearance
+## Exact observed failure
 
-For empty body, inner x/y separation-30pt, minimum width/height-20pt,
-outer x/y separation+3pt, regular polygon anchor corner1:
-manifest expected SVG-frame y=6.29184TeX pt, production y=13.7082039325pt.
-Placement differs7.41636pt before scaling to1.2 SVG units/pt.
-Raw PGF corner1 y is-6.29184 in Y-up coordinates: reverse Y exactly once.
-Do not mistake the already converted manifest value for raw PGF Y-up.
+Read diagnostic
+`point-layout-signed-polygonal-zero-axis-zero-axis-outside-clear-before-native-input`
+and its `...-zero-axis-finished` record in `free-labels-evidence.json`.
 
-The empty manifest covers six shapes×outer0/+3/-3. Regular polygon,
-square, triangle and star agree at outer0, then apply signed clearance in the
-wrong direction at ±3. Other recorded +3 selected results, all converted
-SVG-frame TeX pt, include:
+The first action is `outside-clear`:
+local(12,20) projects through the current connected contour screenCTM
+(a=d3.1,b=c0,e1296.4,f268.975) to
+screen(1333.6000000000001,330.97499999999997).
+Current owner is `["point-node",437,"zero-overlap"]`, source is empty,
+layout ready, contour length135.76449584960938, Inspector closed and
+owned toolbar collapsed.
 
-| Shape/anchor | PGF expected | Production |
-| --- | --- | --- |
-| square/corner1 | (-4.07089,4.07089) | (-10.0710678,10.0710678) |
-| triangle/corner1 | (0,4) | (0,16) |
-| star/outer point1 | (0,5.37004) | (0,14.6300858) |
-| dart/tip | (-4.85109,0) | (-20.6245303,0) |
-
-Read every recorded anchor, not only the selected summary.
-Isosceles apex is nearly correct, but lower corners and numeric borders are not:
-the +3 case has maximum error about184.54pt.
-Dart also differs at outer0, including tip error0.09377pt and maximum0.21692pt,
-so a clearance-sign-only patch would leave an evidenced fitting defect.
-
-Inspect `solve.ts`, `anchors.ts`, runtime solution types, `pgfMath.ts` and
-authenticated PGF geometric/basic math source. Address the distinct causes:
-
-1. Regular polygon/square/triangle retain a signed fitted radius in construction,
-   but `anchors.ts` converts it through `Math.hypot` before clearance.
-   Preserve the fitted radius and add the PGF miter length with its sign,
-   retaining declared start angle/index/order, rotation, external radius,
-   names and numeric-border branch behavior.
-   Do not globally change the magnitude radius used for painted bounds/picking.
-2. Star's generic geometric outward miter loses PGF's declared signed inner/
-   outer-radius adjustment. Retain both fitted radii and PGF's separate miter/
-   cosecant adjustments, ratio/height fitting and declared inner/outer indices.
-   Do not fix every polygon with a blanket separation-sign reversal.
-   Verify mixed-sign radii through independent PGF before assuming a rule.
-3. Isosceles triangle reconstructs its half-angle with `atan2` from signed
-   fitted vertices; this changes quadrant when dimensions are negative.
-   Preserve original and effective PGF fitting angles, including the original
-   apex cosecant versus effective corner-angle distinction.
-   Match PGF divide→atan stretch semantics instead of inferring a new quadrant.
-   Keep minimum order, signed axes, upright body offsets and rotation branches.
-4. Dart's winding-derived miter disagrees with parameter-defined PGF tip/tail/
-   left/right vectors when fitting is signed. Preserve those PGF vectors and
-   fitted lengths/separation/offset, names, external radius and numeric borders.
-   Resolve the recorded outer0 fitting discrepancy too. Trace sequential
-   fixed-point minimum scaling and reciprocal arithmetic against raw PGF.
-   `pgfReciprocal` currently chooses its >100 noninteger branch after abs,
-   while upstream tests the signed integer part; large negative noninteger
-   inputs take a different PGF branch.
-   Permit only the evidenced signed branch/rounding correction and small direct
-   arithmetic controls, not a general math rewrite or replacement with exact1/x.
-
-Preserve ordered paint envelopes separately from signed fitted quantities.
-Keep clearance outside the paint/hit regions, model coordinates unchanged,
-named/indexed/text-side/numeric anchor distinctions and valid singular diagnostics.
-Retain old positive/negative/zero-axis/reference cases, unsupported-name behavior,
-finite-work guards and2D/3D shared placement.
-Do not hide discrepancies by changing authored source, minimum limits, tolerances,
-PGF expected values or the export camera.
-
-## Zero-axis ellipse SVG paint
-
-Empty ellipse, inner xsep0pt, inner ysep20pt, minima/outer separation0,
-anchor center and enabled0.4pt stroke is valid and survives saved JSON reload.
-PGF paints a vertical stroke with raw extrema±28.2843TeX pt.
-Production's analytic half-extent is28.284271247462pt, corresponding to
-33.941125496954 SVG units at1.2 units/pt.
-
-Production emits:
+Fresh `elementFromPoint` is an SVG rect with `canvas:true`,
+`canvasRoot:false`, `pointId:null` and drawer/handle/toolbar/history/quickStyle false.
+The first hit-stack element is that rect; the next is the actual
+`svg.svg-diagram` root with `canvasRoot:true`.
+The contract at `scripts/pointLayoutAnchorsContract.mjs:626` requires
+`target.canvasRoot === true`, producing:
 
 ~~~text
-M 0 0 A 0 33.941125496954 0 0 0 0 0
-      A 0 33.941125496954 0 0 0 0 0 Z
+Outside input reaches the actual canvas beyond all current point contours
+false !== true
 ~~~
 
-Each half-arc starts/ends at the center. SVG omits arcs with coincident
-endpoints; zero-radius arcs with distinct endpoints become lines under the
-[SVG arc parameter rules](https://www.w3.org/TR/SVG/paths.html#ArcOutOfRangeParameters).
-Current sampled vertices still span ±33.941125, so committed picking selects
-the invisible contour at local(0,20).
+`zeroAxisInput` at `scripts/checkPointLayoutAnchors.mjs:353` calls that assertion
+after persisting the before-input observation and before `page.mouse.click`.
+There is no first-action stateAfter/after/event evidence.
+Ordinary-axis, Alt-start/next and outside-final did not execute.
+This record establishes a harness root-target assumption, not a production
+outside-selection or zero-axis paint failure.
 
-Retained2D/3D producer records are ready, validate/round-trip successfully,
-have no limitation and use the same path for live and settled SVG.
-Actual librsvg rendering of production is blank, while independently converted
-PGF paint is nonempty. These are producer/picking/render probes, not actual
-native click acceptance; preserve that evidence distinction.
+`src/rendering/SvgDiagram.tsx:915` emits
+`rect[data-svg-background="true"]`, and `isSvgBackgroundTarget` recognizes
+the marker on an SVG element. Root click handling accepts bubbled background
+input. The complete DOM/source/stack support the background interpretation,
+but the retained target descriptor does not record the marker.
+Do not retrofit `svgBackground:true` into historical evidence or claim its
+exact attribute was already authenticated by the raw target record.
+Observe it freshly in the next run.
 
-Add a narrow faithful degenerate-path branch retaining the full signed angular
-traversal and intervening extrema. For this positive zero-x full ellipse it
-traces center→upper SVG extremum→center→lower extremum→center, then closure.
-Equivalent line/cubic encoding must retain ordered retracing, path length,
-dash phase and cap/join/closure behavior; a shortened single segment is not
-equivalent. Zero-area fill must remain zero-area.
+## Scoped background observation and contract fix
 
-Handle zero-y/both-zero and signed surviving axes consistently with authenticated
-PGF/SVG semantics. Do not add epsilon radii, a disc/rectangle/marker, reject valid
-models, suppress current picking to match invisible paint or change anchors to
-avoid the defect. Paint paths and sampled/picking geometry must describe the
-same traversal.
+Inspect `observeGeometricSelection` and the event descriptors in
+`scripts/pointGeometricSelection.mjs`, the owned zero-axis observer in
+`scripts/checkPointLayoutAnchors.mjs`, `assertFreshZeroAxisAction` and
+`assertZeroAxisNativeCase` in `scripts/pointLayoutAnchorsContract.mjs`.
+Use a small explicit predicate with raw observations consistent across the
+before-hit stack, after observations, native events and parent validation.
 
-Keep nondegenerate arcs and corrected magnitude-based sampling,0.005-unit
-precision/2048 budget unchanged.
-If altering the shared arc builder, include actual signed/reversed/rotated partial
-sweeps and all intervening turning extrema. Equal subdivisions of at most90°
-alone are insufficient: zero-x45→135° still has coincident endpoints while
-traversing an extremum. Do not rewrite unrelated curved-shape construction.
+For the two outside actions accept the actual current canvas root, or its
+unique connected direct-child background rect with exact
+`data-svg-background="true"`. Freshly retain the background attribute/predicate
+and current-canvas relationship; authenticate that observed identity rather than
+accepting any rect/SVG descendant merely because it sits under the canvas.
+Require SVG/canvas membership, no point owner, connected current root and
+matching hit-stack/composed-path root.
+Reject stale/wrong-canvas, unmarked or wrong-marker children, point contours,
+drag handles, overlays, toolbar/history/quick-style/drawer targets.
+An authenticated root needs no background marker; retain its actual null/false
+marker observation. Exact marker=true is mandatory for the rect branch only.
+Retain the selected point's source/request/bodyRequest/owner/revision,
+model/camera, finite invertible current contour/point/canvas CTMs and measured
+click projection. Keep hit-stack head equal to the observed target.
 
-## Authenticated references and meaningful regressions
+Keep outside local(12,20), ordinary/Alt local(0,20), the unchanged stroke width
+and greater-than-six-unit contour clearance. Prove the current coincident
+point contours are still the intended fixture; a background DOM target alone
+does not prove geometric distance beyond production picking tolerance.
+Do not move the click arbitrarily, seek a root-only location, enlarge tolerance,
+disable the background rect or bypass the real native gesture.
+If fresh geometry/obstruction invalidates a coordinate, preserve the observation
+and fail explicitly rather than retrying until selection looks correct.
 
-Preserve byte-for-byte all existing32C and original172-box/4,925-anchor/
-11-failure references, plus the new signed-basic8-box/192-anchor bundle and
-retained historical review records under `signed-axes/`.
-Keep unchanged0.025pt anchor/0.03pt contour tolerances,0.005 sampling precision,
-2048 budget and independent negative controls.
-Add evidence separately; do not regenerate old expectations from production.
+Require one trusted pointerdown→pointerup→click for each action, actual current
+canvas path, correct button/buttons/pointerId/Alt and precise native coordinate
+propagation. Pointerdown must reach the freshly observed target. Validate outside
+event targets against the authenticated background/root predicate too; do not
+leave events as an arbitrary non-point canvas-child check.
+Keep real browser capture/retargeting observations rather than fabricating events.
 
-Retain the new empty/targeted/zero-axis review inputs/raw/compiler/reproduction
-outputs with hashes before edits. The polygon manifest records source/production
-hashes but not all artifact hashes: authenticate retained input/raw/compiler/
-parsed observations explicitly when adding repository references.
-Preserve engine/PGF3.1.11a/source hashes, no-shell-escape command, exit status,
-complete fixed-box dimensions/options and TeX pt/Y conversion.
-Oracle generation/parsing must remain independent of production fitting/math/
-support tables. Production results are failing reproductions, not oracle inputs.
+Preserve the five-action order:
+`outside-clear` → `ordinary-axis` → `alt-start` → `alt-next` → `outside-final`.
+Required selection IDs remain
+`null` → `zero-overlap` → `zero-overlap` → `app-point` → `null`.
+Require real model/history/revision/uiSettings invariance, continuity between
+actions and the same current source/request/owner at each boundary.
+The inside hit must remain the actual visible path owned by `zero-overlap`.
+No DEV selection mutation, forced/DOM click, larger proximity budget,
+synthetic acceptance flag or skip may substitute for native selection.
 
-Use the18 empty cases and targeted evidence as a compact core across all six
-branches, outer0/+3/-3, required named/indexed/standard/numeric anchors.
-Add a small purposeful set for body-dominant versus minimum-dominant fitting,
-signed radius/length transitions, rotation/incircle/stretch, star ratio/height
-and mixed-sign inner/outer radii. Include direct reciprocal signed-branch evidence
-needed for dart and preserve parameter/singular boundary guards.
-A sign-flipped/absolute-radius/geometric-outward-miter control must fail even
-when paint bounds remain correct. Isosceles apex-only coverage cannot pass.
+Keep bounded evidence persistence before every validation/input and after
+input before assertions/image work, owned Inspector/toolbar preparation and
+restoration, primary error precedence, Alt/listener registry cleanup and
+bounded secondary diagnostics. Failure cleanup must remain observable.
+Do not turn a pre-input record into a success or erase missing after evidence.
 
-Add a PGF-authenticated zero-x paint traversal/reference, zero-y and both-zero
-controls and signed surviving-axis coverage.
-Tests must inspect actual emitted path and rendered stroke/extents, not just
-finite bounds/vertices or selected candidates.
-Retain valid zero-area fill and meaningful cap/join/dash-phase traversal checks.
+## Faithful regressions and required acceptance
 
-Use registered geometry/reference/rendering suites where practical. Verify
-validation and exact saved/raw units/provenance, both TikZ modes, unchanged
-model coordinates and current/pending/settled placement in both ambient dimensions.
-New2D points use z=0;3D placement/projection uses its active work-plane semantics.
-Do not inflate a redundant full parameter cross product.
+`tests/scripts/phase32dVerification.test.mjs:184–204` currently synthesizes
+outside targets as root `svg` with `canvasRoot:true`. Add a faithful marked
+background-rect success fixture through both fresh-action and complete parent
+raw-evidence validation; retain genuine root success as a separate case.
+Make fixture events/hit stacks/current canvas/marker observations agree,
+and preserve authentic target differences between input/capture events.
 
-Add narrow required native cases in the existing cumulative layout workflow:
-actual polygonal selected-anchor placement, zero-axis visible stroke and current
-ordinary click/Alt cycling at the observed local-axis point in2D/3D.
-Bind input/control/CTM/source/owner/request/revision and paint/selection evidence
-to the real current model and artifacts; persist observations before validation.
-Require a genuinely outside point beyond existing tolerance to stay unselected,
-and current lock/layer/filter/stale-owner guards to remain.
-Do not use a DEV selection mutation, larger proximity tolerance or synthetic
-success flag to establish native acceptance.
+Add focused failures for missing/false/wrong marker on the background-rect
+branch, arbitrary SVG child,
+wrong canvas/root/path, point/handle/overlay ownership, stale owner/request/
+revision/CTM, mismatched measured click, dropped/untrusted/wrong events,
+wrong selection/cycle order and changed model/history/UI.
+An unchanged old root-only assertion must reject the faithful rect fixture;
+an overbroad canvas-descendant predicate must fail the negative controls.
+Use compact meaningful cases, not a redundant parameter cross product.
 
-Verify actual standalone downloaded/reopened SVG/complete-root PNG retains the
-corrected stroke and placement with existing content/background/file-identity
-contracts. Existing all18 passes do not establish these new cases.
-Clearly distinguish pure/fixed-metric, independent renderer and real native
-browser observations in contracts and status documents.
+Update schema/artifact/raw-policy assertions and isolated runner dependencies
+only as needed for the added observations. Keep all prior fixtures, negative
+controls, required group/scenario counts and failure evidence.
+Do not make raw marker/current-canvas observations optional in new outside
+records; the rect branch requires the exact true marker, while authenticated
+root records retain the actual absent/false marker.
 
-Register new tests explicitly in `npm test` and required native cases/raw artifacts
-in current contracts/parent policy. Copy actual imported dependencies into
-isolated runner fixtures. Keep existing predecessor/scenario counts honest;
-do not drop prior cases to accommodate additions.
-Do not add a runtime dependency on TeX/librsvg or silently make evidence optional.
+The nine required32D scenarios include
+`point-layout-signed-polygonal-zero-axis` between the six predecessor scenarios
+and the two pending scenarios. Require all twelve polygonal selected-anchor
+cases across2D/3D and both zero-axis native sequences.
+Retain actual native live PNG bytes/hash/dimensions, fresh before/after CTMs/state
+and magenta stroke pixel extents along both turning extrema.
+Require both new transparent signed-polygonal/zero-axis standalone downloads
+with all six polygonal nodes plus the zero-axis node, exact file identity,
+external SVG reopening and complete PNG validation.
+Preserve both existing pending transparent/white workflows and final cumulative
+standalone acceptance. None is optional because the child lacks browser startup.
+
+Keep authenticated reference bundles byte-for-byte:
+original172 boxes/4,925 anchors/11 failure controls; signed-basic8 boxes/
+192 anchors;54 polygonal boxes/1,386 anchors;12 direct arithmetic controls;
+four dart fitting traces; one singular boundary control;
+eleven zero-axis PGF paths and37 independent rendering records.
+Keep existing32C reference files and490 additive polygonal/zero-axis artifacts.
+Do not regenerate oracle expected values or loosen0.025pt anchor/0.03pt contour
+tolerances,0.005-unit sampling precision or2048 finite-work budget.
+
+Preserve signed fitted radii/isosceles angle distinctions/dart parameter-defined
+miter and narrow reciprocal branch corrections, ordered collapsed-axis traversal
+including partial/reversed/rotated extrema and zero-area fill.
+Keep production path/dash/cap/join/closure, painted bounds and picking conformance.
+Retain all registered geometry/reference/rendering/model/TikZ regressions,
+both TikZ modes and2D z=0/3D active-work-plane semantics.
+This fix adds native evidence fidelity without reopening those geometry branches.
 
 ## Preserve completed corrections and contracts
 
@@ -276,7 +238,8 @@ both-dimension signedAnchorCases/signedPickingCases/raw policies.
 Retain deterministic stalled-report injected ordinary-write recorder,20ms
 deadline, exact primary Error/nativeChecks count, two stalled failure writes,
 late rejection ownership and complete listener/page/browser/server cleanup.
-The full6,425 test pass clears that prior review failure; do not loosen it.
+The earlier full6,425 test pass cleared that prior review failure; the latest
+registered suite passes6,655 tests. Do not loosen this deterministic control.
 
 Keep explicit resolved preview schema (six dimensions, anchor, effective font
 context) separate from exact authored units/source/context.
@@ -334,13 +297,13 @@ byte validation, artifact inventories, raw-policy checks and runner copies.
 
 Use strict TypeScript without `any`; keep module separation, codim convention,
 raw user text and model coordinates. Add no dependency without explaining why.
-Update Phase32 status/geometry docs to the actual polygonal/zero-axis scope,
-reference inventory and observed current results. Preserve evidence history.
+Update Phase32 status documents with the actual background-target correction,
+retained reference inventory and observed results. Preserve evidence history.
 
-Use Homebrew Node>=22.12.0. Run focused authenticated polygonal/degenerate PGF,
-signed math/fitting, production path/placement/paint/picking, previous signed-axis/
-density, resolved-provenance/view/pending/capture, diagnostic/runner and parent-policy
-checks. Run all required commands:
+Use Homebrew Node>=22.12.0. Run focused fresh-action/native-event/parent-policy
+and faithful-fixture checks, applicable runner and preserved geometry/path/
+capture/pending controls. Count overlapping focused sweeps honestly.
+Run all required commands:
 
 ~~~bash
 PATH=/opt/homebrew/bin:$PATH npm test
@@ -351,12 +314,11 @@ PATH=/opt/homebrew/bin:$PATH npm run check:free-labels
 ~~~
 
 Run applicable focused strict TypeScript/lint and changed-script syntax checks.
-Latest review reproduced four unchanged-HEAD lint errors:
-two geometric-caller no-unsafe-finally errors, verifier unused _role and layers
-unused defaultCurveStyle. Preserve/report these failed baseline checks separately
-from passing changed-file checks; repository-wide lint was not run.
-Do not carry the resolved full-suite race forward as current debt or claim
-unperformed checks. Avoid unrelated lint cleanup.
+Four inherited lint errors remain: two geometric-caller no-unsafe-finally errors,
+verifier unused _role and layers unused defaultCurveStyle.
+Preserve/report reproduced failed baseline checks separately from passing
+changed-file checks; avoid unrelated cleanup or claiming unperformed checks.
+The earlier stalled-report full-suite race is resolved.
 
 Use a fresh owned browser-capable parent process/server, supported Playwright/
 Chrome and actual current tracked/untracked tree without committing:
@@ -365,29 +327,37 @@ Chrome and actual current tracked/untracked tree without committing:
 PATH=/opt/homebrew/bin:$PATH node scripts/automation/run-phase.mjs 32D verify
 ~~~
 
-Require all twelve31F groups, three32A groups, complete32B paint/import,
-complete32C shapes/visibility/downloads, combined32D layout and final standalone,
-including new polygonal/zero-axis native cases and all retained signed cases.
-Require both pending downloads/reopening/complete PNG/TikZ, actual valid artifacts,
-native history/JSON persistence and no page errors.
-Do not reuse HMy8AM after edits, skip predecessors, defer supported cases,
-reject valid models or substitute scoped/synthetic reports.
+Require all18 cumulative groups as registered by the runner: twelve31F groups
+(already including final standalone), three32A groups and one group each for
+32B paint/import,32C shapes/visibility/downloads and combined32D layout.
+Require all nine named32D scenarios, the new twelve polygonal cases/both
+zero-axis sequences/live paint/downloads, all retained signed cases, both
+pending downloads/reopening/complete PNG/TikZ, native history/JSON persistence,
+valid exact artifacts and no page errors.
+Do not substitute Ab9guh's partial result, historical HMy8AM, a scoped report,
+synthetic tests or cleanup captures for fresh complete acceptance.
+Do not skip predecessors or defer supported cases.
+
 Preserve implementation/fix clean-tree rules; do not reset/stash/discard/commit
 unfinished work to bypass them.
-If child execution encounters server EPERM, retain startup failure/exact tree
-and pending parent native work without weakening acceptance.
+If child browser startup encounters EPERM, retain exact startup failure/tree
+and pending parent work without weakening acceptance. Obtain approved
+browser-capable execution where available; do not endlessly repeat blocked
+startup or confuse it with the parent's assertion.
+If a later native boundary fails, persist raw pre/after input/current geometry
+before interpreting it and report the next concrete blocker.
 
 After fresh required verification passes, obtain independent read-only completion
 review of the exact matching tracked/untracked tree using
-`prompts/phase-32d-review.md`, and inspect actual reports/artifacts.
-Require both findings resolved with independent authenticated references,
-production/native paint/placement conformance, full-suite success and fresh
-cumulative acceptance. Keep post-review identity guard.
+`prompts/phase-32d-review.md` and inspect actual reports/artifacts.
+Require the prior geometry findings independently resolved, faithful outside
+background/native owner proof, paint/placement conformance, full-suite success
+and fresh cumulative acceptance. Keep post-review identity guard.
 Failed/incomplete verification stops before review/commit; needs_changes blocks
 completion/commit even when required tests/browser checks pass.
 
-Report scoped signed-fitting/clearance and degenerate-path fixes, added authenticated
-references/native cases, preserved contracts, changed files, focused/full checks,
+Report the scoped observation/contract fix, meaningful fixture controls,
+preserved production/reference bytes, changed files, focused/full checks,
 baseline failures, exact tree/report identity and independent review result.
-Keep Phase32 incomplete until all gates pass.
+Keep Phase32 incomplete until every gate passes.
 Leave commit/push to the parent after verification and review.

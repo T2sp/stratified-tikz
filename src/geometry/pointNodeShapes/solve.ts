@@ -9,13 +9,14 @@ import type { PointShape, PointShapeParameters, Vec2 } from '../../model/types.t
 import { resolvePointShapeParameters } from '../../model/pointShapeParameters.ts'
 import { ellipseContour, ellipsePoint, polygonContour, ShapeContourBuilder } from './contours.ts'
 import { pointNodeAnchorLayout } from './anchors.ts'
-import { pgfCircleRadius, pgfReciprocal, pgfSin, pgfCos, pgfTan, pgfCot, pgfMultiply } from './pgfMath.ts'
+import { pgfCircleRadius, pgfReciprocal, pgfSin, pgfCos, pgfTan, pgfCot, pgfMultiply, pgfDivide, pgfAtan } from './pgfMath.ts'
 import type {
   PointNodeShapeInput,
   PointNodeShapeSolution,
   PointShapeBounds,
   PointShapeContour,
   PointShapePaintRegion,
+  PointPolygonalFitting,
 } from './types.ts'
 
 const degree = Math.PI / 180
@@ -25,7 +26,7 @@ const tan = pgfTan
 const cot = pgfCot
 
 type Parameters = Required<PointShapeParameters>
-type Construction = { contours: PointShapeContour[]; regions?: PointShapePaintRegion[]; rotation: number; signedFittedAxes?: Vec2 }
+type Construction = { contours: PointShapeContour[]; regions?: PointShapePaintRegion[]; rotation: number; signedFittedAxes?: Vec2; polygonalFitting?: PointPolygonalFitting }
 
 /**
  * Solve the PGF background path around a fixed upright box. All geometry is in
@@ -55,6 +56,7 @@ export function solvePointNodeShape(input: PointNodeShapeInput): PointNodeShapeS
     bodyOrigin: { x: bodyBounds.minX, y: bodyBounds.minY },
     baseline: (input.body.height - input.body.depth) / 2,
     ...(construction.signedFittedAxes ? { signedFittedAxes: construction.signedFittedAxes } : {}),
+    ...(construction.polygonalFitting ? { polygonalFitting: construction.polygonalFitting } : {}),
     anchorBounds: bounds,
     rotation: construction.rotation,
     radius: Math.max(...construction.contours.flatMap((contour) => contour.vertices.map((point) => Math.hypot(point.x, point.y)))),
@@ -98,14 +100,16 @@ function construct(input: PointNodeShapeInput, p: Parameters, x: number, y: numb
       const sides = input.shape === 'square' ? 4 : input.shape === 'triangle' ? 3 : p.regularPolygonSides
       const radius = Math.max(Math.SQRT2 * Math.max(x, y) / cos(180 / sides), minimumRadius)
       const start = sides % 2 ? 90 : 90 - 180 / sides
-      return single(polygonContour(Array.from({ length: sides }, (_, index) => polar(radius, start + index * 360 / sides)), p.borderRotate), p.borderRotate)
+      return { ...single(polygonContour(Array.from({ length: sides }, (_, index) => polar(radius, start + index * 360 / sides)), p.borderRotate), p.borderRotate),
+        polygonalFitting: { kind: 'regular polygon', radius } }
     }
     case 'star': {
       let inner = Math.SQRT2 * Math.max(x, y)
       const originalOuter = p.starPointMode === 'height' ? inner + p.starPointHeight : inner * p.starPointRatio
       const outer = Math.max(originalOuter, minimumRadius)
       if (outer > originalOuter) inner = p.starPointMode === 'height' ? outer - p.starPointHeight : outer / p.starPointRatio
-      return single(polygonContour(Array.from({ length: 2 * p.starPoints }, (_, index) => polar(index % 2 ? inner : outer, 90 + index * 180 / p.starPoints)), p.borderRotate), p.borderRotate)
+      return { ...single(polygonContour(Array.from({ length: 2 * p.starPoints }, (_, index) => polar(index % 2 ? inner : outer, 90 + index * 180 / p.starPoints)), p.borderRotate), p.borderRotate),
+        polygonalFitting: { kind: 'star', innerRadius: inner, outerRadius: outer } }
     }
     case 'trapezium': return trapezium(input, p, x, y)
     case 'isosceles triangle': return triangle(input, p, x, y)
@@ -180,23 +184,25 @@ function trapezium(input: PointNodeShapeInput, p: Parameters, initialX: number, 
 function triangle(input: PointNodeShapeInput, p: Parameters, initialX: number, initialY: number): Construction {
   const { x, y, rotation } = fitAxes(p, initialX, initialY, true, input.unitScale)
   let halfAngle = p.isoscelesTriangleApexAngle / 2
+  const originalHalfAngle = halfAngle
   let length = p.borderUsesIncircle ? x * (1 + 1 / sin(halfAngle)) : 2 * x + cot(halfAngle) * y
   let halfWidth = p.borderUsesIncircle ? tan(halfAngle) * length : 2 * x * tan(halfAngle) + y
   if (length === 0) length = input.minimumHeight
   if (halfWidth < input.minimumWidth / 2) {
     halfWidth = input.minimumWidth / 2
-    if (p.isoscelesTriangleStretches) halfAngle = Math.atan2(halfWidth, length) / degree
+    if (p.isoscelesTriangleStretches) halfAngle = pgfAtan(pgfDivide(halfWidth / (input.unitScale ?? 1), length / (input.unitScale ?? 1)))
     else length = cot(halfAngle) * halfWidth
   }
   if (length < input.minimumHeight) {
     length = input.minimumHeight
-    if (p.isoscelesTriangleStretches) halfAngle = Math.atan2(halfWidth, length) / degree
+    if (p.isoscelesTriangleStretches) halfAngle = pgfAtan(pgfDivide(halfWidth / (input.unitScale ?? 1), length / (input.unitScale ?? 1)))
     else halfWidth = tan(halfAngle) * length
   }
   const offset = p.borderUsesIncircle
     ? length * sin(halfAngle) / (1 + sin(halfAngle))
     : x + ((halfWidth - y) * cos(halfAngle) - 2 * x * sin(halfAngle)) / (1 + sin(halfAngle))
-  return single(polygonContour([{ x: length - offset, y: 0 }, { x: -offset, y: halfWidth }, { x: -offset, y: -halfWidth }], rotation), rotation)
+  return { ...single(polygonContour([{ x: length - offset, y: 0 }, { x: -offset, y: halfWidth }, { x: -offset, y: -halfWidth }], rotation), rotation),
+    polygonalFitting: { kind: 'isosceles triangle', originalHalfAngle, effectiveHalfAngle: halfAngle } }
 }
 
 function kite(input: PointNodeShapeInput, p: Parameters, initialX: number, initialY: number): Construction {
@@ -245,31 +251,45 @@ function kite(input: PointNodeShapeInput, p: Parameters, initialX: number, initi
 
 function dart(input: PointNodeShapeInput, p: Parameters, initialX: number, initialY: number): Construction {
   const axes = fitAxes(p, initialX, initialY, false, input.unitScale)
+  const scale = input.unitScale ?? 1
+  const multiply = (factor: number, value: number) => pgfMultiply(factor, value, scale)
   let x = axes.x
   const a = p.dartTipAngle / 2
   const b = p.dartTailAngle / 2
-  let tipLength = p.borderUsesIncircle ? x * (cot(a) + 1) : cot(a) * axes.y + 2 * x
-  let halfSeparation = tipLength * sin(a) * cos(a) / sin(b - a)
-  const totalLength = cot(a) * halfSeparation
+  let tipLength = p.borderUsesIncircle ? multiply(cot(a), x) + x : multiply(cot(a), axes.y) + 2 * x
+  // Each assignment in PGF multiplies a TeX dimension separately. Combining
+  // these products changes both signed minimum decisions and reciprocal input.
+  let halfSeparation = multiply(pgfReciprocal(sin(b - a)), tipLength)
+  halfSeparation = multiply(sin(a), halfSeparation)
+  halfSeparation = multiply(cos(a), halfSeparation)
+  const totalLength = multiply(cot(a), halfSeparation)
   let tailLength = totalLength - tipLength
   if (totalLength < input.minimumHeight) {
-    const factor = checkedRatio(input.minimumHeight, totalLength, input.unitScale)
-    tipLength *= factor
-    tailLength *= factor
-    halfSeparation *= factor
-    x *= factor
+    const factor = multiply(pgfReciprocal(totalLength / scale), input.minimumHeight) / scale
+    tipLength = multiply(factor, tipLength)
+    tailLength = multiply(factor, tailLength)
+    halfSeparation = multiply(factor, halfSeparation)
+    x = multiply(factor, x)
   }
   if (halfSeparation < input.minimumWidth / 2) {
-    const factor = checkedRatio(input.minimumWidth / 2, halfSeparation, input.unitScale)
+    const factor = multiply(pgfReciprocal(halfSeparation / scale), input.minimumWidth / 2) / scale
     halfSeparation = input.minimumWidth / 2
-    tipLength *= factor
-    tailLength *= factor
-    x *= factor
+    tipLength = multiply(factor, tipLength)
+    tailLength = multiply(factor, tailLength)
+    x = multiply(factor, x)
   }
-  return single(polygonContour([
+  const sep = Math.max(input.outerXSep, input.outerYSep)
+  const tailMiterLength = multiply(pgfReciprocal(sin((b - a) / 2)), sep)
+  const tailMiterAngle = 90 - (a + b) / 2
+  const tailMiterX = -multiply(sin(tailMiterAngle), tailMiterLength)
+  const tailMiterY = multiply(cos(tailMiterAngle), tailMiterLength)
+  return { ...single(polygonContour([
     { x: tipLength - x, y: 0 }, { x: -x - tailLength, y: halfSeparation },
     { x: -x, y: 0 }, { x: -x - tailLength, y: -halfSeparation },
-  ], axes.rotation), axes.rotation)
+  ], axes.rotation), axes.rotation), polygonalFitting: { kind: 'dart', tipLength, tailLength, halfSeparation, offset: x,
+    tipMiter: { x: multiply(pgfReciprocal(sin(a)), sep), y: 0 },
+    tailCenterMiter: { x: -multiply(pgfReciprocal(sin(b)), sep), y: 0 },
+    leftTailMiter: { x: tailMiterX, y: tailMiterY }, rightTailMiter: { x: tailMiterX, y: -tailMiterY } } }
 }
 
 function semicircle(input: PointNodeShapeInput, p: Parameters, initialX: number, initialY: number): Construction {

@@ -42,6 +42,14 @@ export type PointShapePaintRegion = PointShapeContour & {
   role: 'body' | 'end'
 }
 
+/** PGF construction quantities retain their signs independently of paint bounds. */
+export type PointPolygonalFitting =
+  | { kind: 'regular polygon'; radius: number }
+  | { kind: 'star'; innerRadius: number; outerRadius: number }
+  | { kind: 'isosceles triangle'; originalHalfAngle: number; effectiveHalfAngle: number }
+  | { kind: 'dart'; tipLength: number; tailLength: number; halfSeparation: number; offset: number;
+      tipMiter: Vec2; tailCenterMiter: Vec2; leftTailMiter: Vec2; rightTailMiter: Vec2 }
+
 export type PointNodeShapeSolution = {
   /** The outer closed contour is first; cylinder adds its open end seam. */
   contours: PointShapeContour[]
@@ -55,6 +63,8 @@ export type PointNodeShapeSolution = {
   baseline: number
   /** Rectangle/ellipse fitted axes retain PGF's signs; painted bounds are only their ordered envelope. */
   signedFittedAxes?: Vec2
+  /** Runtime-only PGF parameters; no saved model or history fields are added. */
+  polygonalFitting?: PointPolygonalFitting
   /** Clearance is separate from the path and paint and is never a hit region. */
   anchorBounds: PointShapeBounds
   /** Supported named anchors, relative to the upright text-box center, SVG y down. */

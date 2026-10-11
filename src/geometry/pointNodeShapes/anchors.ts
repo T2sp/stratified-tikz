@@ -5,7 +5,7 @@ import type { PointShape, Vec2 } from '../../model/types.ts'
 import { resolvePointShapeParameters } from '../../model/pointShapeParameters.ts'
 import { boundsOfPoints, svgPoint } from './contours.ts'
 import type { PointNodeAnchorResolution, PointNodeShapeInput, PointNodeShapeSolution, PointShapeBounds } from './types.ts'
-import { pgfAsin, pgfAtan2, pgfCos, pgfReciprocal, pgfRound, pgfSin, pgfTan, pgfMultiply } from './pgfMath.ts'
+import { pgfAsin, pgfAtan2, pgfCos, pgfReciprocal, pgfRound, pgfSin, pgfTan, pgfMultiply, pgfDivide, pgfCot } from './pgfMath.ts'
 
 const radians = Math.PI / 180
 const sin = (angle: number) => Math.sin(angle * radians)
@@ -427,22 +427,6 @@ function polyline(points: readonly Vec2[]): Line[] { return points.map((a, index
 function arc(center: Vec2, rx: number, ry: number, start = 0, end = 360): Arc { return { kind: 'arc', center, rx, ry, start, end } }
 function arcPoint(item: Arc, angle: number): Vec2 { return add(item.center, { x: item.rx * cos(angle), y: item.ry * sin(angle) }) }
 
-/** Parallel edge intersections preserve PGF's corner/miter clearance. */
-function miterPolygon(points: readonly Vec2[], separation: number): Vec2[] {
-  const area = points.reduce((total, a, index) => total + cross(a, points[(index + 1) % points.length]!), 0)
-  const sign = area < 0 ? -1 : 1
-  return points.map((point, index) => {
-    const before = points[(index + points.length - 1) % points.length]!, after = points[(index + 1) % points.length]!
-    const aLength = Math.hypot(point.x - before.x, point.y - before.y), bLength = Math.hypot(after.x - point.x, after.y - point.y)
-    if (!aLength || !bLength) return { ...point }
-    const a = { x: sign * (point.y - before.y) / aLength, y: sign * (before.x - point.x) / aLength }
-    const b = { x: sign * (after.y - point.y) / bLength, y: sign * (point.x - after.x) / bLength }
-    const denominator = 1 + a.x * b.x + a.y * b.y
-    if (Math.abs(denominator) < 1e-12) return { ...point }
-    return add(point, { x: separation * (a.x + b.x) / denominator, y: separation * (a.y + b.y) / denominator })
-  })
-}
-
 function anchorBoundary(input: PointNodeShapeInput, solution: UnanchoredSolution): Boundary {
   const p = resolvePointShapeParameters(input.parameters)
   const rotation = solution.rotation
@@ -477,22 +461,44 @@ function anchorBoundary(input: PointNodeShapeInput, solution: UnanchoredSolution
       segments = polyline([{ x: rx, y: 0 }, { x: 0, y: ry }, { x: -rx, y: 0 }, { x: 0, y: -ry }]); break
     }
     case 'square': case 'triangle': case 'regular polygon': {
-      const sides = painted.length
-      const points = painted.map((point) => {
-        const radius = Math.hypot(point.x, point.y)
-        const factor = radius ? (radius + sep / cos(180 / sides)) / radius : 1
-        return { x: point.x * factor, y: point.y * factor }
-      })
+      // Coincident zero-radius paint samples still have all declared corners.
+      const sides = input.shape === 'square' ? 4 : input.shape === 'triangle' ? 3 : p.regularPolygonSides
+      const fitted = solution.polygonalFitting
+      if (fitted?.kind !== 'regular polygon') throw new RangeError('The polygon is missing its signed fitted radius.')
+      const scale = input.unitScale ?? 1
+      const miter = pgfMultiply(pgfReciprocal(pgfSin(90 - pgfDivide(180, sides))), sep, scale)
+      const radius = fitted.radius + miter
+      const start = sides % 2 ? 90 : 90 - 180 / sides
+      const points = Array.from({ length: sides }, (_, index) => polar(radius, start + index * 360 / sides))
       points.forEach((point, index) => { names[`corner ${index + 1}`] = point; names[`side ${index + 1}`] = midpoint(point, points[(index + 1) % sides]!) })
       angularStart = sides % 2 ? 90 : 90 - 180 / sides
-      externalRadius = points[0]!.x * cos(angularStart) + points[0]!.y * sin(angularStart)
+      externalRadius = radius
       segments = polyline(points); break
     }
     case 'star': {
-      const points = miterPolygon(painted, sep)
+      const fitted = solution.polygonalFitting
+      if (fitted?.kind !== 'star') throw new RangeError('The star is missing its signed fitted radii.')
+      const scale = input.unitScale ?? 1
+      const step = pgfDivide(180, p.starPoints)
+      const pgfPolar = (radius: number, angle: number): Vec2 => ({ x: pgfMultiply(pgfCos(angle), radius, scale), y: pgfMultiply(pgfSin(angle), radius, scale) })
+      // PGF declares two clockwise angles and adds their cosecant adjustments
+      // to the signed radii. A winding-derived outward miter changes this rule
+      // for negative and mixed-sign fitted radii.
+      const adjustment = (radius: number, otherRadius: number, outer: boolean): number => {
+        const point = pgfPolar(radius, step)
+        const first = pgfPolar(otherRadius, outer ? 2 * step : 0)
+        const second = pgfPolar(otherRadius, outer ? 0 : 2 * step)
+        const firstAngle = pgfAtan2((first.y - point.y) / scale, (first.x - point.x) / scale)
+        const secondAngle = pgfAtan2((second.y - point.y) / scale, (second.x - point.x) / scale)
+        const halfAngle = pgfDivide(normalizedAngle(secondAngle - firstAngle), 2)
+        return pgfMultiply(pgfReciprocal(pgfSin(halfAngle)), sep, scale)
+      }
+      const outerRadius = fitted.outerRadius + adjustment(fitted.outerRadius, fitted.innerRadius, true)
+      const innerRadius = fitted.innerRadius + adjustment(fitted.innerRadius, fitted.outerRadius, false)
+      const points = Array.from({ length: 2 * p.starPoints }, (_, index) => polar(index % 2 ? innerRadius : outerRadius, 90 + index * 180 / p.starPoints))
       points.forEach((point, index) => { names[`${index % 2 ? 'inner' : 'outer'} point ${Math.floor(index / 2) + 1}`] = point })
       angularStart = 90
-      externalRadius = points[0]!.y
+      externalRadius = outerRadius
       segments = polyline(points); break
     }
     case 'trapezium': {
@@ -514,11 +520,13 @@ function anchorBoundary(input: PointNodeShapeInput, solution: UnanchoredSolution
       segments = polyline(points); break
     }
     case 'isosceles triangle': {
-      const [apex, left, right] = painted as [Vec2, Vec2, Vec2]
+      const [apex, left] = painted as [Vec2, Vec2, Vec2]
+      const fitted = solution.polygonalFitting
+      if (fitted?.kind !== 'isosceles triangle') throw new RangeError('The triangle is missing its PGF fitting angles.')
+      const scale = input.unitScale ?? 1
       // PGF deliberately retains the original cosecant at a stretched apex.
-      const halfAngle = Math.atan2(left.y - right.y, 2 * (apex.x - left.x)) / radians
-      const apexAnchor = add(apex, { x: sep / sin(p.isoscelesTriangleApexAngle / 2), y: 0 })
-      const leftAnchor = add(left, { x: -sep, y: sep / Math.tan((90 - halfAngle) / 2 * radians) })
+      const apexAnchor = add(apex, { x: pgfMultiply(pgfReciprocal(pgfSin(fitted.originalHalfAngle)), sep, scale), y: 0 })
+      const leftAnchor = add(left, { x: -sep, y: pgfMultiply(pgfCot((90 - fitted.effectiveHalfAngle) / 2), sep, scale) })
       const rightAnchor = { x: leftAnchor.x, y: -leftAnchor.y }
       Object.assign(names, { apex: apexAnchor, 'left corner': leftAnchor, 'right corner': rightAnchor, 'left side': midpoint(apexAnchor, leftAnchor),
         'right side': midpoint(apexAnchor, rightAnchor), 'lower side': midpoint(leftAnchor, rightAnchor) })
@@ -542,7 +550,10 @@ function anchorBoundary(input: PointNodeShapeInput, solution: UnanchoredSolution
       segments = polyline(points); break
     }
     case 'dart': {
-      const points = miterPolygon(painted, sep)
+      const fitted = solution.polygonalFitting
+      if (fitted?.kind !== 'dart') throw new RangeError('The dart is missing its PGF fitted lengths and miter vectors.')
+      const points = [add(painted[0]!, fitted.tipMiter), add(painted[1]!, fitted.leftTailMiter),
+        add(painted[2]!, fitted.tailCenterMiter), add(painted[3]!, fitted.rightTailMiter)]
       const [tip, left, tail, right] = points as [Vec2, Vec2, Vec2, Vec2]
       externalRadius = Math.max(Math.abs(tip.x - left.x), Math.abs(right.y - left.y))
       Object.assign(names, { tip, 'left tail': left, 'right tail': right, 'tail center': tail, 'left side': midpoint(tip, left), 'right side': midpoint(tip, right) })

@@ -8,6 +8,8 @@ import { assertUnsupportedDiagnosticEvidence } from './pointUnsupportedDiagnosti
 import { assertPendingLayoutPreparation, assertPendingLayoutClickContinuation } from './pointLayoutPendingPreparation.mjs'
 import { assertPendingLayoutFixture } from './pointLayoutPendingFixture.mjs'
 import { assertPendingLayoutViewEvidence } from './pointLayoutPendingView.mjs'
+import { createHash } from 'node:crypto'
+import { decodeConnectedPaintPng } from './connectedLivePaintOracle.mjs'
 
 export const layoutAnchorGroup = 'point-node-layout-anchors-combined'
 export const layoutShapes = ['circle', 'rectangle', 'square', 'triangle', 'ellipse', 'diamond', 'regular polygon',
@@ -54,7 +56,7 @@ export const layoutShapeParameters = {
 }
 export const layoutAnchorScenarios = ['point-layout-per-shape-spacing-minima', 'point-layout-anchor-support-rotation',
   'point-layout-native-controls-persistence', 'point-layout-import-order-units', 'point-layout-async-combined-isolation',
-  'point-layout-native-interaction-2d-3d', 'point-layout-pending-transparent-edit', 'point-layout-pending-white-load']
+  'point-layout-native-interaction-2d-3d', 'point-layout-signed-polygonal-zero-axis', 'point-layout-pending-transparent-edit', 'point-layout-pending-white-load']
 export const layoutFieldKeys = ['innerXSep', 'innerYSep', 'outerXSep', 'outerYSep', 'minimumWidth', 'minimumHeight', 'anchor']
 // PGF 3.1.11a's signed maximum retains -80 TeX pt fitted axes for these
 // authored dimensions. Preview uses 1.2 SVG units per TeX pt: east=-96.
@@ -65,6 +67,24 @@ export const signedAnchorCases = ['ellipse', 'rectangle'].map((shape) => ({ key:
 export const signedPickingCases = [{ key: 'ellipse-body-2d', ambientDimension: 2, source: 'x' },
   { key: 'ellipse-empty-3d', ambientDimension: 3, source: '' }]
   .map((entry) => ({ ...entry, shape: 'ellipse', layout: { ...signedAxisLayout, anchor: 'center' } }))
+// Independent PGF 3.1.11a empty fixed-box observations, already converted once
+// from PGF Y-up to SVG Y-down TeX pt. The lower isosceles corner is intentional:
+// its apex alone did not expose the reviewed signed-angle fitting defect.
+export const signedPolygonalScenario = 'point-layout-signed-polygonal-zero-axis'
+export const signedPolygonalLayout = { innerXSep: -30, innerYSep: -30, minimumWidth: -20, minimumHeight: -20,
+  outerXSep: 3, outerYSep: 3 }
+export const signedPolygonalCases = [
+  { shape: 'regular polygon', anchor: 'corner 1', expectedTeXpt: { x: 0, y: 6.29184 } },
+  { shape: 'square', anchor: 'corner 1', expectedTeXpt: { x: -4.07089, y: 4.07089 } },
+  { shape: 'triangle', anchor: 'corner 1', expectedTeXpt: { x: 0, y: 4 } },
+  { shape: 'star', anchor: 'outer point 1', expectedTeXpt: { x: 0, y: 5.37004 } },
+  { shape: 'isosceles triangle', anchor: 'left corner', expectedTeXpt: { x: -4.1154, y: 3.79349 } },
+  { shape: 'dart', anchor: 'tip', expectedTeXpt: { x: -4.85109, y: 0 } },
+].map((entry) => ({ ...entry, key: entry.shape.replaceAll(' ', '-'), source: '',
+  layout: { ...signedPolygonalLayout, anchor: entry.anchor } }))
+export const zeroAxisLayout = { innerXSep: 0, innerYSep: 20, minimumWidth: 0, minimumHeight: 0,
+  outerXSep: 0, outerYSep: 0, anchor: 'center' }
+export const zeroAxisHalfExtent = 20 * Math.SQRT2 * 1.2
 export const layoutImportCases = [
   { key: 'layout ordered shorthand', options: 'inner xsep=2pt,inner sep=3pt,inner ysep=4pt,outer xsep=2pt,outer sep=5pt,outer ysep=6pt,minimum width=20pt,minimum size=30pt,minimum height=40pt', expected: { innerXSep: 3, innerYSep: 4, outerXSep: 5, outerYSep: 6, minimumWidth: 30, minimumHeight: 40 } },
   { key: 'layout ordered axis', options: 'inner sep=3pt,inner xsep=2pt,outer sep=5pt,outer xsep=2pt,minimum size=30pt,minimum width=20pt', expected: { innerXSep: 2, innerYSep: 3, outerXSep: 2, outerYSep: 5, minimumWidth: 20, minimumHeight: 30 } },
@@ -75,6 +95,11 @@ export const layoutImportCases = [
 ]
 export function layoutAnchorArtifacts(name) {
   const files = [`${name}.json`]
+  if (name === signedPolygonalScenario) for (const ambientDimension of [2, 3]) {
+    const stem = `${name}-${ambientDimension}d`
+    files.push(`${stem}-native.json`, `${stem}-live.png`, `${stem}.svg`, `${stem}.png`, `${stem}-standalone.json`,
+      `${stem}-saved.json`, `${stem}-standalone.tex`, `${stem}-inlineMath.tex`)
+  }
   if (name.startsWith('point-layout-pending-')) files.push(`${name}-preparation.json`, `${name}.svg`, `${name}.png`, `${name}-standalone.json`, `${name}-standalone.tex`, `${name}-inlineMath.tex`)
   if (name === 'point-layout-pending-transparent-edit') files.push(`${name}-post-click-view.json`)
   if (name === 'point-layout-native-controls-persistence') files.push(`${name}-saved.json`, `${name}-standalone.tex`, `${name}-inlineMath.tex`)
@@ -324,6 +349,8 @@ export function assertLayoutAnchorEvidence(evidence, name) {
     assert.equal(evidence.ownedFace.ownedFacePresent, true)
     assert.equal(evidence.fontLifecycle.restored.restored.ownedFacePresent, false)
     assert.ok(evidence.fontLifecycle.restored.restored.previousFaces.every(({ present }) => present))
+  } else if (name === signedPolygonalScenario) {
+    assertSignedPolygonalZeroAxisEvidence(evidence)
   } else if (name === 'point-layout-native-interaction-2d-3d') {
     assert.equal(evidence.cases.length, 4)
     for (const ambientDimension of [2, 3]) for (const shape of ['rectangle', 'circular sector']) {
@@ -478,4 +505,310 @@ export function assertLayoutAnchorEvidence(evidence, name) {
       assert.equal(captured.nodeTransform, found[0].rendered.nodeTransform, 'Settled comparison preserves immutable model placement')
     }
   }
+}
+
+function assertCurrentEmptyPoint(state, id, ambientDimension, shape, layout, position) {
+  assert.ok(Number.isInteger(state.labelDocumentRevision) && state.labelDocumentRevision >= 0)
+  const saved = JSON.parse(state.json), runtime = JSON.parse(state.runtimeDiagramJson), history = JSON.parse(state.history)
+  assert.equal(saved.version, 2)
+  for (const diagram of [saved.diagram, runtime, history.present]) {
+    assert.equal(diagram.ambientDimension, ambientDimension)
+    const point = diagram.strata.find((entry) => entry.id === id)
+    assert.equal(point.geometricKind, 'point'); assert.equal(point.codim, ambientDimension)
+    assert.equal(point.text ?? '', ''); assert.equal(point.style.shape, shape)
+    assert.deepEqual(point.style.layout, layout)
+    assert.deepEqual(point.position, position)
+    if (ambientDimension === 2) assert.equal(point.position.z, 0)
+  }
+}
+function assertPolygonalPlacement(entry, spec) {
+  assertObservedPointPlacement(entry)
+  assert.equal(entry.key, spec.key); assert.equal(entry.source, '')
+  assert.equal(entry.shape, spec.shape); assert.equal(entry.anchor, spec.anchor)
+  assert.deepEqual(entry.layout, spec.layout); assert.equal(entry.rendered.bodyUpright, true)
+  for (const field of layoutFieldKeys) assert.equal(entry.rendered.layout[field], spec.layout[field])
+  for (const axis of ['x', 'y']) {
+    const expected = spec.expectedTeXpt[axis] * 1.2
+    assert.ok(Math.abs(entry.rendered.anchorOffset[axis] - expected) <= .025 * 1.2,
+      `${spec.shape} selected ${spec.anchor} preserves the signed PGF fitting/clearance`)
+    assert.ok(Math.abs(entry.rendered.placementOffset[axis] + entry.rendered.anchorOffset[axis]) < .001,
+      'Actual contour CTM applies the selected PGF anchor translation')
+  }
+}
+export function assertZeroAxisTraversal(rendered) {
+  assert.equal(rendered.contour.tag, 'path'); assert.equal(rendered.contour.attributes.fill, 'none')
+  assert.equal(rendered.shape, 'ellipse'); assert.equal(rendered.source, ''); assert.equal(rendered.state, 'ready')
+  assert.deepEqual(rendered.anchorOffset, { x: 0, y: 0 })
+  assert.ok(Math.abs(rendered.contourLength - 4 * zeroAxisHalfExtent) < .005,
+    'Native SVG arclength retains the full retraced ellipse traversal')
+  assert.ok(!/\bA\s/u.test(rendered.contour.attributes.d), 'Zero-axis contour uses actual traversed paths')
+  assert.match(rendered.contour.attributes.d, /\bZ\s*$/u)
+  assert.equal(rendered.contour.attributes['stroke-width'], '0.48')
+  assert.equal(rendered.contour.attributes.stroke, '#B000C0')
+  assert.equal(rendered.contour.attributes['stroke-linecap'], 'butt')
+  assert.equal(rendered.contour.attributes['stroke-linejoin'], 'miter')
+  assert.equal(rendered.contour.attributes['stroke-dashoffset'], '0')
+  assert.equal(rendered.bounds.width, 0)
+  assert.ok(Math.abs(rendered.bounds.y + zeroAxisHalfExtent) < .005 && Math.abs(rendered.bounds.height - 2 * zeroAxisHalfExtent) < .005)
+  assert.equal(rendered.nativeTraversal.length, 5)
+  for (const [index, y] of [0, -zeroAxisHalfExtent, 0, zeroAxisHalfExtent, 0].entries()) {
+    assert.ok(Math.abs(rendered.nativeTraversal[index].x) < .005 && Math.abs(rendered.nativeTraversal[index].y - y) < .005,
+      'Native SVG traversal retains center, upper extremum, center, lower extremum, center in order')
+  }
+}
+// Inspect retained real screenshot bytes. The magenta border distinguishes the
+// narrow stroke from the App's grid, blue selection decoration and white fill.
+// Raster uncertainty is one pixel cell; geometry and picking tolerances do not
+// change. Replayed bounds must reach both independently known PGF extrema.
+export function observeZeroAxisPixels(png, ctm) {
+  const { width, height, rgba } = decodeConnectedPaintPng(png)
+  assert.ok(Object.values(ctm).every(Number.isFinite))
+  const determinant = ctm.a * ctm.d - ctm.b * ctm.c
+  assert.ok(Math.abs(determinant) > 1e-12)
+  const bounds = { minX: Infinity, minY: Infinity, maxX: -Infinity, maxY: -Infinity }
+  let pixels = 0
+  for (let y = 0; y < height; y++) for (let x = 0; x < width; x++) {
+    const at = (y * width + x) * 4, r = rgba[at], g = rgba[at + 1], b = rgba[at + 2]
+    if (!(r - g > 8 && b - g > 8 && rgba[at + 3] > 0)) continue
+    const dx = x + .5 - ctm.e, dy = y + .5 - ctm.f
+    const local = { x: (ctm.d * dx - ctm.c * dy) / determinant, y: (-ctm.b * dx + ctm.a * dy) / determinant }
+    if (Math.abs(local.x) > 2 || Math.abs(local.y) > zeroAxisHalfExtent + 2) continue
+    pixels++
+    for (const axis of ['X', 'Y']) {
+      const value = local[axis.toLowerCase()]
+      bounds[`min${axis}`] = Math.min(bounds[`min${axis}`], value)
+      bounds[`max${axis}`] = Math.max(bounds[`max${axis}`], value)
+    }
+  }
+  return { method: 'actual-native-PNG-magenta-stroke-pixel-centers', sha256: createHash('sha256').update(png).digest('hex'),
+    bytes: png.length, width, height, ctm: { ...ctm }, pixels, bounds: pixels ? bounds : null }
+}
+export function assertZeroAxisPixelEvidence(pixels) {
+  assert.equal(pixels.method, 'actual-native-PNG-magenta-stroke-pixel-centers')
+  assert.match(pixels.sha256, /^[a-f0-9]{64}$/u); assert.ok(pixels.bytes > 57 && pixels.pixels > 0)
+  const scale = Math.min(Math.hypot(pixels.ctm.a, pixels.ctm.b), Math.hypot(pixels.ctm.c, pixels.ctm.d))
+  const pixelCell = 1.5 / scale
+  assert.ok(pixels.bounds.minY <= -zeroAxisHalfExtent + pixelCell && pixels.bounds.maxY >= zeroAxisHalfExtent - pixelCell,
+    'Actual native raster visibly reaches both zero-axis PGF stroke extrema')
+  assert.ok(Math.abs(pixels.bounds.minX) <= .24 + pixelCell && Math.abs(pixels.bounds.maxX) <= .24 + pixelCell)
+}
+export function assertFreshZeroAxisAction(action) {
+  const snapshot = action.before, state = action.stateBefore
+  assert.deepEqual(snapshot.errors, [])
+  assert.equal(snapshot.labelDocumentRevision, state.labelDocumentRevision)
+  assert.deepEqual(snapshot.selection, state.selection)
+  const runtime = JSON.parse(state.runtimeDiagramJson), point = runtime.strata.find(({ id }) => id === 'zero-overlap')
+  assert.deepEqual(snapshot.model, point); assert.deepEqual(snapshot.camera, runtime.camera ?? null)
+  assert.equal(snapshot.layout.shape, 'ellipse'); assert.equal(snapshot.layout.state, 'ready'); assert.equal(snapshot.layout.source, '')
+  assert.deepEqual(JSON.parse(snapshot.layout.owner), ['point-node', state.labelDocumentRevision, 'zero-overlap'])
+  assert.ok(snapshot.layout.request); assert.equal(snapshot.layout.request, snapshot.layout.bodyRequest)
+  assert.ok(Array.isArray(snapshot.workPlaneControls) && Array.isArray(snapshot.workPlaneStatus))
+  const parameters = JSON.parse(snapshot.layout.parameters)
+  assert.equal(parameters.borderRotate, 0)
+  for (const kind of ['canvas', 'point', 'contour']) {
+    const geometry = snapshot.geometry[kind], matrix = geometry.screenCTM
+    assert.equal(geometry.connected, true); assert.ok(matrix && Object.values(matrix).every(Number.isFinite))
+    assert.ok(Math.abs(matrix.a * matrix.d - matrix.b * matrix.c) > 1e-12)
+  }
+  assert.deepEqual(snapshot.requestedClick, action.click)
+  const matrix = snapshot.geometry.contour.screenCTM
+  const expected = { x: matrix.a * action.local.x + matrix.c * action.local.y + matrix.e,
+    y: matrix.b * action.local.x + matrix.d * action.local.y + matrix.f }
+  for (const axis of ['x', 'y']) assert.ok(Math.abs(expected[axis] - action.click[axis]) < 1e-7)
+  assert.equal(snapshot.inspector.open, false)
+  const target = snapshot.elementFromPoint
+  assert.equal(target.svg, true); assert.equal(target.canvas, true); assert.equal(target.drawer, false)
+  assert.deepEqual(snapshot.elementsFromPoint[0], target)
+  if (action.local.x === 0) {
+    assert.equal(target.tag, 'path'); assert.equal(target.pointId, 'zero-overlap')
+  } else {
+    assert.equal(action.local.x, 12); assert.equal(target.pointId, null)
+    assert.equal(target.canvasRoot, true, 'Outside input reaches the actual canvas beyond all current point contours')
+  }
+}
+function assertZeroAxisNativeCase(entry, ambientDimension) {
+  assert.equal(entry.ambientDimension, ambientDimension)
+  assert.deepEqual(entry.layout, zeroAxisLayout); assertZeroAxisTraversal(entry.rendered)
+  const ids = ['app-point', 'zero-overlap'], position = { x: 3, y: 3, z: ambientDimension === 3 ? .5 : 0 }
+  assertCurrentEmptyPoint(entry.state, 'app-point', ambientDimension, 'ellipse', zeroAxisLayout, position)
+  assertCurrentEmptyPoint(entry.state, 'zero-overlap', ambientDimension, 'ellipse', zeroAxisLayout, position)
+  const nativePoint = JSON.parse(entry.state.runtimeDiagramJson).strata.find(({ id }) => id === 'zero-overlap')
+  assert.equal(nativePoint.style.paint.fill.enabled, false)
+  assert.deepEqual(nativePoint.style.paint.stroke, { enabled: true, color: '#B000C0', opacity: 1, width: .4,
+    lineStyle: 'solid', dashPhase: 0, lineCap: 'butt', lineJoin: 'miter' })
+  assertGeometricSelectionEvidence(entry.rendered.nativeSelection, 'zero-overlap')
+  assert.equal(entry.rendered.nativeSelection.scenario, signedPolygonalScenario)
+  const workflow = entry.axisInteraction
+  assert.equal(workflow.result, 'observed'); assert.equal(workflow.primary, undefined); assert.deepEqual(workflow.secondaryErrors, [])
+  assertPointCanvasPreparation(workflow.preparation, 'zero-overlap')
+  assertPointToolbarPreparation(workflow.toolbarPreparation, workflow.toolbarRestoration, 'zero-overlap')
+  assert.deepEqual(workflow.actions.map(({ key }) => key), ['outside-clear', 'ordinary-axis', 'alt-start', 'alt-next', 'outside-final'])
+  const expectedIds = [null, 'zero-overlap', 'zero-overlap', 'app-point', null]
+  for (const [index, action] of workflow.actions.entries()) {
+    const inside = index > 0 && index < 4, local = inside ? { x: 0, y: 20 } : { x: 12, y: 20 }
+    assert.deepEqual(action.local, local); assert.equal(action.altKey, index === 2 || index === 3)
+    assertFreshZeroAxisAction(action); assert.deepEqual(action.after.errors, [])
+    assert.equal(action.before.inspector.open, false)
+    assert.equal(action.before.tool.selectPressed, action.before.toolbar.collapsed ? null : 'true')
+    assert.equal(action.before.geometry.contour.connected, true)
+    assert.ok(Math.abs(action.before.geometry.contour.length - entry.rendered.contourLength) < .005)
+    assert.deepEqual(action.before.requestedClick, action.click)
+    const matrix = action.before.geometry.contour.screenCTM
+    for (const axis of ['x', 'y']) {
+      const expected = axis === 'x' ? matrix.a * local.x + matrix.c * local.y + matrix.e
+        : matrix.b * local.x + matrix.d * local.y + matrix.f
+      assert.ok(Math.abs(action.click[axis] - expected) < 1e-7)
+    }
+    const actualSelection = action.stateAfter.selection
+    assert.equal(actualSelection?.id ?? null, expectedIds[index], 'Actual trusted native input selects/cycles only the current axis owner')
+    for (const field of ['json', 'runtimeDiagramJson', 'history', 'labelDocumentRevision', 'uiSettings']) {
+      assert.deepEqual(action.stateAfter[field], action.stateBefore[field], `Native zero-axis input preserves ${field}`)
+    }
+    for (const [snapshot, state] of [[action.before, action.stateBefore], [action.after, action.stateAfter]]) {
+      assert.equal(snapshot.labelDocumentRevision, state.labelDocumentRevision)
+      assert.deepEqual(snapshot.selection, state.selection)
+      assert.deepEqual(JSON.parse(snapshot.layout.owner), ['point-node', action.stateBefore.labelDocumentRevision, 'zero-overlap'])
+      assert.equal(snapshot.layout.request, snapshot.layout.bodyRequest); assert.equal(snapshot.layout.source, '')
+      assert.deepEqual(snapshot.model, JSON.parse(action.stateBefore.runtimeDiagramJson).strata.find(({ id }) => id === 'zero-overlap'))
+    }
+    assert.equal(action.events.length, 3); assert.equal(action.droppedEvents, 0)
+    let pointerId
+    for (const [eventIndex, type] of ['pointerdown', 'pointerup', 'click'].entries()) {
+      const event = action.events[eventIndex]
+      assert.equal(event.type, type); assert.equal(event.trusted, true); assert.equal(event.altKey, action.altKey)
+      assert.equal(event.button, 0); assert.equal(event.buttons, type === 'pointerdown' ? 1 : 0)
+      if (type === 'pointerdown') { pointerId = event.pointerId; assert.ok(Number.isInteger(pointerId)); assert.deepEqual(event.selection, action.stateBefore.selection) }
+      else assert.ok(event.pointerId === pointerId || (type === 'click' && event.pointerId === null))
+      assert.equal(event.labelDocumentRevision, action.stateBefore.labelDocumentRevision)
+      assert.equal(event.layout.owner, action.before.layout.owner); assert.equal(event.layout.request, action.before.layout.request)
+      assert.equal(event.layout.source, '')
+      assert.equal(event.target.canvas, true); assert.equal(event.target.drawer, false)
+      assert.ok(event.path.some((item) => item?.canvasRoot === true))
+      if (type === 'pointerdown') assert.deepEqual(event.target, action.before.elementFromPoint, 'Trusted pointerdown reaches the freshly observed hit-stack owner')
+      if (inside) assert.equal(event.target.pointId, 'zero-overlap', 'Native axis input reaches the actual visible stroke')
+      for (const axis of ['x', 'y']) {
+        if (type === 'click') assert.equal(event.client[axis], Math.trunc(action.click[axis]), 'Native click preserves browser integer coordinate propagation')
+        else assert.ok(Math.abs(event.client[axis] - action.click[axis]) < .05)
+      }
+    }
+    if (index) for (const field of ['json', 'runtimeDiagramJson', 'history', 'selection', 'labelDocumentRevision', 'uiSettings']) {
+      assert.deepEqual(action.stateBefore[field], workflow.actions[index - 1].stateAfter[field])
+    }
+    if (!inside) assert.ok(local.x - Number(entry.rendered.contour.attributes['stroke-width']) / 2 > 6,
+      'Native outside point exceeds the unchanged six-unit picking tolerance')
+    for (const id of ids) assertCurrentEmptyPoint(action.stateBefore, id, ambientDimension, 'ellipse', zeroAxisLayout, position)
+  }
+  const live = entry.liveObservation
+  assert.ok(live, 'Actual live paint capture retains fresh current observations after owned toolbar restoration')
+  for (const field of ['json', 'runtimeDiagramJson', 'history', 'selection', 'labelDocumentRevision', 'uiSettings']) assert.deepEqual(live.state[field], workflow.toolbarRestoration.stateAfter[field])
+  assert.equal(live.snapshot.labelDocumentRevision, live.state.labelDocumentRevision); assert.deepEqual(live.snapshot.selection, live.state.selection)
+  assert.deepEqual(live.snapshot.layout, workflow.actions.at(-1).after.layout)
+  assert.deepEqual(entry.livePaint.ctm, live.snapshot.geometry.contour.screenCTM)
+  assert.deepEqual(live.afterSnapshot.geometry.contour.screenCTM, live.snapshot.geometry.contour.screenCTM)
+  assert.deepEqual(live.afterSnapshot.geometry.canvas.screenCTM, live.snapshot.geometry.canvas.screenCTM)
+  for (const field of ['json', 'runtimeDiagramJson', 'history', 'selection', 'labelDocumentRevision', 'uiSettings']) assert.deepEqual(live.afterState[field], live.state[field])
+  assertZeroAxisPixelEvidence(entry.livePaint)
+}
+export function assertSignedPolygonalZeroAxisEvidence(evidence) {
+  assert.equal(evidence.polygonalCases.length, signedPolygonalCases.length * 2)
+  for (const ambientDimension of [2, 3]) for (const spec of signedPolygonalCases) {
+    const found = evidence.polygonalCases.filter((entry) => entry.ambientDimension === ambientDimension && entry.key === spec.key)
+    assert.equal(found.length, 1)
+    const entry = found[0]; assertPolygonalPlacement(entry, spec)
+    assertCurrentEmptyPoint(entry.state, 'app-point', ambientDimension, spec.shape, spec.layout,
+      { x: 3, y: 3, z: ambientDimension === 3 ? .5 : 0 })
+    assertGeometricSelectionEvidence(entry.rendered.nativeSelection, 'app-point')
+    assert.equal(entry.rendered.nativeSelection.scenario, signedPolygonalScenario)
+    for (const field of ['json', 'runtimeDiagramJson', 'history', 'labelDocumentRevision', 'uiSettings']) {
+      assert.deepEqual(entry.state[field], entry.rendered.nativeSelection.stateAfter[field], 'Actual polygon placement and native selected owner share current model/source/revision')
+    }
+  }
+  assert.equal(evidence.zeroAxisCases.length, 2); assert.equal(evidence.downloads.length, 2)
+  for (const ambientDimension of [2, 3]) {
+    const entries = evidence.zeroAxisCases.filter((entry) => entry.ambientDimension === ambientDimension)
+    assert.equal(entries.length, 1); assertZeroAxisNativeCase(entries[0], ambientDimension)
+    const downloads = evidence.downloads.filter((entry) => entry.ambientDimension === ambientDimension)
+    assert.equal(downloads.length, 1)
+    const download = downloads[0]
+    assert.equal(download.scenario, `${signedPolygonalScenario}-${ambientDimension}d`)
+    assert.equal(download.group, layoutAnchorGroup); assert.equal(download.background, 'transparent')
+    assert.equal(download.expected.length, signedPolygonalCases.length + 1)
+    assert.equal(download.capture.status, 'saved')
+    assert.equal(download.click.snapshot.points.length, download.expected.length)
+    assert.equal(download.click.error, undefined)
+    const beforeExportState = download.beforeExportState, snapshot = download.click.snapshot
+    assert.ok(beforeExportState)
+    for (const field of ['json', 'runtimeDiagramJson', 'history', 'selection', 'uiSettings']) assert.deepEqual(snapshot[field], beforeExportState[field])
+    assert.equal(snapshot.runtime.documentRevision, beforeExportState.labelDocumentRevision)
+    assert.equal(snapshot.documentUnchanged, true)
+    assert.deepEqual(snapshot.exportBackground, { count: 1, tag: 'select', ariaLabel: 'SVG export background', value: 'transparent' })
+    const saved = JSON.parse(download.savedJson), capturedModel = JSON.parse(snapshot.json).diagram,
+      runtime = JSON.parse(snapshot.runtimeDiagramJson), history = JSON.parse(snapshot.history).present
+    assert.equal(saved.version, 2)
+    for (const diagram of [capturedModel, runtime, history]) {
+      assert.equal(diagram.ambientDimension, ambientDimension)
+      assert.deepEqual(diagram.strata, saved.diagram.strata)
+      assert.deepEqual(diagram.labels, saved.diagram.labels)
+    }
+    assert.deepEqual(snapshot.camera, capturedModel.camera)
+
+    for (const [index, expected] of download.expected.entries()) {
+      assertObservedPointPlacement(expected)
+      const captured = download.click.snapshot.points[index]
+      assert.equal(captured.id, expected.id); assert.equal(captured.source, '')
+      assert.equal(captured.status, 'ready'); assert.equal(captured.style.shape, expected.shape)
+      assert.deepEqual(captured.style.layout, expected.layout)
+      assert.equal(captured.nodeTransform, expected.rendered.nodeTransform)
+      const modelPoint = saved.diagram.strata[index]
+      assert.equal(modelPoint.id, expected.id); assert.deepEqual(expected.modelPoint, modelPoint)
+      const expectedPosition = { x: index < signedPolygonalCases.length ? 1 + index % 3 * 2 : 7,
+        y: index < signedPolygonalCases.length ? 1 + Math.floor(index / 3) * 2 : 3, z: ambientDimension === 3 ? .5 : 0 }
+      assert.deepEqual(modelPoint.position, expectedPosition)
+      assert.deepEqual(captured.position, modelPoint.position); assert.deepEqual(captured.style, modelPoint.style)
+      assert.equal(captured.modelSource, '')
+      assert.deepEqual(JSON.parse(captured.owner), ['point-node', beforeExportState.labelDocumentRevision, expected.id])
+      assert.equal(captured.owner, expected.rendered.pointOwner)
+      assert.equal(captured.request, expected.rendered.bodyRequest); assert.equal(captured.pointRequest, expected.rendered.pointRequest)
+      assert.equal(captured.request, captured.pointRequest); assert.deepEqual(captured.runtime, snapshot.runtime)
+      assert.equal(captured.held, null)
+
+      if (index < signedPolygonalCases.length) assertPolygonalPlacement(expected, signedPolygonalCases[index])
+      else assertZeroAxisTraversal(expected.rendered)
+    }
+    assertZeroAxisPixelEvidence(download.strokePixels)
+  }
+}
+export function assertSignedPolygonalStandaloneEvidence(evidence, raw, artifactDir, ambientDimension) {
+  assertLayoutAnchorEvidence(evidence, signedPolygonalScenario)
+  const download = evidence.downloads.find((entry) => entry.ambientDimension === ambientDimension)
+  const stem = `${signedPolygonalScenario}-${ambientDimension}d`
+  const xml = assertStandaloneReopeningRecord(raw, download, artifactDir)
+  assert.deepEqual(raw.capture, download.capture)
+  assert.deepEqual(raw.outputs, download.outputs)
+  assert.deepEqual(raw.beforeExportState, download.beforeExportState)
+  assert.equal(readFileSync(resolve(artifactDir, `${stem}-saved.json`), 'utf8'), download.savedJson)
+  for (const mode of ['standalone', 'inlineMath']) {
+    assert.equal(readFileSync(resolve(artifactDir, `${stem}-${mode}.tex`), 'utf8'), raw.outputs[mode])
+    for (const anchor of signedPolygonalCases.map(({ anchor }) => anchor)) assert.ok(raw.outputs[mode].includes(`anchor=${anchor}`))
+    assert.ok(raw.outputs[mode].includes('inner xsep=0pt') && raw.outputs[mode].includes('inner ysep=20pt'))
+  }
+  for (const [index, actual] of raw.reopened.entries()) {
+    const expected = download.expected[index]
+    assert.equal(actual.source, ''); assert.equal(actual.errors, 0)
+    assert.deepEqual(actual.contour, expected.rendered.contour)
+    assert.equal(actual.nodeTransform, expected.rendered.nodeTransform)
+    assert.equal(actual.bodyTransform, expected.rendered.bodyTransform)
+    for (const [key, value] of Object.entries(actual.contour.attributes)) {
+      assert.ok(xml.includes(`${key}="${String(value).replaceAll('&', '&amp;').replaceAll('"', '&quot;')}"`))
+    }
+  }
+  validateStandaloneSvgCaptureEvidence(raw.capture, { svgPath: raw.svgPath,
+    pngPath: resolve(artifactDir, `${stem}.png`), root: raw.document.root })
+  assert.deepEqual(raw.strokePixels, download.strokePixels)
+  assert.deepEqual(observeZeroAxisPixels(readFileSync(resolve(artifactDir, `${stem}.png`)), raw.reopened.at(-1).screenCTM), raw.strokePixels)
+  const native = JSON.parse(readFileSync(resolve(artifactDir, `${stem}-native.json`), 'utf8'))
+  assert.equal(native.scenario, signedPolygonalScenario); assert.equal(native.group, layoutAnchorGroup); assert.equal(native.result, 'observed')
+  assert.deepEqual(native.polygonalCases, evidence.polygonalCases.filter((entry) => entry.ambientDimension === ambientDimension))
+  assert.deepEqual(native.zeroAxisCase, evidence.zeroAxisCases.find((entry) => entry.ambientDimension === ambientDimension))
+  assert.deepEqual(observeZeroAxisPixels(readFileSync(resolve(artifactDir, `${stem}-live.png`)), native.zeroAxisCase.livePaint.ctm), native.zeroAxisCase.livePaint)
 }

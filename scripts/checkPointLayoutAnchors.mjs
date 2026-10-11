@@ -4,7 +4,8 @@ import { resolve } from 'node:path'
 import { pathToFileURL } from 'node:url'
 import { layoutAnchorGroup as group, layoutShapes, layoutRegimes, layoutForShapeRegime, pointAnchorsForShape,
   layoutShapeParameters, layoutAnchorArtifacts, assertLayoutAnchorEvidence, assertPointTikzSourceByMode,
-  signedAnchorCases, signedPickingCases } from './pointLayoutAnchorsContract.mjs'
+  signedAnchorCases, signedPickingCases, signedPolygonalScenario, signedPolygonalCases, zeroAxisLayout,
+  assertZeroAxisTraversal, observeZeroAxisPixels, assertZeroAxisPixelEvidence, assertFreshZeroAxisAction } from './pointLayoutAnchorsContract.mjs'
 import { layoutImportCases as importCases } from './pointLayoutAnchorsContract.mjs'
 import { createOwnedAppPage } from './ownedAppPage.mjs'
 import { ownPageEvent } from './ownedPageEvent.mjs'
@@ -52,7 +53,7 @@ export async function observeLayoutPoint(page, id = 'app-point') {
       .filter(({ name }) => !name.startsWith('data-') && name !== 'pointer-events').map(({ name, value }) => [name, value])) })
     return { source: body.getAttribute('data-label-source'), state: body.getAttribute('data-label-state'),
       shape: node.getAttribute('data-point-shape'), anchor: node.getAttribute('data-point-anchor'),
-      layout: JSON.parse(node.getAttribute('data-point-layout')), pointRequest: node.getAttribute('data-point-request'), bodyRequest: body.getAttribute('data-label-request'),
+      pointOwner: node.getAttribute('data-point-node'), layout: JSON.parse(node.getAttribute('data-point-layout')), pointRequest: node.getAttribute('data-point-request'), bodyRequest: body.getAttribute('data-label-request'),
       anchorOffset, placementOffset: { x: contourLocal.e, y: contourLocal.f }, bodyOrigin: pair('data-point-body-origin'), baseline: Number(node.getAttribute('data-point-body-baseline')),
       placement: coordinate(new DOMPoint().matrixTransform(node.getScreenCTM())),
       placedAnchor: anchorOffset && coordinate(new DOMPoint(anchorOffset.x, anchorOffset.y).matrixTransform(matrix)),
@@ -61,6 +62,8 @@ export async function observeLayoutPoint(page, id = 'app-point') {
       contourScreenBounds: { x: screenBounds.x, y: screenBounds.y, width: screenBounds.width, height: screenBounds.height },
       shapeBounds: node.getAttribute('data-point-shape-bounds'), paintedBounds: node.getAttribute('data-point-painted-bounds'),
       bodyBounds: node.getAttribute('data-point-body-bounds'), anchorBounds: node.getAttribute('data-point-anchor-bounds'),
+      screenCTM: Object.fromEntries(['a', 'b', 'c', 'd', 'e', 'f'].map((key) => [key, matrix[key]])),
+      nativeTraversal: [0, .25, .5, .75, 1].map((fraction) => coordinate(contour.getPointAtLength(contour.getTotalLength() * fraction))),
       contourLength: contour.getTotalLength(), math: body.querySelectorAll('[data-label-math]').length,
       bodyUpright: Math.abs(local.b) < 1e-10 && Math.abs(local.c) < 1e-10,
       inkMatrix: Object.fromEntries(['a', 'b', 'c', 'd', 'e', 'f'].map((key) => [key, inkMatrix[key]])),
@@ -290,6 +293,99 @@ export async function runPointLayoutAnchorChecks({ browser, origin, artifactDir,
     if (cyclePrimary) throw cyclePrimary
     assert.deepEqual(entry.secondaryErrors, [], 'Owner-cycle observation and cleanup completed')
     return entry
+  }
+  async function zeroAxisInput() {
+    const id = 'zero-overlap', workflow = { result: 'observed', actions: [], secondaryErrors: [], toolbarPreparation: { actions: [] }, toolbarRestoration: {} }
+    const retain = async (boundary) => {
+      try { await boundedPointDiagnostic(() => observe(`${scenario}-zero-axis-${boundary}`, { group, result: 'observed', axisInteraction: structuredClone(workflow) }), `Zero-axis ${boundary} evidence`, 5000) }
+      catch (error) {
+        primary ??= error
+        workflow.secondaryErrors.push({ operation: `${boundary} evidence`, message: error.message })
+        pageErrors.push(`Zero-axis ${boundary} evidence: ${error.message}`)
+      }
+    }
+    let primary, installed = false
+    const token = `${scenario}:zero-axis:${++selectionSequence}`
+    try {
+      workflow.preparation = await prepareSelectedPointCanvas({ page, readState: state,
+        diagnose: (details) => diagnostic(group, scenario, details), secondaryErrors: pageErrors,
+        scenario, sequence: selectionSequence, id })
+      await prepareGeometricCanvasClick({ page, readState: state, observePoint: observeLayoutPoint, id, boundary: true,
+        preparation: workflow.toolbarPreparation,
+        diagnostic: async (name, operation) => boundedPointDiagnostic(operation, `Zero-axis ${name}`, 5000), evidence: retain })
+      await page.evaluate(({ token, id }) => {
+        const registry = window.__stzZeroAxisInputs ??= new Map()
+        const describe = (element) => element instanceof Element ? { tag: element.localName, id: element.id, class: element.getAttribute('class'),
+          pointId: element.closest('[data-point-id]')?.getAttribute('data-point-id') ?? null,
+          canvas: !!element.closest('svg.svg-diagram'), canvasRoot: element.matches('svg.svg-diagram'),
+          drawer: !!element.closest('#preview-inspector-drawer'), ariaLabel: element.getAttribute('aria-label'), svg: element instanceof SVGElement,
+          pointHandle: element.matches('circle.svg-geometry-handle') && !!element.closest('[aria-label="Selected point drag handles"]'),
+          creationToolbar: !!element.closest('.preview-floating-toolbar'), toolbarOverlay: !!element.closest('.preview-toolbar-overlay-stack'),
+          quickStyle: !!element.closest('.context-quick-style-bar'), history: !!element.closest('.preview-history-overlay') } : null
+        const owned = { events: [], droppedEvents: 0 }
+        owned.listener = (event) => {
+          if (owned.events.length >= 16) { owned.droppedEvents++; return }
+          const current = window.stzAppLabels.state(), node = document.querySelector(`[data-point-id="${CSS.escape(id)}"] [data-point-node]`)
+          owned.events.push({ type: event.type, trusted: event.isTrusted, altKey: event.altKey,
+            pointerId: event.pointerId ?? null, button: event.button, buttons: event.buttons,
+            client: { x: event.clientX, y: event.clientY }, target: describe(event.target),
+            path: event.composedPath().slice(0, 16).map(describe), selection: current.selection,
+            labelDocumentRevision: current.labelDocumentRevision,
+            layout: { owner: node.getAttribute('data-point-node'), request: node.getAttribute('data-point-request'),
+              source: node.querySelector('[data-label-source]').getAttribute('data-label-source') } })
+        }
+        registry.set(token, owned)
+        for (const type of ['pointerdown', 'pointerup', 'click']) document.addEventListener(type, owned.listener, true)
+      }, { token, id })
+      installed = true
+      for (const [index, key] of ['outside-clear', 'ordinary-axis', 'alt-start', 'alt-next', 'outside-final'].entries()) {
+        const action = { key, local: { x: index > 0 && index < 4 ? 0 : 12, y: 20 }, altKey: index === 2 || index === 3 }
+        workflow.actions.push(action)
+        action.stateBefore = await state()
+        action.click = await page.evaluate(({ id, local }) => {
+          const contour = document.querySelector(`[data-point-id="${CSS.escape(id)}"] [data-point-contour]`)
+          const projected = new DOMPoint(local.x, local.y).matrixTransform(contour.getScreenCTM())
+          return { x: projected.x, y: projected.y }
+        }, { id, local: action.local })
+        action.before = await page.evaluate(observeGeometricSelection, { id, click: action.click, token: null })
+        await retain(`${key}-before-native-input`)
+        if (primary) throw primary
+        assertFreshZeroAxisAction(action)
+        if (action.altKey) await page.keyboard.down('Alt')
+        await page.mouse.click(action.click.x, action.click.y)
+        if (action.altKey) await page.keyboard.up('Alt')
+        action.stateAfter = await state()
+        action.after = await page.evaluate(observeGeometricSelection, { id, click: action.click, token: null })
+        Object.assign(action, await page.evaluate((token) => {
+          const owned = window.__stzZeroAxisInputs.get(token)
+          const result = { events: [...owned.events], droppedEvents: owned.droppedEvents }
+          owned.events.length = 0; owned.droppedEvents = 0
+          return result
+        }, token))
+        await retain(`${key}-after-native-input-before-assertion`)
+        if (primary) throw primary
+        assert.equal(action.stateAfter.selection?.id ?? null, [null, id, id, 'app-point', null][index])
+        for (const field of ['json', 'runtimeDiagramJson', 'history', 'labelDocumentRevision', 'uiSettings']) assert.deepEqual(action.stateAfter[field], action.stateBefore[field])
+      }
+    } catch (error) { primary ??= error }
+    finally {
+      try { await boundedPointDiagnostic(() => page.keyboard.up('Alt'), 'Zero-axis Alt cleanup', 5000) } catch (error) { primary ??= error; workflow.secondaryErrors.push({ operation: 'Alt cleanup', message: error.message }) }
+      if (installed) try {
+        await boundedPointDiagnostic(() => page.evaluate((token) => {
+          const registry = window.__stzZeroAxisInputs, owned = registry?.get(token)
+          if (owned) for (const type of ['pointerdown', 'pointerup', 'click']) document.removeEventListener(type, owned.listener, true)
+          registry?.delete(token); if (registry?.size === 0) delete window.__stzZeroAxisInputs
+        }, token), 'Zero-axis observer cleanup', 5000)
+      } catch (error) { primary ??= error; workflow.secondaryErrors.push({ operation: 'observer cleanup', message: error.message }) }
+      try {
+        await restoreGeometricCanvasToolbar({ page, readState: state, id, preparation: workflow.toolbarPreparation,
+          restoration: workflow.toolbarRestoration, diagnostic: async (name, operation) => boundedPointDiagnostic(operation, `Zero-axis ${name}`, 5000), evidence: retain })
+      } catch (error) { primary ??= error; workflow.secondaryErrors.push({ operation: 'toolbar cleanup', message: error.message }) }
+      if (primary) workflow.primary = { message: primary.message, stack: primary.stack }
+      await retain('finished')
+    }
+    if (primary) throw primary
+    return workflow
   }
   async function observeEntry(input, extra = {}, id = 'app-point') {
     const point = input.diagram.strata.find((point) => point.id === id), rendered = await observeLayoutPoint(page, id)
@@ -662,6 +758,118 @@ export async function runPointLayoutAnchorChecks({ browser, origin, artifactDir,
     }
     await save({ cases: interactions, bodyOverflowCases, signedAnchorCases: signedAnchors, signedPickingCases: signedPicking })
 
+    scenario = signedPolygonalScenario
+    const polygonalCases = [], zeroAxisCases = [], downloads = []
+    for (const ambientDimension of [2, 3]) {
+      const stem = `${scenario}-${ambientDimension}d`, inDimension = []
+      for (const spec of signedPolygonalCases) {
+        const input = await document(spec.shape, spec.layout, '', ambientDimension)
+        input.diagram.strata[0].style.shapeParameters = {}
+        await load(input); await settle()
+        const rendered = await select()
+        const entry = await observeEntry(input, { key: spec.key, ambientDimension, state: await state(), rendered })
+        polygonalCases.push(entry); inDimension.push(entry)
+      }
+      const zeroInput = await document('ellipse', zeroAxisLayout, '', ambientDimension)
+      zeroInput.diagram.strata[0].style.shapeParameters = {}
+      zeroInput.diagram.strata[0].style.paint = { ...structuredClone(paint), fill: { enabled: false, color: '#FFFFFF', opacity: 1 },
+        stroke: { ...structuredClone(paint.stroke), color: '#B000C0' } }
+      zeroInput.diagram.strata.push({ ...structuredClone(zeroInput.diagram.strata[0]), id: 'zero-overlap' })
+      await load(zeroInput); await settle()
+      const rendered = await select('zero-overlap')
+      const zeroAxisCase = { ambientDimension, layout: structuredClone(zeroAxisLayout), rendered, state: await state() }
+      zeroAxisCase.axisInteraction = await zeroAxisInput()
+      await observe(`${scenario}-${ambientDimension}d-zero-axis-traversal`, { group, result: 'observed', zeroAxisCase })
+      assertZeroAxisTraversal(rendered)
+      zeroAxisCase.liveObservation = { state: await state(),
+        snapshot: await page.evaluate(observeGeometricSelection, { id: 'zero-overlap', click: null, token: null }) }
+      await observe(`${stem}-live-paint-before-capture`, { group, result: 'observed', zeroAxisCase })
+      const liveBytes = await page.screenshot({ path: resolve(artifactDir, `${stem}-live.png`), fullPage: false, scale: 'css', timeout: 5000 })
+      zeroAxisCase.liveObservation.afterState = await state()
+      zeroAxisCase.liveObservation.afterSnapshot = await page.evaluate(observeGeometricSelection, { id: 'zero-overlap', click: null, token: null })
+      const liveCtm = zeroAxisCase.liveObservation.snapshot.geometry.contour.screenCTM
+      await observe(`${stem}-live-paint-bytes-before-inspection`, { group, result: 'observed', zeroAxisCase, bytes: liveBytes.length, path: `${stem}-live.png` })
+      zeroAxisCase.livePaint = observeZeroAxisPixels(liveBytes, liveCtm)
+      zeroAxisCases.push(zeroAxisCase)
+      await writeFile(resolve(artifactDir, `${stem}-native.json`), JSON.stringify({ scenario, group, result: 'observed',
+        polygonalCases: inDimension, zeroAxisCase }, null, 2) + '\n')
+      await observe(`${stem}-native-before-assertion`, { group, result: 'observed', zeroAxisCase })
+      assertZeroAxisPixelEvidence(zeroAxisCase.livePaint)
+
+      // Additive standalone fixture: six default-parameter signed polygons and
+      // one visibly retraced empty ellipse. The pending fifteen-point fixture
+      // and both immutable download sequences retain their exact old inputs.
+      const fixture = structuredClone(zeroInput)
+      fixture.diagram.strata = signedPolygonalCases.map((spec, index) => {
+        const point = structuredClone(zeroInput.diagram.strata[0])
+        point.id = `signed-${spec.key}`; point.position = { x: 1 + index % 3 * 2, y: 1 + Math.floor(index / 3) * 2, z: ambientDimension === 3 ? .5 : 0 }
+        point.style.shape = spec.shape; point.style.layout = structuredClone(spec.layout)
+        point.style.paint = structuredClone(paint)
+        return point
+      })
+      const zero = structuredClone(zeroInput.diagram.strata[0]); zero.id = 'signed-zero-axis'
+      zero.position = { x: 7, y: 3, z: ambientDimension === 3 ? .5 : 0 }; fixture.diagram.strata.push(zero)
+      await load(fixture); await settle()
+      const expected = []
+      for (const [index, point] of fixture.diagram.strata.entries()) expected.push(await observeEntry(fixture, {
+        id: point.id, modelPoint: structuredClone(point), key: index < signedPolygonalCases.length ? signedPolygonalCases[index].key : 'zero-axis', ambientDimension }, point.id))
+      const saved = await saveAppJson({ page, artifactDir, name: `${stem}-saved`, owned: waits,
+        diagnose: (details) => observe(`${stem}-save`, { group, details }) })
+      const savedJson = saved.json
+      await load(savedJson); await settle()
+      assert.deepEqual((await model()).strata, fixture.diagram.strata)
+      for (const [index, point] of fixture.diagram.strata.entries()) expected[index] = await observeEntry(fixture, {
+        id: point.id, modelPoint: structuredClone(point), key: index < signedPolygonalCases.length ? signedPolygonalCases[index].key : 'zero-axis', ambientDimension }, point.id)
+      const outputs = await tikzArtifacts(stem)
+      await page.getByLabel('SVG export background', { exact: true }).selectOption('transparent')
+      await page.evaluate((ids) => window.stzAppLabels.armPointExportClick(ids), fixture.diagram.strata.map(({ id }) => id))
+      const beforeExportState = await state()
+      await observe(`${stem}-before-export-click`, { group, result: 'observed', beforeExportState, expected })
+      const { event: download } = await event(stem, 'download', () => page.getByRole('button', { name: 'Export current diagram view as SVG', exact: true }).click())
+      const click = await page.evaluate(() => window.stzAppLabels.pointExportClick())
+      const svgPath = resolve(artifactDir, `${stem}.svg`); await download.saveAs(svgPath)
+      const xml = await readFile(svgPath, 'utf8'), fileUrl = pathToFileURL(svgPath).href
+      const standalone = await context.newPage()
+      const raw = await capturePointLayoutStandalone({ standalone, artifactDir,
+        details: { scenario: stem, group, background: 'transparent', ambientDimension, svgPath, fileUrl, pageErrors, expected, click, outputs, xml, savedJson, beforeExportState },
+        observe: (candidate) => observe(`${stem}-standalone-observed`, { group, result: 'observed', candidate }),
+        reopen: async (standalone) => standalone.evaluate((expected) => {
+          const clean = (element) => ({ tag: element.localName, attributes: Object.fromEntries([...element.attributes].filter(({ name }) => !name.startsWith('data-') && name !== 'pointer-events').map(({ name, value }) => [name, value])) })
+          const bodies = [...document.querySelectorAll('g > title')].filter((title) => title.textContent === '')
+          const reopened = bodies.map((title, index) => {
+            const body = title.parentElement, node = body.parentElement
+            const contour = [...node.children].find((element) => element.localName === 'path' && element.hasAttribute('stroke') && element.getAttribute('stroke') !== 'none')
+            const matrix = contour?.getScreenCTM()
+            return { source: title.textContent, shape: expected[index]?.shape, contour: contour && clean(contour), nodeTransform: node.getAttribute('transform'), bodyTransform: body.getAttribute('transform'),
+              screenCTM: matrix && Object.fromEntries(['a', 'b', 'c', 'd', 'e', 'f'].map((key) => [key, matrix[key]])), errors: document.querySelectorAll('parsererror,foreignObject,image,script').length }
+          })
+          const root = document.documentElement
+          return { reopened, document: { root: { localName: root.localName, namespace: root.namespaceURI,
+            width: root.getAttribute('width'), height: root.getAttribute('height'), viewBox: root.getAttribute('viewBox') },
+            forbiddenCount: document.querySelectorAll('parsererror,foreignObject,image,script,[data-svg-export-exclude]').length,
+            externalReferences: [...document.querySelectorAll('[href]')].map((element) => element.getAttribute('href')).filter((href) => !href.startsWith('#') || !document.getElementById(href.slice(1))),
+            backgroundCount: document.querySelectorAll('[data-stratified-tikz-export-background]').length } }
+        }, expected),
+        assertReopened: ({ reopened, requests, document }) => {
+          assert.equal(reopened.length, expected.length)
+          for (const [index, actual] of reopened.entries()) {
+            assert.equal(actual.source, ''); assert.equal(actual.errors, 0)
+            assert.deepEqual(actual.contour, expected[index].rendered.contour)
+            assert.equal(actual.nodeTransform, expected[index].rendered.nodeTransform); assert.equal(actual.bodyTransform, expected[index].rendered.bodyTransform)
+          }
+          assert.deepEqual(requests, [fileUrl]); assert.equal(document.forbiddenCount, 0)
+          assert.deepEqual(document.externalReferences, []); assert.equal(document.backgroundCount, 0)
+        } })
+      raw.strokePixels = observeZeroAxisPixels(await readFile(resolve(artifactDir, `${stem}.png`)), raw.reopened.at(-1).screenCTM)
+      await writeFile(resolve(artifactDir, `${stem}-standalone.json`), JSON.stringify(raw, null, 2) + '\n')
+      await observe(`${stem}-standalone-pixels-before-assertion`, { group, result: 'observed', raw })
+      assertZeroAxisPixelEvidence(raw.strokePixels)
+      downloads.push({ scenario: stem, group, background: 'transparent', ambientDimension, expected, click, outputs, savedJson, beforeExportState,
+        capture: raw.capture, strokePixels: raw.strokePixels })
+      await page.evaluate(() => window.stzAppLabels.releasePointExportClick())
+    }
+    await save({ polygonalCases, zeroAxisCases, downloads })
+
     for (const background of ['transparent', 'white']) {
       scenario = `point-layout-pending-${background}-${background === 'transparent' ? 'edit' : 'load'}`
       const captured = `captured ${background} $\\frac{anchor_{32D}}{1+\\frac{x}{y}}$`
@@ -760,7 +968,7 @@ export async function runPointLayoutAnchorChecks({ browser, origin, artifactDir,
   } finally {
     for (const wait of waits) wait.dispose()
     const pendingCleanup = { scenario, result: 'observed', primary: primary?.message, holds: [], errors: [] }
-    if (scenario.startsWith('point-layout-pending-')) {
+    if (scenario.startsWith('point-layout-pending-') || scenario === signedPolygonalScenario) {
       try {
         await boundedPointDiagnostic(() => page.evaluate(() => window.stzAppLabels.releasePointExportClick()), 'Pending export listener cleanup')
         pendingCleanup.exportListenerReleased = true
