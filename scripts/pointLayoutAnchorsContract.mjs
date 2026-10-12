@@ -11,6 +11,7 @@ import { assertPendingLayoutViewEvidence } from './pointLayoutPendingView.mjs'
 import { createHash } from 'node:crypto'
 import { decodeConnectedPaintPng } from './connectedLivePaintOracle.mjs'
 import { assertZeroAxisLiveCapture } from './zeroAxisLiveCapture.mjs'
+import { assertSignedPointStandaloneAssociation, assertSignedPointStandaloneGeometry } from './signedPointStandaloneAssociation.mjs'
 
 export const layoutAnchorGroup = 'point-node-layout-anchors-combined'
 export const layoutShapes = ['circle', 'rectangle', 'square', 'triangle', 'ellipse', 'diamond', 'regular polygon',
@@ -895,29 +896,25 @@ export function assertSignedPolygonalStandaloneEvidence(evidence, raw, artifactD
   const download = evidence.downloads.find((entry) => entry.ambientDimension === ambientDimension)
   const stem = `${signedPolygonalScenario}-${ambientDimension}d`
   const xml = assertStandaloneReopeningRecord(raw, download, artifactDir)
+  assert.equal(raw.xml, xml)
+  assert.equal(raw.savedJson, download.savedJson)
+  assert.equal(raw.ambientDimension, ambientDimension)
   assert.deepEqual(raw.capture, download.capture)
   assert.deepEqual(raw.outputs, download.outputs)
   assert.deepEqual(raw.beforeExportState, download.beforeExportState)
+  assert.deepEqual(raw.preExport, download.preExport)
   assert.equal(readFileSync(resolve(artifactDir, `${stem}-saved.json`), 'utf8'), download.savedJson)
   for (const mode of ['standalone', 'inlineMath']) {
     assert.equal(readFileSync(resolve(artifactDir, `${stem}-${mode}.tex`), 'utf8'), raw.outputs[mode])
     for (const anchor of signedPolygonalCases.map(({ anchor }) => anchor)) assert.ok(raw.outputs[mode].includes(`anchor=${anchor}`))
     assert.ok(raw.outputs[mode].includes('inner xsep=0pt') && raw.outputs[mode].includes('inner ysep=20pt'))
   }
-  for (const [index, actual] of raw.reopened.entries()) {
-    const expected = download.expected[index]
-    assert.equal(actual.source, ''); assert.equal(actual.errors, 0)
-    assert.deepEqual(actual.contour, expected.rendered.contour)
-    assert.equal(actual.nodeTransform, expected.rendered.nodeTransform)
-    assert.equal(actual.bodyTransform, expected.rendered.bodyTransform)
-    for (const [key, value] of Object.entries(actual.contour.attributes)) {
-      assert.ok(xml.includes(`${key}="${String(value).replaceAll('&', '&amp;').replaceAll('"', '&quot;')}"`))
-    }
-  }
+  const binding = assertSignedPointStandaloneAssociation(raw, xml)
+  assertSignedPointStandaloneGeometry(raw, binding)
   validateStandaloneSvgCaptureEvidence(raw.capture, { svgPath: raw.svgPath,
     pngPath: resolve(artifactDir, `${stem}.png`), root: raw.document.root })
   assert.deepEqual(raw.strokePixels, download.strokePixels)
-  assert.deepEqual(observeZeroAxisPixels(readFileSync(resolve(artifactDir, `${stem}.png`)), raw.reopened.at(-1).screenCTM), raw.strokePixels)
+  assert.deepEqual(observeZeroAxisPixels(readFileSync(resolve(artifactDir, `${stem}.png`)), binding.zeroAxis.screenCTM), raw.strokePixels)
   const native = JSON.parse(readFileSync(resolve(artifactDir, `${stem}-native.json`), 'utf8'))
   assert.equal(native.scenario, signedPolygonalScenario); assert.equal(native.group, layoutAnchorGroup); assert.equal(native.result, 'observed')
   assert.deepEqual(native.polygonalCases, evidence.polygonalCases.filter((entry) => entry.ambientDimension === ambientDimension))

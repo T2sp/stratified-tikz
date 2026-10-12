@@ -54,9 +54,11 @@ function fixture(t, phase = '31B', options = {}) {
   // The verifier independently checks generated post-key paint. Keep its real
   // oracle and transitive helpers in the isolated checkout so both the parent
   // identity import and each fresh verification worker load the same modules.
-  for (const file of ['standaloneSvgCapture.mjs', 'standaloneSvgCaptureContract.mjs', 'pointSourceVisibility.mjs', 'pointGeometricShapesContract.mjs', 'pointLayoutAnchorsContract.mjs', 'zeroAxisLiveCapture.mjs', 'zeroAxisLiveCaptureWorkflow.mjs', 'pointLayoutPendingPreparation.mjs', 'pointLayoutPendingFixture.mjs', 'pointLayoutPendingView.mjs', 'pointUnsupportedDiagnosticContract.mjs', 'pointNativeDrag.mjs', 'pointGeometricSelection.mjs', 'pointPaintOracle.mjs', 'pointCheckDiagnostics.mjs', 'pointResponsiveFraming.mjs', 'pointPolygonJoinContract.mjs', 'pointDashCapContract.mjs', 'pointDashCapMechanismContract.mjs', 'connectedLivePaintOracle.mjs', 'connectedPaintSampling.mjs']) {
+  for (const file of ['standaloneSvgCapture.mjs', 'standaloneSvgCaptureContract.mjs', 'pointSourceVisibility.mjs', 'pointGeometricShapesContract.mjs', 'pointLayoutAnchorsContract.mjs', 'signedPointStandaloneAssociation.mjs', 'zeroAxisLiveCapture.mjs', 'zeroAxisLiveCaptureWorkflow.mjs', 'pointLayoutPendingPreparation.mjs', 'pointLayoutPendingFixture.mjs', 'pointLayoutPendingView.mjs', 'pointUnsupportedDiagnosticContract.mjs', 'pointNativeDrag.mjs', 'pointGeometricSelection.mjs', 'pointPaintOracle.mjs', 'pointCheckDiagnostics.mjs', 'pointResponsiveFraming.mjs', 'pointPolygonJoinContract.mjs', 'pointDashCapContract.mjs', 'pointDashCapMechanismContract.mjs', 'connectedLivePaintOracle.mjs', 'connectedPaintSampling.mjs']) {
     cpSync(join(automationDir, '..', file), join(cwd, 'scripts', file))
   }
+  mkdirSync(join(cwd, 'src/rendering'), { recursive: true })
+  cpSync(join(automationDir, '../../src/rendering/svgRenderSort.ts'), join(cwd, 'src/rendering/svgRenderSort.ts'))
   const runner = join(localAutomationDir, 'run-phase.mjs')
   for (const [file, source] of Object.entries(options.initialFiles ?? {})) {
     writeFileSync(join(cwd, file), source)

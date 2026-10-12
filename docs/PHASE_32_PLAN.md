@@ -1,5 +1,69 @@
 # Phase 32 Plan: Point-node math, paint, geometric shapes, and layout
 
+Authenticated standalone correspondence follow-up (2026-10-12): clean entry HEAD
+is `ff72e61c43ebc2da3f09513b023e89543719aa3c`, fingerprint
+`cb929c9a5ae2c113fb9a059ad24665ffc7c521575d48e809432bd85b43eb2e11`.
+The live-capture correction and both modules are tracked and preserved. Actual
+before-image mapping, immutable byte inventories, preservation spans, current
+tracked/untracked identity and final reports are retained under
+`/private/tmp/stz-32d-standalone-correspondence-20261012/HANDOFF.json`.
+
+The browser-capable `BjrAYN` parent passes tests/build/diff/label-assets, sixteen
+completed cumulative groups, six predecessor 32D scenarios, six 2D polygonal
+observations, all five trusted native zero-axis actions and the separate live PNG
+oracle. Its 1700×1300, 36,882-byte live PNG, SHA256
+`fab81d376069bb3ab3ee08b17a5e89b8db34ea2589ffeeee3b3e13d81cfa26b3`,
+has 632 magenta pixels and complete local extrema. The inherited toolbar
+restoration and owned cleanup remain complete. The failure is the first actual
+downloaded/reopened standalone SVG's index-paired contour assertion before image
+capture. That raw before-image has no standalone capture record or PNG.
+
+Production sorts the seven point nodes by layer/ID: actual DOM→model indices
+are `[5,4,0,1,3,2,6]`. Sanitized blank titles cannot authenticate ownership, and
+the old raw `shape` fields copied expectations. The scoped observer/helper now
+keeps native pre-export IDs/order, immutable model/click/expected order and native
+reopened document ordinals separate. Unique outer projected placements provide
+an independent cross-check, with separately derived associations/rejection
+reasons persisted before assertions or image work. Both caller and parent
+reconstruct current source/request/owner/revision and canonical-order ownership
+before exact contour/body/outer comparisons. Parent replay binds attributes to
+their exact file-local group structure. Standalone pixel replay uses the unique
+authenticated zero-axis node's current finite invertible reopened screenCTM.
+
+Independent retained synthetic replay also exposed acceptance of a changed SVG
+root transform with stale native matrices/PNG. The preliminary strict run was
+interrupted at its test stage (exit 130, incomplete); it establishes no acceptance.
+The final scoped guard binds full native/file root attributes and the reopened
+CTM frame to the capture's first measurement, with root transform/CSS/opacity
+corruptions rejected. Exact before/after evidence remains in the handoff's
+`root-transform-fixture/manifest.json`. Capture helpers are unchanged.
+
+Faithful fixtures retain declared IDs/layers/positions/styles/text and stripped
+metadata while using actual DOM order, distinct projected placements and local
+geometry. Missing/duplicate/foreign/stale/ambiguous associations, wrong structural
+ownership, swapped geometry with all values still present, and invalid zero-axis
+CTM/file/PNG proof fail closed. New records are required in existing standalone
+artifacts and isolated verifier copies. Historical failure evidence stays intact.
+The [implementation audit](PHASE_32D_IMPLEMENTATION.md) records details and exact
+preservation of production/references, 65 live and 55 background controls, native
+input, capture helpers, both live modules and strict pixel oracle. No dependency
+or production change is included. Final-helper focused controls pass 61/61 and
+the complete policy/runner sweep 761/761; preserved native/pending/standalone
+controls pass 332/332, and geometry/reference/model/TikZ controls
+566/566. Focused sweeps overlap the full suite. Strict TypeScript, preliminary
+build and changed-script lint/syntax/diff pass; final frozen-tree required checks
+and reproduced four-error inherited lint debt are reported in the external handoff.
+
+Phase 32 remains **incomplete**. Require fresh strict verification of all eighteen
+groups/nine scenarios, twelve polygonal cases, both native/live/new transparent
+seven-node standalone workflows, both fifteen-entry pending workflows and final
+standalone before independent read-only completion review and the post-review
+matching-tree guard. `BjrAYN` has no new-scenario terminal pass; first standalone
+PNG, remaining 3D work, both pending cases and final standalone are unexecuted.
+Child startup restrictions or historical partial results cannot close those
+gates. Failed/incomplete verification stops before review/commit; commit/push
+remain with the parent. Earlier entries below retain historical results.
+
 Unobstructed native zero-axis live capture follow-up (2026-10-12): the actual
 starting checkout is clean at `ae8cea9b8c2a7c6535e7d1a611415272cd9dbe76`,
 fingerprint `70d53968dde5d7a4029316bb7c2625d0e45eea22d545201a35fa3e493d769490`.

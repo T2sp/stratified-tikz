@@ -25,6 +25,9 @@ import { preparePendingLayoutPoint, capturePendingLayoutPreparation,
 import { changePendingLayoutView } from './pointLayoutPendingView.mjs'
 import { observeZeroAxisCapture } from './zeroAxisLiveCapture.mjs'
 import { captureZeroAxisLive, isZeroAxisLiveCaptureFailure, markZeroAxisLiveCaptureFailure } from './zeroAxisLiveCaptureWorkflow.mjs'
+import { observeSignedPointPreExport, observeSignedPointReopening, signedPointRenderOrderProof,
+  createSignedPointAssociationCandidate, assertSignedPointStandaloneAssociation,
+  assertSignedPointStandaloneGeometry } from './signedPointStandaloneAssociation.mjs'
 
 const paint = { text: { color: '#203040', opacity: 1 }, fill: { enabled: true, color: '#d8ecff', opacity: .7 },
   stroke: { enabled: true, color: '#203040', opacity: 1, width: .4, lineStyle: 'solid', dashPhase: 0, lineCap: 'butt', lineJoin: 'miter' } }
@@ -873,47 +876,36 @@ export async function runPointLayoutAnchorChecks({ browser, origin, artifactDir,
       await page.getByLabel('SVG export background', { exact: true }).selectOption('transparent')
       await page.evaluate((ids) => window.stzAppLabels.armPointExportClick(ids), fixture.diagram.strata.map(({ id }) => id))
       const beforeExportState = await state()
-      await observe(`${stem}-before-export-click`, { group, result: 'observed', beforeExportState, expected })
+      const preExport = await page.evaluate(observeSignedPointPreExport)
+      preExport.renderOrderProof = signedPointRenderOrderProof
+      await observe(`${stem}-before-export-click`, { group, result: 'observed', beforeExportState, expected, preExport })
       const { event: download } = await event(stem, 'download', () => page.getByRole('button', { name: 'Export current diagram view as SVG', exact: true }).click())
       const click = await page.evaluate(() => window.stzAppLabels.pointExportClick())
       const svgPath = resolve(artifactDir, `${stem}.svg`); await download.saveAs(svgPath)
       const xml = await readFile(svgPath, 'utf8'), fileUrl = pathToFileURL(svgPath).href
       const standalone = await context.newPage()
       const raw = await capturePointLayoutStandalone({ standalone, artifactDir,
-        details: { scenario: stem, group, background: 'transparent', ambientDimension, svgPath, fileUrl, pageErrors, expected, click, outputs, xml, savedJson, beforeExportState },
+        details: { scenario: stem, group, background: 'transparent', ambientDimension, svgPath, fileUrl, pageErrors, expected, click, outputs, xml, savedJson, beforeExportState, preExport },
         observe: (candidate) => observe(`${stem}-standalone-observed`, { group, result: 'observed', candidate }),
-        reopen: async (standalone) => standalone.evaluate((expected) => {
-          const clean = (element) => ({ tag: element.localName, attributes: Object.fromEntries([...element.attributes].filter(({ name }) => !name.startsWith('data-') && name !== 'pointer-events').map(({ name, value }) => [name, value])) })
-          const bodies = [...document.querySelectorAll('g > title')].filter((title) => title.textContent === '')
-          const reopened = bodies.map((title, index) => {
-            const body = title.parentElement, node = body.parentElement
-            const contour = [...node.children].find((element) => element.localName === 'path' && element.hasAttribute('stroke') && element.getAttribute('stroke') !== 'none')
-            const matrix = contour?.getScreenCTM()
-            return { source: title.textContent, shape: expected[index]?.shape, contour: contour && clean(contour), nodeTransform: node.getAttribute('transform'), bodyTransform: body.getAttribute('transform'),
-              screenCTM: matrix && Object.fromEntries(['a', 'b', 'c', 'd', 'e', 'f'].map((key) => [key, matrix[key]])), errors: document.querySelectorAll('parsererror,foreignObject,image,script').length }
-          })
-          const root = document.documentElement
-          return { reopened, document: { root: { localName: root.localName, namespace: root.namespaceURI,
-            width: root.getAttribute('width'), height: root.getAttribute('height'), viewBox: root.getAttribute('viewBox') },
-            forbiddenCount: document.querySelectorAll('parsererror,foreignObject,image,script,[data-svg-export-exclude]').length,
-            externalReferences: [...document.querySelectorAll('[href]')].map((element) => element.getAttribute('href')).filter((href) => !href.startsWith('#') || !document.getElementById(href.slice(1))),
-            backgroundCount: document.querySelectorAll('[data-stratified-tikz-export-background]').length } }
-        }, expected),
-        assertReopened: ({ reopened, requests, document }) => {
-          assert.equal(reopened.length, expected.length)
-          for (const [index, actual] of reopened.entries()) {
-            assert.equal(actual.source, ''); assert.equal(actual.errors, 0)
-            assert.deepEqual(actual.contour, expected[index].rendered.contour)
-            assert.equal(actual.nodeTransform, expected[index].rendered.nodeTransform); assert.equal(actual.bodyTransform, expected[index].rendered.bodyTransform)
-          }
+        reopen: async (standalone) => {
+          const observation = await standalone.evaluate(observeSignedPointReopening)
+          const association = createSignedPointAssociationCandidate({ expected, click, beforeExportState,
+            savedJson, preExport, ...observation, fileUrl })
+          return { ...observation, association }
+        },
+        assertReopened: (candidate) => {
+          const { requests, document } = candidate
+          const binding = assertSignedPointStandaloneAssociation(candidate, xml)
+          assertSignedPointStandaloneGeometry(candidate, binding)
           assert.deepEqual(requests, [fileUrl]); assert.equal(document.forbiddenCount, 0)
           assert.deepEqual(document.externalReferences, []); assert.equal(document.backgroundCount, 0)
         } })
-      raw.strokePixels = observeZeroAxisPixels(await readFile(resolve(artifactDir, `${stem}.png`)), raw.reopened.at(-1).screenCTM)
+      const { zeroAxis } = assertSignedPointStandaloneAssociation(raw, xml)
+      raw.strokePixels = observeZeroAxisPixels(await readFile(resolve(artifactDir, `${stem}.png`)), zeroAxis.screenCTM)
       await writeFile(resolve(artifactDir, `${stem}-standalone.json`), JSON.stringify(raw, null, 2) + '\n')
       await observe(`${stem}-standalone-pixels-before-assertion`, { group, result: 'observed', raw })
       assertZeroAxisPixelEvidence(raw.strokePixels)
-      downloads.push({ scenario: stem, group, background: 'transparent', ambientDimension, expected, click, outputs, savedJson, beforeExportState,
+      downloads.push({ scenario: stem, group, background: 'transparent', ambientDimension, expected, click, outputs, savedJson, beforeExportState, preExport,
         capture: raw.capture, strokePixels: raw.strokePixels })
       await page.evaluate(() => window.stzAppLabels.releasePointExportClick())
     }

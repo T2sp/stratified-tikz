@@ -1,273 +1,291 @@
-# Phase 32D Fix for authenticated standalone point correspondence
+# Phase 32D Fix for bounded lossless evidence publication
 
 ## Objective and scope
 
-Continue from the implemented geometry, root/background native input and separate
-unobstructed live-capture lifecycle. The newest parent passes the2D zero-axis
-native sequence and strict live PNG proof, then rejects the first standalone
-SVG because the checker pairs DOM order with model order.
+Continue from the implemented geometry, native input, live-capture lifecycle
+and authenticated standalone DOM-to-model association.
+The newest parent completes2D image inspection and UI/resource restoration,
+then times out saving final live evidence under the existing5,000ms deadline.
 
-Correct the scoped standalone identity/order association in observations,
-caller assertions, parent raw/file replay and faithful fixtures.
-Keep real SVG document order and immutable model/click expectation order distinct;
-bind each actual node to its authenticated point before exact contour/placement
-comparison. Resolve the zero-axis pixel CTM through that binding too.
+Correct the scoped evidence persistence/publication path.
+Keep every measured observation and strict acceptance check, while avoiding
+repeated serialization/writing of unchanged large capture/native/cumulative
+documents inside each bounded boundary.
+Use immutable, replayable artifacts/references and owned ordered publication;
+a timed-out writer must not later overwrite newer failed/terminal state.
 
-Limit changes to these evidenced standalone harness/contract/fixture branches,
-necessary isolated runner copies and Phase32 status documents.
-Preserve production rendering/export order, metadata sanitization, geometry,
-paint/picking, camera/model coordinates, raw text/units, saved version2,
-authenticated references and complete-root capture helpers.
-Do not repeat the resolved live-capture fix or alter the generated SVG/model
-to make the checker indices align.
-Any later production change needs separately retained independent evidence.
+Limit changes to evidence serialization/storage/publication, necessary caller/
+reporter/parent-loader integration, meaningful persistence regressions, isolated
+runner copies and Phase32 status documentation.
+Preserve production/reference bytes, native UI/input behavior, full-stroke
+measurements, one actual PNG, strict pixel oracle, complete-root standalone
+capture helpers and authenticated association semantics.
+Do not reopen geometry, selection, correspondence or toolbar preparation to
+pass an evidence-write deadline.
 
 Read `AGENTS.md`, `prompts/phase-32d-implement.md`,
 `prompts/phase-32d-review.md`, `docs/PHASE_32D_IMPLEMENTATION.md` and
-`docs/PHASE_32_PLAN.md`. Inspect the actual downloaded SVG and raw reopened nodes.
+`docs/PHASE_32_PLAN.md`. Inspect the exact retained artifacts and persistence
+call chain before choosing the smallest lossless change.
 Maintain cumulative strict verification, verification-before-review/commit and
 the post-review matching-tree guard. Phase32 remains incomplete.
 
 ## Latest handoff, parent failure and identity
 
-Implemented live-capture handoff:
-`/private/tmp/stz-32d-live-capture-fix-20261012/HANDOFF.json`.
-Its preservation audit, native-input/pixel-oracle span audit, exact inventories,
-65 new regression controls, retained obstruction records and logs remain evidence.
-Child strict report:
-`/var/folders/vk/7kf940pd4bx8f6cg3rzlmtc80000gn/T/stz-phase32d-manual-3rUZue/verification.json`.
+Implemented correspondence handoff:
+`/private/tmp/stz-32d-standalone-correspondence-20261012/HANDOFF.json`.
+Keep its61 new controls, file-local replay/placement proof, preservation audits
+and current association module. Child strict report:
+`/var/folders/vk/7kf940pd4bx8f6cg3rzlmtc80000gn/T/stz-phase32d-manual-ipYoJ9/verification.json`.
 
 Newest parent verifier:
-`/var/folders/vk/7kf940pd4bx8f6cg3rzlmtc80000gn/T/stz-phase-verifier-qlY8X8/response.json`.
+`/var/folders/vk/7kf940pd4bx8f6cg3rzlmtc80000gn/T/stz-phase-verifier-hdS5Co/response.json`.
 Strict report:
-`/var/folders/vk/7kf940pd4bx8f6cg3rzlmtc80000gn/T/stz-phase32d-before-review-BjrAYN/verification.json`.
-Current browser evidence is under its `05-check-free-labels/artifacts/`:
+`/var/folders/vk/7kf940pd4bx8f6cg3rzlmtc80000gn/T/stz-phase32d-before-review-tBkjSj/verification.json`.
+Current artifacts are under its `05-check-free-labels/artifacts/`:
 
 - `free-labels-evidence.json` and ordered diagnostics.
-- `point-layout-signed-polygonal-zero-axis-2d-native.json`,
-  `...-2d-live-capture.json` and `...-2d-live.png`.
-- `point-layout-signed-polygonal-zero-axis-2d.svg`,
-  `...-2d-saved.json`, both `...-2d-standalone.tex`/`...-2d-inlineMath.tex`,
-  and `...-2d-standalone.json` containing persisted reopening observations/error.
-- `point-layout-failure.json` and `point-layout-app-failure.json`.
+- `point-layout-signed-polygonal-zero-axis-2d-live-capture.json`,
+  `...-2d-native.json` and `...-2d-live.png`.
+- `point-layout-failure.json` and `point-layout-app-failure.json`,
+  containing the outer timeout and owned live-capture failure observations.
 
 Branch: `phase/32d-margin-minsize-anchor`.
-HEAD: `ae8cea9b8c2a7c6535e7d1a611415272cd9dbe76`.
+HEAD: `ff72e61c43ebc2da3f09513b023e89543719aa3c`.
 Pre-prompt tree matches the parent's before/after checkout:
 
 ~~~text
-41c77a3e38ab8a5a712cf2b17b0888c7a89fa1fef663d8dc00972ec6eb16c558
+71e315fcd7f14234def03fa404d6dc19d080089266049bfbc23e38fe9d32fcbe
 ~~~
 
 Tracked-diff SHA256:
-`88995113e6660971c3c23b601905cf7255c78f8bcf5cc1a7a372049e99cd0b37`.
-Preserve seven modified tracked files: both Phase32 status documents;
-`scripts/checkFreeLabels.mjs`, `scripts/checkPointLayoutAnchors.mjs`,
-`scripts/pointLayoutAnchorsContract.mjs`,
+`5c118e4e291911c57b8ecfe06d64cae2248243e54342e438f4abc500ba755944`.
+Preserve six modified tracked files: both Phase32 documents;
+`scripts/checkPointLayoutAnchors.mjs`, `scripts/pointLayoutAnchorsContract.mjs`,
 `tests/scripts/phase32dVerification.test.mjs` and
 `tests/scripts/runPhaseRunner.test.mjs`.
-Preserve both untracked modules and exact bytes:
-`scripts/zeroAxisLiveCapture.mjs` and `scripts/zeroAxisLiveCaptureWorkflow.mjs`.
-Keep the prior494-file reference/test inventory in HEAD and all production files.
-Use the handoff's exact inventories/hashes. The prompt changes tree identity;
-capture actual current tracked/untracked bytes for all future acceptance.
+Preserve the untracked `scripts/signedPointStandaloneAssociation.mjs`:
+SHA256 `509f70fb773714ef88306da199dfcef5ba67e4e80a49fcab858bc55ef142d5cd`.
+The earlier two live-capture modules and494 reference/test files are now in HEAD.
+Use exact handoff inventories/hashes and preserve prior work.
+The prompt changes identity: capture actual current tracked/untracked bytes
+rather than treating this fingerprint as future acceptance.
 
 | Retained evidence | Actual result |
 | --- | --- |
-| Latest implementation child | 6,775/6,775 tests passed, zero failures/skips; build/diff, focused strict TypeScript, changed-script lint/syntax passed.65 new capture regression controls,55 background controls retained. Focused sweeps overlap. Four inherited lint errors remain. Strict/direct browser startup stopped at localhost EPERM before Chrome. |
-| BjrAYN parent | Tests/build/diff/label-assets passed; free-labels failed during first2D standalone reopening assertions. Sixteen of18 cumulative groups completed,17 started. Combined layout incomplete, final standalone unexecuted; pageErrors empty. |
-| Current progress | Six32D predecessor scenarios terminal-pass. Six2D signed polygonal observations, zero-axis five native actions and owned live PNG lifecycle completed. Standalone fixture JSON saved/reloaded, both TikZ artifacts produced, actual SVG downloaded and externally reopened. |
-| Remaining | First standalone PNG/capture and its pixel proof are not executed. New3D cases/live/download, both pending scenarios and final standalone remain unexecuted. The new scenario has no terminal pass or complete parent raw-policy acceptance. Independent completion review has not begun; no child commit/push. |
+| Implementation child | 6,836/6,836 tests passed, zero failures/skips;61 new association controls. Build/diff, strict TypeScript, changed-script lint/syntax passed. Four inherited lint errors remain. Browser startup stopped at localhost EPERM before Chrome. Focused counts overlap. |
+| tBkjSj parent | Tests/build/diff/label-assets passed; free-labels failed saving final2D live evidence. Sixteen of18 cumulative groups completed,17 started. Six predecessor32D scenarios terminal-pass; combined layout incomplete and final standalone unexecuted. PageErrors empty. |
+| Capture progress | Five2D trusted native actions, one PNG, internal strict pixel assertion, native toolbar expansion/restoration and resource cleanup completed. Final capture lifecycle assertion/normal return did not execute after persistence timeout. |
+| Remaining | Caller native-before-assertion and new standalone fixture were not reached. Both new standalone downloads/association/file replay, new3D cases/live/download, both pending scenarios and final standalone remain unexecuted in this run. Independent completion review has not begun; no child commit/push. |
 
-qsihsK's toolbar obstruction and Ab9guh's root-only rejection are resolved
-predecessor evidence. HMy8AM acceptance/review is historical.
-The latest parent launched Chrome and progressed to an actual downloaded file;
-do not report it as child startup EPERM or as failing the live pixel oracle.
-Partial historical acceptance cannot replace fresh complete verification.
+BjrAYN's ordering mismatch and qsihsK/Ab9guh blockers remain history.
+The association fix is implemented and registered but has no new native
+standalone acceptance in tBkjSj.
+Do not substitute prior partial results or child startup EPERM for the actual
+parent persistence failure. A restored diagnostic name is not a terminal pass.
 
-## Exact observed standalone mismatch
+## Exact observed persistence boundary
 
-The2D live PNG now passes the unchanged strict oracle:
-1700×1300,36,882 bytes,632 magenta pixels,
-local y−34.02419354838708..33.71774193548388, with screenCTM
-(a=d3.1,b=c0,e1296.4,f268.975).
+Primary error:
+
+~~~text
+Timed out after 5000ms during Zero-axis live restored-after-image-attempt evidence
+~~~
+
+`captureZeroAxisLive` in `scripts/zeroAxisLiveCaptureWorkflow.mjs` calls the
+final `persist('restored-after-image-attempt')` after native restoration and
+resource observation. `boundedPointDiagnostic` in
+`scripts/pointCheckDiagnostics.mjs:13` supplies the deadline error.
+
+The same2D PNG as BjrAYN is retained:36,882 bytes,1700×1300,632 magenta pixels,
+local y−34.02419354838708..33.71774193548388 and valid narrow stroke bounds.
 SHA256:
 
 ~~~text
 fab81d376069bb3ab3ee08b17a5e89b8db34ea2589ffeeee3b3e13d81cfa26b3
 ~~~
 
-The current records prove one measured native toolbar collapse, one PNG,
-stable state/geometry, inherited expanded toolbar restoration, no secondary
-errors and cleared owned registries. Preserve that complete lifecycle.
+Current records contain one native Collapse and one native Expand, inherited
+expanded toolbar restored, stable protected state/geometry, cleared registries,
+listeners0 and no native action/restoration/secondary errors.
+The internal pixel assertion returned successfully before the final persist.
+The timeout prevents the final `assertZeroAxisLiveCapture` and normal return;
+do not call the complete capture lifecycle accepted.
 
-The first standalone `expected` array remains in model/fixture order.
-All seven nodes have empty source/title and layer0.
-Actual exported/reopened DOM order follows production's layer/ID ordering:
+`retainLive` at `scripts/checkPointLayoutAnchors.mjs:826–832` sequentially
+serializes/writes full live, full native including live, then calls `observe`.
+`observe` in `scripts/checkFreeLabels.mjs:87–91` appends a diagnostic/checkpoint
+and calls `save`, which rewrites the entire accumulated report.
 
-| DOM ordinal | Actual point ID inferred from authenticated placement/order | Model expected index | Outer transform |
-| --- | --- | --- | --- |
-| 0 | signed-dart | 5 | translate(356 84) |
-| 1 | signed-isosceles-triangle | 4 | translate(228 84) |
-| 2 | signed-regular-polygon | 0 | translate(100 212) |
-| 3 | signed-square | 1 | translate(228 212) |
-| 4 | signed-star | 3 | translate(100 84) |
-| 5 | signed-triangle | 2 | translate(356 212) |
-| 6 | signed-zero-axis | 6 | translate(484 84) |
+| Retained file | Bytes |
+| --- | --- |
+| 2D live-capture JSON | 74,465,740 |
+| 2D native JSON | 130,844,920 |
+| Cumulative free-labels evidence JSON | 255,833,911 |
 
-`src/rendering/SvgDiagram.tsx:572–574` sorts render items with
-`compareSvgRenderItems`. `src/rendering/svgRenderSort.ts` orders these points
-by layer then ID, not stratum array position.
-`src/ui/svgPreviewExport.ts` deep-clones in-place and strips data/aria metadata.
-The standalone SVG has no point IDs; seven blank titles cannot identify owners.
+One boundary therefore includes about461 MB of full-document writes plus
+serialization under a single5s wrapper. The report contains4,223 diagnostics
+and189 evidence entries. Several older direct embedded native-interaction/
+overflow entries are large; new live diagnostic stubs alone are small.
+A capture snapshot retains640 full-stroke samples with up to16 hit-stack
+descriptors each, repeatedly duplicated across lifecycle snapshots.
+The existing `createPointDiagnostics` already persists separate raw artifacts
+and small report references; retain that useful mechanism.
 
-`scripts/checkPointLayoutAnchors.mjs:887–892` collects blank `g > title` bodies
-in document order and stamps `shape: expected[index]?.shape` onto them.
-That shape field is copied expectation metadata, not an observed shape.
-At line906 it compares the first actual dart to model-index0 regular polygon.
-Actual dart path begins `M -15.229339599609 0 L 8.538153076172 9.844427490234`
-with body/contour transform `translate(5.821307373046876 0)`.
-Expected regular polygon begins `M 0 12 L 11.412678195542 3.708203932499`
-with transform `translate(4.623168735846111e-16 -7.55020751953125)`.
+Large repeated persistence is the supported likely cause. Individual
+serialization/write durations were not recorded, so do not assign the timeout
+to one particular file or claim a measured throughput.
+Add bounded byte/operation/duration observations for the changed path.
 
-Every actual contour/node/body transform matches its proper counterpart in the
-retained expected set. This supports an association defect, not bad dart or
-polygon geometry. Do not claim the raw `shape` field authenticated those owners.
+The saved live raw record lacks the subsequently installed timeout primary;
+outer failure records contain the error.
+The bounded helper owns late rejections but cannot cancel its operation.
+Source therefore permits a late timed-out retain/report write to race with
+outer failure publication; the retained report does not prove that race
+actually overwrote failure state.
+The fix must explicitly own late completion and durable terminal publication.
 
-Failure is at caller `assertReopened` line906, through
-`capturePointLayoutStandalone` line105/caller882, before
-`captureStandaloneSvg` line107.
-The raw candidate already retains all seven reopened nodes, the exact fileURL/
-XML, no forbidden content/background, no standalone/cleanup errors and the
-primary assertion. It has no `capture` record/new standalone PNG.
-Preserve this before-image evidence distinction.
+## Scoped lossless publication fix
 
-## Scoped authenticated correspondence
+Inspect the actual `retainLive → observe → save` path, lifecycle persist/error
+ownership, direct large32D diagnostic payloads and parent raw-artifact readers.
+Choose a small lossless representation/publication change supported by measured
+payload structure, not a generic renderer/storage rewrite.
 
-Inspect the signed-polygonal standalone caller/reopen observer, its immutable
-saved/click/expected records, `assertSignedPolygonalStandaloneEvidence` in
-`scripts/pointLayoutAnchorsContract.mjs` and the parent runner's raw-file replay.
-Keep `capturePointLayoutStandalone` and `captureStandaloneSvg` unchanged.
+Freeze/own each evidence boundary before asynchronous publication.
+Keep exact measured state/history/selection/revision/source/request/owner,
+camera/UI/viewport/scroll/CTMs, all640 samples and their hit stacks, native
+events/action ordering, image bytes/hash/frame, restoration and cleanup records.
+Do not trim samples, drop state fields, replace raw data with flags/hashes alone
+or alter comparisons to compensate for absent observations.
 
-Keep all seven model points/IDs/positions/styles/sources in their existing
-declared order. Keep `expected`, saved strata and click-time point order unchanged.
-Retain reopened nodes in actual SVG document order with explicit DOM ordinal,
-native source, contour attributes, outer/body transforms, screenCTM and errors.
-Do not relabel raw observations with `expected[index].shape`.
+Persist unchanged repeated snapshots/state/descriptor data once in immutable
+artifacts or lossless tables with explicit references. Retain every referenced
+byte and sufficient schema/path/hash/length/identity information for deterministic
+parent replay. Reconstruct original values exactly before existing assertions.
+Do not equate similar owners/points, coalesce changed snapshots or lose boundary
+timestamps/order when sharing data. Preserve exact distinctions and provenance.
 
-Build an explicit one-to-one association independent of the contour being
-tested. For this fixture, authenticate the point IDs/order in the current
-pre-export App SVG and validate against immutable model/click/source/request/
-owner/revision and the source-proven point layer/ID render order.
-Use the unique captured outer projected placements as an independent cross-check
-against the actual reopened nodes. All seven placements are distinct.
-Record each derived expected-ID/index ↔ actual-DOM-ordinal/placement relationship
-separately from raw observations and retain the evidence establishing uniqueness.
+Avoid rewriting full live and full native documents at every stage, or embedding
+the entire live lifecycle again in native/failure/report records.
+Avoid serializing/writing the accumulated large browser report on every scoped
+capture boundary. Publish durable compact boundary/index records referring to
+fully retained raw data, then consolidate required terminal reports through
+the owned publication path.
+If direct earlier32D entries inflate the report, externalize them losslessly
+with compatible resolution rather than changing unrelated31F/32A behavior.
+Keep the existing group/scenario/checkpoint/history and artifact-inclusion semantics.
 
-The sanitized file cannot supply stripped point-ID metadata. Mark correlated
-ID/shape fields as derived, never as native observations.
-Do not add metadata/titles, change fixture IDs/layers/text/positions, reorder the
-model, change the renderer comparator or edit downloaded SVG bytes to create an
-identity mechanism. Do not rely on blank titles, assumed model-order indices,
-shape names copied from expectations or selecting whichever contour matches.
+Necessary raw artifacts/refs must be completely written and authenticated
+before their boundary is published or normal preparation/test/acceptance
+assertions and native actions proceed. Owned native restoration/resource cleanup
+must still be attempted after publication failure, preserving primary/secondary
+errors and withholding acceptance; a stalled sink must not prevent cleanup.
+Required final/restored evidence must complete before lifecycle
+validation/normal return or any scenario/group is marked passed.
+No fire-and-forget write, skipped final evidence, optional record, swallowed
+deadline or success flag may establish acceptance.
 
-Require exactly one current expected owner and one actual group per association,
-full seven-owner coverage, unique ordinals/placements, no duplicate/missing/
-foreign/ambiguous candidate and source-proven current ordering.
-Validate group/body/contour structural ownership, connected current SVG/root and
-actual observed placement before geometry comparison.
-Persist raw reopening and association candidates before validation/image work,
-including unassignable candidates and their failure reasons.
-Retain bounded primary/secondary error handling, request/page/listener cleanup
-and exact file identity.
+Keep the existing5,000ms boundary and native/image deadlines.
+Do not merely raise the deadline, retry the screenshot, split the same unchanged
+bulk write into extra fresh deadlines, add heap/concurrency flags or move required
+evidence into an unbounded post-success/background task.
+Reduce repeated work and demonstrate real publication stays bounded.
+Record operation counts/retained bytes/durations without embedding large payloads
+back into progress summaries.
 
-Then compare each associated actual contour and body/outer placement to its
-own immutable expected point with the existing exact assertions.
-Retain paint attributes, signed anchors, zero-axis traversal, source, transforms
-and all forbidden/external/background checks.
-An association must not consume or overwrite the field whose correctness is
-being tested: do not match by path `d`, expected paint or body/anchor transform.
-Outer projected placement is independent of those fitting/clearance attributes.
+Own serialization/publication with a serial or generation-aware lifecycle.
+After timeout/failure, late fulfillment/rejection must remain handled and may
+not mutate frozen boundary observations, replace newer files/checkpoints,
+restore a report to running, publish acceptance or overwrite primary errors.
+Separate immutable boundary bytes from authoritative current/failed/terminal
+index state; commit references only while the owner remains valid.
+Retain the original primary Error object, bounded secondary errors and current
+failed disposition. An orphan/late artifact is not committed acceptance.
+Do not deadlock native cleanup on a stalled publisher or abandon owned resources.
 
-Update BOTH caller reopening assertions and parent raw-policy replay.
-Parent validation must independently reconstruct/validate the association
-against immutable saved/click/pre-export order/placement and actual file-local
-group structure, not trust a stored success flag or derived ID alone.
-Bind each observed contour/body/outer transform to the corresponding actual
-node in the exact downloaded XML. Global `xml.includes(attribute)` assertions
-prove only that a value occurs somewhere and cannot establish node ownership.
-Keep real document ordinals/order and exact SVG/PNG byte/path/root identity.
-Use a small testable pure association helper where useful; add no dependency
-or unrelated generalized SVG/model rewrite.
+Retain raw observations before assertions/image work and exact primary failure/
+restoration evidence afterward. A final evidence timeout must still preserve
+the actual successful image/UI measurements and the new error in an authoritative
+failure record; do not retrofit the error into previously frozen historical data.
+Keep one actual image/no extra failure screenshot and exact inherited toolbar,
+selection, model/history/UI and resource restoration.
 
-Find the unique authenticated `signed-zero-axis` association for standalone
-pixel replay. Use that actual node's fresh reopened screenCTM in BOTH caller
-and parent byte replay. Replace `raw.reopened.at(-1)` assumptions.
-Require current finite invertible CTM and the zero-axis path/placement bound to
-that owner. Last array position, magenta pixels alone or a CTM copied from the
-live App capture cannot establish standalone ownership.
-Keep `observeZeroAxisPixels`/`assertZeroAxisPixelEvidence` unchanged.
+## Parent replay, faithful regressions and acceptance
 
-## Faithful regressions and remaining acceptance
+Integrate referenced evidence into the caller/report/parent policy with explicit
+schema and strict resolution. Validate referenced artifact existence, exact
+bytes/hash/length/path/current tree/stage identity, ordering and complete
+coverage. Missing, stale, truncated, conflicting or unauthenticated refs fail.
+Do not trust a compact summary without resolving its raw proof.
 
-`tests/scripts/phase32dVerification.test.mjs:519–541` currently builds reopened
-records/SVG by mapping model-order `download.expected`. Update the synthetic
-fixture to authentic renderer/DOM order while preserving model/click/expected
-order and distinct faithful projected placements.
-Represent pre-export observed IDs/order separately from stripped-file groups
-and separately derived associations. Preserve the actual blank titles/metadata
-sanitization rather than injecting IDs into synthetic exported SVG.
+Preserve existing public validation semantics after resolution:
+all18 cumulative groups, all nine32D scenarios, complete started/completed/
+unexecuted accounting, exact native/lifecycle assertions and real file/PNG replay.
+Keep `assertLayoutPostClickViewDiagnostic` and its parent call compatible:
+ordered before/immediate-input/after stage prefixes, exactly one accepted actual
+view diagnostic and last/terminal equality must survive referenced records.
+Do not make post-click view proof optional or flatten it to a final flag.
+Keep native/file-local association, immutable click/model order, actual DOM order,
+derived one-to-one ownership and zero-axis CTM replay exact.
 
-The old index-pairing must reject the faithful fixture; corrected authenticated
-association must pass exact contour/placement assertions in both dimensions
-and complete parent raw/file replay.
-Add compact corruption controls for missing/duplicate/foreign owners or groups,
-wrong/ambiguous placement, altered ordinal/order evidence, stale model/click/
-owner/request/revision, incorrect derived-ID/index bindings, wrong body/contour
-ownership and changed path/paint/anchor/outer transforms.
-A swapped geometry beneath otherwise valid projected owner placements must fail;
-matching the unordered set of shapes is insufficient.
+Current lifecycle tests in `tests/scripts/phase32dVerification.test.mjs` use a
+retain stub that clones records and throws immediately at a selected boundary.
+They do not exercise this real triple-write/cumulative reporter path.
+Add meaningful integration controls around the actual chosen writer/observe/
+publication path, using injected ordinary writers and deterministic gates/deadlines.
+Retain existing immediate-error tests.
 
-Include file/raw mismatches where all attribute values remain somewhere in the
-XML but contours are attached to the wrong point group. The parent must reject
-that structural corruption, not pass a global-string presence check.
-Include wrong/missing/duplicate zero-axis association and wrong/stale/nonfinite
-or foreign reopened CTM, plus unchanged blank/short PNG controls.
-Show pixel replay follows the authenticated zero-axis entry rather than the last
-raw entry when exercising association/raw ordering controls.
-Do not relax canonical-order/identity guards merely to accept arbitrary sorting.
-Keep focused cases meaningful and avoid redundant parameter multiplication.
+Verify lossless round-trip of faithful full-sample snapshots and exact
+state/history/events/source/owner fields through artifact resolution.
+Verify unchanged observations are serialized/written once and boundary/index
+writes remain compact, with no repeated full cumulative dump on each capture.
+Use operation/byte counts and controlled async gates rather than fragile
+machine-speed assertions or repeated hundreds-of-megabytes fixture allocation.
 
-Preserve all65 live-capture and55 background controls, completed native input,
-full-stroke measured conditional collapse, one actual CSS viewport PNG,
-correct screenCTM/scroll mapping, exact inherited UI restoration and owned
-failure/secondary cleanup. Keep both new capture modules and strict pixel oracle.
-The earlier synthetic heap allocation issue is resolved by structural sharing;
-keep normal concurrency/heap settings and complete controls.
+Add genuine stalled-final-writer timeout, late fulfillment, late rejection,
+failure publication competing with a late running write, missing/corrupt refs,
+wrong hash/length/owner/order and mutated-after-queue data controls.
+Test exact primary Error preservation, handled late rejection, no terminal
+success after timeout, authoritative failed record and complete cleanup.
+Keep both ambient dimensions, one PNG/no extra screenshot, inherited-collapsed
+no-action and expanded collapse/restore cases, resource registries and protected
+state invariants. Ensure the normal finalized artifact resolves to the same
+record consumed by parent lifecycle/native/file replay.
 
-Register any new tests/raw association records in existing policy/artifact
-requirements and isolated runner copies. Keep missing new proof fail-closed
-without retrofitting historical failure records.
+Keep the prior deterministic stalled-report injected ordinary-writer control,
+20ms test deadline, exact primary Error/nativeChecks, late rejection ownership
+and complete listener/page/browser/server cleanup.
+Use configurable test-only gates/deadlines for new timeout controls while
+production remains5s; do not create a flaky real-5s race.
+Preserve normal heap/concurrency and earlier structural-sharing fixture fix.
 
-Require all nine named32D scenarios, twelve polygonal selected-anchor cases,
-both zero-axis native/live sequences and both transparent new standalone
-downloads/reopening/complete PNG/TikZ, each with all six polygonal nodes plus
-the zero-axis node. Keep both existing fifteen-entry pending transparent/white
-workflows and final cumulative standalone acceptance.
-Production sorting and valid rendered order are preserved; no supported case
-may be dropped because of stripped identity metadata or child startup limits.
+Retain all61 correspondence,65 live-capture and55 background controls.
+Update necessary runner dependencies/artifact inventory/parent loader tests
+without dropping historical cases or making fresh raw proof optional.
+Preserve the association helper's source-proven pre-export IDs/order, unique
+outer placements, separate raw/derived identity, exact file-local contour/body/
+placement checks and owner-bound standalone CTM.
+Keep complete-root standalone helpers and strict pixel oracle unchanged.
 
-Keep every authenticated reference byte:
+Require both fresh zero-axis native/live lifecycles to return successfully
+with all required publications, all twelve polygonal cases, both seven-node
+transparent standalone downloads/reopening/complete PNG/TikZ, both fifteen-entry
+pending transparent/white workflows and final cumulative standalone acceptance.
+tBkjSj never reached the new association workflow; do not infer its acceptance
+from the absence of its old mismatch.
+
+Preserve every authenticated reference byte:
 original172 boxes/4,925 anchors/11 failure controls; signed-basic8 boxes/
 192 anchors;54 polygonal boxes/1,386 anchors;12 direct arithmetic controls;
 four dart fitting traces; one singular boundary control;
 eleven zero-axis PGF paths and37 independent rendering records.
-Preserve original32C and490 additive polygonal/zero-axis evidence files,
+Keep original32C and490 additive polygonal/zero-axis files,
 0.025pt anchor/0.03pt contour tolerances,0.005 precision and2048 finite-work budget.
 Retain signed fitting/clearance, narrow reciprocal math, ordered collapsed-axis/
 partial/reversed/rotated traversal, zero-area fill and dash/cap/join/closure.
-Keep registered geometry/rendering/reference/model/TikZ tests, both TikZ modes
-and2D z=0/3D active-work-plane semantics.
+Keep geometry/rendering/model/TikZ tests, both TikZ modes and2D z=0/3D active-plane
+semantics. Add no dependency without explaining why.
 
 ## Preserve completed corrections and contracts
 
@@ -278,7 +296,7 @@ Retain deterministic stalled-report injected ordinary-write recorder,20ms
 deadline, exact primary Error/nativeChecks count, two stalled failure writes,
 late rejection ownership and complete listener/page/browser/server cleanup.
 The earlier full6,425 test pass cleared that prior review failure; the latest
-registered suite passes6,775 tests. Do not loosen this deterministic control.
+registered suite passes6,836 tests. Do not loosen this deterministic control.
 
 Keep explicit resolved preview schema (six dimensions, anchor, effective font
 context) separate from exact authored units/source/context.
@@ -335,13 +353,13 @@ byte validation, artifact inventories, raw-policy checks and runner copies.
 ## Fresh verification, review and handoff
 
 Use strict TypeScript without `any`; keep module separation, codim convention,
-raw user text and model coordinates. Add no dependency without explaining why.
-Update Phase32 status documents to the actual standalone correspondence scope
-and observed current results, preserving completed live/native/geometry evidence.
+raw user text and model coordinates. Update Phase32 docs to the actual bounded
+lossless-publication scope, byte/duration observations and current outcomes,
+preserving implemented association/live/native/geometry history.
 Count overlapping focused sweeps honestly.
 
-Use Homebrew Node>=22.12.0. Run focused association/reopening/file-local replay/
-pixel-CTM/faithful fixture/parent-policy/runner checks and applicable preserved
+Use Homebrew Node>=22.12.0. Run focused actual persistence/publication/resolver/
+late-writer/error-ownership/parent-policy/runner checks and preserved association,
 live-capture, native, geometry/reference, pending, standalone and deterministic
 stalled-report controls.
 Run all required commands:
@@ -359,7 +377,8 @@ Four inherited lint errors remain: two geometric-caller no-unsafe-finally errors
 verifier unused _role and layers unused defaultCurveStyle.
 Report reproduced failed baseline checks separately from passing changed-file
 checks. Avoid unrelated cleanup or claiming unperformed checks.
-The earlier stalled-report race and fixture allocation failure are resolved.
+The older stalled-report race and fixture allocation failure are resolved;
+the current final live-publication timeout is a distinct observed blocker.
 
 Use a fresh owned browser-capable parent process/server, supported Playwright/
 Chrome and actual current tracked/untracked tree without committing:
@@ -368,36 +387,35 @@ Chrome and actual current tracked/untracked tree without committing:
 PATH=/opt/homebrew/bin:$PATH node scripts/automation/run-phase.mjs 32D verify
 ~~~
 
-Require all18 cumulative groups: twelve31F groups (already including final
-standalone), three32A groups and one each for32B paint/import,32C shapes/
-visibility/downloads and combined32D layout.
-Require all nine named32D scenarios, both native/live cases, all twelve polygonal
-cases, both new transparent downloads with exact owner/contour/placement/CTM
-binding and complete PNGs, both pending downloads/reopening/PNG/TikZ,
-native history/JSON persistence, valid exact artifacts and no page errors.
-Do not reuse BjrAYN's partial result, qsihsK/Ab9guh/HMy8AM history, scoped reports,
-synthetic tests or cleanup captures as complete acceptance.
+Require all18 groups: twelve31F (including final standalone), three32A and
+one each for32B paint/import,32C shapes/visibility/downloads and combined32D.
+Require all nine32D scenarios, finalized native/live/file proof, all referenced
+artifacts resolved exactly, both new transparent downloads/complete PNGs,
+both pending workflows/PNG/TikZ, native history/JSON persistence and no page errors.
+Do not reuse tBkjSj's partial/late-write diagnostics, older reports, scoped
+results or synthetic controls as complete cumulative acceptance.
 Do not skip predecessors or defer supported cases.
 
-Preserve implementation/fix clean-tree rules; do not reset/stash/discard/commit
-unfinished work to bypass them.
+Preserve clean-tree rules; do not reset/stash/discard/commit unfinished work
+to bypass them.
 If child startup encounters EPERM, retain failure/exact tree and pending parent
 native work without weakening acceptance. Obtain approved browser-capable
 execution where available.
-If another boundary fails, persist raw current geometry/identity/order/frame/
-file evidence before interpretation and report the next concrete blocker.
+If another boundary fails, retain actual stage/publication timing, current raw
+measurements, file identities and primary error before reporting the next blocker.
 
 After fresh required verification passes, obtain independent read-only completion
 review of the exact matching tracked/untracked tree using
 `prompts/phase-32d-review.md` and inspect actual reports/artifacts.
-Require prior geometry findings independently resolved, faithful native/live
-and standalone correspondence/paint/placement proof, full-suite success and
-complete cumulative acceptance. Keep post-review identity guard.
+Require prior geometry findings resolved, faithful native/live/association/file
+proof, complete lossless publication, full-suite success and complete cumulative
+acceptance. Keep post-review identity guard.
 Failed/incomplete verification stops before review/commit; needs_changes blocks
 completion/commit even when required tests/browser checks pass.
 
-Report the scoped association fix, meaningful regression controls, preserved
-production/reference/capture bytes, changed files, focused/full checks, baseline
-failures, exact tree/report identity and independent review result.
+Report the scoped persistence fix, lossless payload/write measurements,
+meaningful deadline/late-owner regressions, preserved production/reference/
+capture behavior, changed files, focused/full checks, baseline failures,
+exact tree/report identity and independent review result.
 Keep Phase32 incomplete until every gate passes.
 Leave commit/push to the parent after verification and review.

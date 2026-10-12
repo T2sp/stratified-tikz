@@ -1,5 +1,5 @@
 import assert from 'node:assert/strict'
-import { mkdtempSync, rmSync, writeFileSync, unlinkSync } from 'node:fs'
+import { existsSync, mkdtempSync, readFileSync, rmSync, writeFileSync, unlinkSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { pathToFileURL } from 'node:url'
@@ -11,8 +11,11 @@ import { layoutAnchorGroup, layoutAnchorScenarios, layoutAnchorArtifacts, layout
   assertLayoutStandaloneEvidence, assertLayoutPostClickViewDiagnostic, signedAnchorCases, signedPickingCases,
   signedPolygonalScenario, signedPolygonalCases, zeroAxisLayout, zeroAxisHalfExtent,
   observeZeroAxisPixels, assertZeroAxisPixelEvidence, assertFreshZeroAxisAction, assertZeroAxisNativeAction, assertSignedPolygonalStandaloneEvidence } from '../../scripts/pointLayoutAnchorsContract.mjs'
+import { signedPointRenderOrderProof, signedPointStandaloneRootAttributes, createSignedPointAssociationCandidate, assertSignedPointStandaloneAssociation,
+  assertSignedPointStandaloneGeometry, findSignedZeroAxisAssociation } from '../../scripts/signedPointStandaloneAssociation.mjs'
 import { assertZeroAxisCaptureSnapshot, assertZeroAxisLiveCapture } from '../../scripts/zeroAxisLiveCapture.mjs'
 import { captureZeroAxisLive, isZeroAxisLiveCaptureFailure } from '../../scripts/zeroAxisLiveCaptureWorkflow.mjs'
+import { capturePointLayoutStandalone } from '../../scripts/checkPointLayoutAnchors.mjs'
 import { syntheticStandalonePointDownload, syntheticPendingLayoutPreparation } from './standalonePointDownloadFixture.mjs'
 import { syntheticPendingLayoutViewEvidence } from './pointLayoutPendingViewFixture.mjs'
 import { syntheticUnsupportedDiagnosticEvidence } from './pointUnsupportedDiagnosticFixture.mjs'
@@ -25,6 +28,10 @@ import { syntheticGeometricVisibilityEvidence, mutateSyntheticVisibilityStageMod
   syntheticVisibilityLayerFaults } from './pointGeometricVisibilityFixture.mjs'
 import { assertGeometricSelectionEvidence, assertGeometricShapeEvidence } from '../../scripts/pointGeometricShapesContract.mjs'
 import { compareSvgPreviewSelectionCandidates, nextSvgPreviewSelectionCycle } from '../../src/rendering/svgHitTesting.ts'
+import { compareSvgRenderItems } from '../../src/rendering/svgRenderSort.ts'
+import { resolveSvgCamera } from '../../src/rendering/svgCamera.ts'
+import { projectToSvgPoint } from '../../src/rendering/svgProjection.ts'
+import { createCoordinateAxesGuide } from '../../src/rendering/coordinateAxesGuide.ts'
 
 // Node retains cleanup callbacks until the test completes. Keep their lexical
 // scope limited to the directory rather than the complete raw capture fixture.
@@ -394,6 +401,20 @@ function syntheticZeroNative(ambientDimension, outsideTarget = 'background', cap
   return { ambientDimension, layout: structuredClone(zeroAxisLayout), state, rendered: { ...syntheticZeroRendered(), nativeSelection: selection },
     axisInteraction: workflow, liveObservation, livePaint: syntheticZeroPixels(ctm) }
 }
+// Distinct before-image contours retain the real fixture's body/contour relation.
+// These fabricated records exercise correspondence policy, never native fitting.
+const syntheticSignedContours = [
+  'M 0 12 L 11.412678195542 3.708203932499 L 7.05342302751 -9.708203932499 L -7.05342302751 -9.708203932499 L -11.412678195542 3.708203932499 Z',
+  'M -8.485281374239 8.485281374239 L 8.485281374239 8.485281374239 L 8.485281374239 -8.485281374239 L -8.485281374239 -8.485281374239 Z',
+  'M 0 12 L 10.392304845413 -6 L -10.392304845413 -6 Z',
+  'M 0 12 L 4.70228201834 6.472135955 L 11.412678195542 3.708203932499 L 7.608452130361 -2.472135955 L 7.05342302751 -9.708203932499 L 0 -8 L -7.05342302751 -9.708203932499 L -7.608452130361 -2.472135955 L -11.412678195542 3.708203932499 L -4.70228201834 6.472135955 Z',
+  'M -25.338520367386 0 L -1.338520367386 9.9404296875 L -1.338520367386 -9.9404296875 Z',
+  'M -15.229339599609 0 L 8.538153076172 9.844427490234 L 4.46044921875 0 L 8.538153076172 -9.844427490234 Z',
+]
+function syntheticSignedRenderOrder(expected) {
+  return expected.map((entry, stableIndex) => ({ id: entry.id, layer: entry.modelPoint.layer ?? 0,
+    renderKind: 'point', stableIndex })).sort(compareSvgRenderItems).map(({ stableIndex }) => expected[stableIndex])
+}
 function syntheticPolygonalEvidence(outsideTarget = 'background', captureOptions = {}) {
   const polygonalCases = [2, 3].flatMap((ambientDimension) => signedPolygonalCases.map((spec) => syntheticPolygonalPlacement(spec, ambientDimension)))
   const zeroAxisCases = [2, 3].map((ambientDimension) => syntheticZeroNative(ambientDimension, outsideTarget, captureOptions))
@@ -408,8 +429,23 @@ function syntheticPolygonalEvidence(outsideTarget = 'background', captureOptions
       point.id = entry.id; point.position = { x: index < signedPolygonalCases.length ? 1 + index % 3 * 2 : 7,
         y: index < signedPolygonalCases.length ? 1 + Math.floor(index / 3) * 2 : 3, z: ambientDimension === 3 ? .5 : 0 }
       entry.modelPoint = structuredClone(point); entry.rendered.pointOwner = JSON.stringify(['point-node', 100, point.id])
+      entry.rendered.pointRequest = JSON.stringify(['', 'Times New Roman, Times, serif', 12, '400', 'normal', 1, 4, .2, entry.rendered.pointOwner])
+      entry.rendered.bodyRequest = entry.rendered.pointRequest
       return point
     })
+    const projection = resolveSvgCamera(diagram, 520, 360, { fitToView: true, extraPointsForFit: createCoordinateAxesGuide(ambientDimension).fitPoints })
+    for (const [index, entry] of expected.entries()) {
+      const projected = projectToSvgPoint(projection, entry.modelPoint.position, 360)
+      entry.rendered.nodeTransform = `translate(${projected.x} ${projected.y})`
+      entry.rendered.placement = projected; entry.rendered.placedAnchor = structuredClone(projected)
+      if (index < signedPolygonalCases.length) {
+        const offset = entry.rendered.placementOffset
+        entry.rendered.bodyTransform = `translate(${offset.x} ${offset.y})`
+        entry.rendered.contour = { tag: 'path', attributes: { fill: '#d8ecff', 'fill-opacity': '0.7', stroke: '#203040',
+          'stroke-opacity': '1', 'stroke-width': '0.48', 'stroke-dashoffset': '0', 'stroke-linecap': 'butt',
+          'stroke-linejoin': 'miter', 'stroke-miterlimit': '10', transform: entry.rendered.bodyTransform, d: syntheticSignedContours[index] } }
+      }
+    }
     const savedDiagram = structuredClone(diagram); if (ambientDimension === 2) delete savedDiagram.camera
     const savedJson = JSON.stringify({ version: 2, diagram: savedDiagram })
     const beforeExportState = { json: savedJson, runtimeDiagramJson: JSON.stringify(diagram),
@@ -516,13 +552,49 @@ function syntheticZeroPng(ctm, paint = true, extent = zeroAxisHalfExtent) {
   const header = Buffer.alloc(13); header.writeUInt32BE(width); header.writeUInt32BE(height, 4); header[8] = 8; header[9] = 6
   return Buffer.concat([Buffer.from([137, 80, 78, 71, 13, 10, 26, 10]), chunk('IHDR', header), chunk('IDAT', deflateSync(scanlines)), chunk('IEND', Buffer.alloc(0))])
 }
+function syntheticSignedMatrices(rendered) {
+  const identity = { a: 1, b: 0, c: 0, d: 1, e: 0, f: 0 }
+  const translation = (value) => {
+    if (!value) return identity
+    const values = value.slice('translate('.length, -1).split(/\s+/u).map(Number)
+    return { ...identity, e: Math.fround(values[0]), f: Math.fround(values[1]) }
+  }
+  const outer = translation(rendered.nodeTransform), body = translation(rendered.bodyTransform), contour = translation(rendered.contour.attributes.transform)
+  const placed = (offset) => ({ ...identity, e: outer.e + offset.e, f: outer.f + offset.f })
+  return { nodeCTM: outer, bodyCTM: placed(body), contourCTM: placed(contour),
+    nodeScreenCTM: structuredClone(outer), bodyScreenCTM: placed(body), contourScreenCTM: placed(contour) }
+}
+function syntheticSignedStructure(domOrdinal) {
+  const nodePath = [0, domOrdinal, 0], bodyPath = [...nodePath, 1]
+  return { nodePath, bodyPath, contourPath: [...nodePath, 0], titlePath: [...bodyPath, 0],
+    nodeTag: 'g', bodyTag: 'g', contourTag: 'path', titleTag: 'title', nodeChildTags: ['path', 'g'], bodyChildTags: ['title', 'g'],
+    titleCount: 1, bodyCount: 1, contourCount: 1,
+    connected: { node: true, body: true, contour: true, title: true }, currentRoot: { node: true, body: true, contour: true, title: true } }
+}
+function syntheticSignedSvg(raw) {
+  const escape = (value) => String(value).replaceAll('&', '&amp;').replaceAll('"', '&quot;')
+  return `<svg ${Object.entries(raw.document.rootAttributes).map(([key, value]) => `${key}="${escape(value)}"`).join(' ')}><g>`
+    + raw.reopened.map((entry) => `<g><g transform="${entry.nodeTransform}"><path ${Object.entries(entry.contour.attributes).map(([key, value]) => `${key}="${escape(value)}"`).join(' ')}/><g transform="${entry.bodyTransform}"><title/><g transform="translate(0 0)" opacity="1" fill="#203040" color="#203040" pointer-events="none"><g/></g></g></g></g>`).join('') + '</g></svg>'
+}
 function syntheticSignedStandalone(directory, ambientDimension = 2, outsideTarget = 'background', captureOptions = {}) {
   const evidence = syntheticPolygonalEvidence(outsideTarget, captureOptions), download = evidence.downloads.find((entry) => entry.ambientDimension === ambientDimension)
   const stem = download.scenario, svgPath = join(directory, `${stem}.svg`), pngPath = join(directory, `${stem}.png`), fileUrl = pathToFileURL(svgPath).href
-  const ctm = { a: 1, b: 0, c: 0, d: 1, e: 310, f: 290 }, png = syntheticZeroPng(ctm)
-  const reopened = download.expected.map((entry) => ({ source: '', shape: entry.shape, contour: structuredClone(entry.rendered.contour),
-    nodeTransform: entry.rendered.nodeTransform, bodyTransform: entry.rendered.bodyTransform, errors: 0, screenCTM: ctm }))
+  const ordered = syntheticSignedRenderOrder(download.expected)
+  const reopened = ordered.map((entry, domOrdinal) => {
+    const matrices = syntheticSignedMatrices(entry.rendered)
+    return { domOrdinal, source: '', contour: structuredClone(entry.rendered.contour),
+      nodeTransform: entry.rendered.nodeTransform, bodyTransform: entry.rendered.bodyTransform, errors: 0,
+      screenCTM: structuredClone(matrices.contourScreenCTM), structure: syntheticSignedStructure(domOrdinal), matrices }
+  })
+  const zeroOrdinal = ordered.findIndex(({ id }) => id === 'signed-zero-axis'), ctm = reopened[zeroOrdinal].screenCTM, png = syntheticZeroPng(ctm)
   const root = { localName: 'svg', namespace: 'http://www.w3.org/2000/svg', width: '520', height: '360', viewBox: '0 0 520 360' }
+  download.preExport = { url: 'http://localhost:5173/stratified-tikz/scripts/fixtures/freeLabelsApp.html', root, rootCount: 1, rootConnected: true, rootOwnerDocument: true,
+    labelDocumentRevision: download.beforeExportState.labelDocumentRevision, runtime: structuredClone(download.click.snapshot.runtime),
+    renderOrderProof: structuredClone(signedPointRenderOrderProof), points: ordered.map((entry, domOrdinal) => ({
+      domOrdinal, id: entry.id, source: '', bodySource: '', shape: entry.shape, owner: entry.rendered.pointOwner,
+      request: entry.rendered.pointRequest, bodyRequest: entry.rendered.bodyRequest, state: 'ready',
+      nodeTransform: entry.rendered.nodeTransform, bodyTransform: entry.rendered.bodyTransform,
+      structure: syntheticSignedStructure(domOrdinal), matrices: syntheticSignedMatrices(entry.rendered) })) }
   const measurement = { url: fileUrl, contentType: 'image/svg+xml', readyState: 'complete', bodyExists: false, htmlBodyExists: false, parserErrors: [],
     root: { ...root, bounds: { x: 0, y: 0, width: 520, height: 360 } }, viewport: { width: 1500, height: 1150 }, scroll: { x: 0, y: 0 }, devicePixelRatio: 1 }
   download.capture = { status: 'saved', requestedPath: pngPath, retainedPath: pngPath, fileExists: true,
@@ -532,13 +604,19 @@ function syntheticSignedStandalone(directory, ambientDimension = 2, outsideTarge
   download.strokePixels = observeZeroAxisPixels(png, ctm)
   download.outputs = Object.fromEntries(['standalone', 'inlineMath'].map((mode) => [mode,
     signedPolygonalCases.map(({ anchor }) => `\\node[anchor=${anchor}] {};`).join('\n') + '\n\\node[inner xsep=0pt,inner ysep=20pt] {};']))
-  const raw = { scenario: stem, group: layoutAnchorGroup, result: 'observed', background: 'transparent', expected: structuredClone(download.expected),
+  const raw = { scenario: stem, group: layoutAnchorGroup, result: 'observed', background: 'transparent', ambientDimension, savedJson: download.savedJson,
+    preExport: structuredClone(download.preExport), expected: structuredClone(download.expected),
     click: structuredClone(download.click), beforeExportState: structuredClone(download.beforeExportState), capture: structuredClone(download.capture), strokePixels: structuredClone(download.strokePixels), outputs: download.outputs,
     svgPath, fileUrl, requests: [fileUrl], pageErrors: [], standaloneErrors: [], cleanupErrors: [], reopened,
-    document: { root, forbiddenCount: 0, externalReferences: [], backgroundCount: 0 } }
-  const escape = (value) => String(value).replaceAll('&', '&amp;').replaceAll('"', '&quot;')
-  const svg = `<svg xmlns="${root.namespace}" width="520" height="360" viewBox="0 0 520 360">`
-    + reopened.map((entry) => `<g transform="${entry.nodeTransform}"><path ${Object.entries(entry.contour.attributes).map(([key, value]) => `${key}="${escape(value)}"`).join(' ')}/><g transform="${entry.bodyTransform}"><title></title></g></g>`).join('') + '</svg>'
+    document: { root, rootAttributes: structuredClone(signedPointStandaloneRootAttributes), forbiddenCount: 0, externalReferences: [], backgroundCount: 0,
+      inventory: { pathCount: 7, titleCount: 7, groupCount: 36, rootChildTags: ['g'],
+        contourCandidates: reopened.map((actual) => ({ path: actual.structure.contourPath, parentPath: actual.structure.nodePath,
+          parentTransform: actual.nodeTransform, siblingBodyCount: 1 })) }, frame: {
+      url: fileUrl, contentType: 'image/svg+xml', readyState: 'complete', rootConnected: true, rootOwnerDocument: true,
+      rootCTM: { a: 1, b: 0, c: 0, d: 1, e: 0, f: 0 }, rootScreenCTM: { a: 1, b: 0, c: 0, d: 1, e: 0, f: 0 },
+      rootBounds: { x: 0, y: 0, width: 520, height: 360 }, scroll: { x: 0, y: 0 }, viewport: { width: 1500, height: 1150 } } } }
+  const svg = syntheticSignedSvg(raw)
+  raw.xml = svg; raw.association = createSignedPointAssociationCandidate(raw)
   const zeroAxisCase = evidence.zeroAxisCases.find((entry) => entry.ambientDimension === ambientDimension)
   const livePng = syntheticZeroPng(zeroAxisCase.livePaint.ctm)
   zeroAxisCase.livePaint = observeZeroAxisPixels(livePng, zeroAxisCase.livePaint.ctm)
@@ -553,8 +631,245 @@ function syntheticSignedStandalone(directory, ambientDimension = 2, outsideTarge
   writeFileSync(join(directory, `${stem}-live-capture.json`), JSON.stringify(zeroAxisCase.liveObservation))
   writeFileSync(join(directory, `${stem}-saved.json`), download.savedJson)
   for (const [mode, source] of Object.entries(download.outputs)) writeFileSync(join(directory, `${stem}-${mode}.tex`), source)
-  return { evidence, download, raw, native, png, livePng, svgPath, pngPath }
+  return { evidence, download, raw, native, png, livePng, svgPath, pngPath, zeroAxis: reopened[zeroOrdinal] }
 }
+function persistSyntheticSignedSvg(fixture) {
+  fixture.raw.xml = syntheticSignedSvg(fixture.raw)
+  writeFileSync(fixture.svgPath, fixture.raw.xml)
+}
+function rebindSyntheticSignedRequest(raw, id, change) {
+  const expected = raw.expected.find((entry) => entry.id === id), captured = raw.click.snapshot.points.find((entry) => entry.id === id),
+    observed = raw.preExport.points.find((entry) => entry.id === id)
+  const request = JSON.parse(captured.request)
+  change(request)
+  const value = JSON.stringify(request)
+  expected.rendered.pointRequest = value; expected.rendered.bodyRequest = value
+  captured.request = value; captured.pointRequest = value; observed.request = value; observed.bodyRequest = value
+}
+for (const ambientDimension of [2, 3]) {
+  test(`synthetic faithful ${ambientDimension}D stripped standalone authenticates owners independently of contour order`, (t) => {
+    const directory = syntheticPolicyDirectory(t, 'stz-signed-correspondence-'), fixture = syntheticSignedStandalone(directory, ambientDimension),
+      { evidence, download, raw } = fixture
+    const modelOrder = ['signed-regular-polygon', 'signed-square', 'signed-triangle', 'signed-star', 'signed-isosceles-triangle', 'signed-dart', 'signed-zero-axis']
+    const documentOrder = ['signed-dart', 'signed-isosceles-triangle', 'signed-regular-polygon', 'signed-square', 'signed-star', 'signed-triangle', 'signed-zero-axis']
+    assert.deepEqual(raw.expected.map(({ id }) => id), modelOrder)
+    assert.deepEqual(raw.click.snapshot.points.map(({ id }) => id), modelOrder)
+    assert.deepEqual(JSON.parse(raw.savedJson).diagram.strata.map(({ id }) => id), modelOrder)
+    assert.deepEqual(raw.preExport.points.map(({ id }) => id), documentOrder)
+    assert.deepEqual(raw.reopened.map(({ domOrdinal }) => domOrdinal), [0, 1, 2, 3, 4, 5, 6])
+    assert.equal(new Set(raw.reopened.map(({ nodeTransform }) => nodeTransform)).size, 7)
+    for (const actual of raw.reopened) { assert.equal(actual.source, ''); assert.equal(Object.hasOwn(actual, 'id'), false); assert.equal(Object.hasOwn(actual, 'shape'), false) }
+    assert.equal((raw.xml.match(/<title\/>/gu) ?? []).length, 7)
+    assert.equal(/data-|aria-|signed-/.test(raw.xml), false, 'Exported SVG keeps genuinely stripped metadata and empty native titles')
+    assert.throws(() => raw.reopened.forEach((actual, index) => assert.deepEqual(actual.contour, download.expected[index].rendered.contour)),
+      'The old model-index/document-index pairing rejects this faithful fixture')
+    const binding = assertSignedPointStandaloneAssociation(raw, raw.xml)
+    assertSignedPointStandaloneGeometry(raw, binding)
+    assert.deepEqual(binding.associations.map(({ expectedIndex }) => expectedIndex), [5, 4, 0, 1, 3, 2, 6])
+    assert.equal(binding.zeroAxis, fixture.zeroAxis)
+    assertSignedPolygonalStandaloneEvidence(evidence, raw, directory, ambientDimension)
+  })
+}
+const signedAssociationFaults = [
+  ['missing-pre-export', (raw) => { delete raw.preExport }],
+  ['wrong-App-pathname', (raw) => { raw.preExport.url = 'http://localhost:5173/foreign-App.html' }],
+  ['missing-render-order-proof', (raw) => { delete raw.preExport.renderOrderProof }],
+  ['changed-render-comparator-proof', (raw) => { raw.preExport.renderOrderProof.sha256 = '0'.repeat(64) }],
+  ['missing-native-owner', (raw) => { raw.preExport.points.pop() }],
+  ['duplicate-native-owner', (raw) => { raw.preExport.points[1] = structuredClone(raw.preExport.points[0]) }],
+  ['foreign-native-owner', (raw) => { raw.preExport.points[0].id = 'foreign-point' }],
+  ['altered-native-order', (raw) => { [raw.preExport.points[0], raw.preExport.points[1]] = [raw.preExport.points[1], raw.preExport.points[0]] }],
+  ['altered-native-ordinal', (raw) => { raw.preExport.points[0].domOrdinal = 5 }],
+  ['stale-native-revision', (raw) => { raw.preExport.labelDocumentRevision-- }],
+  ['stale-native-owner', (raw) => { raw.preExport.points[0].owner = '["point-node",99,"signed-dart"]' }],
+  ['stale-native-request', (raw) => { raw.preExport.points[0].request = 'previous-request' }],
+  ['wrong-native-title', (raw) => { raw.preExport.points[0].source = 'foreign source' }],
+  ['wrong-native-body-source', (raw) => { raw.preExport.points[0].bodySource = 'foreign source' }],
+  ['coherent-request-stale-owner', (raw) => { rebindSyntheticSignedRequest(raw, 'signed-dart', (request) => { request[8] = '["point-node",99,"signed-dart"]' }) }],
+  ['coherent-request-stale-font', (raw) => { rebindSyntheticSignedRequest(raw, 'signed-dart', (request) => { request[5]-- }) }],
+  ['coherent-request-wrong-source', (raw) => { rebindSyntheticSignedRequest(raw, 'signed-dart', (request) => { request[0] = 'later source' }) }],
+  ['stale-click-runtime', (raw) => { raw.click.snapshot.runtime.documentRevision-- }],
+  ['edited-click-position', (raw) => { raw.click.snapshot.points[0].position.x++ }],
+  ['edited-saved-model', (raw) => { const saved = JSON.parse(raw.savedJson); saved.diagram.strata[0].position.x++; raw.savedJson = JSON.stringify(saved) }],
+  ['coherent-edited-fixture-position', (raw) => {
+    const saved = JSON.parse(raw.savedJson)
+    saved.diagram.strata[0].position.x++; raw.savedJson = JSON.stringify(saved)
+    for (const state of [raw.beforeExportState, raw.click.snapshot]) {
+      const envelope = JSON.parse(state.json), runtime = JSON.parse(state.runtimeDiagramJson), history = JSON.parse(state.history)
+      envelope.diagram.strata[0].position.x++; runtime.strata[0].position.x++; history.present.strata[0].position.x++
+      state.json = JSON.stringify(envelope); state.runtimeDiagramJson = JSON.stringify(runtime); state.history = JSON.stringify(history)
+    }
+    raw.expected[0].modelPoint.position.x++; raw.click.snapshot.points[0].position.x++
+  }],
+  ['coherent-foreign-owner', (raw) => {
+    const foreignId = 'foreign-dart', oldId = 'signed-dart', saved = JSON.parse(raw.savedJson)
+    const remap = (diagram) => { diagram.strata.find(({ id }) => id === oldId).id = foreignId }
+    remap(saved.diagram); raw.savedJson = JSON.stringify(saved)
+    for (const state of [raw.beforeExportState, raw.click.snapshot]) {
+      const envelope = JSON.parse(state.json), runtime = JSON.parse(state.runtimeDiagramJson), history = JSON.parse(state.history)
+      remap(envelope.diagram); remap(runtime); remap(history.present)
+      state.json = JSON.stringify(envelope); state.runtimeDiagramJson = JSON.stringify(runtime); state.history = JSON.stringify(history)
+    }
+    const expected = raw.expected.find(({ id }) => id === oldId), captured = raw.click.snapshot.points.find(({ id }) => id === oldId),
+      observed = raw.preExport.points.find(({ id }) => id === oldId), owner = JSON.stringify(['point-node', 100, foreignId])
+    expected.id = foreignId; expected.modelPoint.id = foreignId; expected.rendered.pointOwner = owner
+    captured.id = foreignId; captured.owner = owner; observed.id = foreignId; observed.owner = owner
+    rebindSyntheticSignedRequest(raw, foreignId, (request) => { request[8] = owner })
+  }],
+  ['missing-actual-group', (raw) => { raw.reopened.pop() }],
+  ['duplicate-actual-group', (raw) => { raw.reopened[1] = structuredClone(raw.reopened[0]) }],
+  ['foreign-actual-placement', (raw) => { raw.reopened[0].nodeTransform = 'translate(42 42)' }],
+  ['ambiguous-native-placement', (raw) => { raw.preExport.points[1].nodeTransform = raw.preExport.points[0].nodeTransform }],
+  ['altered-actual-ordinal', (raw) => { raw.reopened[0].domOrdinal = 1 }],
+  ['altered-actual-order', (raw) => { [raw.reopened[0], raw.reopened[1]] = [raw.reopened[1], raw.reopened[0]] }],
+  ['derived-wrong-id', (raw) => { raw.association.associations[0].expectedId = 'signed-square' }],
+  ['derived-wrong-index', (raw) => { raw.association.associations[0].expectedIndex = 0 }],
+  ['derived-wrong-ordinal', (raw) => { raw.association.associations[0].actualDomOrdinal = 1 }],
+  ['disconnected-actual-group', (raw) => { raw.reopened[0].structure.connected.node = false }],
+  ['foreign-actual-root', (raw) => { raw.reopened[0].structure.currentRoot.contour = false }],
+  ['wrong-body-ownership', (raw) => { raw.reopened[0].structure.bodyPath = raw.reopened[1].structure.bodyPath }],
+  ['wrong-contour-ownership', (raw) => { raw.reopened[0].structure.contourPath = raw.reopened[1].structure.contourPath }],
+  ['copied-native-shape', (raw) => { raw.reopened[0].shape = raw.expected[0].shape }],
+  ['foreign-untitled-contour-candidate', (raw) => { raw.document.inventory.contourCandidates.push({ path: [0, 7, 0], parentPath: [0, 7], parentTransform: 'translate(40 40)', siblingBodyCount: 0 }); raw.document.inventory.pathCount++ }],
+  ['missing-file-group-inventory', (raw) => { delete raw.document.inventory }],
+  ['stale-reopened-frame-viewport', (raw) => { raw.document.frame.viewport.width-- }],
+  ['zero-missing-association', (raw) => { raw.association.associations = raw.association.associations.filter(({ expectedId }) => expectedId !== 'signed-zero-axis') }],
+  ['zero-duplicate-association', (raw) => { raw.association.associations.push(structuredClone(raw.association.associations.find(({ expectedId }) => expectedId === 'signed-zero-axis'))) }],
+  ['zero-foreign-association', (raw) => { raw.association.associations.find(({ expectedId }) => expectedId === 'signed-zero-axis').actualDomOrdinal = 0 }],
+  ['zero-stale-screen-ctm', (raw) => { findSignedZeroAxisAssociation(raw.reopened, raw.association).screenCTM.e += 5 }],
+  ['zero-nonfinite-screen-ctm', (raw) => { findSignedZeroAxisAssociation(raw.reopened, raw.association).screenCTM.e = Infinity }],
+  ['zero-singular-screen-ctm', (raw) => { findSignedZeroAxisAssociation(raw.reopened, raw.association).screenCTM.a = 0 }],
+  ['zero-foreign-screen-ctm', (raw) => { findSignedZeroAxisAssociation(raw.reopened, raw.association).screenCTM = structuredClone(raw.reopened[0].screenCTM) }],
+]
+for (const [fault, mutate] of signedAssociationFaults) {
+  test(`synthetic authenticated standalone association rejects ${fault} before geometry or pixel replay`, (t) => {
+    const directory = syntheticPolicyDirectory(t, 'stz-signed-association-fault-'), fixture = syntheticSignedStandalone(directory), { raw } = fixture
+    mutate(raw)
+    assert.throws(() => assertSignedPointStandaloneAssociation(raw, raw.xml))
+    fixture.download.preExport = structuredClone(raw.preExport)
+    assert.throws(() => assertSignedPolygonalStandaloneEvidence(fixture.evidence, raw, directory, 2))
+  })
+}
+for (const fault of ['swapped-geometry', 'wrong-paint', 'wrong-body-transform', 'wrong-anchor-transform']) {
+  test(`synthetic authenticated standalone owner placements cannot conceal ${fault}`, (t) => {
+    const directory = syntheticPolicyDirectory(t, 'stz-signed-owned-geometry-'), fixture = syntheticSignedStandalone(directory), { raw } = fixture
+    if (fault === 'swapped-geometry') [raw.reopened[0].contour, raw.reopened[1].contour] = [raw.reopened[1].contour, raw.reopened[0].contour]
+    if (fault === 'wrong-paint') raw.reopened[0].contour.attributes.stroke = '#000000'
+    if (fault === 'wrong-body-transform') raw.reopened[0].bodyTransform = 'translate(0 0)'
+    if (fault === 'wrong-anchor-transform') raw.reopened[0].contour.attributes.transform = 'translate(0 0)'
+    for (const actual of raw.reopened) {
+      actual.matrices = syntheticSignedMatrices(actual); actual.screenCTM = structuredClone(actual.matrices.contourScreenCTM)
+    }
+    persistSyntheticSignedSvg(fixture)
+    const binding = assertSignedPointStandaloneAssociation(raw, raw.xml)
+    assert.throws(() => assertSignedPointStandaloneGeometry(raw, binding), 'Owner association cannot consume the contour/body attribute under test')
+    assert.throws(() => assertSignedPolygonalStandaloneEvidence(fixture.evidence, raw, directory, 2))
+  })
+}
+for (const fault of ['swapped-file-contours', 'swapped-file-bodies']) {
+  test(`synthetic parent file-local replay rejects ${fault} while every attribute value remains in XML`, (t) => {
+    const directory = syntheticPolicyDirectory(t, 'stz-signed-file-local-'), fixture = syntheticSignedStandalone(directory), { raw } = fixture
+    const original = raw.xml, changed = structuredClone(raw)
+    if (fault === 'swapped-file-contours') [changed.reopened[0].contour, changed.reopened[1].contour] = [changed.reopened[1].contour, changed.reopened[0].contour]
+    if (fault === 'swapped-file-bodies') [changed.reopened[0].bodyTransform, changed.reopened[1].bodyTransform] = [changed.reopened[1].bodyTransform, changed.reopened[0].bodyTransform]
+    raw.xml = syntheticSignedSvg(changed); writeFileSync(fixture.svgPath, raw.xml)
+    const attributes = (xml) => [...xml.matchAll(/\s[\w-]+="[^"]*"/gu)].map(([value]) => value).sort()
+    assert.deepEqual(attributes(raw.xml), attributes(original), 'A global attribute-presence/multiset check would accept the corrupt file')
+    const binding = assertSignedPointStandaloneAssociation(raw)
+    assertSignedPointStandaloneGeometry(raw, binding)
+    assert.throws(() => assertSignedPointStandaloneAssociation(raw, raw.xml), 'Parent reconstructs actual title/body/path structural ownership from the exact file')
+    assert.throws(() => assertSignedPolygonalStandaloneEvidence(fixture.evidence, raw, directory, 2))
+  })
+}
+test('synthetic zero-axis pixel lookup follows derived owner ordinal while canonical raw order still rejects reordered observations', (t) => {
+  const directory = syntheticPolicyDirectory(t, 'stz-signed-bound-zero-'), fixture = syntheticSignedStandalone(directory), { raw } = fixture
+  const reordered = [fixture.zeroAxis, ...raw.reopened.filter((actual) => actual !== fixture.zeroAxis)]
+  assert.notEqual(reordered.at(-1), fixture.zeroAxis)
+  assert.equal(findSignedZeroAxisAssociation(reordered, raw.association), fixture.zeroAxis)
+  assert.deepEqual(observeZeroAxisPixels(fixture.png, findSignedZeroAxisAssociation(reordered, raw.association).screenCTM), raw.strokePixels)
+  assert.throws(() => assertZeroAxisPixelEvidence(observeZeroAxisPixels(fixture.png, reordered.at(-1).screenCTM)), 'The final raw entry belongs to a different projected point')
+  raw.reopened = reordered
+  assert.throws(() => assertSignedPointStandaloneAssociation(raw, raw.xml), 'The isolated lookup never relaxes required real SVG document order')
+  assert.throws(() => assertSignedPolygonalStandaloneEvidence(fixture.evidence, raw, directory, 2))
+})
+test('synthetic exact-file replay rejects a foreign untitled painted group even with all seven authenticated titles', (t) => {
+  const directory = syntheticPolicyDirectory(t, 'stz-signed-foreign-file-group-'), fixture = syntheticSignedStandalone(directory), { raw } = fixture
+  raw.xml = raw.xml.replace('</svg>', '<g transform="translate(40 40)"><path d="M 0 0 L 1 1" stroke="#203040"/></g></svg>')
+  writeFileSync(fixture.svgPath, raw.xml)
+  assert.equal((raw.xml.match(/<title\/>/gu) ?? []).length, 7)
+  assertSignedPointStandaloneGeometry(raw)
+  assert.throws(() => assertSignedPointStandaloneAssociation(raw, raw.xml))
+  assert.throws(() => assertSignedPolygonalStandaloneEvidence(fixture.evidence, raw, directory, 2))
+})
+for (const fault of ['root-transform', 'root-CSS-transform', 'root-opacity']) {
+  test(`synthetic caller and parent reject ${fault} with otherwise unchanged geometry and PNG evidence`, (t) => {
+    const directory = syntheticPolicyDirectory(t, 'stz-signed-root-identity-'), fixture = syntheticSignedStandalone(directory), { raw } = fixture
+    const before = structuredClone(raw), rootAttributes = structuredClone(raw.document.rootAttributes)
+    if (fault === 'root-transform') rootAttributes.transform = 'translate(5 0)'
+    if (fault === 'root-CSS-transform') rootAttributes.style += 'transform:translate(5px,0);'
+    if (fault === 'root-opacity') rootAttributes.opacity = '0'
+    raw.xml = syntheticSignedSvg({ ...raw, document: { ...raw.document, rootAttributes } })
+    writeFileSync(fixture.svgPath, raw.xml)
+    assert.deepEqual(raw.document, before.document)
+    assert.deepEqual(raw.reopened, before.reopened)
+    assert.deepEqual(raw.capture, before.capture); assert.deepEqual(raw.strokePixels, before.strokePixels)
+    assertSignedPointStandaloneGeometry(raw)
+    assert.throws(() => assertSignedPointStandaloneAssociation(raw, raw.xml), 'Exact parsed root attributes bind all native CTMs to the downloaded SVG root')
+    assert.throws(() => assertSignedPolygonalStandaloneEvidence(fixture.evidence, raw, directory, 2))
+    raw.document.rootAttributes = rootAttributes
+    const candidate = createSignedPointAssociationCandidate(raw)
+    assert.ok(candidate.failureReasons.some(({ reason }) => reason === 'document-root-attributes'))
+    assert.throws(() => assertSignedPointStandaloneAssociation(raw), 'Caller authenticates fresh native root attributes before image work')
+  })
+}
+test('synthetic unassignable standalone candidate persists raw owners and association reasons before bounded rejection and image work', async (t) => {
+  const directory = syntheticPolicyDirectory(t, 'stz-signed-unassignable-candidate-'), fixture = syntheticSignedStandalone(directory), { raw } = fixture
+  unlinkSync(fixture.pngPath)
+  const details = structuredClone(raw)
+  for (const field of ['capture', 'strokePixels', 'reopened', 'document', 'association', 'result', 'requests', 'standaloneErrors', 'cleanupErrors']) delete details[field]
+  const reopened = structuredClone(raw.reopened), document = structuredClone(raw.document), listeners = new Map()
+  reopened[0].nodeTransform = 'translate(999 999)'
+  document.inventory.contourCandidates[0].parentTransform = reopened[0].nodeTransform
+  const observation = { reopened, document }
+  observation.association = createSignedPointAssociationCandidate({ ...details, ...observation })
+  assert.ok(observation.association.failureReasons.some(({ reason }) => reason === 'missing-duplicate-foreign-or-ambiguous-owner-placement'))
+  let captures = 0, closed = 0, beforeAssertion
+  const standalone = {
+    on: (type, listener) => listeners.set(type, listener), off: (type) => listeners.delete(type),
+    goto: async (url) => listeners.get('request')({ url: () => url }), close: async () => { closed++ },
+    screenshot: async () => { captures++; return fixture.png },
+  }
+  await assert.rejects(capturePointLayoutStandalone({ standalone, artifactDir: directory, details,
+    reopen: async () => observation, observe: async () => {}, assertReopened: (candidate) => {
+      beforeAssertion = JSON.parse(readFileSync(join(directory, `${raw.scenario}-standalone.json`), 'utf8'))
+      return assertSignedPointStandaloneAssociation(candidate, raw.xml)
+    } }), /Every actual group has one current authenticated unique owner/u)
+  assert.deepEqual(beforeAssertion.reopened, reopened)
+  assert.deepEqual(beforeAssertion.association, observation.association)
+  assert.equal(beforeAssertion.capture, undefined)
+  const retained = JSON.parse(readFileSync(join(directory, `${raw.scenario}-standalone.json`), 'utf8'))
+  assert.deepEqual(retained.reopened, reopened); assert.deepEqual(retained.association, observation.association)
+  assert.match(retained.error.message, /Every actual group/u)
+  assert.deepEqual(retained.cleanupErrors, []); assert.equal(retained.capture, undefined)
+  assert.equal(captures, 0); assert.equal(closed, 1); assert.equal(listeners.size, 0)
+  assert.equal(existsSync(fixture.pngPath), false, 'Association failure retains no new standalone PNG or cleanup screenshot')
+})
+test('synthetic malformed owner inputs retain association failure reasons without consuming or rewriting reopened candidates', (t) => {
+  const directory = syntheticPolicyDirectory(t, 'stz-signed-malformed-owners-'), { raw } = syntheticSignedStandalone(directory)
+  for (const corrupt of [
+    (input) => { delete input.expected[0].modelPoint },
+    (input) => { input.expected = { invalid: 'non-array owners' } },
+    (input) => { input.preExport.points = { invalid: 'non-array observations' } },
+  ]) {
+    const input = structuredClone(raw), before = structuredClone(input.reopened)
+    corrupt(input)
+    let candidate
+    assert.doesNotThrow(() => { candidate = createSignedPointAssociationCandidate(input) })
+    assert.ok(candidate.failureReasons.length > 0)
+    assert.deepEqual(input.reopened, before, 'Native document ordinals, raw sources, contours, ownership paths and matrices remain available to failure persistence')
+    assert.equal(input.reopened.length, 7)
+  }
+})
 for (const captureMode of ['restored-expanded-obstruction', 'inherited-collapsed', 'clear-expanded']) {
   test(`synthetic full-stroke live capture ${captureMode} preserves separate native picking and complete parent raw evidence`, (t) => {
     for (const ambientDimension of [2, 3]) {
@@ -1055,13 +1370,13 @@ for (const ambientDimension of [2, 3]) {
       if (fault === 'native-flags-only') { delete native.zeroAxisCase.axisInteraction; writeFileSync(join(directory, `${stem}-native.json`), JSON.stringify(native)) }
       if (fault === 'wrong-live-png') writeFileSync(join(directory, `${stem}-live.png`), fixture.png)
       if (fault === 'blank-live-png') writeFileSync(join(directory, `${stem}-live.png`), syntheticZeroPng(native.zeroAxisCase.livePaint.ctm, false))
-      if (fault === 'wrong-reopened-path') raw.reopened.at(-1).contour.attributes.d = 'M 0 0 A 0 33.941 0 0 0 0 0 Z'
+      if (fault === 'wrong-reopened-path') fixture.zeroAxis.contour.attributes.d = 'M 0 0 A 0 33.941 0 0 0 0 0 Z'
       if (fault === 'wrong-reopened-transform') raw.reopened[0].nodeTransform = 'translate(310 320)'
       if (fault === 'wrong-root') raw.document.root.viewBox = '0 0 1040 720'
       if (fault === 'wrong-png') writeFileSync(fixture.pngPath, fixture.livePng)
-      if (fault === 'blank-png') writeFileSync(fixture.pngPath, syntheticZeroPng(raw.reopened.at(-1).screenCTM, false))
+      if (fault === 'blank-png') writeFileSync(fixture.pngPath, syntheticZeroPng(fixture.zeroAxis.screenCTM, false))
       if (fault === 'png-header-only') writeFileSync(fixture.pngPath, fixture.png.subarray(0, 33))
-      if (fault === 'wrong-pixel-ctm') raw.reopened.at(-1).screenCTM.e += 12
+      if (fault === 'wrong-pixel-ctm') fixture.zeroAxis.screenCTM.e += 12
       if (fault === 'wrong-tikz') writeFileSync(join(directory, `${stem}-inlineMath.tex`), 'later replacement')
       if (fault === 'wrong-saved-json') writeFileSync(join(directory, `${stem}-saved.json`), '{}')
       assert.throws(() => assertSignedPolygonalStandaloneEvidence(evidence, raw, directory, ambientDimension))

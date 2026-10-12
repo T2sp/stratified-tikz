@@ -1,5 +1,115 @@
 # Phase 32D spacing, minima, anchors, and combined audit
 
+## Authenticated standalone point correspondence follow-up (2026-10-12)
+
+This scoped follow-up starts from clean HEAD
+`ff72e61c43ebc2da3f09513b023e89543719aa3c`, fingerprint
+`cb929c9a5ae2c113fb9a059ad24665ffc7c521575d48e809432bd85b43eb2e11`.
+The preceding live-capture correction, including both capture modules, is now
+tracked. Actual current tracked/untracked bytes, immutable HEAD inventory,
+before-image inspection, preservation spans and final verification disposition
+are retained under `/private/tmp/stz-32d-standalone-correspondence-20261012/`.
+The final `HANDOFF.json` records the frozen tree and actual reports; historical
+fingerprints cannot establish acceptance for this tree.
+
+The newest browser-capable parent `BjrAYN` passed tests/build/diff/label-assets,
+completed sixteen of eighteen cumulative groups, started seventeen, and passed
+the six predecessor 32D scenarios. It completed the six 2D polygonal observations,
+all five trusted zero-axis actions and the separate unobstructed live lifecycle.
+The actual live PNG is 1700×1300, 36,882 bytes, SHA256
+`fab81d376069bb3ab3ee08b17a5e89b8db34ea2589ffeeee3b3e13d81cfa26b3`:
+632 magenta pixels, local y extrema -34.02419354838708 and 33.71774193548388,
+screenCTM a=d=3.1, b=c=0, e=1296.4, f=268.975. One measured native toolbar
+collapse, one PNG, stable state/geometry, exact inherited restoration, empty
+secondary errors and cleared owned registries remain complete predecessor proof.
+
+The first downloaded SVG is 4,301 bytes, SHA256
+`11f80c8a6de9dc39dc2ae81f34f0ba014b41abcc4b4f702aeaa324c4c771296e`.
+Its XML matches the retained raw XML. The seven sanitized native titles are blank
+and no point IDs survive metadata removal. Actual DOM order is dart, isosceles
+triangle, regular polygon, square, star, triangle, zero-axis; expected model/click
+indices are respectively 5, 4, 0, 1, 3, 2, 6. Their distinct outer translates
+authenticate placement correspondence independently of the contour under test.
+Every file-local contour/body/outer transform equals its proper expected owner.
+The earlier raw `shape` fields were copied expectations, not observed identity.
+The parent failed the index-paired first-contour assertion before standalone
+capture: that before-image has seven raw nodes and its primary error, but no
+standalone capture record, PNG or pixel proof. It is neither child startup EPERM
+nor a failed live pixel oracle.
+
+`signedPointStandaloneAssociation.mjs` retains native pre-export IDs/document
+order and sanitized reopened document ordinals/structural paths independently
+from unchanged immutable model/click/expected order. Separate derived candidates
+record unique owner/expected-index ↔ actual-ordinal/projected-placement bindings
+and rejection reasons before assertions/image work. Authentication checks current
+model/source/request/owner/revision, immutable saved/click inputs and the preserved
+production layer/ID ordering source. Matching uses outer projected placements;
+it never uses contour paths, paint or fitted body/anchor translations.
+
+Both the caller and parent reconstruct this association before exact geometry
+comparisons. Parent replay parses the exact downloaded XML into bounded local
+element paths and checks direct node/body/contour ownership and each attribute
+within its own group. Presence of all attribute strings elsewhere in XML supplies
+no ownership proof. The unique authenticated `signed-zero-axis` binding supplies
+its fresh file-local finite invertible screenCTM for both PNG replays, with native
+root/group propagation checked; the last array entry supplies no identity.
+
+A retained independent synthetic file replay exposed an additional scoped root
+gap: inserting a root SVG transform while retaining the old native matrices and
+PNG was accepted. Its before/after files, raw records and result are retained in
+`root-transform-fixture/manifest.json` under this handoff directory. The preliminary
+strict run on fingerprint `9da969287ff31d9a275761ebbeb4068ef28e67b444a802491632471271a0c758`
+was interrupted with exit 130 before any required check completed; it supplies
+no acceptance. The final observer retains full native root attributes, and replay
+requires exact native/file attributes for the actual fixed seven-point root.
+Root SVG/CSS transforms and opacity corruptions now fail. The reopened CTM frame
+also matches the capture's first URL/root/viewport/scroll measurement, preserving
+one later viewport expansion. Missing or changed root proof is retained as a
+pre-image association rejection reason. Capture helpers remain unchanged.
+
+Faithful synthetic regressions preserve model/click order and blank stripped-file
+titles while using production DOM order and distinct real projected placements.
+They exercise correspondence, file-local geometry ownership and pixel CTM
+corruption, including swapped geometry with the same unordered attribute set.
+These are policy regressions, not native acceptance. New proof is required in
+existing standalone raw artifacts, and isolated runner copies load the helper
+and exact ordering source. Missing proof fails closed; historical records remain
+unchanged.
+
+No production, geometry, metadata sanitization, rendering/export sorting, paint,
+picking, coordinates/camera, authored text/units, saved version 2, reference bytes
+or tolerances changed. All 212 production files, 1,073 fixture files, 544
+authenticated reference files and the former 494-entry handoff inventory remain
+byte-identical. Native input, both live-capture modules, complete-root capture
+helpers and strict pixel oracle spans also remain byte-identical. The 65 live
+capture and 55 background controls remain registered. No dependency was added.
+
+The final helper's 61 new focused controls pass 61/61 with zero failures/skips.
+The final complete policy/runner sweep passes 761/761 on the same helper bytes.
+Preserved native,
+pending, standalone and deterministic controls pass 332/332, and geometry,
+reference, model and TikZ controls pass 566/566. Strict application TypeScript,
+preliminary build, five changed-script lint/syntax checks and diff pass. Focused
+sweeps overlap the full registered suite; full final-tree required verification
+results belong to the external handoff. Four inherited
+lint failures were reproduced from immutable HEAD: two geometric-caller
+`no-unsafe-finally`, verifier unused `_role`, and layers-test unused
+`defaultCurveStyle`; these remain failed baseline checks. Changed-file checks
+are reported separately. The full required strict verifier must run on the final
+tracked/untracked tree, without a commit or browser waiver.
+
+All eighteen cumulative groups, nine named 32D scenarios, twelve polygonal
+selected-anchor cases, both native/live sequences, both new transparent seven-node
+SVG downloads/reopening/complete PNG/TikZ, both existing fifteen-entry pending
+transparent/white workflows and final standalone acceptance remain mandatory.
+The new scenario still has no terminal parent pass. Its first standalone image,
+all remaining 3D/new-download work, both pending scenarios and final standalone
+did not execute in `BjrAYN`. Only fresh complete verification can open independent
+read-only completion review using the exact matching tree, followed by the
+post-review identity guard. Failed/incomplete verification or `needs_changes`
+blocks completion and commit. Phase 32 remains **incomplete**; commit/push remain
+with the parent. Earlier entries below retain historical results.
+
 ## Unobstructed native zero-axis live capture follow-up (2026-10-12)
 
 The actual starting checkout is clean at
