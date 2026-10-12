@@ -1,5 +1,78 @@
 # Phase 32 Plan: Point-node math, paint, geometric shapes, and layout
 
+Unobstructed native zero-axis live capture follow-up (2026-10-12): the actual
+starting checkout is clean at `ae8cea9b8c2a7c6535e7d1a611415272cd9dbe76`,
+fingerprint `70d53968dde5d7a4029316bb7c2625d0e45eea22d545201a35fa3e493d769490`.
+The prompt commit retains the six-file background fix and all 55 regression
+controls; the entry untracked count is zero. Baseline hashes of all 1,980 tracked
+files are retained under `/private/tmp/stz-32d-live-capture-preservation-dc4_bzs6/`,
+and every prior 494-entry polygonal/zero-axis handoff hash matches. Historical
+parent identities never establish acceptance for a later tree.
+
+The actual `qsihsK` live PNG and matching raw records confirm a capture obstruction:
+the interaction lifecycle completed all five trusted 2D actions/cycles and owned
+cleanup, then restored the inherited expanded toolbar before the separate image.
+That toolbar visibly covers the upper magenta stroke. Native geometry remains
+full and stable at projected y extrema 163.7575 and 374.1925; the 56,406-byte,
+1700×1300 PNG, SHA256 `0564067bd15143ff9ea591bb12f2fa62b0c380b21e29e88df5a2313e7daee10e`,
+contains a shortened upper pixel extent correctly rejected by the unchanged oracle.
+The parent launched Chrome and completed sixteen of eighteen groups, six
+predecessor 32D scenarios and six 2D polygonal observations. This differs from
+child startup EPERM and from an unproven production paint defect. The new scenario
+has no terminal pass; its remaining downloads/3D work, both pending scenarios and
+final standalone acceptance remain unperformed for that parent.
+
+The separate `zeroAxisLiveCaptureWorkflow.mjs` lifecycle and
+`zeroAxisLiveCapture.mjs` observation/contract follow completed interaction restoration.
+It retains the inherited state and whole projected stroke/width/current geometry,
+viewport/scroll and real overlay/hit-stack evidence, conditionally uses one unique
+normal native Collapse preview toolbar control for measured obstruction, then
+remeasures the complete unobstructed stroke before one actual bounded CSS-pixel
+PNG. Already-clear/inherited-collapsed cases explicitly record no action.
+Fresh pre/post PNG frames bind current model/source/request/owner/revision and
+canvas/point/contour CTMs to actual viewport origin and PNG file/byte identity;
+page scroll is not deducted twice from screenCTM. Owned finally restoration
+preserves state and primary failures, including image/persistence/oracle failures,
+without an extra failure screenshot. The required `${stem}-live-capture.json` is
+bound exactly to existing native JSON/live PNG and checked by parent file replay;
+isolated runner copies include the new capture contract. Faithful lifecycle and
+complete parent raw/file regressions remain distinct from preserved native input
+proof. Outer failure diagnostics recognize the original capture error identity
+and suppress a second image.
+
+Production geometry/rendering/picking/camera/model coordinates/authored units,
+saved version 2, references/tolerances and completed standalone capture remain
+unchanged. The detailed [implementation audit](PHASE_32D_IMPLEMENTATION.md) retains
+all original/signed-basic/polygonal/zero-axis inventory counts and history.
+Focused capture controls pass 65/65, the earlier full 32D policy checkpoint
+passes 662/662 before the final additional control (663 now registered), preserved
+runner/native/pending/standalone/deterministic checks pass 888/888 and geometry/
+reference/model/TikZ checks pass 424/424, all with zero failures/skips. Focused
+sweeps overlap the registered full suite. The retained initial synthetic-fixture
+heap exhaustion is corrected through immutable structural sharing and small
+cleanup closures; final focused runs pass under the normal Node heap with
+no heap flags or waived controls. Seven changed/new script lint/syntax, diff,
+strict application TypeScript, preserved production TypeScript lint and build pass.
+The four reproduced inherited lint errors remain separately failed.
+
+Configured direct browser attempts stop at fresh owned-server localhost EPERM
+before Chrome; label-assets passes its static graph only, and strict free-labels
+has browserVersion null/zero completed/all eighteen unexecuted groups. Full
+registered `npm test` passes **6,775/6,775**, zero failures/cancellations/skips/todo,
+exit 0 with normal concurrency (789006.314375ms), including the current 663-test
+32D policy suite. Frozen-tree strict verification remains pending. Its actual
+final disposition/results, exact tracked/untracked identity, logs, preservation
+audit and report paths
+belong to `/private/tmp/stz-32d-live-capture-fix-20261012/HANDOFF.json`; no later
+documentation write is needed to record that report. No completion review has begun.
+All eighteen cumulative groups/nine scenarios,
+twelve polygonal cases, both fresh zero-axis native/live cases/new transparent
+downloads, both fifteen-entry pending workflows/reopening/complete PNG/TikZ and
+final standalone remain mandatory before exact matching-tree read-only review and
+the post-review identity guard. Phase 32 remains **incomplete**; failed/incomplete
+verification or needs-changes review blocks completion/commit. Commit/push remain
+with the parent. Earlier entries below retain historical results.
+
 Authenticated zero-axis outside-input follow-up (2026-10-11): the actual starting
 checkout is clean at `09cd6a7e8a7e2226acb4c04634b36dbd166f0858`, fingerprint
 `ab87d2e864a94b4f7ad4ae38767165b71869a401699f7cc0d0a581c203c29a53`.

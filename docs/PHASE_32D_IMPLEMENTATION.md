@@ -1,5 +1,158 @@
 # Phase 32D spacing, minima, anchors, and combined audit
 
+## Unobstructed native zero-axis live capture follow-up (2026-10-12)
+
+The actual starting checkout is clean at
+`ae8cea9b8c2a7c6535e7d1a611415272cd9dbe76`, fingerprint
+`70d53968dde5d7a4029316bb7c2625d0e45eea22d545201a35fa3e493d769490`.
+The prompt commit already retains the six-file background observation correction
+and its 55 regression controls; the entry untracked count is zero. The
+historical `09cd6a7`/`d8bebf0` parent identity is retained as history, not reused
+for this invocation's acceptance. All 1,980 tracked file hashes, including 212
+production files and 1,073 fixture files, were captured before edits under
+`/private/tmp/stz-32d-live-capture-preservation-dc4_bzs6/`. All 494 entries in the
+polygonal/zero-axis handoff still match byte for byte; the former inventory count
+is distinct from this invocation's actual tracked/untracked inventory.
+
+The actual `qsihsK` PNG and matching native/raw failure records were inspected
+before implementation. That browser-capable parent passed tests/build/diff and
+label-assets, completed sixteen of eighteen cumulative groups and started
+seventeen. All six predecessor 32D scenarios and six 2D polygonal selected-anchor
+observations passed. All five zero-axis actions completed with three trusted
+events each, zero dropped events and selection
+null → zero-overlap → zero-overlap → app-point → null. Outside pointerdown
+reached the authenticated background rect; captured pointerup/click reached the
+current SVG root. Interaction Inspector/toolbar restoration and Alt/observer
+cleanup completed before the distinct live image attempt.
+
+The live pre/post records both retain the restored expanded floating toolbar,
+closed Inspector, owner `["point-node",437,"zero-overlap"]`, empty ready source,
+matching current point/body requests and unchanged geometry. The native path is
+`M 0 0 L 0 -33.941125496954 L 0 0 L 0 33.941125496954 L 0 0 Z`, with length
+135.76449584960938. Its screenCTM has a=d=3.1, b=c=0, e=1296.4 and f=268.975;
+independent full-stroke extrema project to y=163.75751095944256 and
+374.19248904055735. The actual 1700×1300 PNG is 56,406 bytes, SHA256
+`0564067bd15143ff9ea591bb12f2fa62b0c380b21e29e88df5a2313e7daee10e`.
+It contains 582 magenta pixels with local y bounds -28.54032258064515 to
+33.71774193548388. The image visibly shows the expanded toolbar covering the
+upper stroke; the strict oracle correctly rejects its missing upper extremum.
+This is retained capture-obstruction evidence, not proof of a new production
+paint defect. Historical raw records and pixels remain unchanged.
+
+The live caller now uses `zeroAxisLiveCaptureWorkflow.mjs` and the separate
+observation/pure contract in `zeroAxisLiveCapture.mjs` after completed interaction
+restoration: inherited capture state/geometry and complete stroke visibility →
+optional measured native toolbar collapse → freshly prepared pre-image frame →
+one actual PNG and post-image frame → owned capture restoration.
+The required region derives from the independently known extrema, real native
+traversal and stroke width, including both endpoints. A clear `.23` input point
+cannot prove whole-stroke visibility. Current root/background, both coincident
+contours, source/request/owner/revision, finite invertible canvas/point/contour
+CTMs, viewport/visual viewport/scroll, overlay/control bounds and actual hit-stack
+ownership are freshly observed before preparation and around the image. Each
+`${stem}-live-capture.json` record is required and bound exactly to the existing
+native JSON/live PNG; parent file replay cannot accept a detached summary.
+Progress diagnostics link the exact complete native/live records instead of
+repeating their large lifecycle snapshots in the global report. Required raw
+files retain every full observation. The isolated runner copy list includes the
+new transitive capture contract.
+
+Only a measured toolbar obstruction permits one unique normal native Collapse
+preview toolbar action. An inherited-collapsed or already-clear case records
+no action. Capture preparation neither repeats Select nor changes selected owner,
+model, history, coordinates, camera, zoom, authored units or UI settings. Fresh
+post-transition measurements require the entire stroke inside the actual
+viewport/canvas and clear of all UI; unsupported frames, stale geometry or remaining
+occlusion fail with retained evidence. ScreenCTM already includes retained page
+scroll; scrollY is not subtracted a second time. The screenshot remains one bounded
+non-full-page CSS-pixel image with normal fonts and the current magenta stroke.
+Its actual file/path/bytes/hash/dimensions precede replay and strict extrema/width
+assertions. No retry, CSS/DOM hiding, crop, reconstructed image or export-only
+substitute establishes live acceptance.
+
+Capture restoration owns only this capture's changes and runs after image,
+evidence-persistence or oracle failure. Primary error identity survives bounded
+secondary/restoration failures, with no extra failure image or leaked owned
+observer/listener/Alt resources. The existing complete-root standalone capture
+helper and strict pixel oracle remain unchanged. The retained
+`preserved-native-input-and-pixel-oracle.json` audit binds the native input
+function and shared pixel replay/oracle to exact entry-HEAD bytes.
+Faithful restored-expanded and
+inherited-clear fixtures retain the earlier native input proof separately.
+Parent raw/native-file policy rejects absent or corrupt lifecycle/frame/file
+proof, fabricated actions and incomplete restoration in both ambient dimensions.
+`checkFreeLabels.mjs` and the owned layout failure path recognize the capture
+error identity, so later diagnostics cannot take a second failure screenshot.
+
+Registered synthetic controls model the restored expanded toolbar covering the
+upper extremum after the earlier valid collapsed-input workflow, plus inherited
+collapsed and clear expanded no-action success. They use separate fresh timestamps
+and both ambient dimensions with complete raw/native/file replay. Meaningful
+failures cover missing/wrong/duplicate controls, stale or foreign canvas/owner/
+request/revision/CTM, off-viewport/canvas endpoints, a clear `.23` point with a
+covered extremum, remaining toolbar/history/quick-style/selection obstruction,
+changed model/history/selection/UI settings, fabricated or repeated actions,
+frame/origin/scroll mismatch, altered raw/file identity, truncated/blank/short
+PNG, absent/failed restoration and owned-resource leaks. Workflow controls retain
+exact primary screenshot/evidence/oracle Error identity when restoration also
+fails and require actual native restoration despite cleanup measurement or
+persistence failure. These are regressions, not fresh native acceptance.
+
+Executed focused checks use Homebrew-first Node v26.9.0. The final 65 new
+capture controls pass 65/65, zero failures/skips
+(`/private/tmp/stz-zero-live-final-65-controls.log`). The full 32D policy suite
+checkpoint passed 662/662 before the final additional control; its current
+registered count is 663. Preserved runner/native/pending/standalone/deterministic
+controls pass 888/888 and geometry/reference/model/TikZ controls pass 424/424,
+with zero failures/skips. These focused sweeps overlap the registered full suite;
+65 new controls do not supply a separate cumulative acceptance count. The initial
+large synthetic fixture allocation exhausted the normal Node heap; that failure
+is retained. Structural sharing of immutable synthetic records and small owned
+cleanup closures fix the test fixture allocation without heap flags, waived
+controls or altered evidence semantics. The final focused runs use the normal heap and pass.
+
+All seven changed/new script files pass recommended-rule lint and syntax; diff
+checks pass. Strict `tsconfig.app` TypeScript, preserved production TypeScript
+lint and application build pass. The four inherited lint errors were reproduced
+separately in the retained baseline logs: the geometric caller's two
+`no-unsafe-finally` errors, verifier unused `_role` and layer-test unused
+`defaultCurveStyle`. Those baseline checks remain failed; no unrelated cleanup or
+repository-wide lint pass is claimed.
+
+Both direct required browser commands use supported cached Playwright and
+configured Chrome, but fail at fresh owned-server `listen EPERM 127.0.0.1`
+before Chrome. Label-assets passes only its static graph (four main entries,
+43 worker chunks, 85 references and 40 approved font modules); its browser check
+fails. Strict free-labels retains development-server-listen failure with
+browserVersion null, zero completed groups and all eighteen unexecuted. These
+startup failures are distinct from the inspected Chrome-launched `qsihsK` parent
+obstruction and establish no fresh native/live/download acceptance. Command logs
+and raw startup artifacts are under
+`/private/tmp/stz-32d-live-capture-fix-20261012/`.
+
+Full registered `npm test` passes **6,775/6,775**, with zero failures,
+cancellations, skips or todo, exit 0 and normal project concurrency
+(`npm-test.log`, 789006.314375ms). This includes the current 663-test 32D policy
+suite and all 65 new capture controls. The final frozen-tree strict verifier
+remains pending; the stable external
+`/private/tmp/stz-32d-live-capture-fix-20261012/HANDOFF.json` retains its actual
+final disposition/report paths, full/strict results, exact tracked/untracked
+identity, preservation audit and logs without changing frozen documentation
+after verification.
+Independent completion review has not begun. Production and every authenticated
+reference byte, all signed/root/background corrections, tolerances, sampling/work
+bounds, saved version 2, raw text and both TikZ modes are preserved.
+
+Phase 32 remains **incomplete**. Fresh strict verification of the exact final
+tracked/untracked tree must accept all eighteen groups, all nine named 32D
+scenarios, twelve polygonal cases, both zero-axis native/live cases and new
+transparent downloads, both fifteen-entry pending workflows/reopening/complete
+PNG/TikZ and final standalone acceptance. Failed/incomplete verification stops
+before independent read-only completion review using `prompts/phase-32d-review.md`;
+a passing review must match that exact tree and retain the post-review identity
+guard. Commit/push remain with the parent after all gates pass. Earlier entries
+below retain their historical identities/results.
+
 ## Authenticated zero-axis outside-input observation follow-up (2026-10-11)
 
 The actual starting checkout is clean at

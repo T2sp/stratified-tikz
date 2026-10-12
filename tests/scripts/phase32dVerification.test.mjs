@@ -10,7 +10,9 @@ import { layoutAnchorGroup, layoutAnchorScenarios, layoutAnchorArtifacts, layout
   pointAnchorsForShape, layoutImportCases, assertLayoutAnchorEvidence, assertObservedPointPlacement, assertPointTikzSourceByMode,
   assertLayoutStandaloneEvidence, assertLayoutPostClickViewDiagnostic, signedAnchorCases, signedPickingCases,
   signedPolygonalScenario, signedPolygonalCases, zeroAxisLayout, zeroAxisHalfExtent,
-  observeZeroAxisPixels, assertFreshZeroAxisAction, assertZeroAxisNativeAction, assertSignedPolygonalStandaloneEvidence } from '../../scripts/pointLayoutAnchorsContract.mjs'
+  observeZeroAxisPixels, assertZeroAxisPixelEvidence, assertFreshZeroAxisAction, assertZeroAxisNativeAction, assertSignedPolygonalStandaloneEvidence } from '../../scripts/pointLayoutAnchorsContract.mjs'
+import { assertZeroAxisCaptureSnapshot, assertZeroAxisLiveCapture } from '../../scripts/zeroAxisLiveCapture.mjs'
+import { captureZeroAxisLive, isZeroAxisLiveCaptureFailure } from '../../scripts/zeroAxisLiveCaptureWorkflow.mjs'
 import { syntheticStandalonePointDownload, syntheticPendingLayoutPreparation } from './standalonePointDownloadFixture.mjs'
 import { syntheticPendingLayoutViewEvidence } from './pointLayoutPendingViewFixture.mjs'
 import { syntheticUnsupportedDiagnosticEvidence } from './pointUnsupportedDiagnosticFixture.mjs'
@@ -23,6 +25,14 @@ import { syntheticGeometricVisibilityEvidence, mutateSyntheticVisibilityStageMod
   syntheticVisibilityLayerFaults } from './pointGeometricVisibilityFixture.mjs'
 import { assertGeometricSelectionEvidence, assertGeometricShapeEvidence } from '../../scripts/pointGeometricShapesContract.mjs'
 import { compareSvgPreviewSelectionCandidates, nextSvgPreviewSelectionCycle } from '../../src/rendering/svgHitTesting.ts'
+
+// Node retains cleanup callbacks until the test completes. Keep their lexical
+// scope limited to the directory rather than the complete raw capture fixture.
+function syntheticPolicyDirectory(t, prefix) {
+  const directory = mkdtempSync(join(tmpdir(), prefix))
+  t.after(() => rmSync(directory, { recursive: true, force: true }))
+  return directory
+}
 
 function placement(shape = 'rectangle', anchor = 'base east', extra = {}) {
   return { result: 'passed', source: '$x_i$', shape, anchor, modelPositionUnchanged: true, rendered: {
@@ -161,7 +171,7 @@ function syntheticZeroRendered() {
 }
 function syntheticZeroPixels(ctm) {
   return { method: 'actual-native-PNG-magenta-stroke-pixel-centers', sha256: 'a'.repeat(64), bytes: 100,
-    width: 700, height: 700, ctm, pixels: 68, bounds: { minX: -.2, maxX: .2, minY: -zeroAxisHalfExtent, maxY: zeroAxisHalfExtent } }
+    width: 1500, height: 1150, ctm, pixels: 68, bounds: { minX: -.2, maxX: .2, minY: -zeroAxisHalfExtent, maxY: zeroAxisHalfExtent } }
 }
 function syntheticZeroCanvas(ambientDimension) {
   const common = { id: '', class: null, pointId: null, drawer: false, ariaLabel: null, svg: true, canvas: true,
@@ -184,7 +194,132 @@ function syntheticZeroCoincidentContours(snapshot, ctm) {
       bounds: structuredClone(rendered.bounds), length: rendered.contourLength, traversal: structuredClone(rendered.nativeTraversal),
       CTM: structuredClone(ctm), screenCTM: structuredClone(ctm) } }))
 }
-function syntheticZeroNative(ambientDimension, outsideTarget = 'background') {
+function syntheticCaptureElement(canvasObservation, { toolbar = false, label = null, tag = 'div' } = {}) {
+  return { ...structuredClone(canvasObservation.root), tag, class: toolbar ? 'preview-floating-toolbar' : 'other-ui',
+    ariaLabel: label, svg: false, canvas: false, canvasRoot: false, currentCanvas: false, currentCanvasRoot: false,
+    creationToolbar: toolbar, toolbarOverlay: toolbar }
+}
+// The earlier native workflow owns its own collapse/restoration. This separate
+// fabricated lifecycle starts from that restored UI and measures the entire
+// independently known stroke, including its upper endpoint, before one image.
+function syntheticZeroCaptureSnapshot(snapshot, state, collapsed, clearExpanded = false) {
+  const result = structuredClone(snapshot), matrix = result.geometry.contour.screenCTM
+  result.readyState = 'complete'
+  const project = ({ x, y }) => ({ x: matrix.a * x + matrix.c * y + matrix.e, y: matrix.b * x + matrix.d * y + matrix.f })
+  result.toolbar = { overlayCount: 1, collapsed, floatingCount: Number(!collapsed), expandCount: Number(collapsed),
+    collapseCount: Number(!collapsed), quickStyleCount: 0, historyCount: 1 }
+  result.tool.selectPressed = collapsed ? null : 'true'
+  result.selection = structuredClone(state.selection); result.requestedClick = null
+  result.elementFromPoint = null; result.elementsFromPoint = []; result.events = []; result.droppedEvents = null
+  result.viewport = { width: 1500, height: 1150, devicePixelRatio: 1, scrollX: 0, scrollY: 129,
+    visual: { width: 1500, height: 1150, offsetLeft: 0, offsetTop: 0, scale: 1 } }
+  result.geometry.canvas.bounds ??= { x: 43, y: 130.375, width: 1414, height: 1018 }
+  const strokeWidth = .48, h = zeroAxisHalfExtent, halfStroke = strokeWidth / 2
+  const corners = [{ x: -halfStroke, y: -h - halfStroke }, { x: halfStroke, y: -h - halfStroke },
+    { x: halfStroke, y: h + halfStroke }, { x: -halfStroke, y: h + halfStroke }].map(project)
+  const minX = Math.min(...corners.map(({ x }) => x)), maxX = Math.max(...corners.map(({ x }) => x)),
+    minY = Math.min(...corners.map(({ y }) => y)), maxY = Math.max(...corners.map(({ y }) => y))
+  const bounds = { x: minX, y: minY, width: maxX - minX, height: maxY - minY }
+  for (const kind of ['point', 'contour']) result.geometry[kind].bounds = { x: matrix.e, y: matrix.f - matrix.d * h, width: 0, height: 2 * h * matrix.d }
+  const controlBounds = { x: 55, y: 144, width: 28, height: 30 }, toolbarBounds = clearExpanded
+    ? { x: 51, y: 138, width: 500, height: 42 } : { x: 51, y: 138, width: 1350, height: 42 }
+  const toolbar = syntheticCaptureElement(result.canvasObservation, { toolbar: true, tag: 'section' })
+  const intersects = (overlay) => overlay.x < bounds.x + bounds.width && overlay.x + overlay.width > bounds.x
+    && overlay.y < bounds.y + bounds.height && overlay.y + overlay.height > bounds.y
+  const overlays = [...(collapsed ? [] : [{ kind: 'toolbar', element: toolbar, bounds: toolbarBounds, visible: true,
+    intersects: intersects(toolbarBounds), painted: true }]),
+  { kind: 'history', element: { ...syntheticCaptureElement(result.canvasObservation), class: 'preview-history-toolbar', history: true },
+    bounds: { x: 51, y: 185, width: 108, height: 41 }, visible: true, intersects: false, painted: true }]
+  const target = { ...structuredClone(result.canvasObservation.root), tag: 'path', class: null, pointId: 'zero-overlap',
+    canvasRoot: false, currentCanvasRoot: false }
+  const locals = [], steps = Math.ceil(2 * h * Math.hypot(matrix.c, matrix.d))
+  for (let i = 0; i <= steps; i++) for (const x of [-strokeWidth / 4, 0, strokeWidth / 4]) locals.push({ x, y: -h + 2 * h * i / steps })
+  locals.push({ x: -halfStroke, y: -h - halfStroke }, { x: halfStroke, y: -h - halfStroke },
+    { x: halfStroke, y: h + halfStroke }, { x: -halfStroke, y: h + halfStroke })
+  const samples = locals.map((local) => {
+    const screen = project(local), covered = !collapsed && screen.x >= toolbarBounds.x && screen.x <= toolbarBounds.x + toolbarBounds.width
+      && screen.y >= toolbarBounds.y && screen.y <= toolbarBounds.y + toolbarBounds.height
+    const elementFromPoint = covered ? toolbar : target
+    return { local, screen, elementFromPoint, elementsFromPoint: [elementFromPoint, result.canvasObservation.root] }
+  })
+  const obstructions = overlays.flatMap((overlay, index) => overlay.visible && overlay.painted && overlay.intersects ? [{ kind: 'overlay', index }] : [])
+  for (const [index, sample] of samples.entries()) if (!sample.elementFromPoint.currentCanvas) obstructions.push({ kind: 'hit-stack', index })
+  const control = (label) => ({ element: { ...syntheticCaptureElement(result.canvasObservation, { toolbar: true, label, tag: 'button' }),
+    creationToolbar: label === 'Collapse preview toolbar', class: 'preview-overlay-button' },
+    bounds: structuredClone(controlBounds), visible: true, disabled: false })
+  result.captureGeometry = { method: 'fresh-native-zero-axis-entire-stroke',
+    current: { rootCount: 1, pointCount: 1, contourCount: 1, canvasObservation: structuredClone(result.canvasObservation),
+      layout: structuredClone(result.layout), revision: state.labelDocumentRevision,
+      geometry: Object.fromEntries(['canvas', 'point', 'contour'].map((key) => [key, structuredClone(result.geometry[key])])) },
+    halfExtent: h, strokeWidth, nativeTraversal: syntheticZeroRendered().nativeTraversal,
+    nativeEndpoints: [{ x: 0, y: -h }, { x: 0, y: h }].map(project),
+    endpoints: [{ x: 0, y: -h }, { x: 0, y: h }].map(project), footprint: { corners, bounds },
+    frame: { origin: { x: 0, y: 0 }, viewport: structuredClone(result.viewport) },
+    controls: { collapse: collapsed ? [] : [control('Collapse preview toolbar')], expand: collapsed ? [control('Expand preview toolbar')] : [] },
+    overlays, samples, obstructions, insideViewport: true, insideCanvas: true, errors: [] }
+  return result
+}
+function syntheticZeroLiveObservation(workflow, state, { inheritedCollapsed = false, clearExpanded = false } = {}) {
+  const inherited = syntheticZeroCaptureSnapshot(workflow.actions.at(-1).after, state, inheritedCollapsed, clearExpanded)
+  const needsCollapse = inherited.captureGeometry.obstructions.length > 0
+  const prepared = syntheticZeroCaptureSnapshot(workflow.actions.at(-1).after, state, inheritedCollapsed || needsCollapse, clearExpanded)
+  inherited.at = 200; prepared.at = 220
+  const collapsedAfter = { ...structuredClone(prepared), at: 210 }, afterImage = { ...structuredClone(prepared), at: 230 },
+    restorationBefore = { ...structuredClone(prepared), at: 240 }, restoredActionAfter = { ...structuredClone(inherited), at: 250 },
+    restorationAfter = { ...structuredClone(inherited), at: 260 }
+  const action = (name, before, after, purpose) => ({ name, purpose, controlCount: 1, oppositeCount: 1,
+    controlName: `${name === 'collapse' ? 'Collapse' : 'Expand'} preview toolbar`,
+    control: structuredClone(before.captureGeometry.controls[name][0]), stateBefore: structuredClone(state), before: structuredClone(before),
+    stateAfter: structuredClone(state), after: structuredClone(after) })
+  const pixels = syntheticZeroPixels(prepared.geometry.contour.screenCTM)
+  const capture = { inheritedState: structuredClone(state), inherited,
+    decision: { action: needsCollapse ? 'collapse' : 'none', reason: needsCollapse ? 'measured-toolbar-obstruction' : 'already-unobstructed',
+      obstructions: structuredClone(inherited.captureGeometry.obstructions) },
+    actions: needsCollapse ? [action('collapse', inherited, collapsedAfter, 'capture-obstruction')] : [], preparedState: structuredClone(state), prepared,
+    restoration: { actions: needsCollapse ? [action('expand', restorationBefore, restoredActionAfter, 'restore')] : [], stateBefore: structuredClone(state),
+      before: restorationBefore, stateAfter: structuredClone(state), after: restorationAfter,
+      ...(needsCollapse ? { expandCount: 1, collapseCount: 0 } : {}) },
+    cleanup: { observerRegistries: Object.fromEntries(['geometricSelection', 'pointNativeDrag', 'zeroAxisInput', 'zeroAxisCapture']
+      .map((key) => [key, { present: false, size: 0 }])), listenersInstalled: 0, altKeyUp: 'completed-by-native-interaction' }, secondaryErrors: [],
+    image: { attempts: 1, path: `/synthetic-policy-only/${signedPolygonalScenario}-live.png`, bytes: pixels.bytes, sha256: pixels.sha256,
+      width: pixels.width, height: pixels.height, frame: { origin: { x: 0, y: 0 }, viewport: structuredClone(prepared.viewport), ctm: structuredClone(pixels.ctm) },
+      fullPage: false, scale: 'css' } }
+  return { state: structuredClone(state), snapshot: structuredClone(prepared), afterState: structuredClone(state), afterSnapshot: afterImage, capture, pixels }
+}
+function refreshSyntheticCaptureObstruction(snapshot) {
+  const geometry = snapshot.captureGeometry, bounds = geometry.footprint.bounds
+  const target = { ...structuredClone(snapshot.canvasObservation.root), tag: 'path', class: null, pointId: 'zero-overlap',
+    canvasRoot: false, currentCanvasRoot: false }
+  for (const overlay of geometry.overlays) overlay.intersects = overlay.bounds.x < bounds.x + bounds.width
+    && overlay.bounds.x + overlay.bounds.width > bounds.x && overlay.bounds.y < bounds.y + bounds.height
+    && overlay.bounds.y + overlay.bounds.height > bounds.y
+  for (const sample of geometry.samples) {
+    const overlay = geometry.overlays.findLast((entry) => entry.visible && entry.painted && sample.screen.x >= entry.bounds.x
+      && sample.screen.x <= entry.bounds.x + entry.bounds.width && sample.screen.y >= entry.bounds.y
+      && sample.screen.y <= entry.bounds.y + entry.bounds.height)
+    sample.elementFromPoint = overlay?.element ?? target
+    sample.elementsFromPoint = [sample.elementFromPoint, snapshot.canvasObservation.root]
+  }
+  geometry.obstructions = geometry.overlays.flatMap((overlay, index) => overlay.visible && overlay.painted && overlay.intersects ? [{ kind: 'overlay', index }] : [])
+  for (const [index, sample] of geometry.samples.entries()) if (!sample.elementFromPoint.currentCanvas) geometry.obstructions.push({ kind: 'hit-stack', index })
+}
+function setSyntheticZeroInputContour(record) {
+  const ctm = { a: 3.1, b: 0, c: 0, d: 3.1, e: 1296.4, f: 268.975 }
+  const local = { x: 0, y: -.92 * zeroAxisHalfExtent }, boundary = { x: ctm.e, y: ctm.d * local.y + ctm.f }
+  const bounds = { x: ctm.e, y: ctm.f - ctm.d * zeroAxisHalfExtent, width: 0, height: 2 * ctm.d * zeroAxisHalfExtent }
+  const visit = (value) => {
+    if (!value || typeof value !== 'object') return
+    if (value.geometry?.contour) Object.assign(value.geometry.contour, { length: 4 * zeroAxisHalfExtent, fraction: .23,
+      localBoundary: structuredClone(local), boundary: structuredClone(boundary), bounds: structuredClone(bounds) })
+    if (Object.hasOwn(value, 'contourLength')) { value.contourLength = 4 * zeroAxisHalfExtent; value.contourScreenBounds = structuredClone(bounds) }
+    if (Object.hasOwn(value, 'boundary')) value.boundary = structuredClone(boundary)
+    if (value.requestedClick) value.requestedClick = structuredClone(boundary)
+    if (value.type && ['pointerdown', 'pointerup', 'click'].includes(value.type)) value.client = structuredClone(boundary)
+    for (const child of Object.values(value)) visit(child)
+  }
+  visit(record)
+}
+function syntheticZeroNative(ambientDimension, outsideTarget = 'background', captureOptions = {}) {
   const spec = { source: '', shape: 'ellipse', layout: zeroAxisLayout, ambientDimension }, state = syntheticSignedState(spec)
   for (const field of ['json', 'runtimeDiagramJson', 'history']) {
     const value = JSON.parse(state[field]), diagram = field === 'json' ? value.diagram : field === 'history' ? value.present : value
@@ -196,7 +331,9 @@ function syntheticZeroNative(ambientDimension, outsideTarget = 'background') {
   const selection = syntheticGeometricSelectionEvidence({ scenario: signedPolygonalScenario,
     id: 'zero-overlap', ambientDimension, shape: 'ellipse', state })
   const prepared = syntheticGeometricSelectionEvidence({ scenario: signedPolygonalScenario,
-    id: 'zero-overlap', ambientDimension, shape: 'ellipse', state, initialSelection: state.selection })
+    id: 'zero-overlap', ambientDimension, shape: 'ellipse', state, initialSelection: state.selection, obstructed: true,
+    collapsed: captureOptions.inheritedCollapsed ?? false })
+  setSyntheticZeroInputContour(selection); setSyntheticZeroInputContour(prepared)
   const canvasPreparation = syntheticOwnerCycle('zero-overlap', 'zero-overlap', true, state).preparation
   const workflow = { result: 'observed', secondaryErrors: [], preparation: canvasPreparation,
     toolbarPreparation: prepared.toolbarPreparation, toolbarRestoration: prepared.toolbarRestoration, actions: [] }
@@ -210,6 +347,7 @@ function syntheticZeroNative(ambientDimension, outsideTarget = 'background') {
     current.selection = selectedId ? { kind: 'stratum', id: selectedId } : null
     const before = structuredClone(prepared.before), after = structuredClone(prepared.after)
     for (const [snapshot, snapshotState] of [[before, stateBefore], [after, current]]) {
+      snapshot.at = 110 + index * 10 + Number(snapshot === after) * 5
       snapshot.selection = structuredClone(snapshotState.selection); snapshot.requestedClick = click
       snapshot.events = []; snapshot.droppedEvents = null
       snapshot.layout.parameters = '{"borderRotate":0}'
@@ -242,18 +380,23 @@ function syntheticZeroNative(ambientDimension, outsideTarget = 'background') {
   }
   for (const field of ['stateBefore', 'stateAfter']) workflow.toolbarRestoration[field] = structuredClone(current)
   for (const field of ['before', 'after']) {
-    workflow.toolbarRestoration[field].selection = null
-    workflow.toolbarRestoration[field].toolbar.quickStyleCount = 0
+    const { toolbar, tool } = workflow.toolbarRestoration[field]
+    workflow.toolbarRestoration[field] = { ...structuredClone(workflow.actions.at(-1).after),
+      at: field === 'before' ? 170 : 180, toolbar, tool, requestedClick: null, elementFromPoint: null, elementsFromPoint: [] }
+    toolbar.quickStyleCount = 0
+  }
+  for (const action of workflow.toolbarPreparation.actions.filter(({ purpose }) => purpose === 'restore')) {
+    action.stateBefore = structuredClone(current); action.stateAfter = structuredClone(current)
+    action.before = structuredClone(workflow.toolbarRestoration.before); action.after = structuredClone(workflow.toolbarRestoration.after)
   }
   workflow.cleanup = { altKeyUp: 'completed', observer: { tokenPresent: false, registryPresent: false, remaining: 0 } }
-  const liveObservation = { state: structuredClone(current), snapshot: structuredClone(workflow.actions.at(-1).after),
-    afterState: structuredClone(current), afterSnapshot: structuredClone(workflow.actions.at(-1).after) }
+  const liveObservation = syntheticZeroLiveObservation(workflow, current, captureOptions)
   return { ambientDimension, layout: structuredClone(zeroAxisLayout), state, rendered: { ...syntheticZeroRendered(), nativeSelection: selection },
     axisInteraction: workflow, liveObservation, livePaint: syntheticZeroPixels(ctm) }
 }
-function syntheticPolygonalEvidence(outsideTarget = 'background') {
+function syntheticPolygonalEvidence(outsideTarget = 'background', captureOptions = {}) {
   const polygonalCases = [2, 3].flatMap((ambientDimension) => signedPolygonalCases.map((spec) => syntheticPolygonalPlacement(spec, ambientDimension)))
-  const zeroAxisCases = [2, 3].map((ambientDimension) => syntheticZeroNative(ambientDimension, outsideTarget))
+  const zeroAxisCases = [2, 3].map((ambientDimension) => syntheticZeroNative(ambientDimension, outsideTarget, captureOptions))
   const downloads = [2, 3].map((ambientDimension) => {
     const expected = signedPolygonalCases.map((spec) => syntheticPolygonalPlacement(spec, ambientDimension, `signed-${spec.key}`))
     expected.push({ result: 'passed', id: 'signed-zero-axis', source: '', shape: 'ellipse', anchor: 'center', layout: structuredClone(zeroAxisLayout),
@@ -352,13 +495,13 @@ function evidence(name) {
 
 // Complete lossless fabricated PNG transport exercises replay and corruption
 // policy only. It never supplies production/native paint acceptance.
-function syntheticZeroPng(ctm, paint = true) {
+function syntheticZeroPng(ctm, paint = true, extent = zeroAxisHalfExtent) {
   const width = 1500, height = 1150, stride = width * 4 + 1, scanlines = Buffer.alloc(height * stride, 255)
   for (let y = 0; y < height; y++) {
     scanlines[y * stride] = 0
     if (!paint) continue
     const localY = (y + .5 - ctm.f) / ctm.d
-    if (Math.abs(localY) > zeroAxisHalfExtent + .5 / ctm.d) continue
+    if (Math.abs(localY) > extent + .5 / ctm.d) continue
     const x = Math.floor(ctm.e), at = y * stride + 1 + x * 4
     scanlines[at] = 176; scanlines[at + 1] = 0; scanlines[at + 2] = 192
   }
@@ -373,8 +516,8 @@ function syntheticZeroPng(ctm, paint = true) {
   const header = Buffer.alloc(13); header.writeUInt32BE(width); header.writeUInt32BE(height, 4); header[8] = 8; header[9] = 6
   return Buffer.concat([Buffer.from([137, 80, 78, 71, 13, 10, 26, 10]), chunk('IHDR', header), chunk('IDAT', deflateSync(scanlines)), chunk('IEND', Buffer.alloc(0))])
 }
-function syntheticSignedStandalone(directory, ambientDimension = 2, outsideTarget = 'background') {
-  const evidence = syntheticPolygonalEvidence(outsideTarget), download = evidence.downloads.find((entry) => entry.ambientDimension === ambientDimension)
+function syntheticSignedStandalone(directory, ambientDimension = 2, outsideTarget = 'background', captureOptions = {}) {
+  const evidence = syntheticPolygonalEvidence(outsideTarget, captureOptions), download = evidence.downloads.find((entry) => entry.ambientDimension === ambientDimension)
   const stem = download.scenario, svgPath = join(directory, `${stem}.svg`), pngPath = join(directory, `${stem}.png`), fileUrl = pathToFileURL(svgPath).href
   const ctm = { a: 1, b: 0, c: 0, d: 1, e: 310, f: 290 }, png = syntheticZeroPng(ctm)
   const reopened = download.expected.map((entry) => ({ source: '', shape: entry.shape, contour: structuredClone(entry.rendered.contour),
@@ -399,18 +542,321 @@ function syntheticSignedStandalone(directory, ambientDimension = 2, outsideTarge
   const zeroAxisCase = evidence.zeroAxisCases.find((entry) => entry.ambientDimension === ambientDimension)
   const livePng = syntheticZeroPng(zeroAxisCase.livePaint.ctm)
   zeroAxisCase.livePaint = observeZeroAxisPixels(livePng, zeroAxisCase.livePaint.ctm)
+  const liveCaptureImage = zeroAxisCase.liveObservation.capture.image
+  Object.assign(liveCaptureImage, { path: join(directory, `${stem}-live.png`), bytes: livePng.length, sha256: zeroAxisCase.livePaint.sha256,
+    width: zeroAxisCase.livePaint.width, height: zeroAxisCase.livePaint.height })
+  zeroAxisCase.liveObservation.pixels = structuredClone(zeroAxisCase.livePaint)
   const native = { scenario: signedPolygonalScenario, group: layoutAnchorGroup, result: 'observed',
     polygonalCases: evidence.polygonalCases.filter((entry) => entry.ambientDimension === ambientDimension), zeroAxisCase }
   writeFileSync(svgPath, svg); writeFileSync(pngPath, png); writeFileSync(join(directory, `${stem}-live.png`), livePng)
   writeFileSync(join(directory, `${stem}-native.json`), JSON.stringify(native))
+  writeFileSync(join(directory, `${stem}-live-capture.json`), JSON.stringify(zeroAxisCase.liveObservation))
   writeFileSync(join(directory, `${stem}-saved.json`), download.savedJson)
   for (const [mode, source] of Object.entries(download.outputs)) writeFileSync(join(directory, `${stem}-${mode}.tex`), source)
   return { evidence, download, raw, native, png, livePng, svgPath, pngPath }
 }
+for (const captureMode of ['restored-expanded-obstruction', 'inherited-collapsed', 'clear-expanded']) {
+  test(`synthetic full-stroke live capture ${captureMode} preserves separate native picking and complete parent raw evidence`, (t) => {
+    for (const ambientDimension of [2, 3]) {
+      const directory = syntheticPolicyDirectory(t, 'stz-zero-capture-policy-')
+      const options = { inheritedCollapsed: captureMode === 'inherited-collapsed', clearExpanded: captureMode === 'clear-expanded' }
+      const { evidence, raw, native } = syntheticSignedStandalone(directory, ambientDimension, 'background', options)
+      const zero = native.zeroAxisCase, live = zero.liveObservation, capture = live.capture
+      for (const action of zero.axisInteraction.actions) {
+        assert.equal(action.before.toolbar.collapsed, true, 'Earlier native input remains separately prepared and proven')
+        assertZeroAxisNativeAction(action)
+      }
+      assert.equal(capture.inherited.toolbar.collapsed, options.inheritedCollapsed)
+      assert.equal(capture.restoration.after.toolbar.collapsed, options.inheritedCollapsed)
+      assert.ok(capture.prepared.at > capture.inherited.at && live.afterSnapshot.at > capture.prepared.at
+        && capture.restoration.after.at > capture.restoration.before.at, 'Every image boundary retains a separate fresh observation')
+      assert.equal(capture.image.attempts, 1); assert.equal(capture.image.frame.viewport.scrollY, 129)
+      assert.deepEqual(capture.image.frame.ctm, live.snapshot.geometry.contour.screenCTM, 'screenCTM already includes retained page scroll')
+      if (captureMode === 'restored-expanded-obstruction') {
+        assert.equal(zero.axisInteraction.toolbarRestoration.after.toolbar.collapsed, false)
+        assert.equal(capture.decision.action, 'collapse'); assert.equal(capture.actions.length, 1)
+        assert.equal(capture.actions[0].controlName, 'Collapse preview toolbar')
+        assert.equal(capture.restoration.actions[0].controlName, 'Expand preview toolbar')
+        assert.ok(capture.inherited.captureGeometry.obstructions.length > 0)
+        const upper = capture.inherited.captureGeometry.samples.find(({ local }) => local.x === 0 && local.y === -zeroAxisHalfExtent)
+        assert.equal(upper.elementFromPoint.creationToolbar, true, 'The restored toolbar covers the independent upper extremum')
+        assert.equal(capture.actions.filter(({ name }) => name === 'Select').length, 0)
+      } else {
+        assert.deepEqual(capture.decision, { action: 'none', reason: 'already-unobstructed', obstructions: [] })
+        assert.deepEqual(capture.actions, []); assert.deepEqual(capture.restoration.actions, [])
+      }
+      assertZeroAxisLiveCapture(live, zero.axisInteraction, zero.livePaint)
+      assertZeroAxisPixelEvidence(zero.livePaint)
+      assertSignedPolygonalStandaloneEvidence(evidence, raw, directory, ambientDimension)
+    }
+  })
+}
+
+const liveCaptureFaults = [
+  ['missing-capture-lifecycle', (zero) => { delete zero.liveObservation.capture }],
+  ['missing-entire-stroke-measurement', (zero) => { delete zero.liveObservation.capture.inherited.captureGeometry }],
+  ['missing-collapse-control', (zero) => { zero.liveObservation.capture.inherited.captureGeometry.controls.collapse = [] }],
+  ['wrong-collapse-control', (zero) => { zero.liveObservation.capture.inherited.captureGeometry.controls.collapse[0].element.ariaLabel = 'Select' }],
+  ['duplicate-collapse-control', (zero) => { const controls = zero.liveObservation.capture.inherited.captureGeometry.controls.collapse; controls.push(structuredClone(controls[0])) }],
+  ['foreign-current-root', (zero) => { zero.liveObservation.capture.inherited.canvasObservation.root.currentCanvasRoot = false }],
+  ['stale-owner', (zero) => { zero.liveObservation.capture.inherited.layout.owner = '["point-node",99,"zero-overlap"]' }],
+  ['stale-body-request', (zero) => { zero.liveObservation.capture.inherited.layout.bodyRequest = 'stale-request' }],
+  ['stale-revision', (zero) => { zero.liveObservation.capture.inherited.labelDocumentRevision++ }],
+  ['singular-current-CTM', (zero) => { zero.liveObservation.capture.prepared.geometry.canvas.screenCTM.a = 0 }],
+  ['foreign-current-CTM', (zero) => { zero.liveObservation.capture.prepared.captureGeometry.current.geometry.contour.screenCTM.e += 10 }],
+  ['endpoint-outside-viewport', (zero) => { const snapshot = zero.liveObservation.capture.prepared;
+    snapshot.viewport.height = 300; snapshot.captureGeometry.frame.viewport.height = 300 }],
+  ['endpoint-outside-canvas', (zero) => { const snapshot = zero.liveObservation.capture.prepared;
+    snapshot.geometry.canvas.bounds.height = 170; snapshot.captureGeometry.current.geometry.canvas.bounds.height = 170 }],
+  ['unsupported-visual-viewport', (zero) => { zero.liveObservation.capture.prepared.viewport.visual.offsetTop = 129 }],
+  ['omitted-upper-footprint', (zero) => { zero.liveObservation.capture.prepared.captureGeometry.footprint.bounds.y += 16 }],
+  ['missing-full-stroke-hit-stack', (zero) => { zero.liveObservation.capture.prepared.captureGeometry.samples.pop() }],
+  ['clear-point-23-covered-extremum', (zero) => {
+    const snapshot = zero.liveObservation.capture.prepared, geometry = snapshot.captureGeometry,
+      upper = geometry.samples.find(({ local }) => local.x === 0 && local.y === -zeroAxisHalfExtent)
+    assert.notDeepEqual(upper.screen, snapshot.geometry.contour.boundary)
+    assert.equal(snapshot.geometry.contour.boundary.y > upper.screen.y + 3, true, 'The original .23 target is clear below this obstruction')
+    const element = syntheticCaptureElement(snapshot.canvasObservation, { toolbar: true })
+    geometry.overlays.push({ kind: 'toolbar', element, bounds: { x: upper.screen.x - 2, y: upper.screen.y - 1, width: 4, height: 3 },
+      visible: true, painted: true, intersects: true })
+    refreshSyntheticCaptureObstruction(snapshot)
+  }],
+  ['toolbar-paint-remains-after-collapse', (zero) => { const snapshot = zero.liveObservation.capture.prepared;
+    snapshot.captureGeometry.overlays.push({ kind: 'toolbar', element: syntheticCaptureElement(snapshot.canvasObservation, { toolbar: true }),
+      bounds: { x: 51, y: 138, width: 1350, height: 42 }, visible: true, painted: true, intersects: true })
+    refreshSyntheticCaptureObstruction(snapshot) }],
+  ['collapsed-floating-toolbar-not-detached', (zero) => { const snapshot = zero.liveObservation.capture.prepared;
+    snapshot.captureGeometry.overlays.push({ kind: 'toolbar', element: syntheticCaptureElement(snapshot.canvasObservation, { toolbar: true, tag: 'section' }),
+      bounds: { x: 51, y: 138, width: 1350, height: 42 }, visible: true, painted: true, intersects: true })
+    refreshSyntheticCaptureObstruction(snapshot) }],
+  ['foreign-UI-first-hit', (zero) => { const sample = zero.liveObservation.capture.prepared.captureGeometry.samples[0],
+    element = syntheticCaptureElement(zero.liveObservation.capture.prepared.canvasObservation);
+    sample.elementFromPoint = element; sample.elementsFromPoint[0] = structuredClone(element) }],
+  ['foreign-label-current-canvas-first-hit', (zero) => { const geometry = zero.liveObservation.capture.prepared.captureGeometry,
+    sample = geometry.samples[0], element = { ...structuredClone(sample.elementFromPoint), pointId: null, tag: 'text' };
+    sample.elementFromPoint = element; sample.elementsFromPoint[0] = structuredClone(element)
+    geometry.obstructions = [{ kind: 'hit-stack', index: 0 }] }],
+  ['history-covers-endpoint', (zero) => { const snapshot = zero.liveObservation.capture.prepared, endpoint = snapshot.captureGeometry.endpoints[0];
+    snapshot.captureGeometry.overlays.find(({ kind }) => kind === 'history').bounds = { x: endpoint.x - 2, y: endpoint.y - 2, width: 4, height: 4 }
+    refreshSyntheticCaptureObstruction(snapshot) }],
+  ['quick-style-covers-endpoint', (zero) => { const snapshot = zero.liveObservation.capture.prepared, endpoint = snapshot.captureGeometry.endpoints[0];
+    snapshot.captureGeometry.overlays.push({ kind: 'quick-style', element: syntheticCaptureElement(snapshot.canvasObservation, { toolbar: true }),
+      bounds: { x: endpoint.x - 2, y: endpoint.y - 2, width: 4, height: 4 }, visible: true, painted: true, intersects: true }); refreshSyntheticCaptureObstruction(snapshot) }],
+  ['selection-decoration-covers-endpoint', (zero) => { const snapshot = zero.liveObservation.capture.prepared, endpoint = snapshot.captureGeometry.endpoints[0];
+    snapshot.captureGeometry.overlays.push({ kind: 'selection-decoration', element: { ...syntheticCaptureElement(snapshot.canvasObservation), pointHandle: true },
+      bounds: { x: endpoint.x - 2, y: endpoint.y - 2, width: 4, height: 4 }, visible: true, painted: true, intersects: true }); refreshSyntheticCaptureObstruction(snapshot) }],
+  ['changed-model', (zero) => { const state = zero.liveObservation.capture.preparedState, runtime = JSON.parse(state.runtimeDiagramJson);
+    runtime.strata[0].position.x++; state.runtimeDiagramJson = JSON.stringify(runtime) }],
+  ['changed-history', (zero) => { zero.liveObservation.capture.preparedState.history += ' ' }],
+  ['changed-selection', (zero) => { zero.liveObservation.capture.actions[0].stateAfter.selection = { kind: 'stratum', id: 'app-point' } }],
+  ['changed-UI-settings', (zero) => { zero.liveObservation.capture.actions[0].stateAfter.uiSettings = '{"changed":true}' }],
+  ['missing-native-collapse', (zero) => { zero.liveObservation.capture.actions = [] }],
+  ['fabricated-native-collapse', (zero) => { zero.liveObservation.capture.actions[0].controlCount = 0 }],
+  ['extra-Select-action', (zero) => { zero.liveObservation.capture.actions.push({ ...structuredClone(zero.liveObservation.capture.actions[0]), name: 'Select' }) }],
+  ['post-image-viewport-changed', (zero) => { zero.liveObservation.afterSnapshot.viewport.scrollY++ }],
+  ['post-image-point-CTM-changed', (zero) => { zero.liveObservation.afterSnapshot.geometry.point.screenCTM.e++ }],
+  ['image-frame-origin-shifted', (zero) => { zero.liveObservation.capture.image.frame.origin.y = 129 }],
+  ['image-frame-scroll-subtracted-twice', (zero) => { zero.liveObservation.capture.image.frame.ctm.f -= 129 }],
+  ['second-image-attempt', (zero) => { zero.liveObservation.capture.image.attempts = 2 }],
+  ['image-byte-record-altered', (zero) => { zero.liveObservation.capture.image.bytes++ }],
+  ['absent-capture-restoration', (zero) => { delete zero.liveObservation.capture.restoration }],
+  ['failed-capture-restoration', (zero) => { zero.liveObservation.capture.restoration.error = { message: 'controlled native expansion failure' } }],
+  ['inherited-toolbar-unrestored', (zero) => { zero.liveObservation.capture.restoration.after.toolbar.collapsed = true }],
+  ['inherited-viewport-scroll-unrestored', (zero) => { const restoration = zero.liveObservation.capture.restoration;
+    for (const snapshot of [restoration.actions[0].after, restoration.after]) {
+      snapshot.viewport.scrollY++; snapshot.captureGeometry.frame.viewport.scrollY++
+    } }],
+  ['leaked-owned-observer', (zero) => { zero.liveObservation.capture.cleanup.observerRegistries.zeroAxisCapture = { present: true, size: 1 } }],
+  ['leaked-owned-listener', (zero) => { zero.liveObservation.capture.cleanup.listenersInstalled = 1 }],
+  ['missing-Alt-cleanup', (zero) => { delete zero.liveObservation.capture.cleanup.altKeyUp }],
+]
+for (const [index, [fault, mutate]] of liveCaptureFaults.entries()) {
+  test(`synthetic full-stroke live capture direct and complete parent raw policy rejects ${fault}`, (t) => {
+    const ambientDimension = index % 2 === 0 ? 2 : 3
+    const directory = syntheticPolicyDirectory(t, 'stz-zero-capture-policy-')
+    const { evidence, raw, native, download } = syntheticSignedStandalone(directory, ambientDimension)
+    mutate(native.zeroAxisCase)
+    if (['clear-point-23-covered-extremum', 'toolbar-paint-remains-after-collapse', 'foreign-label-current-canvas-first-hit', 'history-covers-endpoint',
+      'quick-style-covers-endpoint', 'selection-decoration-covers-endpoint'].includes(fault)) {
+      const capture = native.zeroAxisCase.liveObservation.capture
+      assertZeroAxisCaptureSnapshot(capture.preparedState, capture.prepared)
+      assert.throws(() => assertZeroAxisCaptureSnapshot(capture.preparedState, capture.prepared, { requireClear: true }), /unobstructed/)
+    }
+    assert.throws(() => assertZeroAxisLiveCapture(native.zeroAxisCase.liveObservation, native.zeroAxisCase.axisInteraction, native.zeroAxisCase.livePaint))
+    writeFileSync(join(directory, `${download.scenario}-native.json`), JSON.stringify(native))
+    writeFileSync(join(directory, `${download.scenario}-live-capture.json`), JSON.stringify(native.zeroAxisCase.liveObservation))
+    assert.throws(() => assertSignedPolygonalStandaloneEvidence(evidence, raw, directory, ambientDimension))
+  })
+}
+for (const fault of ['missing-live-capture-raw', 'raw-live-capture-disagrees', 'truncated-live-PNG', 'blank-live-PNG', 'short-stroke-live-PNG']) {
+  test(`synthetic full-stroke live capture complete file policy rejects ${fault}`, (t) => {
+    const directory = syntheticPolicyDirectory(t, 'stz-zero-capture-file-policy-')
+    const { evidence, raw, native, download, livePng } = syntheticSignedStandalone(directory, 3), stem = download.scenario,
+      capturePath = join(directory, `${stem}-live-capture.json`)
+    if (fault === 'missing-live-capture-raw') unlinkSync(capturePath)
+    if (fault === 'raw-live-capture-disagrees') { const observation = structuredClone(native.zeroAxisCase.liveObservation);
+      observation.capture.decision.reason = 'fabricated-clear'; writeFileSync(capturePath, JSON.stringify(observation)) }
+    if (fault === 'truncated-live-PNG') writeFileSync(join(directory, `${stem}-live.png`), livePng.subarray(0, 33))
+    if (fault === 'blank-live-PNG' || fault === 'short-stroke-live-PNG') {
+      const zero = native.zeroAxisCase, png = syntheticZeroPng(zero.livePaint.ctm, fault !== 'blank-live-PNG', 20)
+      zero.livePaint = observeZeroAxisPixels(png, zero.livePaint.ctm); zero.liveObservation.pixels = structuredClone(zero.livePaint)
+      Object.assign(zero.liveObservation.capture.image, { bytes: png.length, sha256: zero.livePaint.sha256 })
+      assert.throws(() => assertZeroAxisPixelEvidence(zero.livePaint), 'Complete geometry cannot waive absent/short native raster paint')
+      writeFileSync(join(directory, `${stem}-live.png`), png); writeFileSync(join(directory, `${stem}-native.json`), JSON.stringify(native))
+      writeFileSync(capturePath, JSON.stringify(zero.liveObservation))
+    }
+    assert.throws(() => assertSignedPolygonalStandaloneEvidence(evidence, raw, directory, 3))
+  })
+}
+
+function syntheticLiveWorkflow(t, { ambientDimension = 2, inheritedCollapsed = false, clearExpanded = false,
+  failScreenshot, failPixelAssertion, failRetain, failRestoration, failMeasurement, shiftedPreparedFrame = false, duplicateNativeCollapse = false } = {}) {
+  const directory = syntheticPolicyDirectory(t, 'stz-zero-capture-workflow-')
+  const native = syntheticZeroNative(ambientDimension, 'background', { inheritedCollapsed, clearExpanded }),
+    state = native.axisInteraction.toolbarRestoration.stateAfter, pngPath = join(directory, 'single-live.png'), live = {},
+    calls = { controls: [], native: [], screenshots: [], retained: [], measures: 0, resourceObservations: 0 }
+  let collapsed = inheritedCollapsed
+  const page = {
+    getByRole(role, options) {
+      assert.equal(role, 'button'); assert.equal(options.exact, true)
+      assert.ok(['Collapse preview toolbar', 'Expand preview toolbar'].includes(options.name), 'Capture never selects another owner or tool')
+      calls.controls.push(options.name)
+      const expected = () => options.name === `${collapsed ? 'Expand' : 'Collapse'} preview toolbar`
+      return { count: async () => Number(expected()) * (duplicateNativeCollapse && options.name === 'Collapse preview toolbar' ? 2 : 1),
+        waitFor: async (wait) => { assert.deepEqual(wait, { state: 'visible', timeout: 5000 }); assert.equal(expected(), true) },
+        click: async (click) => {
+          assert.deepEqual(click, { timeout: 5000 }, 'Capture uses one normal native control gesture without force')
+          assert.equal(expected(), true); calls.native.push(options.name)
+          if (options.name === 'Expand preview toolbar' && failRestoration) throw failRestoration
+          collapsed = options.name === 'Collapse preview toolbar'
+        } }
+    },
+    locator(selector) { return { waitFor: async (options) => {
+      assert.equal(options.timeout, 5000)
+      if (selector === 'section.preview-floating-toolbar') assert.equal(options.state, collapsed ? 'detached' : 'visible')
+      else { assert.equal(selector, `.preview-toolbar-overlay-stack${collapsed ? '.is-collapsed' : ':not(.is-collapsed)'}`); assert.equal(options.state, 'visible') }
+    } } },
+    async screenshot(options) {
+      calls.screenshots.push(structuredClone(options))
+      assert.deepEqual(options, { path: pngPath, fullPage: false, scale: 'css', timeout: 5000 })
+      assert.equal(calls.retained.at(-1).boundary, 'single-image-attempt', 'Fresh geometry and single image intent precede screenshot bytes')
+      assert.equal(live.snapshot.toolbar.collapsed, inheritedCollapsed || !clearExpanded)
+      if (failScreenshot) throw failScreenshot
+      const png = syntheticZeroPng(live.snapshot.geometry.contour.screenCTM)
+      writeFileSync(pngPath, png); return png
+    },
+    async evaluate() { calls.resourceObservations++; return structuredClone(native.liveObservation.capture.cleanup) },
+  }
+  const measure = async () => {
+    calls.measures++
+    if (calls.measures === failMeasurement?.at) throw failMeasurement.error
+    const base = structuredClone(native.axisInteraction.actions.at(-1).after)
+    if (shiftedPreparedFrame && collapsed && !inheritedCollapsed) {
+      for (const kind of ['canvas', 'point', 'contour']) base.geometry[kind].screenCTM.f += 9
+      base.geometry.canvas.bounds = { x: 43, y: 139.375, width: 1414, height: 1018 }
+      for (const entry of base.coincidentContours) { entry.pointScreenCTM.f += 9; entry.contour.screenCTM.f += 9 }
+    }
+    const snapshot = syntheticZeroCaptureSnapshot(base, state, collapsed, clearExpanded)
+    snapshot.at = 1000 + calls.measures
+    assertZeroAxisCaptureSnapshot(state, snapshot)
+    return { state: structuredClone(state), snapshot }
+  }
+  const retain = async (boundary, record) => {
+    calls.retained.push({ boundary, record: structuredClone(record) })
+    if (boundary === failRetain?.boundary) throw failRetain.error
+  }
+  const args = { page, measure, retain, pngPath, interaction: native.axisInteraction, live, inspect: observeZeroAxisPixels,
+    assertPixels(pixels) { assertZeroAxisPixelEvidence(pixels); if (failPixelAssertion) throw failPixelAssertion } }
+  return { args, calls, native, live, isCollapsed: () => collapsed }
+}
+for (const mode of ['measured-collapse', 'inherited-collapsed', 'clear-expanded']) {
+  test(`synthetic native live lifecycle ${mode} takes one complete image with owned restoration and independent measurements`, async (t) => {
+    const fixture = syntheticLiveWorkflow(t, { ambientDimension: mode === 'inherited-collapsed' ? 3 : 2,
+      inheritedCollapsed: mode === 'inherited-collapsed', clearExpanded: mode === 'clear-expanded' })
+    const result = await captureZeroAxisLive(fixture.args)
+    assert.equal(result, fixture.live); assert.equal(fixture.calls.screenshots.length, 1)
+    assert.deepEqual(fixture.calls.native, mode === 'measured-collapse' ? ['Collapse preview toolbar', 'Expand preview toolbar'] : [])
+    assert.equal(fixture.isCollapsed(), mode === 'inherited-collapsed'); assert.equal(fixture.calls.resourceObservations, 1)
+    assert.ok(result.snapshot.at < result.afterSnapshot.at && result.afterSnapshot.at < result.capture.restoration.before.at
+      && result.capture.restoration.before.at < result.capture.restoration.after.at)
+    const retainedBytes = fixture.calls.retained.find(({ boundary }) => boundary === 'bytes-before-inspection').record
+    assert.equal(retainedBytes.pixels, undefined, 'Raw image path/bytes/hash/dimensions precede pixel inspection')
+    assert.equal(retainedBytes.capture.image.bytes, result.pixels.bytes)
+    assert.equal(retainedBytes.capture.image.sha256, result.pixels.sha256)
+    assert.deepEqual(result.capture.cleanup, fixture.native.liveObservation.capture.cleanup)
+  })
+}
+test('synthetic native live lifecycle binds a changed native preparation frame to one image and restores the original frame', async (t) => {
+  const fixture = syntheticLiveWorkflow(t, { ambientDimension: 3, shiftedPreparedFrame: true }), result = await captureZeroAxisLive(fixture.args)
+  assert.equal(result.snapshot.geometry.contour.screenCTM.f, result.capture.inherited.geometry.contour.screenCTM.f + 9)
+  assert.deepEqual(result.pixels.ctm, result.snapshot.geometry.contour.screenCTM)
+  assert.deepEqual(result.capture.image.frame.ctm, result.snapshot.geometry.contour.screenCTM)
+  assert.deepEqual(result.capture.restoration.after.geometry.contour.screenCTM, result.capture.inherited.geometry.contour.screenCTM)
+  assert.equal(result.state.runtimeDiagramJson, result.capture.inheritedState.runtimeDiagramJson)
+  assert.equal(fixture.calls.screenshots.length, 1); assert.deepEqual(fixture.calls.native, ['Collapse preview toolbar', 'Expand preview toolbar'])
+})
+test('synthetic native live lifecycle rejects actual duplicate controls before collapse or image input', async (t) => {
+  const fixture = syntheticLiveWorkflow(t, { duplicateNativeCollapse: true })
+  await assert.rejects(captureZeroAxisLive(fixture.args), /one unique native toolbar control/)
+  assert.equal(fixture.calls.screenshots.length, 0); assert.deepEqual(fixture.calls.native, [])
+  assert.equal(fixture.isCollapsed(), false); assert.equal(fixture.calls.resourceObservations, 1)
+  assert.equal(fixture.live.capture.restoration.after.toolbar.collapsed, false)
+})
+for (const phase of ['screenshot', 'image-evidence', 'pixel-oracle']) {
+  test(`synthetic native live lifecycle preserves exact primary ${phase} Error when native restoration also fails`, async (t) => {
+    const primary = new Error(`controlled primary ${phase}`), secondary = new Error('controlled secondary native expand')
+    const fixture = syntheticLiveWorkflow(t, { ambientDimension: 3, failRestoration: secondary,
+      ...(phase === 'screenshot' ? { failScreenshot: primary } : phase === 'image-evidence'
+        ? { failRetain: { boundary: 'bytes-before-inspection', error: primary } } : { failPixelAssertion: primary }) })
+    await assert.rejects(captureZeroAxisLive(fixture.args), (error) => error === primary)
+    assert.equal(isZeroAxisLiveCaptureFailure(primary), true, 'Outer failure diagnostics cannot add another screenshot')
+    assert.equal(fixture.calls.screenshots.length, 1); assert.deepEqual(fixture.calls.native, ['Collapse preview toolbar', 'Expand preview toolbar'])
+    assert.equal(fixture.live.capture.primary.message, primary.message)
+    assert.ok(fixture.live.capture.secondaryErrors.some(({ message }) => message === secondary.message))
+    assert.equal(fixture.live.capture.restoration.error.message, secondary.message)
+    assert.equal(fixture.calls.resourceObservations, 1)
+    assert.equal(Object.keys(primary).length, 0, 'Primary Error identity and properties remain owned by its original source')
+  })
+}
+for (const boundary of ['before-restoration', 'restore-expand-before-native-action']) {
+  test(`synthetic native live lifecycle still restores the inherited toolbar when ${boundary} evidence persistence fails`, async (t) => {
+    const primary = new Error(`controlled ${boundary} persistence failure`), fixture = syntheticLiveWorkflow(t, { failRetain: { boundary, error: primary } })
+    await assert.rejects(captureZeroAxisLive(fixture.args), (error) => error === primary)
+    assert.equal(fixture.calls.screenshots.length, 1); assert.deepEqual(fixture.calls.native, ['Collapse preview toolbar', 'Expand preview toolbar'])
+    assert.equal(fixture.isCollapsed(), false); assert.equal(fixture.calls.resourceObservations, 1)
+    assert.equal(fixture.live.capture.primary.message, primary.message)
+    assert.equal(fixture.live.capture.restoration.after.toolbar.collapsed, false)
+  })
+}
+test('synthetic native live lifecycle preserves screenshot failure and completes restoration after cleanup evidence failure', async (t) => {
+  const primary = new Error('controlled image failure'), cleanup = new Error('controlled cleanup evidence failure'),
+    fixture = syntheticLiveWorkflow(t, { failScreenshot: primary, failRetain: { boundary: 'before-restoration', error: cleanup } })
+  await assert.rejects(captureZeroAxisLive(fixture.args), (error) => error === primary)
+  assert.equal(fixture.calls.screenshots.length, 1); assert.equal(fixture.isCollapsed(), false)
+  assert.ok(fixture.live.capture.secondaryErrors.some(({ message }) => message === cleanup.message))
+  assert.deepEqual(fixture.calls.native, ['Collapse preview toolbar', 'Expand preview toolbar']); assert.equal(fixture.calls.resourceObservations, 1)
+})
+test('synthetic native live lifecycle restores the actual toolbar after restoration measurement fails', async (t) => {
+  const primary = new Error('controlled fresh cleanup measurement failure'),
+    fixture = syntheticLiveWorkflow(t, { failMeasurement: { at: 5, error: primary } })
+  await assert.rejects(captureZeroAxisLive(fixture.args), (error) => error === primary)
+  assert.equal(fixture.calls.screenshots.length, 1); assert.equal(fixture.isCollapsed(), false)
+  assert.deepEqual(fixture.calls.native, ['Collapse preview toolbar', 'Expand preview toolbar'])
+  assert.equal(fixture.live.capture.primary.message, primary.message); assert.equal(fixture.calls.resourceObservations, 1)
+  assert.equal(fixture.live.capture.restoration.after.toolbar.collapsed, false)
+})
+test('synthetic native live lifecycle retains a first final-evidence failure after complete actual restoration', async (t) => {
+  const primary = new Error('controlled final restored evidence failure'),
+    fixture = syntheticLiveWorkflow(t, { failRetain: { boundary: 'restored-after-image-attempt', error: primary } })
+  await assert.rejects(captureZeroAxisLive(fixture.args), (error) => error === primary)
+  assert.equal(fixture.calls.screenshots.length, 1); assert.equal(fixture.isCollapsed(), false)
+  assert.equal(fixture.live.capture.primary.message, primary.message); assert.equal(isZeroAxisLiveCaptureFailure(primary), true)
+  assert.deepEqual(fixture.calls.native, ['Collapse preview toolbar', 'Expand preview toolbar'])
+})
 for (const outsideTarget of ['background', 'root']) {
   test(`synthetic authenticated zero-axis ${outsideTarget} accepts fresh actions and complete parent raw records in both dimensions`, (t) => {
     for (const ambientDimension of [2, 3]) {
-      const directory = mkdtempSync(join(tmpdir(), 'stz-zero-outside-policy-')); t.after(() => rmSync(directory, { recursive: true, force: true }))
+      const directory = syntheticPolicyDirectory(t, 'stz-zero-outside-policy-')
       const { evidence, raw } = syntheticSignedStandalone(directory, ambientDimension, outsideTarget)
       const zero = evidence.zeroAxisCases.find((entry) => entry.ambientDimension === ambientDimension)
       for (const action of zero.axisInteraction.actions) {
@@ -468,7 +914,7 @@ const freshOutsideFaults = [
 ]
 for (const [fault, mutate] of freshOutsideFaults) {
   test(`synthetic authenticated zero-axis fresh and complete raw policy rejects ${fault}`, (t) => {
-    const directory = mkdtempSync(join(tmpdir(), 'stz-zero-outside-policy-')); t.after(() => rmSync(directory, { recursive: true, force: true }))
+    const directory = syntheticPolicyDirectory(t, 'stz-zero-outside-policy-')
     const { evidence, raw, native, download } = syntheticSignedStandalone(directory)
     const action = native.zeroAxisCase.axisInteraction.actions[0]
     mutate(action)
@@ -519,7 +965,7 @@ const outsideNativeFaults = [
 ]
 for (const [fault, mutate] of outsideNativeFaults) {
   test(`synthetic authenticated zero-axis complete native raw policy rejects ${fault}`, (t) => {
-    const directory = mkdtempSync(join(tmpdir(), 'stz-zero-outside-policy-')); t.after(() => rmSync(directory, { recursive: true, force: true }))
+    const directory = syntheticPolicyDirectory(t, 'stz-zero-outside-policy-')
     const { evidence, raw, native, download } = syntheticSignedStandalone(directory, 3,
       fault === 'root-input-spurious-capture' ? 'root' : 'background')
     mutate(native.zeroAxisCase.axisInteraction)
@@ -593,7 +1039,7 @@ for (const ambientDimension of [2, 3]) for (const fault of ['missing-polygon', '
 }
 for (const ambientDimension of [2, 3]) {
   test(`synthetic additive ${ambientDimension}D raw acceptance replays complete lossless PNG bytes`, (t) => {
-    const directory = mkdtempSync(join(tmpdir(), 'stz-signed-zero-policy-')); t.after(() => rmSync(directory, { recursive: true, force: true }))
+    const directory = syntheticPolicyDirectory(t, 'stz-signed-zero-policy-')
     const { evidence, raw } = syntheticSignedStandalone(directory, ambientDimension)
     assertLayoutAnchorEvidence(evidence, signedPolygonalScenario)
     assertSignedPolygonalStandaloneEvidence(evidence, raw, directory, ambientDimension)
@@ -602,7 +1048,7 @@ for (const ambientDimension of [2, 3]) {
     'wrong-reopened-path', 'wrong-reopened-transform', 'wrong-root', 'wrong-png', 'blank-png', 'png-header-only',
     'wrong-pixel-ctm', 'wrong-tikz', 'wrong-saved-json']) {
     test(`synthetic additive ${ambientDimension}D standalone policy rejects ${fault}`, (t) => {
-      const directory = mkdtempSync(join(tmpdir(), 'stz-signed-zero-policy-')); t.after(() => rmSync(directory, { recursive: true, force: true }))
+      const directory = syntheticPolicyDirectory(t, 'stz-signed-zero-policy-')
       const fixture = syntheticSignedStandalone(directory, ambientDimension), { evidence, raw, native, download } = fixture, stem = download.scenario
       if (fault === 'missing-native-raw') unlinkSync(join(directory, `${stem}-native.json`))
       if (fault === 'wrong-native-record') { native.scenario = 'point-layout-native-interaction-2d-3d'; writeFileSync(join(directory, `${stem}-native.json`), JSON.stringify(native)) }
@@ -1228,8 +1674,7 @@ for (const fault of ['missing-preparation', 'observed-preparation', 'trapezium-b
 }
 for (const background of ['transparent', 'white']) {
   test(`32D synthetic standalone ${background} policy accepts only complete raster and raw placement`, (t) => {
-    const directory = mkdtempSync(join(tmpdir(), 'stz-32d-standalone-policy-'))
-    t.after(() => rmSync(directory, { recursive: true, force: true }))
+    const directory = syntheticPolicyDirectory(t, 'stz-32d-standalone-policy-')
     const fixture = syntheticStandalonePointDownload(directory, `point-layout-pending-${background === 'transparent' ? 'transparent-edit' : 'white-load'}`)
     assert.equal(fixture.raw.result, 'observed'); assert.equal(fixture.raw.capture.before.bodyExists, false)
     assertLayoutStandaloneEvidence(fixture.evidence, fixture.raw, directory)
@@ -1294,8 +1739,7 @@ for (const fault of ['pending', 'missing-record', 'unrelated-scenario', 'wrong-p
   'missing-view-artifact', 'unrelated-view-artifact', 'wrong-view-artifact-group', 'passed-view-artifact', 'failed-view-artifact',
   'view-artifact-disagrees', 'view-artifact-authored-provenance', 'missing-raw-view', 'raw-view-disagrees', 'raw-view-authored-provenance']) {
   test(`32D standalone parent contract rejects ${fault}`, (t) => {
-    const directory = mkdtempSync(join(tmpdir(), 'stz-32d-standalone-policy-'))
-    t.after(() => rmSync(directory, { recursive: true, force: true }))
+    const directory = syntheticPolicyDirectory(t, 'stz-32d-standalone-policy-')
     const fixture = syntheticStandalonePointDownload(directory, 'point-layout-pending-transparent-edit')
     const { evidence, raw } = fixture, capture = raw.capture
     if (fault === 'pending') capture.status = 'pending'
@@ -1357,7 +1801,7 @@ const phase31fGroups = ['existing-renderer-regressions', 'independent-oracle-neg
   'inverted-success-and-failure-races', 'pending-lock-and-autohide', 'deletion-and-unmount', 'real-App-input-JSON-history-reused-ID-load', 'current-SVG-cloning',
   'inline-node-rendering-placement-halo-picking', 'inline-node-lifecycle-path-operations-export', 'settled-SVG-export-standalone', 'combined-free-inline-workflows']
 function reportFixture(t) {
-  const root = mkdtempSync(join(tmpdir(), 'stz-32d-policy-')); t.after(() => rmSync(root, { recursive: true, force: true }))
+  const root = syntheticPolicyDirectory(t, 'stz-32d-policy-')
   const checkout = { revision: 'exact', trackedDiffSha256: 'tracked', untrackedSha256: { 'layout-fixture.ts': 'untracked' } }
   const report = { result: 'passed', stage: 'complete', environment: { browserVersion: 'controlled policy fixture' }, checkout,
     completed: [...phase31fGroups, ...Object.keys(allPointNodeScenarios)], incompleteGroups: [], unexecuted: [], pageErrors: [], evidence: [] }

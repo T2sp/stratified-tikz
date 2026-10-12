@@ -10,6 +10,7 @@ import { layoutAnchorGroup } from './pointLayoutAnchorsContract.mjs'
  * STZ_BROWSER_EXECUTABLE=/absolute/path/to/chrome node scripts/checkFreeLabels.mjs
  */
 import assert from 'node:assert/strict'
+import { isZeroAxisLiveCaptureFailure } from './zeroAxisLiveCaptureWorkflow.mjs'
 import { mkdir, writeFile } from 'node:fs/promises'
 import { isAbsolute, resolve } from 'node:path'
 import { pathToFileURL } from 'node:url'
@@ -496,7 +497,7 @@ try {
   // rejects. No diagnostic or teardown error may replace the scenario error.
   await saveFailure()
   console.error(`Free-label browser acceptance failed at ${stage}; evidence: ${artifactDir}`)
-  if (page) {
+  if (page && !isZeroAxisLiveCaptureFailure(error)) {
     try {
       await page.screenshot({ path: resolve(artifactDir, 'failure.png'), fullPage: false, timeout: 5_000 })
     } catch (screenshotError) {

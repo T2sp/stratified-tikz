@@ -10,6 +10,7 @@ import { assertPendingLayoutFixture } from './pointLayoutPendingFixture.mjs'
 import { assertPendingLayoutViewEvidence } from './pointLayoutPendingView.mjs'
 import { createHash } from 'node:crypto'
 import { decodeConnectedPaintPng } from './connectedLivePaintOracle.mjs'
+import { assertZeroAxisLiveCapture } from './zeroAxisLiveCapture.mjs'
 
 export const layoutAnchorGroup = 'point-node-layout-anchors-combined'
 export const layoutShapes = ['circle', 'rectangle', 'square', 'triangle', 'ellipse', 'diamond', 'regular polygon',
@@ -97,7 +98,7 @@ export function layoutAnchorArtifacts(name) {
   const files = [`${name}.json`]
   if (name === signedPolygonalScenario) for (const ambientDimension of [2, 3]) {
     const stem = `${name}-${ambientDimension}d`
-    files.push(`${stem}-native.json`, `${stem}-live.png`, `${stem}.svg`, `${stem}.png`, `${stem}-standalone.json`,
+    files.push(`${stem}-native.json`, `${stem}-live-capture.json`, `${stem}-live.png`, `${stem}.svg`, `${stem}.png`, `${stem}-standalone.json`,
       `${stem}-saved.json`, `${stem}-standalone.tex`, `${stem}-inlineMath.tex`)
   }
   if (name.startsWith('point-layout-pending-')) files.push(`${name}-preparation.json`, `${name}.svg`, `${name}.png`, `${name}-standalone.json`, `${name}-standalone.tex`, `${name}-inlineMath.tex`)
@@ -810,14 +811,14 @@ function assertZeroAxisNativeCase(entry, ambientDimension) {
     for (const id of ids) assertCurrentEmptyPoint(action.stateBefore, id, ambientDimension, 'ellipse', zeroAxisLayout, position)
   }
   const live = entry.liveObservation
-  assert.ok(live, 'Actual live paint capture retains fresh current observations after owned toolbar restoration')
-  for (const field of ['json', 'runtimeDiagramJson', 'history', 'selection', 'labelDocumentRevision', 'uiSettings']) assert.deepEqual(live.state[field], workflow.toolbarRestoration.stateAfter[field])
-  assert.equal(live.snapshot.labelDocumentRevision, live.state.labelDocumentRevision); assert.deepEqual(live.snapshot.selection, live.state.selection)
-  assert.deepEqual(live.snapshot.layout, workflow.actions.at(-1).after.layout)
-  assert.deepEqual(entry.livePaint.ctm, live.snapshot.geometry.contour.screenCTM)
-  assert.deepEqual(live.afterSnapshot.geometry.contour.screenCTM, live.snapshot.geometry.contour.screenCTM)
-  assert.deepEqual(live.afterSnapshot.geometry.canvas.screenCTM, live.snapshot.geometry.canvas.screenCTM)
-  for (const field of ['json', 'runtimeDiagramJson', 'history', 'selection', 'labelDocumentRevision', 'uiSettings']) assert.deepEqual(live.afterState[field], live.state[field])
+  assert.ok(live, 'Actual live paint capture retains a separate lifecycle after completed interaction restoration')
+  assertZeroAxisLiveCapture(live, workflow, entry.livePaint)
+  for (const [state, snapshot] of [[live.capture.inheritedState, live.capture.inherited], [live.state, live.snapshot],
+    [live.afterState, live.afterSnapshot], [live.capture.restoration.stateAfter, live.capture.restoration.after]]) {
+    assertCurrentCoincidentZeroAxisContours(snapshot, state)
+    assert.deepEqual(snapshot.layout, workflow.actions.at(-1).after.layout, 'Every capture boundary keeps the authenticated native owner/source/request')
+  }
+  assert.deepEqual(live.pixels, entry.livePaint, 'Live lifecycle retains the exact inspected image evidence')
   assertZeroAxisPixelEvidence(entry.livePaint)
 }
 export function assertSignedPolygonalZeroAxisEvidence(evidence) {
@@ -921,5 +922,11 @@ export function assertSignedPolygonalStandaloneEvidence(evidence, raw, artifactD
   assert.equal(native.scenario, signedPolygonalScenario); assert.equal(native.group, layoutAnchorGroup); assert.equal(native.result, 'observed')
   assert.deepEqual(native.polygonalCases, evidence.polygonalCases.filter((entry) => entry.ambientDimension === ambientDimension))
   assert.deepEqual(native.zeroAxisCase, evidence.zeroAxisCases.find((entry) => entry.ambientDimension === ambientDimension))
-  assert.deepEqual(observeZeroAxisPixels(readFileSync(resolve(artifactDir, `${stem}-live.png`)), native.zeroAxisCase.livePaint.ctm), native.zeroAxisCase.livePaint)
+  const capture = JSON.parse(readFileSync(resolve(artifactDir, `${stem}-live-capture.json`), 'utf8'))
+  assert.deepEqual(capture, native.zeroAxisCase.liveObservation, 'Parent replays the actual complete capture lifecycle raw file')
+  assert.equal(capture.capture.image.path, resolve(artifactDir, `${stem}-live.png`), 'Live PNG path is the exact owned artifact')
+  const liveBytes = readFileSync(capture.capture.image.path)
+  assert.equal(liveBytes.length, capture.capture.image.bytes)
+  assert.equal(createHash('sha256').update(liveBytes).digest('hex'), capture.capture.image.sha256)
+  assert.deepEqual(observeZeroAxisPixels(liveBytes, capture.capture.image.frame.ctm), native.zeroAxisCase.livePaint)
 }

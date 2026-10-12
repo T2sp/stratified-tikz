@@ -4,7 +4,7 @@ import { resolve } from 'node:path'
 import { pathToFileURL } from 'node:url'
 import { layoutAnchorGroup as group, layoutShapes, layoutRegimes, layoutForShapeRegime, pointAnchorsForShape,
   layoutShapeParameters, layoutAnchorArtifacts, assertLayoutAnchorEvidence, assertPointTikzSourceByMode,
-  signedAnchorCases, signedPickingCases, signedPolygonalScenario, signedPolygonalCases, zeroAxisLayout,
+  signedAnchorCases, signedPickingCases, signedPolygonalScenario, signedPolygonalCases, zeroAxisLayout, zeroAxisHalfExtent,
   assertZeroAxisTraversal, observeZeroAxisPixels, assertZeroAxisPixelEvidence, assertFreshZeroAxisAction, assertZeroAxisNativeAction } from './pointLayoutAnchorsContract.mjs'
 import { layoutImportCases as importCases } from './pointLayoutAnchorsContract.mjs'
 import { createOwnedAppPage } from './ownedAppPage.mjs'
@@ -23,6 +23,8 @@ import { buildPendingLayoutFixture, assertPendingLayoutFixture, resolvePendingLa
 import { preparePendingLayoutPoint, capturePendingLayoutPreparation,
   assertPendingLayoutClickContinuation } from './pointLayoutPendingPreparation.mjs'
 import { changePendingLayoutView } from './pointLayoutPendingView.mjs'
+import { observeZeroAxisCapture } from './zeroAxisLiveCapture.mjs'
+import { captureZeroAxisLive, isZeroAxisLiveCaptureFailure, markZeroAxisLiveCaptureFailure } from './zeroAxisLiveCaptureWorkflow.mjs'
 
 const paint = { text: { color: '#203040', opacity: 1 }, fill: { enabled: true, color: '#d8ecff', opacity: .7 },
   stroke: { enabled: true, color: '#203040', opacity: 1, width: .4, lineStyle: 'solid', dashPhase: 0, lineCap: 'butt', lineJoin: 'miter' } }
@@ -130,7 +132,7 @@ export async function runPointLayoutAnchorChecks({ browser, origin, artifactDir,
   const page = await context.newPage(), url = `${origin}/stratified-tikz/scripts/fixtures/freeLabelsApp.html`
   const app = createOwnedAppPage({ page, expectedUrl: url, artifactDir, prefix: 'point-layout-app' })
   const diagnostic = createPointDiagnostics({ artifactDir, observe, artifactPrefix: 'point-layout-selection' })
-  let scenario = 'point-layout-per-shape-spacing-minima', primary, selectionSequence = 0
+  let scenario = 'point-layout-per-shape-spacing-minima', primary, selectionSequence = 0, currentLiveCapture
   async function retainFailure(name, details) {
     try { await writeFile(resolve(artifactDir, name), JSON.stringify(details, null, 2) + '\n') }
     catch (error) { pageErrors.push(`Failure evidence ${name}: ${error.message}`); console.error(`Layout failure evidence ${name}: ${error.message}`) }
@@ -812,22 +814,36 @@ export async function runPointLayoutAnchorChecks({ browser, origin, artifactDir,
       const rendered = await select('zero-overlap')
       const zeroAxisCase = { ambientDimension, layout: structuredClone(zeroAxisLayout), rendered, state: await state() }
       zeroAxisCase.axisInteraction = await zeroAxisInput()
-      await observe(`${scenario}-${ambientDimension}d-zero-axis-traversal`, { group, result: 'observed', zeroAxisCase })
+      await writeFile(resolve(artifactDir, `${stem}-native.json`), JSON.stringify({ scenario, group, result: 'observed',
+        polygonalCases: inDimension, zeroAxisCase }, null, 2) + '\n')
+      await observe(`${scenario}-${ambientDimension}d-zero-axis-traversal`, { group, result: 'observed', artifact: `${stem}-native.json` })
       assertZeroAxisTraversal(rendered)
-      zeroAxisCase.liveObservation = { state: await state(),
-        snapshot: await page.evaluate(observeGeometricSelection, { id: 'zero-overlap', click: null, token: null }) }
-      await observe(`${stem}-live-paint-before-capture`, { group, result: 'observed', zeroAxisCase })
-      const liveBytes = await page.screenshot({ path: resolve(artifactDir, `${stem}-live.png`), fullPage: false, scale: 'css', timeout: 5000 })
-      zeroAxisCase.liveObservation.afterState = await state()
-      zeroAxisCase.liveObservation.afterSnapshot = await page.evaluate(observeGeometricSelection, { id: 'zero-overlap', click: null, token: null })
-      const liveCtm = zeroAxisCase.liveObservation.snapshot.geometry.contour.screenCTM
-      await observe(`${stem}-live-paint-bytes-before-inspection`, { group, result: 'observed', zeroAxisCase, bytes: liveBytes.length, path: `${stem}-live.png` })
-      zeroAxisCase.livePaint = observeZeroAxisPixels(liveBytes, liveCtm)
+      zeroAxisCase.liveObservation = {}
+      currentLiveCapture = zeroAxisCase
+      const retainLive = async (boundary, live) => {
+        if (live.pixels) zeroAxisCase.livePaint = live.pixels
+        await writeFile(resolve(artifactDir, `${stem}-live-capture.json`), JSON.stringify(live, null, 2) + '\n')
+        await writeFile(resolve(artifactDir, `${stem}-native.json`), JSON.stringify({ scenario, group, result: 'observed',
+          polygonalCases: inDimension, zeroAxisCase }, null, 2) + '\n')
+        await observe(`${stem}-live-paint-${boundary}`, { group, result: 'observed',
+          artifact: `${stem}-live-capture.json`, nativeArtifact: `${stem}-native.json`, image: live.capture.image })
+      }
+      await captureZeroAxisLive({ page, pngPath: resolve(artifactDir, `${stem}-live.png`),
+        live: zeroAxisCase.liveObservation, interaction: zeroAxisCase.axisInteraction,
+        measure: async () => {
+          const current = await state()
+          const snapshot = await page.evaluate(observeGeometricSelection, { id: 'zero-overlap', click: null,
+            token: null, coincidentIds: ['app-point', 'zero-overlap'] })
+          return { state: current, snapshot: await page.evaluate(observeZeroAxisCapture, { snapshot, halfExtent: zeroAxisHalfExtent }) }
+        }, retain: retainLive, inspect: observeZeroAxisPixels, assertPixels: assertZeroAxisPixelEvidence })
+      zeroAxisCase.livePaint = zeroAxisCase.liveObservation.pixels
       zeroAxisCases.push(zeroAxisCase)
       await writeFile(resolve(artifactDir, `${stem}-native.json`), JSON.stringify({ scenario, group, result: 'observed',
         polygonalCases: inDimension, zeroAxisCase }, null, 2) + '\n')
-      await observe(`${stem}-native-before-assertion`, { group, result: 'observed', zeroAxisCase })
+      await observe(`${stem}-native-before-assertion`, { group, result: 'observed',
+        artifact: `${stem}-native.json`, captureArtifact: `${stem}-live-capture.json` })
       assertZeroAxisPixelEvidence(zeroAxisCase.livePaint)
+      currentLiveCapture = undefined
 
       // Additive standalone fixture: six default-parameter signed polygons and
       // one visibly retraced empty ellipse. The pending fifteen-point fixture
@@ -993,8 +1009,11 @@ export async function runPointLayoutAnchorChecks({ browser, origin, artifactDir,
     assert.deepEqual(pageErrors, []); await completeGroup(group)
   } catch (error) {
     primary = error
-    await retainFailure('point-layout-failure.json', { scenario, group, result: 'failed', pageErrors, error: { message: error.message, stack: error.stack } })
-    try { await app.failure(error, { scenario, pageErrors }, { captureScreenshot: !scenario.startsWith('point-layout-pending-') }) } catch (diagnosticError) {
+    if (currentLiveCapture) markZeroAxisLiveCaptureFailure(error)
+    const liveCapture = isZeroAxisLiveCaptureFailure(error) ? currentLiveCapture : undefined
+    await retainFailure('point-layout-failure.json', { scenario, group, result: 'failed', pageErrors, liveCapture, error: { message: error.message, stack: error.stack } })
+    try { await app.failure(error, { scenario, pageErrors, liveCapture }, { captureScreenshot: !scenario.startsWith('point-layout-pending-')
+      && !isZeroAxisLiveCaptureFailure(error) }) } catch (diagnosticError) {
       await retainFailure('point-layout-secondary-failure.json', { primary: error.message, diagnostic: diagnosticError.message })
     }
     throw error
