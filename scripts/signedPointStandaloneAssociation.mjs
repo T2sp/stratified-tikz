@@ -368,6 +368,7 @@ function assertFileLocal(input, xml) {
   assert.equal(elements.filter(({ tag }) => tag === 'g').length, 36)
   assert.equal(elements.filter(({ tag }) => tag === 'path').length, 7)
   assert.ok(elements.every(({ tag }) => ['svg', 'g', 'path', 'title'].includes(tag)), 'Only the seven empty point owners paint this scoped fixture')
+  assert.ok(elements.every(({ text }) => text === ''), 'Empty-source native shells contain no stray text')
   assert.ok(elements.every(({ attributes }) => Object.keys(attributes)
     .every((name) => !name.startsWith('data-') && !name.startsWith('aria-'))), 'The entire downloaded point fixture remains metadata-sanitized')
   for (const [ordinal, actual] of input.reopened.entries()) {
@@ -380,6 +381,16 @@ function assertFileLocal(input, xml) {
     assert.deepEqual(actual.structure.nodePath, [0, ordinal, 0])
     assert.equal(body.children[1].tag, 'g'); assert.equal(body.children[1].children.length, 1)
     assert.equal(body.children[1].children[0].tag, 'g'); assert.equal(body.children[1].children[0].children.length, 0)
+    const association = input.association.associations.find((entry) => entry.actualDomOrdinal === ordinal)
+    assert.ok(association, 'The empty shell belongs to its authenticated immutable owner')
+    const style = input.expected[association.expectedIndex].modelPoint.style
+    assert.deepEqual(title.attributes, {})
+    // svgLabelView retains the native ink/content groups for empty source. Bind
+    // their complete attributes to immutable authored paint without adding ink.
+    assert.deepEqual(body.children[1].attributes, { transform: 'translate(0 0)',
+      opacity: String(style.opacity * style.paint.text.opacity),
+      fill: style.paint.text.color, color: style.paint.text.color, 'pointer-events': 'none' })
+    assert.deepEqual(body.children[1].children[0].attributes, {})
     assert.deepEqual(node.children.map(({ tag }) => tag), structure.nodeChildTags)
     assert.deepEqual(body.children.map(({ tag }) => tag), structure.bodyChildTags)
     assert.equal(title.text, actual.source); assert.equal(title.children.length, 0)

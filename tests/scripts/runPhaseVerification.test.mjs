@@ -1,39 +1,22 @@
 import assert from 'node:assert/strict'
 import { spawnSync } from 'node:child_process'
 import { createHash } from 'node:crypto'
-import {
-  mkdirSync,
-  mkdtempSync,
-  readFileSync,
-  realpathSync,
-  rmSync,
-  unlinkSync,
-  writeFileSync,
-} from 'node:fs'
+import { mkdirSync, mkdtempSync, readFileSync, realpathSync, rmSync, unlinkSync, writeFileSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { dirname, join, relative } from 'node:path'
 import test from 'node:test'
-import {
-  browserChecksForPhase,
-  pointNodeScenarios,
-  pointNodeScenarioArtifacts,
-  captureCheckoutIdentity,
-  runPhaseVerification,
-  verificationMatchesCheckout,
-  hasWholePointSvg,
-  validateBrowserEvidence,
-  allPointNodeScenarios,
-} from '../../scripts/automation/phase-verification.mjs'
+import { browserChecksForPhase, pointNodeScenarios, pointNodeScenarioArtifacts, captureCheckoutIdentity, runPhaseVerification, verificationMatchesCheckout, hasWholePointSvg, validateBrowserEvidence, allPointNodeScenarios } from '../../scripts/automation/phase-verification.mjs'
 import { createEvidencePublisher, readEvidenceDocumentSync } from '../../scripts/evidencePublication.mjs'
 import { layoutAnchorGroup, assertLayoutStandaloneEvidence, assertLayoutPostClickViewDiagnostic } from '../../scripts/pointLayoutAnchorsContract.mjs'
 import { syntheticStandalonePointDownload } from './standalonePointDownloadFixture.mjs'
+import { populatePhase32dParentEvidence } from './phase32dParentEvidenceFixture.mjs'
+import { syntheticZeroPng } from './signedPointStandaloneFixture.mjs'
+import { pointGroups, importRegressionScenarios, correctionScenarios, continuityScenarios, targetedPaintScenarios, synchronizeClearSnapshot, polygonJoinEvidence, completePointEvidence } from './phase32abParentEvidenceFixture.mjs'
 
 import { dashCapScenario, dashCapArtifacts } from '../../scripts/pointDashCapContract.mjs'
-import { dashCapEvidence, syntheticDashCapLivePng } from './dashCapEvidenceFixture.mjs'
 import { dashCapMechanismStem, dashCapMechanismArtifacts } from '../../scripts/pointDashCapMechanismContract.mjs'
-import { syntheticMechanismEvidence, syntheticMechanismLiveSvg, syntheticMechanismLivePng } from './pointDashCapMechanismFixture.mjs'
 
-import { polygonJoinScenario, polygonJoinCases, polygonJoinScales, polygonJoinArtifacts, assertPolygonJoinEvidence } from '../../scripts/pointPolygonJoinContract.mjs'
+import { polygonJoinScenario, polygonJoinArtifacts, assertPolygonJoinEvidence } from '../../scripts/pointPolygonJoinContract.mjs'
 
 const freeLabelGroups = [
   'existing-renderer-regressions',
@@ -493,19 +476,6 @@ for (const phase of ['31B', '31D']) {
   })
 }
 
-const pointGroups = [...combinedLabelGroups, ...Object.keys(pointNodeScenarios)]
-const importRegressionScenarios = [
-  'point-paint-local-override-intent', 'point-paint-cross-file-resolution', 'point-paint-unsupported-color-bindings',
-]
-const correctionScenarios = ['point-paint-unsupported-mutations', 'point-paint-clear-imported-style']
-const continuityScenarios = ['point-paint-mutation-directory-uncertainty', 'point-paint-app-continuity']
-const targetedPaintScenarios = [
-  'point-paint-namespace-aliases',
-  'point-paint-responsive-circle',
-  'point-paint-responsive-triangle',
-  'point-paint-responsive-downloads',
-  ...importRegressionScenarios, ...correctionScenarios, ...continuityScenarios, polygonJoinScenario, dashCapScenario,
-]
 test('32B preserves its original groups and scenarios and requires namespace and responsive paint evidence', () => {
   assert.equal(pointGroups.length, 16)
   assert.equal(Object.values(pointNodeScenarios).flat().length, 29)
@@ -564,302 +534,6 @@ test('point SVG artifact gate accepts sanitized structure and rejects absent/dam
     `<!-- <g><circle/>${body}</g> --><svg/>`,
   ]) assert.equal(hasWholePointSvg(broken), false, broken)
 })
-function importRegressionEvidence(name) {
-  const snapshot = (key, expected, warnings = []) => {
-    const colors = Object.entries(expected).filter(([, value]) => typeof value === 'string' && value.startsWith('#'))
-    const definitions = colors.map(([channel, value]) => `\\definecolor{${channel}Color}{HTML}{${value.slice(1)}}`).join('\n')
-    const options = Object.entries(expected).filter(([, value]) => value !== null)
-      .map(([channel, value]) => `${channel}=${value.startsWith('#') ? `${channel}Color` : value}`).join(',')
-    const code = `%   \\input{base.sty}\n%   \\input{outer.sty}\n${definitions}\n\\node[${key},${options}] at (0,0) {};`
-    return { key, current: { importedTikzStyleReferenceId: 'fixture-reference' }, warnings,
-      observation: { contour: { fill: 'rgb(0, 0, 0)' }, leaves: [{ fill: 'rgb(0, 0, 0)' }] },
-      state: { json: '{}', history: '{}' }, output: { standalone: code, inlineMath: code } }
-  }
-  const result = { download: { boundary: 'download', differencePaths: [] }, reload: { boundary: 'reload', differencePaths: [] },
-    standalone: { pageErrors: [], observation: { contour: { fill: 'rgb(0, 0, 0)' }, leaves: [{ fill: 'rgb(0, 0, 0)' }] } } }
-  if (name === 'point-paint-local-override-intent') {
-    for (const boundary of ['untouched', 'reset']) result[boundary] = snapshot('example', { fill: null, text: null })
-    for (const boundary of ['away', 'undone']) result[boundary] = snapshot('example', { fill: '#123456', text: null })
-    for (const boundary of ['back', 'redone', 'reloaded']) result[boundary] = snapshot('example', { fill: '#000000', text: null })
-    result.settingsBefore = snapshot('unknown controls', { fill: null, text: null, draw: null, 'fill opacity': null, 'line width': null })
-    result.settingsFocusBlur = snapshot('unknown controls', { fill: null, text: null, draw: null, 'fill opacity': null, 'line width': null })
-    result.settingsFocusBlur.current.style = { importedPaint: { overriddenFields: [] } }
-    result.settingsFocusBlur.focusBlurControls = ['Fill opacity', 'Border width'].map((name) => ({ name, before: '1', after: '1', focused: true, blurred: true }))
-    result.settingsBack = snapshot('unknown controls', { fill: null, text: null, draw: null, 'fill opacity': '1', 'line width': '0.4pt' })
-    const source = '\\tikzstyle{example}=[fill=\\mycolor,text=red]\n\\tikzstyle{unknown controls}=[fill=\\mycolor,text=\\mytext,draw=\\myborder,fill opacity=\\myalpha,line width=\\mywidth]\n'
-    for (const boundary of ['untouched', 'away', 'back', 'undone', 'redone', 'reloaded', 'reset', 'settingsBefore', 'settingsFocusBlur', 'settingsBack']) {
-      const entry = result[boundary]
-      entry.warnings = ['Unsupported executable paint option: fill=\\mycolor. Runtime color bindings and option handlers remain unknown; later paint cannot restore certainty.']
-      entry.modelDiagnostics = { validation: { valid: true }, resolution: { executionUncertain: true, diagnostics: entry.warnings,
-        unresolvedFields: ['fillColor', 'fillEnabled', 'drawColor', 'drawEnabled', 'textColor', 'fillOpacity', 'drawOpacity',
-          'textOpacity', 'lineWidth', 'dashPattern', 'dashPhase', 'lineCap', 'lineJoin'] }, reference: { previewDiagnostics: entry.warnings } }
-      entry.diagram = { externalTikzStyleSources: [{ rawSource: source }] }
-      const overriddenFields = ['untouched', 'reset', 'settingsBefore', 'settingsFocusBlur'].includes(boundary) ? []
-        : boundary === 'settingsBack' ? ['fill.opacity', 'stroke.width'] : ['fill.color']
-      entry.current.style = { paint: { fill: { color: ['away', 'undone'].includes(boundary) ? '#123456' : '#000000' } }, importedPaint: { overriddenFields } }
-      entry.observation.leaves[0].fillAlpha = 1
-    }
-    result.standalone.observation = result.reloaded.observation
-  } else if (name === 'point-paint-cross-file-resolution') {
-    for (const boundary of ['crossFile', 'reloaded']) result[boundary] = snapshot('outer', { fill: '#ff0000', text: '#00ff00', draw: '#0000ff' })
-    result.priorColor = snapshot('outer', { fill: '#123456', text: '#00ff00', draw: '#0000ff' })
-    result.redefined = snapshot('outer', { fill: '#ffff00', text: '#0000ff', draw: '#00ff00' })
-    result.missing = snapshot('outer', { fill: null, text: null, draw: null }, ['Unsupported absent base'])
-    result.missing.modelDiagnostics = { resolution: { executionUncertain: true,
-      diagnostics: ['Unsupported absent base'], unresolvedFields: ['fillColor', 'drawColor', 'textColor'] } }
-    result.laterUndone = snapshot('outer', { fill: '#000000', text: null })
-    for (const boundary of ['later', 'laterRedone', 'laterReloaded']) result[boundary] = snapshot('outer', { fill: '#000000', text: '#00ff00', draw: '#0000ff' })
-    result.laterDownload = { boundary: 'download', differencePaths: [] }; result.laterReload = { boundary: 'reload', differencePaths: [] }
-  } else if (name === 'point-paint-mutation-directory-uncertainty') {
-    result.directory = snapshot('outer', { fill: null, text: null, draw: null })
-    result.independent = snapshot('independent', { fill: '#0000ff', text: '#00ff00', draw: '#ff0000' })
-    result.independent.modelDiagnostics = { validation: { valid: true }, resolution: {} }
-    result.independent.observation = { contour: { fill: 'rgb(0, 0, 255)', stroke: 'rgb(255, 0, 0)' }, leaves: [{ fill: 'rgb(0, 255, 0)', fillAlpha: 1 }] }
-    for (const boundary of ['away', 'undone']) result[boundary] = snapshot('outer', { fill: null, text: '#123456', draw: null })
-    for (const boundary of ['back', 'redone', 'reloaded']) result[boundary] = snapshot('outer', { fill: null, text: '#ff0000', draw: null })
-    const source = '\\tikzset{\n  myPoint/.style={fill=red,text=red},\n  myPoint/.append style={/other/.cd},\n  /other/text/.style={/tikz/text=blue,/tikz/.cd},\n  outer/.style={myPoint,text=green}\n}'
-    for (const boundary of ['directory', 'away', 'back', 'undone', 'redone', 'reloaded']) {
-      const entry = result[boundary]
-      entry.warnings = ['Unsupported runtime directory /.cd']
-      entry.modelDiagnostics = { validation: { valid: true }, resolution: { unresolvedFields: ['textColor'] }, reference: { previewDiagnostics: entry.warnings } }
-      entry.diagram = { externalTikzStyleSources: [{ rawSource: source }] }
-      entry.current.style = { paint: { text: { color: ['away', 'undone'].includes(boundary) ? '#123456' : '#ff0000' } },
-        importedPaint: { overriddenFields: boundary === 'directory' ? [] : ['text.color'] } }
-      entry.observation = { contour: { fill: 'rgb(255, 0, 0)' }, leaves: [{ fill: 'rgb(255, 0, 0)', fillAlpha: 1 }] }
-    }
-    result.away.state.history = JSON.stringify({ past: [{ earlier: 1 }], present: { text: '#123456' }, future: [] })
-    result.back.state.history = JSON.stringify({ past: [{ earlier: 1 }, { text: '#123456' }], present: { text: '#ff0000' }, future: [] })
-    result.standalone.observation = result.reloaded.observation
-  } else if (name === 'point-paint-unsupported-mutations') {
-    result.mutation = snapshot('myPoint', { fill: null, text: null, draw: null })
-    for (const boundary of ['away', 'undone']) result[boundary] = snapshot('myPoint', { fill: '#123456', text: null, draw: null })
-    for (const boundary of ['back', 'redone', 'reloaded']) result[boundary] = snapshot('myPoint', { fill: '#ff0000', text: null, draw: null })
-    const source = '\\tikzset{\n  myPoint/.style={fill=red,text=red},\n  myPoint/.append style={fill=blue,text=blue}\n}'
-    for (const boundary of ['mutation', 'away', 'back', 'undone', 'redone', 'reloaded']) {
-      const entry = result[boundary]
-      entry.warnings = ['Unsupported myPoint/.append style']
-      entry.modelDiagnostics = { validation: { valid: true }, resolution: { unresolvedFields: ['fillColor', 'textColor'] },
-        reference: { previewDiagnostics: entry.warnings } }
-      entry.diagram = { externalTikzStyleSources: [{ rawSource: source }] }
-      entry.current.style = { paint: { fill: { color: ['away', 'undone'].includes(boundary) ? '#123456' : '#ff0000' } },
-        importedPaint: { overriddenFields: boundary === 'mutation' ? [] : ['fill.color'] } }
-      entry.observation = { contour: { fill: 'rgb(255, 0, 0)' }, leaves: [{ fill: 'rgb(255, 0, 0)', fillAlpha: 1 }] }
-    }
-    result.standalone.observation = result.reloaded.observation
-  } else {
-    result.unsupported = snapshot('myPoint', { fill: null, text: null, draw: '#000000' }, ['Unsupported red'])
-    for (const boundary of ['away', 'undone']) result[boundary] = snapshot('myPoint', { fill: '#123456', text: null })
-    for (const boundary of ['back', 'redone', 'reloaded']) result[boundary] = snapshot('myPoint', { fill: '#000000', text: null })
-  }
-  return result
-}
-function clearRegressionEvidence() {
-  // Synthetic policy fixtures only: these records exercise parent acceptance
-  // assertions and do not claim native browser, model, or download observations.
-  const basePaint = { text: { color: '#000000', opacity: 1 }, fill: { enabled: true, color: '#ff0000', opacity: 1 },
-    stroke: { enabled: true, color: '#000000', opacity: 1, width: .4, lineStyle: 'solid', dashPhase: 0, lineCap: 'butt', lineJoin: 'miter' } }
-  const mixedPaint = { text: { color: '#654321', opacity: .5 }, fill: { enabled: true, color: '#123456', opacity: .25 },
-    stroke: { enabled: true, color: '#008000', opacity: .75, width: 3, lineStyle: 'solid', dashPattern: [3, 2], dashPhase: 1, lineCap: 'round', lineJoin: 'bevel' } }
-  const expectedObservation = (paint) => {
-    const rgb = (hex) => `rgb(${[1, 3, 5].map((index) => parseInt(hex.slice(index, index + 2), 16)).join(', ')})`
-    return { contour: { fill: rgb(paint.fill.color), fillAlpha: paint.fill.opacity, stroke: rgb(paint.stroke.color),
-      strokeAlpha: paint.stroke.opacity, strokeWidth: paint.stroke.width * 1.2, dash: paint.stroke.dashPattern ? '3, 2' : 'none',
-      dashOffset: paint.stroke.dashPhase * 1.2, cap: paint.stroke.lineCap, join: paint.stroke.lineJoin },
-    leaves: [{ fill: rgb(paint.text.color), fillAlpha: paint.text.opacity }], bodyBounds: { width: 2 }, shapeBounds: { width: 5 } }
-  }
-  const layoutForPoint = (index) => {
-    const xContext = { fontSizePt: 12 + index, xHeightPt: 5 + index }
-    const yContext = { fontSizePt: 10 + index, xHeightPt: 4 + index }
-    const baseline = { innerXSep: xContext.fontSizePt, innerYSep: yContext.xHeightPt,
-      outerXSep: 1 + index / 10, outerYSep: .5 + index / 10,
-      minimumWidth: 36 + index, minimumHeight: 18 + index,
-      anchor: ['base east', 'north west', 'south'][index], fontContext: xContext,
-      units: {
-        innerXSep: { source: '1em', unit: 'em', texPoints: xContext.fontSizePt, fontContext: xContext },
-        innerYSep: { source: '1ex', unit: 'ex', texPoints: yContext.xHeightPt, fontContext: yContext },
-        outerXSep: { source: `${1 + index / 10}pt`, unit: 'pt', texPoints: 1 + index / 10 },
-        outerYSep: { source: `${.5 + index / 10}pt`, unit: 'pt', texPoints: .5 + index / 10 },
-        minimumWidth: { source: `${36 + index}pt`, unit: 'pt', texPoints: 36 + index },
-        minimumHeight: { source: `${18 + index}pt`, unit: 'pt', texPoints: 18 + index },
-      } }
-    const layout = structuredClone(baseline)
-    layout.innerXSep = 1.5 * xContext.fontSizePt
-    layout.units.innerXSep = { source: '1.5em', unit: 'em', texPoints: layout.innerXSep, fontContext: structuredClone(xContext) }
-    return { layout, importedLayout: { referenceId: 'reference', baseline: structuredClone(baseline), overriddenFields: ['innerXSep'] } }
-  }
-  const makeCase = (ids) => {
-    const multiple = ids.length === 2, key = multiple ? 'independent point' : 'redpoint'
-    const secondPaint = { text: { color: '#ff0000', opacity: .6 }, fill: { enabled: true, color: '#0000ff', opacity: .35 },
-      stroke: { enabled: true, color: '#00ff00', opacity: .7, width: 2, lineStyle: 'solid', dashPattern: [3, 2], dashPhase: 1, lineCap: 'round', lineJoin: 'bevel' } }
-    const points = ['app-point', 'bulk-point', 'copy-point'].map((id, index) => ({
-      current: { id, text: ['Clear target', 'Clear second', 'Control point'][index], stylePresetId: 'preset', importedTikzStyleReferenceId: 'reference',
-        style: { opacity: 1, paint: structuredClone(multiple ? index === 0 ? mixedPaint : secondPaint : basePaint),
-          importedPaint: { referenceId: 'reference' }, ...layoutForPoint(index) } },
-      observation: expectedObservation(multiple ? index === 0 ? mixedPaint : secondPaint : basePaint),
-    }))
-    const snapshot = (detached) => {
-      const current = structuredClone(points)
-      if (detached) for (const { current: point } of current) if (ids.includes(point.id)) {
-        delete point.stylePresetId; delete point.importedTikzStyleReferenceId; delete point.style.importedPaint; delete point.style.importedShape; delete point.style.importedLayout
-      }
-      const diagram = { strata: current.map((point) => point.current), userStylePresets: [{ id: 'preset' }],
-        externalTikzStyleSources: [{ id: 'source', rawSource: 'preserved source' }], importedTikzStyleReferences: [{ id: 'reference', key }] }
-      const nodes = current.map(({ current: point }, index) => {
-        const { paint } = point.style
-        const colors = ['fill', 'text', 'stroke'].map((channel) => `\\definecolor{${channel}${index}}{HTML}{${paint[channel].color.slice(1)}}`).join('\n')
-        const dash = paint.stroke.dashPattern ? `dash pattern=on 3pt off 2pt` : 'solid'
-        return `${colors}\n\\node[${point.importedTikzStyleReferenceId ? `${key},` : ''}fill=fill${index},text=text${index},draw=stroke${index},fill opacity=${paint.fill.opacity},text opacity=${paint.text.opacity},draw opacity=${paint.stroke.opacity},line width=${paint.stroke.width}pt,${dash},dash phase=${paint.stroke.dashPhase}pt,line cap=${paint.stroke.lineCap},line join=${paint.stroke.lineJoin}] at (${index},0) {${point.text}};`
-      }).join('\n')
-      // Synthetic policy evidence only; these markers are not browser/model observations.
-      const beforePresent = { clear: 'before', ids }, afterPresent = { clear: 'after', ids }
-      return { points: current, diagram, output: { standalone: nodes, inlineMath: nodes }, modelDiagnostics: { validation: { valid: true } },
-        state: { json: JSON.stringify({ diagram }), history: JSON.stringify({
-          past: detached ? [{ before: 'retained' }, beforePresent] : [{ before: 'retained' }],
-          present: detached ? afterPresent : beforePresent, future: [],
-        }) } }
-    }
-    const entry = { evidenceKind: 'synthetic-policy', ids, nativeAction: { selector: 'TikZ style selector', action: 'Clear TikZ style' },
-      before: snapshot(false), cleared: snapshot(true), undone: snapshot(false), redone: snapshot(true), reloaded: snapshot(true),
-      download: { boundary: 'download', differencePaths: [] }, reload: { boundary: 'reload', differencePaths: [] },
-      standalone: { pageErrors: [], observation: points[0].observation,
-        points: multiple ? [{ id: 'bulk-point', observation: points[1].observation }] : [] } }
-    return entry
-  }
-  return { evidenceKind: 'synthetic-policy', single: makeCase(['app-point']), multiple: makeCase(['app-point', 'bulk-point']) }
-}
-
-// Faults must agree across all duplicate representations before the acceptance
-// policy checks their semantics. This deliberately leaves history unchanged.
-function synchronizeClearSnapshot(entry) {
-  entry.diagram.strata = entry.points.map((point) => structuredClone(point.current))
-  const saved = JSON.parse(entry.state.json)
-  saved.diagram = structuredClone(entry.diagram)
-  entry.state.json = JSON.stringify(saved)
-}
-function appContinuityEvidence() {
-  // Policy fixtures only; native App transitions and negative controls run in
-  // check:free-labels and cannot be substituted with these synthetic records.
-  const expectedUrl = 'http://fixture/stratified-tikz/scripts/fixtures/freeLabelsApp.html'
-  const snapshot = (boundary, pageId = 'app-main', generation = 'document-main') => ({ boundary, pageId, expectedUrl,
-    closed: false, crashed: false, document: { url: expectedUrl, generation, readyState: 'complete',
-      api: { type: 'object', stateType: 'function', sameInstance: true }, root: { children: 1 },
-      scripts: [{ type: 'module', src: 'http://fixture/stratified-tikz/scripts/fixtures/freeLabelsApp.tsx' }] },
-    state: { json: '{}', runtimeDiagramJson: '{}', history: '{}', labelDocumentRevision: 1 } })
-  const names = ['point-paint-local-override-intent', 'point-paint-cross-file-resolution', 'point-paint-unsupported-color-bindings',
-    'point-paint-unsupported-mutations', 'point-paint-mutation-directory-uncertainty', 'point-paint-clear-imported-style', 'point-paint-clear-imported-style-multi']
-  const transitions = names.map((name, index) => ({ name, result: 'passed', before: snapshot(`${name}:before-standalone`), after: snapshot(`${name}:after-standalone-close`),
-    standalonePages: [{ pageId: `svg-${index}`, closed: true, events: [{ event: 'main-frame-navigation', url: `file:///tmp/${name}.svg` }, { event: 'close' }] }] }))
-  const files = {}
-  const controls = ['missing-api', 'wrong-api', 'same-url-reload'].map((fault) => {
-    const prefix = `point-paint-app-control-${fault}`, pageId = `app-${fault}`
-    const before = snapshot('startup', pageId, `document-${fault}`)
-    const failed = structuredClone(before); failed.boundary = 'failure'
-    failed.document.dom = { nodes: [{ tag: 'html' }], bytes: 14, maxNodes: 512, maxBytes: 64_000 }
-    if (fault === 'same-url-reload') failed.document.generation += '-new'
-    if (fault === 'missing-api') failed.document.api.type = 'undefined'
-    if (fault === 'wrong-api') failed.document.api.sameInstance = false
-    const evidence = { pageId, expectedUrl, deliberateNegativeControl: true, fault, snapshot: failed,
-      screenshot: `${prefix}-failure.png`, error: { message: fault === 'same-url-reload' ? 'generation changed' : fault === 'missing-api' ? 'API missing' : 'API instance changed' } }
-    files[`${prefix}-failure.json`] = evidence
-    files[`${prefix}-lifecycle.json`] = { pageId, expectedUrl, events: [{ event: 'document-observation', boundary: 'failure' }] }
-    return { fault, result: 'passed', before, evidence }
-  })
-  const evidence = { schema: 1, startup: snapshot('startup-committed'), transitions, controls,
-    helperReturn: snapshot('import-helper-return'), beforeNextLoad: snapshot('before-next-app-load'), afterControls: snapshot('after-native-continuity-controls') }
-  files['point-paint-app-transitions.json'] = { transitions }
-  files['point-paint-app-lifecycle.json'] = { schema: 1, pageId: 'app-main', expectedUrl, expected: { generation: 'document-main' },
-    events: [{ event: 'document-observation', boundary: 'import-helper-return' }] }
-  files['point-paint-app-controls.json'] = { schema: 1, controls }
-  return { evidence, files }
-}
-function polygonJoinEvidence() {
-  return { scenario: polygonJoinScenario, group: 'point-node-paint-import-persistence', result: 'passed',
-    cases: polygonJoinCases.flatMap((specification) => polygonJoinScales.map((scale) => ({
-      key: specification.key, scale, specification, modelUnchanged: true,
-      observation: { source: '', bodyStatus: 'ready', vertices: Array.from({ length: specification.shape === 'star' ? 10 : 3 }, (_, index) => {
-          const angle = -Math.PI / 2 - index * Math.PI / (specification.shape === 'star' ? 5 : 1.5)
-          const radius = specification.size * 1.2 / 2 * Math.SQRT2 * (specification.shape === 'star' ? index % 2 === 0 ? 1.5 : 1 : 2)
-          return { x: Math.cos(angle) * radius, y: Math.sin(angle) * radius }
-        }),
-        strokeWidth: specification.widthPt * 1.2, fill: 'none', join: specification.join,
-        miterLimit: 10, resolution: 16, boundaryPixelCount: 100, boundsMatch: true,
-        declaredBounds: [-10, specification.key === 'triangle-bevel-wide' ? -15.4544155877 : -10, 10, specification.key === 'triangle-miter-wide' ? 20.5455844123 : 10],
-        rasterBounds: { minX: -10, minY: specification.key === 'triangle-bevel-wide' ? -15.4544155877 : -10, maxX: 10, maxY: specification.key === 'triangle-miter-wide' ? 20.5455844123 : 10 }, ctm: { a: scale, b: 0, c: 0, d: scale, e: 10, f: 10 } },
-      probes: ['paint', 'within', 'outside', 'interior', ...(specification.exact ? ['exact'] : []),
-        ...(specification.key === 'triangle-miter-wide' ? ['miter-tip'] : []),
-        ...(specification.key === 'triangle-bevel-wide' ? ['bevel-edge'] : [])].map((kind) => {
-        const candidates = ['outside', 'exact'].includes(kind) ? ['control'] : ['control', 'p']
-        const local = kind === 'exact' ? specification.exact : kind === 'miter-tip' ? { x: 0, y: -40.8 } : kind === 'bevel-edge' ? { x: 10, y: -14 } : { x: 0, y: 0 }
-        return { kind, screenshot: `${polygonJoinScenario}-${specification.key}-scale-${scale}-${kind}.png`, nativeStrokeContains: true, local, transform: { ctm: { a: scale, b: 0, c: 0, d: scale, e: 10, f: 20 } }, selectionCleared: true,
-          rasterDistance: ({ paint: 0, within: 5.5, outside: 6.5, interior: 0, exact: specification.join === 'miter' ? 7.4544155877 : 8.5455844123, 'miter-tip': 0, 'bevel-edge': 0 })[kind],
-          actions: [false, true, true, true].map((alt, index) => ({ alt, trusted: true, beforeSelection: null,
-            overlayExcluded: true, candidates, screen: { x: scale * local.x + 10, y: scale * local.y + 20 }, point: { x: 450 + local.x, y: 350 + local.y }, selection: { id: index === 0 && ['paint', 'miter-tip', 'bevel-edge'].includes(kind) ? 'p' : candidates[index % candidates.length] } })) }
-      }),
-    }))) }
-}
-
-function completePointEvidence(fixture) {
-  fixture.env.STZ_TEST_FREE_LABEL_GROUPS = JSON.stringify(pointGroups)
-  fixture.env.STZ_TEST_POINT_ARTIFACTS = 'yes'
-  const bodyStructure = (background) => ({ title: 'Scale', expectedBackground: background,
-    exportBackground: { markers: background === 'white'
-      ? [{ attribute: { namespace: null, name: 'data-stratified-tikz-export-background', value: 'white' } }] : [] },
-  })
-  const bodySample = (background, shape, variant, scale) => ({ background, shape, variant, scale,
-    bodyContractPassed: true, output: { capture: { coordinatesStable: true } },
-    bodyObservation: { structure: bodyStructure(background),
-      literal: { source: 'Scale', documentUnchanged: true, fontReadiness: { status: 'loaded', checked: true } },
-      settling: { documentUnchanged: true, status: 'loaded', leaves: [{ readiness: { status: 'loaded', checked: true } }] } },
-  })
-  const evidence = { checkout: captureCheckoutIdentity({ cwd: fixture.cwd, env: fixture.env }),
-    evidence: Object.entries(pointNodeScenarios).flatMap(([group, names]) => names.map((name) =>
-      ({ group, name, result: 'passed', artifacts: pointNodeScenarioArtifacts(name) }))) }
-  fixture.env.STZ_TEST_POINT_EVIDENCE = JSON.stringify(evidence)
-  fixture.env.STZ_TEST_POINT_ARTIFACT_VALUES = JSON.stringify(Object.fromEntries(targetedPaintScenarios.map((name) => [
-    `${name}.json`, { scenario: name, group: 'point-node-paint-import-persistence', result: 'passed',
-      ...(name === dashCapScenario ? dashCapEvidence() : name === polygonJoinScenario ? polygonJoinEvidence() : name === 'point-paint-app-continuity' ? appContinuityEvidence().evidence : name === 'point-paint-clear-imported-style' ? clearRegressionEvidence() : [...importRegressionScenarios, 'point-paint-unsupported-mutations', 'point-paint-mutation-directory-uncertainty'].includes(name) ? importRegressionEvidence(name) : name === 'point-paint-responsive-downloads' ? {
-        cases: ['transparent', 'white'].flatMap((background) => [['circle', 'solid'], ['triangle', 'solid'], ['circle', 'dashed']]
-          .map(([shape, variant]) => ({ background, shape, variant,
-            baseline: { fixture: { source: 'Scale' }, expectedBackground: background, saved: bodyStructure(background) },
-            fileUnchanged: true, documentRestored: true,
-            scales: [.5, 2].map((scale) => bodySample(background, shape, variant, scale)),
-            returnScale: bodySample(background, shape, variant, .5),
-            negativeControls: [['text-mutation', 'foreground content/order'], ['body-displacement', 'body local placement transform'],
-              ['font-change', 'text font family']].map(([kind, reason]) =>
-              ({ kind, rejected: true, reason: `displayed file: ${reason}`, documentUnchanged: true })),
-          }))),
-      } : name.startsWith('point-paint-responsive-') ? { cases: [.5, 2].map((scale) => ({ scale, negativeControlRejected: true })) }
-        : { cases: ['shadowing', 'missing', 'aliases'].map((name) => ({ name, source: 'fixture style',
-          output: { standalone: 'fixture', inlineMath: 'fixture' },
-          reloadedOutput: { standalone: 'fixture', inlineMath: 'fixture' },
-          editedOutput: { standalone: 'fixture', inlineMath: 'fixture' },
-          uneditedDownload: { boundary: 'download', differencePaths: [] }, uneditedReload: { boundary: 'reload', differencePaths: [] },
-          editedDownload: { boundary: 'download', differencePaths: [] }, editedReload: { boundary: 'reload', differencePaths: [] },
-        })) }),
-    },
-  ])))
-  const mechanism = syntheticMechanismEvidence()
-  fixture.env.STZ_TEST_POINT_ARTIFACT_VALUES = JSON.stringify({
-    ...JSON.parse(fixture.env.STZ_TEST_POINT_ARTIFACT_VALUES), ...appContinuityEvidence().files,
-    [`${dashCapMechanismStem}.json`]: mechanism,
-    ...Object.fromEntries(mechanism.cases.flatMap((entry) => {
-      const stem = `${dashCapMechanismStem}-${entry.key}`
-      return [[`${stem}.json`, entry], [`${stem}.live.svg`, syntheticMechanismLiveSvg(entry)],
-        ...entry.livePaint.captures.map((capture) => [capture.file, { syntheticPngBase64: syntheticMechanismLivePng(capture.scale, entry.key).toString('base64') }]),
-        ...['input.svg', 'solid.input.svg'].map((suffix) =>
-        [`${stem}.${suffix}`, `<svg xmlns="http://www.w3.org/2000/svg"><polygon points="${entry.source.rawPoints}" fill="none" stroke="#000000" stroke-width="${entry.specification.width}" stroke-dasharray="${suffix === 'solid.input.svg' ? 'none' : entry.specification.pattern?.join(' ') ?? 'none'}" stroke-dashoffset="${suffix === 'solid.input.svg' ? 0 : entry.specification.phase}" stroke-linecap="${entry.specification.cap}" stroke-linejoin="${entry.specification.join}" stroke-miterlimit="${entry.specification.miterLimit}"></polygon></svg>`])]
-    })),
-    ...Object.fromEntries(dashCapEvidence().cases.filter((entry) => entry.specification.audit).flatMap((entry) => {
-      const stem = `${dashCapScenario}-${entry.key}-scale-${entry.scale}`
-      return [[`${stem}-engine-audit.json`, entry.observation.engineAudit],
-        ...[...(entry.observation.livePaint?.captures ?? []), ...entry.probes.flatMap(({ liveCapture }) => liveCapture ? [liveCapture] : [])]
-          .map((capture) => [capture.screenshot, { syntheticPngBase64: syntheticDashCapLivePng(capture, entry.key).toString('base64') }]),
-        ...['.input.svg', '-solid.input.svg'].map((suffix) =>
-        [`${stem}${suffix}`, `<svg xmlns="http://www.w3.org/2000/svg"><polygon points="${entry.observation.engineAudit.rawPoints}" fill="none" stroke="black"></polygon></svg>`])]
-    })),
-  })
-  return evidence
-}
 for (const background of ['transparent', 'white']) {
   for (const boundary of ['baseline', 'saved', 'scale-0.5', 'scale-2', 'return-scale-0.5']) {
     for (const fault of ['missing-mode', 'wrong-mode', ...(boundary === 'baseline' ? [] : ['missing-background', 'empty-background'])]) {
@@ -1638,4 +1312,163 @@ test('32D parent pending file replay and ordered post-click prefixes consume res
   resolved.diagnostics.splice(2, 1)
   assert.throws(() => assertLayoutPostClickViewDiagnostic(terminal, resolved.diagnostics), /immediate-input/,
     'Lossless references preserve mandatory raw stage prefixes instead of replacing them with terminal flags')
+})
+
+function completePhase32dParentFixture(t) {
+  const earlier = checkoutFixture(t)
+  const base = completePointEvidence(earlier)
+  const artifactDir = realpathSync(mkdtempSync(join(tmpdir(), 'stz-authenticated-empty-parent-')))
+  t.after(() => rmSync(artifactDir, { recursive: true, force: true }))
+  return populatePhase32dParentEvidence(artifactDir, base.checkout,
+    JSON.parse(earlier.env.STZ_TEST_POINT_ARTIFACT_VALUES), combinedLabelGroups)
+}
+
+test('32D real complete parent artifact loop accepts seven native empty-source bodies in both dimensions', t => {
+  const fixture = completePhase32dParentFixture(t)
+  assert.equal(fixture.report.completed.length, 18)
+  for (const { raw } of fixture.signed) {
+    assert.deepEqual(raw.expected.map(({ id }) => id), ['signed-regular-polygon', 'signed-square', 'signed-triangle', 'signed-star',
+      'signed-isosceles-triangle', 'signed-dart', 'signed-zero-axis'])
+    assert.deepEqual(raw.preExport.points.map(({ id }) => id), ['signed-dart', 'signed-isosceles-triangle', 'signed-regular-polygon',
+      'signed-square', 'signed-star', 'signed-triangle', 'signed-zero-axis'])
+    assert.equal((raw.xml.match(/<title\/>/gu) ?? []).length, 7)
+    assert.equal(/<text|<use|data-|aria-/u.test(raw.xml), false)
+    assert.equal(hasWholePointSvg(raw.xml), false, 'Legacy painted-body envelope keeps its default rejection')
+  }
+  validateBrowserEvidence('check:free-labels', fixture.artifactDir, '32D', fixture.checkout)
+})
+
+test('32D real complete parent dispatch accepts explicitly closed empty titles and authenticated raw publications', async t => {
+  const fixture = completePhase32dParentFixture(t)
+  const publisher = createEvidencePublisher({ artifactDir: fixture.artifactDir, checkout: fixture.checkout })
+  for (const entry of fixture.signed) {
+    entry.raw.xml = entry.raw.xml.replaceAll('<title/>', '<title></title>')
+    writeFileSync(entry.svgPath, entry.raw.xml)
+    fixture.save(`${entry.download.scenario}-standalone.json`, entry.raw)
+  }
+  for (const name of [
+    'point-layout-signed-polygonal-zero-axis.json',
+    ...fixture.signed.flatMap(({ download }) => ['native', 'live-capture', 'standalone'].map(suffix => `${download.scenario}-${suffix}.json`)),
+  ]) await publisher.publish(name, fixture.readJson(name), { stage: 'observed-exact-artifact' })
+  await publisher.publish('free-labels-evidence.json', fixture.report, { stage: 'complete', disposition: 'passed' })
+  assert.equal(JSON.parse(readFileSync(join(fixture.artifactDir, 'free-labels-evidence.json'), 'utf8')).schema, 'stz-evidence-document-v1')
+  assert.deepEqual(readEvidenceDocumentSync(fixture.artifactDir, 'free-labels-evidence.json', { checkout: fixture.checkout }), fixture.report)
+  validateBrowserEvidence('check:free-labels', fixture.artifactDir, '32D', fixture.checkout)
+})
+
+const emptyParentFaults = [
+  ['missing-scenario', f => f.report(report => { report.evidence = report.evidence.filter(entry => entry.name !== f.scenario) })],
+  ['wrong-scenario-group', f => f.report(report => { report.evidence.find(entry => entry.name === f.scenario).group = 'point-node-settled-export' })],
+  ['missing-exact-artifact', f => f.report(report => { const record = report.evidence.find(entry => entry.name === f.scenario); record.artifacts = record.artifacts.filter(name => name !== `${f.stem}.svg`) })],
+  ['foreign-artifact', f => { f.write('foreign-empty.svg', f.raw().xml); f.report(report => report.evidence.find(entry => entry.name === f.scenario).artifacts.push('foreign-empty.svg')) }],
+  ['legacy-reuse', f => { const record = f.fixture.report.evidence.find(entry => entry.group === 'point-node-settled-export');
+    f.write('legacy-empty.svg', f.raw().xml); f.report(report => report.evidence.find(entry => entry.name === record.name).artifacts.push('legacy-empty.svg')) }],
+  ['wrong-raw-scenario', f => f.json(`${f.stem}-standalone.json`, raw => { raw.scenario += '-foreign' })],
+  ['nonempty-source', f => f.json(`${f.scenario}.json`, evidence => { evidence.downloads[0].expected[0].source = 'invented' })],
+  ['wrong-saved-source', f => f.json(`${f.stem}-standalone.json`, raw => { const saved = JSON.parse(raw.savedJson); saved.diagram.strata[0].text = 'foreign'; raw.savedJson = JSON.stringify(saved) })],
+  ['wrong-click-source', f => f.json(`${f.scenario}.json`, evidence => { evidence.downloads[0].click.snapshot.points[0].source = 'foreign' })],
+  ['wrong-native-record', f => f.json(`${f.stem}-native.json`, native => { native.polygonalCases[0].state.json += 'corrupt' })],
+  ['missing-owner', f => f.json(`${f.stem}-standalone.json`, raw => { delete raw.preExport.points[0].owner })],
+  ['duplicate-owner', f => f.json(`${f.stem}-standalone.json`, raw => { raw.preExport.points[1].owner = raw.preExport.points[0].owner })],
+  ['foreign-owner', f => f.json(`${f.stem}-standalone.json`, raw => { raw.preExport.points[0].owner = '["point-node",100,"foreign"]' })],
+  ['missing-title', f => f.xml(xml => xml.replace('<title/>', ''))],
+  ['duplicate-title', f => f.xml(xml => xml.replace('<title/>', '<title/><title/>'))],
+  ['foreign-title-attribute', f => f.xml(xml => xml.replace('<title/>', '<title class="foreign"/>'))],
+  ['foreign-title', f => f.xml(xml => xml.replace('<title/>', '<title>foreign</title>'))],
+  ['missing-body', f => f.xml(xml => xml.replace(/<g transform="[^"]*"><title\/><g transform="translate\(0 0\)"[^>]*><g\/><\/g><\/g>/u, ''))],
+  ['duplicate-body', f => f.xml(xml => xml.replace(/(<g transform="[^"]*"><title\/><g transform="translate\(0 0\)"[^>]*><g\/><\/g><\/g>)/u, '$1$1'))],
+  ['missing-ink', f => f.xml(xml => xml.replace(/<g transform="translate\(0 0\)"[^>]*><g\/><\/g>/u, ''))],
+  ['duplicate-ink', f => f.xml(xml => xml.replace(/(<g transform="translate\(0 0\)"[^>]*><g\/><\/g>)/u, '$1$1'))],
+  ['duplicate-content', f => f.xml(xml => xml.replace('<g/></g></g>', '<g/><g/></g></g>'))],
+  ['missing-content', f => f.xml(xml => xml.replace('<g/></g></g>', '</g></g>'))],
+  ['ink-stray-text', f => f.xml(xml => xml.replace('<g/></g></g>', 'foreign<g/></g></g>'))],
+  ['content-stray-text', f => f.xml(xml => xml.replace('<g/></g></g>', '<g>foreign</g></g></g>'))],
+  ['foreign-content-attribute', f => f.xml(xml => xml.replace('<g/></g></g>', '<g transform="translate(1 0)"/></g></g>'))],
+  ['nested-wrong-shell', f => f.xml(xml => xml.replace('<g/></g></g>', '<g><g/></g></g></g>'))],
+  ['missing-contour', f => f.xml(xml => xml.replace(/<path [^>]*\/>/u, ''))],
+  ['duplicate-contour', f => f.xml(xml => xml.replace(/(<path [^>]*\/>)/u, '$1$1'))],
+  ['extra-node', f => f.xml(xml => xml.replace('</svg>', '<g><path d="M 0 0 L 1 1"/></g></svg>'))],
+  ['reordered-native-nodes', f => f.json(`${f.stem}-standalone.json`, raw => raw.preExport.points.reverse())],
+  ['reordered-file-nodes', f => f.xml(xml => { const pattern = /<g><g transform="[^"]*"><path [^>]*\/><g transform="[^"]*"><title\/><g[^>]*><g\/><\/g><\/g><\/g><\/g>/gu;
+    const nodes = [...xml.matchAll(pattern)].map(match => match[0]); assert.equal(nodes.length, 7); let ordinal = 0;
+    return xml.replace(pattern, () => nodes[[1, 0, 2, 3, 4, 5, 6][ordinal++]]) })],
+  ['wrong-body-owner', f => f.json(`${f.stem}-standalone.json`, raw => { raw.reopened[0].structure.bodyPath = raw.reopened[1].structure.bodyPath })],
+  ['wrong-namespace', f => f.xml(xml => xml.replace('http://www.w3.org/2000/svg', 'http://foreign.invalid/svg'))],
+  ['nested-root', f => f.xml(xml => xml.replace('</svg>', '<svg/></svg>'))],
+  ['wrong-closing-tag', f => f.xml(xml => xml.replace('</svg>', '</g></svg>'))],
+  ['comment-only-root', f => f.xml(xml => `<!-- ${xml} -->`)],
+  ['changed-ink-paint', f => f.xml(xml => xml.replace('opacity="1" fill=', 'opacity="0.5" fill='))],
+  ['changed-ink-color', f => f.xml(xml => xml.replace('color="#000000"', 'color="#ff0000"'))],
+  ['changed-ink-transform', f => f.xml(xml => xml.replace('<g transform="translate(0 0)" opacity=', '<g transform="translate(1 0)" opacity='))],
+  ['changed-contour-paint', f => f.xml(xml => xml.replace('fill="#d8ecff"', 'fill="#00ff00"'))],
+  ['changed-placement', f => f.xml(xml => xml.replace(/<g transform="translate\([^)]*\)">/u, '<g transform="translate(0 0)">'))],
+  ['changed-reopened-CTM', f => f.json(`${f.stem}-standalone.json`, raw => { raw.reopened[0].matrices.nodeCTM.e += 1 })],
+  ['blank-PNG', f => f.write(`${f.stem}.png`, syntheticZeroPng(f.fixture.signed[0].zeroAxis.screenCTM, false))],
+  ['short-PNG', f => f.write(`${f.stem}.png`, f.fixture.signed[0].png.subarray(0, 33))],
+  ['mismatched-PNG', f => f.write(`${f.stem}.png`, f.fixture.signed[0].livePng)],
+  ['changed-TikZ', f => f.write(`${f.stem}-inlineMath.tex`, '\\node {foreign};')],
+  ['changed-saved-file', f => f.write(`${f.stem}-saved.json`, '{}')],
+]
+
+test('32D real parent contextual empty-body failures reach mandatory full replay with exact-file mutations', async t => {
+  const fixture = completePhase32dParentFixture(t)
+  const scenario = 'point-layout-signed-polygonal-zero-axis', stem = `${scenario}-2d`
+  // Share the unchanged cumulative predecessor bytes and complete PNGs. Each
+  // independent control restores only its own changed files before the next.
+  for (const [fault, mutate] of emptyParentFaults) await t.test(fault, () => {
+    const originals = new Map()
+    const write = (name, value) => {
+      if (!originals.has(name)) { try { originals.set(name, readFileSync(join(fixture.artifactDir, name))) } catch (error) { if (error.code !== 'ENOENT') throw error; originals.set(name, null) } }
+      writeFileSync(join(fixture.artifactDir, name), value)
+    }
+    const json = (name, change) => { const value = fixture.readJson(name); change(value); write(name, JSON.stringify(value)) }
+    const controls = { fixture, scenario, stem, write, json, raw: () => fixture.readJson(`${stem}-standalone.json`),
+      report: change => json('free-labels-evidence.json', change),
+      xml: change => { const raw = fixture.readJson(`${stem}-standalone.json`); raw.xml = change(raw.xml);
+        write(`${stem}.svg`, raw.xml); write(`${stem}-standalone.json`, JSON.stringify(raw)) } }
+    try {
+      mutate(controls)
+      assert.ok(originals.size > 0)
+      assert.throws(() => validateBrowserEvidence('check:free-labels', fixture.artifactDir, '32D', fixture.checkout),
+        error => ['foreign-artifact', 'legacy-reuse'].includes(fault) || !/Invalid whole-point SVG artifact/.test(error.message),
+        `Mandatory targeted replay rejects ${fault}; the generic painted-body envelope cannot mask the rejection`)
+    } finally {
+      for (const [name, bytes] of originals) if (bytes === null) unlinkSync(join(fixture.artifactDir, name)); else writeFileSync(join(fixture.artifactDir, name), bytes)
+    }
+  })
+})
+
+test('32D real parent empty-body route retains current scenario/native/live/standalone publication authority', async t => {
+  const fixture = completePhase32dParentFixture(t), scenario = 'point-layout-signed-polygonal-zero-axis', stem = `${scenario}-2d`
+  const publisher = createEvidencePublisher({ artifactDir: fixture.artifactDir, checkout: fixture.checkout })
+  const names = [`${scenario}.json`, `${stem}-native.json`, `${stem}-live-capture.json`, `${stem}-standalone.json`]
+  const stale = {}
+  for (const name of names) {
+    const value = fixture.readJson(name)
+    await publisher.publish(name, value, { stage: 'first-exact-raw' })
+    stale[name] = readFileSync(join(fixture.artifactDir, name))
+    await publisher.publish(name, value, { stage: 'current-exact-raw' })
+  }
+  await publisher.publish('free-labels-evidence.json', fixture.report, { stage: 'complete', disposition: 'passed' })
+  validateBrowserEvidence('check:free-labels', fixture.artifactDir, '32D', fixture.checkout)
+  const controls = [
+    ...names.map(name => [`missing-${name}`, ({ remove }) => remove(name)]),
+    ...names.map(name => [`stale-${name}`, ({ write }) => write(name, stale[name])]),
+    ['corrupt-native-boundary', ({ write }) => { const doc = JSON.parse(readFileSync(join(fixture.artifactDir, `${stem}-native.json`), 'utf8')); write(doc.artifact.path, '{corrupt') }],
+    ['wrong-live-hash', ({ write }) => { const name = `${stem}-live-capture.json`, doc = JSON.parse(readFileSync(join(fixture.artifactDir, name), 'utf8')); doc.artifact.sha256 = '0'.repeat(64); write(name, JSON.stringify(doc)) }],
+    ['wrong-standalone-file-binding', ({ write }) => write(`${stem}-standalone.json`, readFileSync(join(fixture.artifactDir, `${stem}-native.json`)))],
+    ['wrong-current-checkout', controls => { controls.checkout = { ...fixture.checkout, trackedDiffSha256: 'f'.repeat(64) } }],
+  ]
+  for (const [fault, change] of controls) await t.test(fault, () => {
+    const originals = new Map()
+    const retain = name => { if (!originals.has(name)) originals.set(name, readFileSync(join(fixture.artifactDir, name))) }
+    const controls = { checkout: fixture.checkout,
+      write: (name, bytes) => { retain(name); writeFileSync(join(fixture.artifactDir, name), bytes) },
+      remove: name => { retain(name); unlinkSync(join(fixture.artifactDir, name)) } }
+    try {
+      change(controls)
+      assert.throws(() => validateBrowserEvidence('check:free-labels', fixture.artifactDir, '32D', controls.checkout),
+        error => !/Invalid whole-point SVG artifact/.test(error.message), 'Authentication must fail before an empty body can be accepted')
+    } finally { for (const [name, bytes] of originals) writeFileSync(join(fixture.artifactDir, name), bytes) }
+  })
 })

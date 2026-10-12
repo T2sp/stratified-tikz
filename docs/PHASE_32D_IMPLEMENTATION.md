@@ -1,5 +1,120 @@
 # Phase 32D spacing, minima, anchors, and combined audit
 
+## Authenticated empty-body parent SVG gate follow-up (2026-10-12)
+
+The actual invocation entry is clean HEAD
+`470866616c46216c4459f3b7ff84b8cd3efbb981`, fingerprint
+`0a6486310c1f6210a6224b23a67c7479154e413b69fe72570aaed0a501080cfc`.
+The preceding lossless-publication changes, their seventy-two controls and both
+formerly untracked publication files are tracked here and preserved. The supplied
+prompt changed the entry identity from historical `ef06105a` / `a9e886bad`; a fresh
+final tracked/untracked identity is required for acceptance of this follow-up.
+
+The newest browser-capable parent `zyBzG8` passes tests/build/diff/label-assets.
+Its strict report is
+`/var/folders/vk/7kf940pd4bx8f6cg3rzlmtc80000gn/T/stz-phase32d-before-review-zyBzG8/verification.json`.
+The `check:free-labels` subprocess exits 0. Resolving its authenticated
+`stz-evidence-document-v1` report with `readEvidenceDocumentSync` and that exact
+historical checkout yields `passed` / `complete`: eighteen groups started and
+completed, all nine named 32D scenarios terminal-passed, 202 evidence records,
+4,547 diagnostics and no page errors, incomplete groups or unexecuted groups.
+Node is 26.9.0 and Chrome is 154.0.8037.98. All twelve polygonal placements, both
+zero-axis native/live lifecycles, both seven-node transparent standalone SVG/PNG/
+reopening/TikZ workflows, both fifteen-entry pending transparent/white workflows
+and final cumulative standalone completed. This supersedes the older unexecuted
+coverage, association-order failure and final-publication timeout as the current
+browser disposition, while preserving their evidence below.
+
+The strict parent nevertheless fails `check:free-labels` during its generic SVG
+artifact loop: `Invalid whole-point SVG artifact:
+point-layout-signed-polygonal-zero-axis-2d.svg`. Its legacy `hasWholePointSvg`
+predicate requires a sibling contour, titled body group and descendant body paint.
+Both exact new downloads correctly contain seven empty sources and no body glyphs:
+2D is 4,301 bytes, 3D is 4,495 bytes; each has one root, 36 groups, seven sibling
+contour paths and seven empty titles, with no runtime data attributes. The native
+body retains its body/ink/content groups. The contour is a sibling rather than
+glyph paint. `<title/>` was already parsed correctly; absence of `text` / `path` /
+`rect` / `use` inside the genuinely empty body caused this classification mismatch.
+The parent failed before targeted standalone/association/file replay for the new
+scenario or later policy checks, so browser-local success did not establish
+complete strict acceptance.
+
+The scoped parent route recognizes only `point-layout-signed-polygonal-zero-axis`
+in `point-node-layout-anchors-combined`. Before classifying either exact 2D/3D
+standalone SVG, it executes both mandatory `assertSignedPolygonalStandaloneEvidence`
+replays. Those replays authenticate the current resolved scenario, all seven empty
+model/saved/click/source/owner/revision records, unique association and canonical
+source-proven DOM order, then exact file-local structure and raw SVG/PNG/TikZ bytes.
+Only successful replay classifies those exact files as intentional empty bodies.
+An empty title, filename, copied flag or terminal success alone cannot grant it.
+All other artifacts retain the legacy painted-body envelope, including rejection
+of nonempty titles without ink and the existing mechanism/input classification.
+
+The small file-local structural guard requires the complete native body, ink and
+content shell within each authenticated owner. It binds its attributes to immutable
+text paint and requires actually empty element text. Both `<title/>` and equivalent
+`<title></title>` are valid; missing title/ink/content, naked titled groups, extra or
+wrongly nested/owned nodes, changed shell paint and stray text fail. Balanced XML,
+single-root/namespace, contour/body/outer transforms, root/CTMs, owner-bound reopened
+zero-axis CTM, source/order association, forbidden/external/background checks,
+complete PNG bytes and strict pixels, native/live records, saved/click records and
+both TikZ modes remain mandatory at their exact existing assertions/tolerances.
+Raw pointers/packs continue to resolve with `readEvidenceDocumentSync` and the
+checkout; direct pointer JSON is never treated as the browser report.
+
+The retained files have been replayed diagnostically with the scoped gate. Both
+dimensions' targeted replays and the real complete parent dispatch pass on the
+unchanged historical downloads. The complete historical offline dispatch takes
+22.18s, with exact file and policy hashes retained in
+`/private/tmp/stz-32d-empty-body-evidence-audit-20261012/historical-offline-policy-replay.json`.
+That diagnostic establishes no fresh browser/native acceptance for the changed
+tree; the historical parent remains failed and no downstream blocker was observed
+in the offline replay. Faithful complete-dispatch/runner fixtures now exercise
+blank titles and complete native shells without a mocked strong validator. The
+67 added Node tests comprise two cumulative positives, 48 contextual corruptions,
+12 publication-authority corruptions, three isolated runner cases and two containing
+tests. All 64 parent-dispatch and three runner tests pass. The runner copies only
+the shared fixtures' literal dependency closure: twelve fixture modules, twenty-two
+pure source modules, twenty-four existing policy/automation modules and one retained
+PNG. Shared predecessor and signed fixtures avoid duplicate heavyweight builders;
+their empty shell paint follows the immutable model's actual normalized text paint.
+
+The preserved publication/native/live/pending/standalone/stalled-report sweep passes
+935/935 and geometry/reference/model/rendering/TikZ passes 591/591. These focused
+sweeps overlap the registered full suite; their counts are not additive. Final full
+suite/build/diff and strict parent outcomes, exact tracked/untracked identity and
+logs are retained in `/private/tmp/stz-32d-empty-body-20261012/HANDOFF.json`.
+Strict TypeScript and changed-script recommended lint pass (the verifier's exact
+inherited `_role` finding is reproduced separately and excluded for its changed-code
+check). Changed-script syntax/diff and the 1,306-file protected byte audit pass.
+Both direct browser commands using supported Playwright/Chrome fail at localhost
+`listen EPERM` before Chrome. Earlier attempts without the explicit Playwright
+path failed at module import; those failed attempts are retained, not passes.
+
+No production/reference/export/sanitizer, geometry/camera/model/picking, raw empty
+text, complete-root/live capture, native preparation or lossless-publication bytes
+change. No dependency, fake body glyph, capture retry or tolerance relaxation is
+added. All earlier 72 publication, 61 correspondence, 65 live-capture and 55
+background controls remain registered, as do the deterministic ordinary-write/
+20ms stalled-report/late-rejection/primary-Error controls. The frozen publication
+handoff's final offline retain/live/native/report boundary is 232.86ms with 215,233
+additional bytes; unchanged repeat is 21.19ms with 12,044 bytes, inside the unchanged
+5,000ms deadline. These are offline replay measurements, distinct from the complete
+historical browser run. Earlier measurements below retain their original identity.
+The scoped four inherited lint errors remain separate failed baseline checks.
+A broader `npm run lint` also reproduces 79 errors/seven warnings in unchanged
+TypeScript files; no unrelated lint cleanup is included.
+
+Phase 32 remains **incomplete**. Fresh accepted browser-capable strict parent
+`32D verify` on the actual final tracked/untracked tree remains pending. All eighteen
+cumulative groups and all nine scenarios, both new transparent SVG/PNG/TikZ records,
+native history/JSON persistence, both pending workflows, final standalone and exact
+immutable-reference replay remain required. Failed or incomplete verification stops
+before independent read-only completion review using `prompts/phase-32d-review.md`;
+only a matching passing review opens the post-review identity guard. No completion
+review, commit or push is claimed. Commit/push remain with the parent. Earlier
+entries preserve their historical results and bytes.
+
 ## Bounded lossless evidence publication follow-up (2026-10-12)
 
 The actual invocation entry is clean HEAD

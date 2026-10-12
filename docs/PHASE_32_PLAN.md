@@ -1,5 +1,80 @@
 # Phase 32 Plan: Point-node math, paint, geometric shapes, and layout
 
+Authenticated empty-body parent SVG gate follow-up (2026-10-12): the actual clean
+entry HEAD is `470866616c46216c4459f3b7ff84b8cd3efbb981`, fingerprint
+`0a6486310c1f6210a6224b23a67c7479154e413b69fe72570aaed0a501080cfc`.
+The prior lossless-publication files and seventy-two controls are now tracked and
+preserved. Historical `ef06105a` / `a9e886bad` identities cannot accept this changed
+tree; a fresh final tracked/untracked identity is required.
+
+The newest browser-capable parent `zyBzG8` passes tests/build/diff/label-assets and
+its free-labels subprocess exits 0. Its authenticated report, resolved through
+`readEvidenceDocumentSync` with the historical checkout, is passed/complete:
+18/18 groups started/completed, all nine 32D scenarios terminal-passed, 202 evidence
+records/4,547 diagnostics and no page errors or incomplete/unexecuted groups.
+Node26.9.0/Chrome154.0.8037.98 execute all twelve polygonal placements, both native/
+live lifecycles, both seven-node transparent standalone SVG/PNG/reopening/TikZ
+workflows, both fifteen-entry pending transparent/white workflows and final
+standalone. Older `tBkjSj` timeout, `BjrAYN` correspondence-order failure and
+unexecuted coverage remain historical evidence, not current browser blockers.
+
+Its strict parent remains **failed** at the generic whole-point SVG artifact gate,
+before new-scenario targeted replay: the first new 2D file has seven genuine empty
+sources and complete titled body/ink/content shells but no glyph paint. Its seven
+contours are siblings of the bodies. The 4,301-byte 2D and 4,495-byte 3D downloads
+each retain one root, 36 groups, seven contours and seven blank titles; sanitized
+bytes/raw source are correct. The old predicate's `hasPaint(body)` requirement
+misclassifies these intentional empty bodies; self-closing title parsing is valid.
+Browser-local completeness cannot bypass that parent failure.
+
+The scoped parent route executes both mandatory standalone/association/file-local/
+SVG/PNG/TikZ/native/live replays before classifying the exact 2D/3D SVG names for
+`point-layout-signed-polygonal-zero-axis` in the layout group. Eligibility derives
+from the current resolved scenario and immutable seven-empty-point saved/model/
+click/source/owner/revision proof, unique canonical association and exact file
+structure; filename, empty title or success flag alone provides no allowance.
+The small native-shell guard preserves exact body/ink/content placement/paint and
+accepts empty `<title/>` or `<title></title>`, while rejecting missing, foreign,
+extra, nested or damaged structures and stray text. Legacy nonempty-body ink,
+balanced XML/root/namespace, mechanism/input, file/hash/current-tree, raw refs,
+CTM/placement/pixels/background and both TikZ gates remain mandatory.
+
+Both exact retained targeted replays and the complete real parent dispatch now
+pass as a historical offline diagnostic, with no downstream blocker observed.
+The 22.18s dispatch and exact file/policy hashes are retained in
+`/private/tmp/stz-32d-empty-body-evidence-audit-20261012/historical-offline-policy-replay.json`;
+this supplies no fresh native/current-tree acceptance. Faithful complete-dispatch/
+runner fixtures now pass 67 added Node tests: two cumulative positives, 48 contextual
+and 12 publication-authority corruptions, three runner cases and two containing
+tests. Shared fixtures preserve blank titles/native shells and normalized immutable
+text paint; isolated runner copies are limited to their literal dependency closure.
+Preserved focused sweeps pass 935/935 and 591/591; these overlap the full suite.
+Final full/strict outcomes, logs and exact frozen tracked/untracked identity are in
+`/private/tmp/stz-32d-empty-body-20261012/HANDOFF.json`. Strict TypeScript,
+changed-script lint/syntax/diff and the 1,306 protected-file byte audit pass.
+Both supported direct browser checks fail at localhost EPERM before Chrome;
+earlier missing-Playwright-path failures are retained separately. The
+[implementation audit](PHASE_32D_IMPLEMENTATION.md) records the exact scope.
+
+Production/reference/sanitized-export/raw-text, geometry/model/camera/picking,
+native/live/complete-root capture and lossless-publication behavior remain unchanged.
+No dependency, fake glyph, retry or relaxed tolerance is introduced. Prior 72
+publication, 61 correspondence, 65 live and 55 background controls and deterministic
+20ms stalled-report/late-rejection/primary-Error semantics remain. The frozen
+publication replay's 232.86ms/215,233-byte final boundary and 21.19ms/12,044-byte
+unchanged repeat retain the 5,000ms deadline; these are offline measurements.
+The scoped four inherited lint errors remain separately failed baseline checks;
+broader repository lint also fails with 79 errors/seven warnings in unchanged
+TypeScript files. No unrelated cleanup is included.
+
+Phase 32 remains **incomplete**. Fresh required full checks and strict current-tree
+`32D verify` must accept all eighteen groups/nine scenarios and complete immutable
+refs, native history/JSON, both new standalone workflows, both pending workflows
+and final standalone before independent read-only completion review with the
+matching exact tree and post-review identity guard. Failed/incomplete verification
+or `needs_changes` blocks completion/commit. No completion review, commit or push
+is claimed; commit/push remain with the parent. Earlier entries retain history.
+
 Bounded lossless evidence publication follow-up (2026-10-12): the actual clean
 entry HEAD is `ef06105a0d1659cc2e9e34abfabaedb157fdb6cd`, fingerprint
 `d6c6ecaf1c4dfa7c6600db467b7f617e14814252ec2ca9964ff6cff4159dffad`.

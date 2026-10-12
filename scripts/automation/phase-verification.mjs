@@ -858,6 +858,18 @@ export function validateBrowserEvidence(name, artifactDir, phase, checkout, prof
           || !pointNodeScenarioArtifacts(name, profile).every((file) => records[0].artifacts.includes(file))) {
           throw new Error(`Missing completed point-node scenario: ${name}`);
         }
+        // These seven empty-source points intentionally have no glyph paint.
+        // Authenticate BOTH exact downloads through the complete current-source,
+        // association, file-local SVG/PNG/TikZ and native/live replay first. Only
+        // that successful replay supplies their envelope classification; neither
+        // a filename nor a blank title grants an empty-body allowance.
+        const authenticatedEmptyPointSvgs = new Set();
+        if (group === layoutAnchorGroup && name === signedPolygonalScenario) {
+          validateTargetedPaintEvidence(artifactDir, name, group, profile, checkout);
+          for (const ambientDimension of [2, 3]) {
+            authenticatedEmptyPointSvgs.add(`${signedPolygonalScenario}-${ambientDimension}d.svg`);
+          }
+        }
         for (const artifact of records[0].artifacts) {
           if (typeof artifact !== "string" || !artifact || artifact.includes("..")
             || resolve(artifactDir, artifact) !== join(artifactDir, artifact)
@@ -874,7 +886,7 @@ export function validateBrowserEvidence(name, artifactDir, phase, checkout, prof
               && (artifact.endsWith(".input.svg") || artifact.startsWith(`${dashCapMechanismStem}-`) && artifact.endsWith(".live.svg"))) {
               if (!/^<svg\s[^>]*><(polygon|circle)\s[^>]*><\/\1><\/svg>$/u.test(svg)
                 || /(?:href|onload|script|data-)=/u.test(svg)) throw new Error(`Invalid polygon stroke SVG input: ${artifact}`);
-            } else if (!hasWholePointSvg(svg)) {
+            } else if (!authenticatedEmptyPointSvgs.has(artifact) && !hasWholePointSvg(svg)) {
               throw new Error(`Invalid whole-point SVG artifact: ${artifact}`);
             }
           } else if (artifact.endsWith(".png") && (bytes.length < 24
@@ -882,7 +894,9 @@ export function validateBrowserEvidence(name, artifactDir, phase, checkout, prof
             throw new Error(`Invalid point-node PNG artifact: ${artifact}`);
           }
         }
-        validateTargetedPaintEvidence(artifactDir, name, group, profile, checkout);
+        if (authenticatedEmptyPointSvgs.size === 0) {
+          validateTargetedPaintEvidence(artifactDir, name, group, profile, checkout);
+        }
         if (name === 'point-layout-pending-transparent-edit') {
           assertLayoutPostClickViewDiagnostic(evidenceObject(artifactDir, `${name}.json`, checkout), evidence.diagnostics);
         }

@@ -1,8 +1,8 @@
 import assert from 'node:assert/strict'
 import { spawnSync } from 'node:child_process'
-import { chmodSync, cpSync, mkdirSync, mkdtempSync, readFileSync, writeFileSync } from 'node:fs'
+import { chmodSync, cpSync, existsSync, mkdirSync, mkdtempSync, readFileSync, writeFileSync } from 'node:fs'
 import { tmpdir } from 'node:os'
-import { join } from 'node:path'
+import { dirname, join, relative, resolve } from 'node:path'
 import { fileURLToPath } from 'node:url'
 import nodeTest from 'node:test'
 import { runOwnedRunnerProcess } from './helpers/ownedRunnerProcess.mjs'
@@ -32,6 +32,26 @@ const allLabelGroups = [...freeLabelGroups, ...inlineLabelGroups]
 const settledExportGroups = [...allLabelGroups, 'settled-SVG-export-standalone']
 const combinedLabelGroups = [...settledExportGroups, 'combined-free-inline-workflows']
 
+function copyRelativeFixtureModules(cwd, entries) {
+  const sourceRoot = resolve(fileURLToPath(new URL('../..', import.meta.url))), seen = new Set()
+  const visit = source => {
+    if (seen.has(source)) return
+    seen.add(source)
+    const target = join(cwd, relative(sourceRoot, source))
+    mkdirSync(dirname(target), { recursive: true }); cpSync(source, target)
+    const code = readFileSync(source, 'utf8')
+    for (const match of code.matchAll(/\b(?:import|export)\s+(?:[^'"]+?\s+from\s+)?['"](\.[^'"]+)['"]/gu)) {
+      const requested = resolve(dirname(source), match[1])
+      assert.ok(requested.startsWith(sourceRoot + '/'), 'Fixture dependency stays in the isolated repository copy')
+      const dependency = [requested, requested + '.ts', requested + '.mjs', join(requested, 'index.ts')]
+        .find(candidate => existsSync(candidate))
+      assert.ok(dependency, `Relative fixture dependency exists: ${match[1]}`)
+      visit(dependency)
+    }
+  }
+  entries.forEach(entry => visit(join(sourceRoot, entry)))
+}
+
 function fixture(t, phase = '31B', options = {}) {
   const cwd = mkdtempSync(join(tmpdir(), 'stz-runner-test-'))
   const evidence = createRunnerFixtureEvidence(cwd)
@@ -59,6 +79,16 @@ function fixture(t, phase = '31B', options = {}) {
   }
   mkdirSync(join(cwd, 'src/rendering'), { recursive: true })
   cpSync(join(automationDir, '../../src/rendering/svgRenderSort.ts'), join(cwd, 'src/rendering/svgRenderSort.ts'))
+  if (options.faithful32d) {
+    // The full controlled runner records use the same pure model/projection/TikZ
+    // fixture builders as the parent-dispatch suite. Keep their dependencies in
+    // the isolated checkout while real validators remain the copied modules.
+    copyRelativeFixtureModules(cwd, ['tests/scripts/phase32abParentEvidenceFixture.mjs',
+      'tests/scripts/phase32dParentEvidenceFixture.mjs'])
+    const png = 'tests/fixtures/dash-cap-native-endpoints/point-paint-dash-caps-triangle-square-wide-scale-0.5-edit-dashPhase.screen.png'
+    mkdirSync(join(cwd, 'tests/fixtures/dash-cap-native-endpoints'), { recursive: true })
+    cpSync(join(automationDir, '../..', png), join(cwd, png))
+  }
   const runner = join(localAutomationDir, 'run-phase.mjs')
   for (const [file, source] of Object.entries(options.initialFiles ?? {})) {
     writeFileSync(join(cwd, file), source)
@@ -117,7 +147,36 @@ if (stage === 'free-browser') {
     completed: groups, incompleteGroups: [], unexecuted: [], pageErrors: [],
     ...JSON.parse(process.env.STZ_TEST_FREE_EVIDENCE_OVERRIDE || '{}'),
   };
-  if (process.env.STZ_TEST_REFERENCED_REPORT) {
+  if (process.env.STZ_TEST_FAITHFUL_32D) {
+    const publish = async () => {
+      const { pathToFileURL } = require('node:url');
+      const load = name => import(pathToFileURL(join(process.cwd(), name)).href);
+      const { completePointEvidence } = await load('tests/scripts/phase32abParentEvidenceFixture.mjs');
+      const { populatePhase32dParentEvidence } = await load('tests/scripts/phase32dParentEvidenceFixture.mjs');
+      const { createEvidencePublisher } = await load('scripts/evidencePublication.mjs');
+      const fixture = { cwd: process.cwd(), env: { ...process.env } };
+      const earlier = completePointEvidence(fixture);
+      const complete = populatePhase32dParentEvidence(dir, earlier.checkout,
+        JSON.parse(fixture.env.STZ_TEST_POINT_ARTIFACT_VALUES), ${JSON.stringify(combinedLabelGroups)});
+      const stem = 'point-layout-signed-polygonal-zero-axis-2d';
+      if (process.env.STZ_TEST_FAITHFUL_32D === 'corrupt-content') {
+        const raw = complete.readJson(stem + '-standalone.json');
+        raw.xml = raw.xml.replace('<g/></g></g>', '<g>foreign</g></g></g>');
+        writeFileSync(join(dir, stem + '.svg'), raw.xml);
+        complete.save(stem + '-standalone.json', raw);
+      }
+      const publisher = createEvidencePublisher({ artifactDir: dir, checkout: earlier.checkout });
+      const name = stem + '-standalone.json';
+      await publisher.publish(name, complete.readJson(name), { stage: 'standalone-empty-shell' });
+      await publisher.publish('free-labels-evidence.json', complete.report, { stage: 'complete', disposition: 'passed' });
+      if (process.env.STZ_TEST_FAITHFUL_32D === 'missing-boundary') {
+        const { readFileSync, unlinkSync } = require('node:fs');
+        const document = JSON.parse(readFileSync(join(dir, name), 'utf8'));
+        unlinkSync(join(dir, document.artifact.path));
+      }
+    };
+    publish().catch(error => { console.error(error); process.exitCode = 1; });
+  } else if (process.env.STZ_TEST_REFERENCED_REPORT) {
     const publish = async () => {
       const { pathToFileURL } = require('node:url');
       const { createEvidencePublisher } = await import(pathToFileURL(join(process.cwd(), 'scripts/evidencePublication.mjs')).href);
@@ -615,3 +674,24 @@ for (const mode of ['verify-deferred', 'review-deferred']) {
     assert.throws(() => readFileSync(join(cwd, 'logs/review-prompt.txt')), { code: 'ENOENT' })
   })
 }
+
+
+test('32D isolated real runner verifies faithful complete empty-body artifacts without review or commit', async t => {
+  const { cwd, git, run, initialHead } = fixture(t, '32D', { faithful32d: true })
+  const result = await run('verify', { STZ_TEST_FAITHFUL_32D: 'complete' })
+  assert.equal(result.status, 0, runnerDiagnostics(result))
+  assert.match(result.stdout, /Verification passed/)
+  assert.equal(git('rev-parse', 'HEAD'), initialHead)
+  assert.throws(() => readFileSync(join(cwd, 'logs/review-prompt.txt')), { code: 'ENOENT' })
+  assert.doesNotMatch(result.stdout, /\$ git (?:add|commit|push)\b/)
+})
+
+for (const fault of ['corrupt-content', 'missing-boundary']) test(`32D isolated real runner rejects ${fault} before review or commit`, async t => {
+  const { cwd, git, run, initialHead } = fixture(t, '32D', { faithful32d: true })
+  const result = await run('implement', { STZ_TEST_FAITHFUL_32D: fault })
+  assert.notEqual(result.status, 0, runnerDiagnostics(result))
+  assert.match(result.stderr, /evidence is incomplete or invalid/)
+  assert.equal(git('rev-parse', 'HEAD'), initialHead)
+  assert.throws(() => readFileSync(join(cwd, 'logs/review-prompt.txt')), { code: 'ENOENT' })
+  assert.doesNotMatch(result.stdout, /\$ git (?:add|commit|push)\b/)
+})
