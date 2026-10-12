@@ -23,6 +23,7 @@ import { observePostExternalPointPaint, assertPostExternalPointPaint, observeLit
 
 import { dashCapMechanismStem, dashCapMechanismArtifacts, assertDashCapMechanismEvidence } from "../pointDashCapMechanismContract.mjs";
 import { dashCapScenario, dashCapArtifacts, assertDashCapEvidence } from "../pointDashCapContract.mjs";
+import { readEvidenceDocumentSync } from "../evidencePublication.mjs";
 
 import { polygonJoinScenario, polygonJoinArtifacts, assertPolygonJoinEvidence } from "../pointPolygonJoinContract.mjs";
 import { inspectConnectedLivePaintPng } from "../connectedLivePaintOracle.mjs";
@@ -218,8 +219,8 @@ function browserEnvironment(cwd, env) {
   return result;
 }
 
-function evidenceObject(artifactDir, name) {
-  const evidence = JSON.parse(readFileSync(join(artifactDir, name), "utf8"));
+function evidenceObject(artifactDir, name, checkout) {
+  const evidence = readEvidenceDocumentSync(artifactDir, name, { checkout });
   if (!evidence || typeof evidence !== "object" || Array.isArray(evidence)) {
     throw new Error(`${name} must contain a JSON object`);
   }
@@ -281,17 +282,17 @@ function validateDashLivePaintFiles(artifactDir, live) {
   }
 }
 
-function validateTargetedPaintEvidence(artifactDir, name, group, profile = "strict") {
+function validateTargetedPaintEvidence(artifactDir, name, group, profile = "strict", checkout) {
   if (group === layoutAnchorGroup) {
-    const evidence = evidenceObject(artifactDir, `${name}.json`);
+    const evidence = evidenceObject(artifactDir, `${name}.json`, checkout);
     assertLayoutAnchorEvidence(evidence, name);
     if (name === signedPolygonalScenario) for (const ambientDimension of [2, 3]) {
-      const raw = evidenceObject(artifactDir, `${name}-${ambientDimension}d-standalone.json`);
-      assertSignedPolygonalStandaloneEvidence(evidence, raw, artifactDir, ambientDimension);
+      const raw = evidenceObject(artifactDir, `${name}-${ambientDimension}d-standalone.json`, checkout);
+      assertSignedPolygonalStandaloneEvidence(evidence, raw, artifactDir, ambientDimension, { checkout });
     }
     if (name.startsWith('point-layout-pending-')) {
-      const standalone = evidenceObject(artifactDir, `${name}-standalone.json`);
-      assertLayoutStandaloneEvidence(evidence, standalone, artifactDir);
+      const standalone = evidenceObject(artifactDir, `${name}-standalone.json`, checkout);
+      assertLayoutStandaloneEvidence(evidence, standalone, artifactDir, { checkout });
       assert.deepEqual(standalone.pageErrors, []);
       assert.deepEqual(standalone.expected, evidence.expected); assert.deepEqual(standalone.click, evidence.click);
       assert.equal(standalone.reopened.length, evidence.expected.length);
@@ -316,10 +317,10 @@ function validateTargetedPaintEvidence(artifactDir, name, group, profile = "stri
     return;
   }
   if (group === geometricShapeGroup) {
-    const evidence = evidenceObject(artifactDir, `${name}.json`);
+    const evidence = evidenceObject(artifactDir, `${name}.json`, checkout);
     assertGeometricShapeEvidence(evidence, name);
     if (name.startsWith('point-geometric-download-')) {
-      const standalone = evidenceObject(artifactDir, `${name}-standalone.json`);
+      const standalone = evidenceObject(artifactDir, `${name}-standalone.json`, checkout);
       assertGeometricStandaloneEvidence(evidence, standalone, artifactDir);
       assert.deepEqual(standalone.pageErrors, []);
       assert.deepEqual(standalone.expected, evidence.expected); assert.deepEqual(standalone.click, evidence.click);
@@ -343,11 +344,11 @@ function validateTargetedPaintEvidence(artifactDir, name, group, profile = "stri
     return;
   }
   if (name === dashCapScenario) {
-    const evidence = evidenceObject(artifactDir, `${name}.json`);
+    const evidence = evidenceObject(artifactDir, `${name}.json`, checkout);
     assertDashCapEvidence(evidence);
     for (const entry of evidence.cases) if (entry.specification.audit) {
       const stem = `${name}-${entry.key}-scale-${entry.scale}`;
-      assert.deepEqual(evidenceObject(artifactDir, `${stem}-engine-audit.json`),
+      assert.deepEqual(evidenceObject(artifactDir, `${stem}-engine-audit.json`, checkout),
         entry.observation.engineAudit, "Retained independent audit artifact matches the recorded native case");
       for (const suffix of [".input.svg", "-solid.input.svg"]) {
         const source = readFileSync(join(artifactDir, `${stem}${suffix}`), "utf8");
@@ -358,13 +359,13 @@ function validateTargetedPaintEvidence(artifactDir, name, group, profile = "stri
         validateDashLivePaintFiles(artifactDir, { captures: entry.probes.map(({ liveCapture }) => liveCapture) });
       }
     }
-    const mechanism = evidenceObject(artifactDir, `${dashCapMechanismStem}.json`);
+    const mechanism = evidenceObject(artifactDir, `${dashCapMechanismStem}.json`, checkout);
     if (profile === phase32cProfile) assertScopedMechanismEvidence(mechanism);
     else assertDashCapMechanismEvidence(mechanism);
     for (const entry of mechanism.cases) {
       if (profile === phase32cProfile && entry.key === deferredMechanismKey) continue;
       const stem = `${dashCapMechanismStem}-${entry.key}`;
-      assert.deepEqual(evidenceObject(artifactDir, `${stem}.json`), entry,
+      assert.deepEqual(evidenceObject(artifactDir, `${stem}.json`, checkout), entry,
         "Retained mechanism entry matches the complete matrix");
       validateDashLivePaintFiles(artifactDir, entry.livePaint);
       for (const suffix of ["input.svg", "solid.input.svg", "live.svg"]) {
@@ -382,23 +383,23 @@ function validateTargetedPaintEvidence(artifactDir, name, group, profile = "stri
     return;
   }
   if (name === polygonJoinScenario) {
-    assertPolygonJoinEvidence(evidenceObject(artifactDir, `${name}.json`));
+    assertPolygonJoinEvidence(evidenceObject(artifactDir, `${name}.json`, checkout));
     return;
   }
   if (name === "point-paint-app-continuity") {
-    validateAppContinuityEvidence(artifactDir, name, group);
+    validateAppContinuityEvidence(artifactDir, name, group, checkout);
     return;
   }
   if (name === "point-paint-clear-imported-style") {
-    validateDetachedPaintEvidence(artifactDir, name, group);
+    validateDetachedPaintEvidence(artifactDir, name, group, checkout);
     return;
   }
   if (["point-paint-local-override-intent", "point-paint-cross-file-resolution", "point-paint-unsupported-color-bindings", "point-paint-unsupported-mutations", "point-paint-mutation-directory-uncertainty"].includes(name)) {
-    validateImportedPaintEvidence(artifactDir, name, group);
+    validateImportedPaintEvidence(artifactDir, name, group, checkout);
     return;
   }
   if (name !== "point-paint-namespace-aliases" && !name.startsWith("point-paint-responsive-")) return;
-  const evidence = evidenceObject(artifactDir, `${name}.json`);
+  const evidence = evidenceObject(artifactDir, `${name}.json`, checkout);
   if (evidence.scenario !== name || evidence.group !== group || evidence.result !== "passed") {
     throw new Error(`Targeted point paint scenario did not complete: ${name}`);
   }
@@ -464,8 +465,8 @@ function validateTargetedPaintEvidence(artifactDir, name, group, profile = "stri
   }
 }
 
-function validateAppContinuityEvidence(artifactDir, name, group) {
-  const evidence = evidenceObject(artifactDir, `${name}.json`);
+function validateAppContinuityEvidence(artifactDir, name, group, checkout) {
+  const evidence = evidenceObject(artifactDir, `${name}.json`, checkout);
   assert.equal(evidence.scenario, name); assert.equal(evidence.group, group); assert.equal(evidence.result, "passed");
   assert.equal(evidence.schema, 1);
   const initial = evidence.startup;
@@ -513,15 +514,15 @@ function validateAppContinuityEvidence(artifactDir, name, group) {
   assert.deepEqual(evidence.beforeNextLoad.state, evidence.helperReturn.state);
   assert.equal(evidence.afterControls.boundary, "after-native-continuity-controls");
   assert.deepEqual(evidence.afterControls.state, evidence.beforeNextLoad.state);
-  const transitions = evidenceObject(artifactDir, "point-paint-app-transitions.json");
+  const transitions = evidenceObject(artifactDir, "point-paint-app-transitions.json", checkout);
   assert.deepEqual(transitions.transitions, evidence.transitions);
-  const lifecycle = evidenceObject(artifactDir, "point-paint-app-lifecycle.json");
+  const lifecycle = evidenceObject(artifactDir, "point-paint-app-lifecycle.json", checkout);
   assert.equal(lifecycle.schema, 1); assert.equal(lifecycle.pageId, initial.pageId);
   assert.equal(lifecycle.expectedUrl, initial.expectedUrl);
   assert.equal(lifecycle.expected?.generation, initial.document.generation);
   assert.ok(Array.isArray(lifecycle.events) && lifecycle.events.length > 0 && lifecycle.events.length <= 256);
   assert.ok(lifecycle.events.some((entry) => entry.event === "document-observation" && entry.boundary === "import-helper-return"));
-  const controls = evidenceObject(artifactDir, "point-paint-app-controls.json");
+  const controls = evidenceObject(artifactDir, "point-paint-app-controls.json", checkout);
   assert.equal(controls.schema, 1); assert.deepEqual(controls.controls, evidence.controls);
   assert.equal(evidence.controls?.length, 3);
   for (const fault of ["missing-api", "wrong-api", "same-url-reload"]) {
@@ -529,7 +530,7 @@ function validateAppContinuityEvidence(artifactDir, name, group) {
     assert.equal(matches.length, 1); const control = matches[0];
     assert.equal(control.result, "passed"); assert.notEqual(control.before.pageId, initial.pageId);
     const prefix = `point-paint-app-control-${fault}`;
-    const failure = evidenceObject(artifactDir, `${prefix}-failure.json`);
+    const failure = evidenceObject(artifactDir, `${prefix}-failure.json`, checkout);
     assert.deepEqual(failure, control.evidence);
     assert.equal(failure.pageId, control.before.pageId); assert.equal(failure.snapshot?.pageId, control.before.pageId);
     assert.equal(failure.expectedUrl, initial.expectedUrl); assert.equal(failure.snapshot.document.url, initial.expectedUrl);
@@ -543,14 +544,14 @@ function validateAppContinuityEvidence(artifactDir, name, group) {
     else assert.equal(failure.snapshot.document.generation, control.before.document.generation);
     if (fault === "missing-api") assert.equal(failure.snapshot.document.api.type, "undefined");
     if (fault === "wrong-api") assert.equal(failure.snapshot.document.api.sameInstance, false);
-    const owned = evidenceObject(artifactDir, `${prefix}-lifecycle.json`);
+    const owned = evidenceObject(artifactDir, `${prefix}-lifecycle.json`, checkout);
     assert.equal(owned.pageId, control.before.pageId); assert.equal(owned.expectedUrl, initial.expectedUrl);
     assert.ok(owned.events.some((entry) => entry.event === "document-observation" && entry.boundary === "failure"));
   }
 }
 
-function validateImportedPaintEvidence(artifactDir, name, group) {
-  const evidence = evidenceObject(artifactDir, `${name}.json`);
+function validateImportedPaintEvidence(artifactDir, name, group, checkout) {
+  const evidence = evidenceObject(artifactDir, `${name}.json`, checkout);
   const persistence = (entry, boundary) => entry?.boundary === boundary
     && Array.isArray(entry.differencePaths) && entry.differencePaths.length === 0;
   if (evidence.scenario !== name || evidence.group !== group || evidence.result !== "passed"
@@ -695,8 +696,8 @@ function validateImportedPaintEvidence(artifactDir, name, group) {
 
 /** Deliberately separate from imported-state checks: a detached point requires
  * BOTH the external association and importer provenance to be absent. */
-function validateDetachedPaintEvidence(artifactDir, name, group) {
-  const evidence = evidenceObject(artifactDir, `${name}.json`);
+function validateDetachedPaintEvidence(artifactDir, name, group, checkout) {
+  const evidence = evidenceObject(artifactDir, `${name}.json`, checkout);
   assert.equal(evidence.scenario, name); assert.equal(evidence.group, group); assert.equal(evidence.result, "passed");
   const observed = (entry) => {
     assert.equal(entry?.modelDiagnostics?.validation?.valid, true, "Clear model is immediately valid");
@@ -803,17 +804,17 @@ export function hasWholePointSvg(svg) {
 export function validateBrowserEvidence(name, artifactDir, phase, checkout, profile = "strict") {
   resolveVerificationProfile(profile, phase);
   if (name === "check:label-assets") {
-    const evidence = evidenceObject(artifactDir, "native-retry-evidence.json");
+    const evidence = evidenceObject(artifactDir, "native-retry-evidence.json", checkout);
     if (typeof evidence.browser !== "string" || evidence.browser.trim() === ""
       || evidence.affectedBrowserRecoveryVerified !== true
       || evidence.nativeFailureCaching?.cachesFailedNativeImports !== true) {
       throw new Error("Affected-browser native import recovery has not been verified");
     }
-    evidenceObject(artifactDir, "asset-graph-evidence.json");
-    evidenceObject(artifactDir, "containment-evidence.json");
+    evidenceObject(artifactDir, "asset-graph-evidence.json", checkout);
+    evidenceObject(artifactDir, "containment-evidence.json", checkout);
     return;
   }
-  const evidence = evidenceObject(artifactDir, "free-labels-evidence.json");
+  const evidence = evidenceObject(artifactDir, "free-labels-evidence.json", checkout);
   if (profile === phase32cProfile) { assert.equal(evidence.profile, profile, "Scoped browser profile mismatch"); assert.deepEqual(evidence.deferredScenarios, [mechanismNotRun()]); }
   else assert.ok(evidence.profile === undefined || evidence.profile === "strict", "Strict verification cannot accept scoped evidence");
   if (evidence.result !== "passed" || evidence.stage !== "complete"
@@ -865,7 +866,7 @@ export function validateBrowserEvidence(name, artifactDir, phase, checkout, prof
           }
           const bytes = readFileSync(join(artifactDir, artifact));
           if (artifact.endsWith(".json")) {
-            const value = JSON.parse(bytes.toString());
+            const value = readEvidenceDocumentSync(artifactDir, artifact, { checkout });
             if (!value || typeof value !== "object") throw new Error(`Invalid point-node JSON: ${artifact}`);
           } else if (artifact.endsWith(".svg")) {
             const svg = bytes.toString();
@@ -881,9 +882,9 @@ export function validateBrowserEvidence(name, artifactDir, phase, checkout, prof
             throw new Error(`Invalid point-node PNG artifact: ${artifact}`);
           }
         }
-        validateTargetedPaintEvidence(artifactDir, name, group, profile);
+        validateTargetedPaintEvidence(artifactDir, name, group, profile, checkout);
         if (name === 'point-layout-pending-transparent-edit') {
-          assertLayoutPostClickViewDiagnostic(evidenceObject(artifactDir, `${name}.json`), evidence.diagnostics);
+          assertLayoutPostClickViewDiagnostic(evidenceObject(artifactDir, `${name}.json`, checkout), evidence.diagnostics);
         }
       }
     }
@@ -1046,7 +1047,7 @@ export function runPhaseVerification({ phase, cwd = process.cwd(), env = process
  * is never passed to run-phase's success/commit path. The second browser run
  * executes every non-deferred scenario, including final SVG and all new shapes. */
 function validateNamedStrict32CDiagnostic(check, checkout) {
-  const evidence = evidenceObject(check.artifactDir, 'free-labels-evidence.json');
+  const evidence = evidenceObject(check.artifactDir, 'free-labels-evidence.json', checkout);
   assert.equal(evidence.profile ?? 'strict', 'strict');
   assert.equal(evidence.checkout?.revision, checkout.revision);
   assert.equal(evidence.checkout?.trackedDiffSha256, checkout.trackedDiffSha256);
@@ -1055,8 +1056,8 @@ function validateNamedStrict32CDiagnostic(check, checkout) {
   assert.equal(evidence.completed.length, earlier.length);
   assert.ok(earlier.every((group) => evidence.completed.includes(group)));
   assert.ok(evidence.incompleteGroups.includes('settled-SVG-export-standalone') && evidence.incompleteGroups.includes('point-node-paint-import-persistence'));
-  const appDash = evidenceObject(check.artifactDir, `${dashCapScenario}.json`);
-  assertNamedStrict32BFailure(evidence, evidenceObject(check.artifactDir, `${dashCapMechanismStem}.json`), appDash);
+  const appDash = evidenceObject(check.artifactDir, `${dashCapScenario}.json`, checkout);
+  assertNamedStrict32BFailure(evidence, evidenceObject(check.artifactDir, `${dashCapMechanismStem}.json`, checkout), appDash);
   assertDashCapEvidence({ ...appDash, result: 'passed' });
 }
 

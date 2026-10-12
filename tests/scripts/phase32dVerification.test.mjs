@@ -15,6 +15,8 @@ import { signedPointRenderOrderProof, signedPointStandaloneRootAttributes, creat
   assertSignedPointStandaloneGeometry, findSignedZeroAxisAssociation } from '../../scripts/signedPointStandaloneAssociation.mjs'
 import { assertZeroAxisCaptureSnapshot, assertZeroAxisLiveCapture } from '../../scripts/zeroAxisLiveCapture.mjs'
 import { captureZeroAxisLive, isZeroAxisLiveCaptureFailure } from '../../scripts/zeroAxisLiveCaptureWorkflow.mjs'
+import { createEvidencePublisher, createEvidenceReportStorage, createLiveEvidenceRetainer,
+  readEvidenceDocumentSync } from '../../scripts/evidencePublication.mjs'
 import { capturePointLayoutStandalone } from '../../scripts/checkPointLayoutAnchors.mjs'
 import { syntheticStandalonePointDownload, syntheticPendingLayoutPreparation } from './standalonePointDownloadFixture.mjs'
 import { syntheticPendingLayoutViewEvidence } from './pointLayoutPendingViewFixture.mjs'
@@ -2159,3 +2161,176 @@ for (const source of ['  native $x_i$\t\\keep\n tail  ', ' \\slash\r\n\r\n\t nex
     }
   })
 }
+
+function controlledPublicationGate() {
+  let resolve, reject
+  const promise = new Promise((fulfill, fail) => { resolve = fulfill; reject = fail })
+  return { promise, resolve, reject }
+}
+
+function liveWorkflowPublication(t, options = {}) {
+  const fixture = syntheticLiveWorkflow(t, options), artifactDir = join(fixture.args.pngPath, '..')
+  const checkout = { fingerprint: 'publication-controlled-tree', revision: 'publication-controlled-head',
+    trackedDiffSha256: 'controlled-tracked', untrackedSha256: { 'evidencePublication.mjs': 'controlled-untracked' } }
+  const gate = controlledPublicationGate(), entered = controlledPublicationGate(), finished = controlledPublicationGate()
+  const writes = []
+  let withheld = false
+  const publisher = createEvidencePublisher({ artifactDir, checkout, timeoutMs: 1000, write: async (path, bytes) => {
+    if (options.writerFailure === 'no-write') return
+    if (options.writerFailure === 'corrupt') {
+      const corrupted = Buffer.from(bytes); corrupted[0] ^= 1; writeFileSync(path, corrupted); return
+    }
+    const boundary = path.endsWith('.boundary.json') ? JSON.parse(bytes.toString()) : null
+    const shouldStall = (options.stalledFinal === true || options.stallBoundary) && !withheld
+      && boundary?.identity.stage === (options.stallBoundary ?? 'restored-after-image-attempt')
+    writes.push({ path, bytes: bytes.length, stage: boundary?.identity.stage })
+    if (shouldStall) {
+      withheld = true; entered.resolve()
+      try { await gate.promise; writeFileSync(path, bytes) } finally { finished.resolve() }
+    } else writeFileSync(path, bytes)
+  } })
+  const storage = createEvidenceReportStorage({ artifactDir, checkout, publisher }), stem = `signed-controlled-${options.ambientDimension ?? 2}d`
+  const report = { result: 'running', stage: 'native-live', checkout, started: [layoutAnchorGroup], completed: [],
+    diagnostics: [], checkpoints: [], evidence: [], pageErrors: [], unexecuted: ['standalone-download'] }
+  const zeroAxisCase = { ambientDimension: options.ambientDimension ?? 2, axisInteraction: fixture.native.axisInteraction,
+    state: fixture.native.state, rendered: fixture.native.rendered, liveObservation: fixture.live }
+  const actualRetain = createLiveEvidenceRetainer({ publisher, stem, scenario: signedPolygonalScenario, group: layoutAnchorGroup,
+    zeroAxisCase, polygonalCases: [], observe: async (name, details) => {
+      report.checkpoints.push({ group: layoutAnchorGroup, name }); report.diagnostics.push({ name, ...details })
+      await storage.save(report)
+    } })
+  const retained = []
+  const retain = async (boundary, record, primary) => {
+    fixture.calls.retained.push({ boundary })
+    retained.push({ boundary, primary, imageAttempts: record.capture.image?.attempts, listeners: record.capture.cleanup?.listenersInstalled })
+    return actualRetain(boundary, record, primary)
+  }
+  retain.fail = actualRetain.fail
+  const assertions = { pixels: 0 }
+  const assertPixels = fixture.args.assertPixels
+  fixture.args = { ...fixture.args, retain, timeoutMs: options.stalledFinal || options.stallBoundary ? 20 : 5000,
+    assertPixels: (pixels) => { assertions.pixels++; assertPixels(pixels) } }
+  return { fixture, artifactDir, checkout, publisher, storage, stem, report, gate, entered, finished, writes, retained, assertions }
+}
+
+for (const ambientDimension of [2, 3]) for (const inheritedCollapsed of [false, true]) {
+  test(`actual owned writer path finalizes ${ambientDimension}D live capture with inherited ${inheritedCollapsed ? 'collapsed' : 'expanded'} toolbar`, async (t) => {
+    const control = liveWorkflowPublication(t, { ambientDimension, inheritedCollapsed }), { fixture, artifactDir, checkout, stem } = control
+    const result = await captureZeroAxisLive(fixture.args)
+    assert.equal(result, fixture.live)
+    const resolved = readEvidenceDocumentSync(artifactDir, `${stem}-live-capture.json`, { checkout })
+    assert.deepEqual(resolved, result)
+    assertZeroAxisLiveCapture(resolved, fixture.native.axisInteraction, resolved.pixels)
+    assert.deepEqual(readEvidenceDocumentSync(artifactDir, `${stem}-native.json`, { checkout }).zeroAxisCase.liveObservation, resolved)
+    assert.deepEqual(readEvidenceDocumentSync(artifactDir, 'free-labels-evidence.json', { checkout }), control.report)
+    assert.equal(control.assertions.pixels, 1)
+    assert.equal(fixture.calls.screenshots.length, 1)
+    assert.deepEqual(fixture.calls.native, inheritedCollapsed ? [] : ['Collapse preview toolbar', 'Expand preview toolbar'])
+    assert.equal(fixture.isCollapsed(), inheritedCollapsed)
+    assert.equal(fixture.calls.resourceObservations, 1)
+    assert.equal(resolved.capture.cleanup.listenersInstalled, 0)
+    assert.ok(Object.values(resolved.capture.cleanup.observerRegistries).every(({ present, size }) => !present && size === 0))
+    assert.equal(resolved.capture.primary, undefined)
+    assert.deepEqual(resolved.state, resolved.capture.restoration.stateAfter)
+    assert.equal(control.retained.at(-1).boundary, 'restored-after-image-attempt')
+  })
+  for (const late of ['fulfillment', 'rejection']) test(`actual ${ambientDimension}D final writer timeout owns late ${late} after ${inheritedCollapsed ? 'collapsed' : 'expanded'} toolbar cleanup`, async (t) => {
+    const control = liveWorkflowPublication(t, { ambientDimension, inheritedCollapsed, stalledFinal: true })
+    const { fixture, artifactDir, checkout, publisher, storage, stem, report, gate, entered, finished } = control
+    const unhandled = [], onUnhandled = (error) => unhandled.push(error)
+    process.on('unhandledRejection', onUnhandled); t.after(() => process.off('unhandledRejection', onUnhandled))
+    let primary
+    const outcome = captureZeroAxisLive(fixture.args)
+    await entered.promise
+    await assert.rejects(outcome, (error) => {
+      primary = error
+      return /^Timed out after 20ms during Zero-axis live restored-after-image-attempt evidence$/.test(error.message)
+    })
+    assert.equal(publisher.primary, primary)
+    assert.equal(isZeroAxisLiveCaptureFailure(primary), true)
+    assert.equal(control.assertions.pixels, 1, 'Actual PNG passed strict pixel inspection before final evidence timeout')
+    assert.equal(fixture.calls.screenshots.length, 1, 'Owned failure never adds another screenshot')
+    assert.deepEqual(fixture.calls.native, inheritedCollapsed ? [] : ['Collapse preview toolbar', 'Expand preview toolbar'])
+    assert.equal(fixture.isCollapsed(), inheritedCollapsed)
+    assert.equal(fixture.calls.resourceObservations, 1)
+    assert.equal(fixture.live.capture.cleanup.listenersInstalled, 0)
+    assert.ok(Object.values(fixture.live.capture.cleanup.observerRegistries).every(({ present, size }) => !present && size === 0))
+    assert.deepEqual(fixture.live.state, fixture.live.capture.restoration.stateAfter)
+    assert.equal(fixture.live.capture.primary.message, primary.message)
+    assert.equal(control.retained.find(({ boundary }) => boundary === 'restored-after-image-attempt').primary, undefined,
+      'Frozen restored history precedes its subsequently owned persistence Error')
+    assert.equal(control.retained.at(-1).boundary, 'failed-after-restoration')
+    assert.equal(control.retained.at(-1).primary, primary)
+    report.result = 'failed'; report.error = { message: primary.message, stack: primary.stack }
+    await storage.save(report)
+    const authoritative = readFileSync(join(artifactDir, `${stem}-live-capture.json`)), terminalReport = readFileSync(join(artifactDir, 'free-labels-evidence.json'))
+    const failure = readEvidenceDocumentSync(artifactDir, `${stem}-live-capture.json`, { checkout })
+    assert.deepEqual(failure, fixture.live)
+    assert.equal(failure.capture.primary.message, primary.message)
+    assert.equal(failure.capture.image.attempts, 1)
+    assert.deepEqual(readEvidenceDocumentSync(artifactDir, `${stem}-native.json`, { checkout }).zeroAxisCase.liveObservation, failure)
+    assert.deepEqual(readEvidenceDocumentSync(artifactDir, 'free-labels-evidence.json', { checkout }), report)
+    if (late === 'fulfillment') gate.resolve(); else gate.reject(new Error('controlled late restored-boundary writer rejection'))
+    await finished.promise
+    await new Promise((resolve) => setImmediate(resolve))
+    assert.deepEqual(readFileSync(join(artifactDir, `${stem}-live-capture.json`)), authoritative)
+    assert.deepEqual(readFileSync(join(artifactDir, 'free-labels-evidence.json')), terminalReport)
+    assert.equal(JSON.parse(readFileSync(join(artifactDir, 'evidence-publication-index.json'), 'utf8')).disposition, 'failed')
+    assert.deepEqual(unhandled, [])
+    assert.throws(() => publisher.publish('free-labels-evidence.json', { result: 'passed' }, { disposition: 'passed' }), (error) => error === primary)
+    assert.equal(Object.keys(primary).length, 0)
+  })
+}
+
+for (const ambientDimension of [2, 3]) test(`actual ${ambientDimension}D stalled pre-restoration writer cannot block owned native cleanup`, async (t) => {
+  const control = liveWorkflowPublication(t, { ambientDimension, stallBoundary: 'before-restoration' })
+  const { fixture, artifactDir, checkout, publisher, stem, gate, entered, finished } = control
+  let primary
+  const outcome = captureZeroAxisLive(fixture.args)
+  await entered.promise
+  await assert.rejects(outcome, (error) => {
+    primary = error
+    return /^Timed out after 20ms during Zero-axis live before-restoration evidence$/.test(error.message)
+  })
+  assert.equal(publisher.primary, primary)
+  assert.equal(control.assertions.pixels, 1)
+  assert.equal(fixture.calls.screenshots.length, 1)
+  assert.deepEqual(fixture.calls.native, ['Collapse preview toolbar', 'Expand preview toolbar'])
+  assert.equal(fixture.isCollapsed(), false)
+  assert.equal(fixture.calls.resourceObservations, 1)
+  assert.deepEqual(fixture.live.capture.restoration.stateAfter, fixture.live.capture.inheritedState)
+  assert.equal(fixture.live.capture.restoration.after.toolbar.collapsed, false)
+  assert.ok(Object.values(fixture.live.capture.cleanup.observerRegistries).every(({ present, size }) => !present && size === 0))
+  assert.equal(fixture.live.capture.cleanup.listenersInstalled, 0)
+  assert.equal(control.retained.at(-1).boundary, 'failed-after-restoration')
+  const authoritative = readFileSync(join(artifactDir, `${stem}-live-capture.json`))
+  assert.deepEqual(readEvidenceDocumentSync(artifactDir, `${stem}-live-capture.json`, { checkout }), fixture.live)
+  gate.reject(new Error('late pre-restoration writer rejection'))
+  await finished.promise; await new Promise((resolve) => setImmediate(resolve))
+  assert.deepEqual(readFileSync(join(artifactDir, `${stem}-live-capture.json`)), authoritative)
+  assert.equal(publisher.primary, primary)
+})
+
+for (const writerFailure of ['no-write', 'corrupt']) test(`actual live capture attempts no native or image action after ordinary ${writerFailure} artifact authentication fails`, async (t) => {
+  const control = liveWorkflowPublication(t, { ambientDimension: writerFailure === 'no-write' ? 2 : 3, writerFailure })
+  let primary
+  await assert.rejects(captureZeroAxisLive(control.fixture.args), (error) => {
+    primary = error
+    return writerFailure === 'no-write' ? error.code === 'ENOENT' : /SHA256/.test(error.message)
+  })
+  assert.equal(control.publisher.primary, primary)
+  assert.equal(isZeroAxisLiveCaptureFailure(primary), true)
+  assert.deepEqual(control.fixture.calls.native, [])
+  assert.equal(control.fixture.calls.screenshots.length, 0)
+  assert.equal(control.assertions.pixels, 0)
+  assert.equal(control.fixture.calls.resourceObservations, 1)
+  assert.equal(control.fixture.isCollapsed(), false)
+  assert.equal(control.fixture.live.capture.restoration.after.toolbar.collapsed, false)
+  assert.equal(control.fixture.live.capture.cleanup.listenersInstalled, 0)
+  assert.ok(Object.values(control.fixture.live.capture.cleanup.observerRegistries).every(({ present, size }) => !present && size === 0))
+  assert.equal(existsSync(join(control.artifactDir, `${control.stem}-live-capture.json`)), false)
+  assert.equal(existsSync(join(control.artifactDir, `${control.stem}-native.json`)), false)
+  const index = JSON.parse(readFileSync(join(control.artifactDir, 'evidence-publication-index.json'), 'utf8'))
+  assert.equal(index.disposition, 'failed'); assert.deepEqual(index.documents, {}); assert.deepEqual(index.history, [])
+  assert.equal(index.primary.message, primary.message)
+})

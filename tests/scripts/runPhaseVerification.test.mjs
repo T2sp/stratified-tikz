@@ -1,11 +1,13 @@
 import assert from 'node:assert/strict'
 import { spawnSync } from 'node:child_process'
+import { createHash } from 'node:crypto'
 import {
   mkdirSync,
   mkdtempSync,
   readFileSync,
   realpathSync,
   rmSync,
+  unlinkSync,
   writeFileSync,
 } from 'node:fs'
 import { tmpdir } from 'node:os'
@@ -19,7 +21,12 @@ import {
   runPhaseVerification,
   verificationMatchesCheckout,
   hasWholePointSvg,
+  validateBrowserEvidence,
+  allPointNodeScenarios,
 } from '../../scripts/automation/phase-verification.mjs'
+import { createEvidencePublisher, readEvidenceDocumentSync } from '../../scripts/evidencePublication.mjs'
+import { layoutAnchorGroup, assertLayoutStandaloneEvidence, assertLayoutPostClickViewDiagnostic } from '../../scripts/pointLayoutAnchorsContract.mjs'
+import { syntheticStandalonePointDownload } from './standalonePointDownloadFixture.mjs'
 
 import { dashCapScenario, dashCapArtifacts } from '../../scripts/pointDashCapContract.mjs'
 import { dashCapEvidence, syntheticDashCapLivePng } from './dashCapEvidenceFixture.mjs'
@@ -1503,3 +1510,132 @@ for (const target of ['named-full-closed-limitation', 'unrelated-App-failure']) 
     assert.equal(failedVerification(t, fixture, '32B').report.status, 'failed')
   })
 }
+
+function referencedParentFixture(t) {
+  const artifactDir = realpathSync(mkdtempSync(join(tmpdir(), 'stz-parent-publication-')))
+  t.after(() => rmSync(artifactDir, { recursive: true, force: true }))
+  const checkout = { revision: 'current-revision', trackedDiffSha256: 'current-tracked-bytes',
+    untrackedSha256: { 'current-observation.mjs': 'current-untracked-bytes' }, fingerprint: 'current-tree' }
+  const publisher = createEvidencePublisher({ artifactDir, checkout: { ...checkout, status: ' M current-observation.mjs\n' } })
+  const report = { result: 'passed', stage: 'complete', environment: { browserVersion: 'controlled parent-policy fixture' },
+    checkout: { ...checkout, status: ' M current-observation.mjs\n' },
+    started: [...combinedLabelGroups, ...Object.keys(allPointNodeScenarios)],
+    completed: [...combinedLabelGroups, ...Object.keys(allPointNodeScenarios)],
+    incompleteGroups: [], unexecuted: [], pageErrors: [], evidence: [],
+    diagnostics: [{ name: 'preserved-observation', group: layoutAnchorGroup, result: 'observed',
+      state: { history: 'exact-history-'.repeat(20), source: 'exact raw $x$ source', owner: '["point-node",17,"current-point"]' } }] }
+  return { artifactDir, checkout, publisher, report }
+}
+
+async function publishParentReport(fixture, disposition = 'passed') {
+  const { artifactDir, publisher, report } = fixture
+  await publisher.publish('preserved-observation.json', report.diagnostics[0], { stage: 'before-current-report' })
+  await publisher.publish('free-labels-evidence.json', report, { stage: 'complete', disposition })
+  return JSON.parse(readFileSync(join(artifactDir, 'free-labels-evidence.json'), 'utf8'))
+}
+
+function replaceParentPointer(artifactDir, document) {
+  writeFileSync(join(artifactDir, 'free-labels-evidence.json'), JSON.stringify(document) + '\n')
+  const indexPath = join(artifactDir, 'evidence-publication-index.json')
+  const index = JSON.parse(readFileSync(indexPath, 'utf8'))
+  index.documents['free-labels-evidence.json'] = document
+  writeFileSync(indexPath, JSON.stringify(index) + '\n')
+}
+
+function replaceParentBoundary(artifactDir, document, boundary) {
+  const bytes = Buffer.from(JSON.stringify(boundary) + '\n')
+  writeFileSync(join(artifactDir, document.artifact.path), bytes)
+  document.artifact.bytes = bytes.length
+  document.artifact.sha256 = createHash('sha256').update(bytes).digest('hex')
+  replaceParentPointer(artifactDir, document)
+}
+
+test('32D parent resolves current-tree report references without accepting a complete group count alone', async t => {
+  const fixture = referencedParentFixture(t)
+  await publishParentReport(fixture)
+  assert.deepEqual(readEvidenceDocumentSync(fixture.artifactDir, 'free-labels-evidence.json', { checkout: fixture.checkout }), fixture.report,
+    'Browser-only git status provenance does not change the authenticated tree identity')
+  assert.throws(() => validateBrowserEvidence('check:free-labels', fixture.artifactDir, '32D', fixture.checkout),
+    /Missing completed point-node scenario/, 'All 18 groups still require terminal named scenarios and raw artifact replay')
+})
+
+test('32D parent rejects a referenced complete predecessor report before review', async t => {
+  const fixture = referencedParentFixture(t)
+  fixture.report.completed = fixture.report.completed.filter(group => group !== layoutAnchorGroup)
+  fixture.report.started = [...fixture.report.completed]
+  await publishParentReport(fixture)
+  assert.throws(() => validateBrowserEvidence('check:free-labels', fixture.artifactDir, '32D', fixture.checkout), /18 required groups/)
+})
+
+for (const fault of ['running-document', 'running-index', 'wrong-terminal-stage']) {
+  test(`parent rejects compact complete flags without matching terminal publication: ${fault}`, async t => {
+    const fixture = referencedParentFixture(t), { artifactDir, publisher, report, checkout } = fixture
+    report.completed = [...combinedLabelGroups]
+    report.started = [...combinedLabelGroups]
+    await publisher.publish('free-labels-evidence.json', report, {
+      stage: fault === 'wrong-terminal-stage' ? 'uncompleted-stage' : 'complete',
+      disposition: fault === 'running-document' ? 'running' : 'passed',
+    })
+    if (fault === 'running-index') {
+      const path = join(artifactDir, 'evidence-publication-index.json'), index = JSON.parse(readFileSync(path, 'utf8'))
+      index.disposition = 'running'
+      writeFileSync(path, JSON.stringify(index) + '\n')
+    }
+    assert.throws(() => validateBrowserEvidence('check:free-labels', artifactDir, '31F', checkout),
+      'A complete raw body must agree with durable terminal document and index authority')
+  })
+}
+
+for (const fault of ['missing-boundary', 'missing-pack', 'truncated-pack', 'wrong-hash', 'wrong-length',
+  'wrong-owner', 'wrong-stage', 'wrong-pack-order', 'untracked-tree', 'stale-current-pointer']) {
+  test(`32D parent rejects unauthenticated referenced report: ${fault}`, async t => {
+    const fixture = referencedParentFixture(t), { artifactDir, checkout, publisher, report } = fixture
+    const document = await publishParentReport(fixture, fault === 'stale-current-pointer' ? 'running' : 'passed')
+    const boundary = JSON.parse(readFileSync(join(artifactDir, document.artifact.path), 'utf8'))
+    assert.ok(boundary.packs.length >= 2, 'The control includes retained shared data and current report data')
+    if (fault === 'missing-boundary') unlinkSync(join(artifactDir, document.artifact.path))
+    if (fault === 'missing-pack') unlinkSync(join(artifactDir, boundary.packs[0].path))
+    if (fault === 'truncated-pack') {
+      const path = join(artifactDir, boundary.packs[0].path), bytes = readFileSync(path)
+      writeFileSync(path, bytes.subarray(0, bytes.length - 1))
+    }
+    if (fault === 'wrong-hash') { document.artifact.sha256 = '0'.repeat(64); replaceParentPointer(artifactDir, document) }
+    if (fault === 'wrong-length') { document.artifact.bytes++; replaceParentPointer(artifactDir, document) }
+    if (fault === 'wrong-owner') { document.identity.owner = 'foreign-publisher'; replaceParentPointer(artifactDir, document) }
+    if (fault === 'wrong-stage') { boundary.identity.stage = 'unexecuted-stage'; replaceParentBoundary(artifactDir, document, boundary) }
+    if (fault === 'wrong-pack-order') { boundary.packs.reverse(); replaceParentBoundary(artifactDir, document, boundary) }
+    if (fault === 'untracked-tree') checkout.untrackedSha256['current-observation.mjs'] = 'stale-untracked-bytes'
+    if (fault === 'stale-current-pointer') {
+      report.diagnostics.push({ name: 'new-terminal-observation', group: layoutAnchorGroup, result: 'observed' })
+      await publisher.publish('free-labels-evidence.json', report, { stage: report.stage, disposition: 'passed' })
+      writeFileSync(join(artifactDir, 'free-labels-evidence.json'), JSON.stringify(document) + '\n')
+    }
+    assert.throws(() => validateBrowserEvidence('check:free-labels', artifactDir, '32D', checkout),
+      error => !/Missing completed point-node scenario/.test(error.message), 'Reference authentication fails before summary or scenario acceptance')
+  })
+}
+
+test('32D parent pending file replay and ordered post-click prefixes consume resolved original observations', async t => {
+  const { artifactDir, checkout, publisher } = referencedParentFixture(t)
+  const scenario = 'point-layout-pending-transparent-edit', { evidence, raw } = syntheticStandalonePointDownload(artifactDir, scenario)
+  for (const suffix of ['preparation', 'post-click-view']) {
+    const name = `${scenario}-${suffix}.json`, value = JSON.parse(readFileSync(join(artifactDir, name), 'utf8'))
+    await publisher.publish(name, value, { stage: suffix })
+  }
+  const common = { name: `${scenario}-post-click-view`, group: layoutAnchorGroup, result: 'observed' }
+  const diagnostics = [0, 1, 2, 3].map(count => ({ ...common, postClickView: { ...structuredClone(evidence.postClickView),
+    result: 'observed', stages: structuredClone(evidence.postClickView.stages.slice(0, count)) } }))
+    .concat({ ...common, postClickView: structuredClone(evidence.postClickView) })
+  await publisher.publish(`${scenario}.json`, evidence, { stage: 'terminal-scenario' })
+  await publisher.publish(`${scenario}-standalone.json`, raw, { stage: 'reopened-file' })
+  await publisher.publish('ordered-post-click-diagnostics.json', { diagnostics }, { stage: 'ordered-post-click-diagnostics' })
+  const terminal = readEvidenceDocumentSync(artifactDir, `${scenario}.json`, { checkout })
+  const standalone = readEvidenceDocumentSync(artifactDir, `${scenario}-standalone.json`, { checkout })
+  const resolved = readEvidenceDocumentSync(artifactDir, 'ordered-post-click-diagnostics.json', { checkout })
+  assert.deepEqual(terminal, evidence); assert.deepEqual(standalone, raw); assert.deepEqual(resolved.diagnostics, diagnostics)
+  assertLayoutStandaloneEvidence(terminal, standalone, artifactDir, { checkout })
+  assertLayoutPostClickViewDiagnostic(terminal, resolved.diagnostics)
+  resolved.diagnostics.splice(2, 1)
+  assert.throws(() => assertLayoutPostClickViewDiagnostic(terminal, resolved.diagnostics), /immediate-input/,
+    'Lossless references preserve mandatory raw stage prefixes instead of replacing them with terminal flags')
+})

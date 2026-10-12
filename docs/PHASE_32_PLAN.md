@@ -1,5 +1,90 @@
 # Phase 32 Plan: Point-node math, paint, geometric shapes, and layout
 
+Bounded lossless evidence publication follow-up (2026-10-12): the actual clean
+entry HEAD is `ef06105a0d1659cc2e9e34abfabaedb157fdb6cd`, fingerprint
+`d6c6ecaf1c4dfa7c6600db467b7f617e14814252ec2ca9964ff6cff4159dffad`.
+All 1,983 entry files match the prior correspondence handoff except the new fix
+prompt; previous changed files/helper are now tracked. Exact inventories, retained
+artifact identities and current preservation/measurement audits are under
+`/private/tmp/stz-32d-evidence-audit-20261012/`.
+
+The actual latest parent `tBkjSj` passes tests/build/diff/label-assets and sixteen
+of eighteen cumulative groups, with seventeen started/six predecessor 32D
+scenarios terminal-passed. It fails the final restored 2D live evidence save at
+the unchanged 5,000ms deadline. All five trusted native actions, one actual PNG,
+internal strict pixel assertion, inherited toolbar restoration and resource
+observation complete, but final lifecycle validation/normal return do not execute.
+The native-before-assertion checkpoint/new association workflow, new standalone
+workflows, 3D work, both pending scenarios and final standalone remain unexecuted
+in that run. Empty page errors and restored diagnostics are not terminal passes.
+The unchanged image is 36,882 bytes/1700×1300, SHA256
+`fab81d376069bb3ab3ee08b17a5e89b8db34ea2589ffeeee3b3e13d81cfa26b3`,
+632 magenta pixels and valid full stroke extrema. This differs from historical
+BjrAYN's association ordering failure and child localhost EPERM.
+
+The old `retainLive → observe → save` boundary rewrites 74,465,740-byte live,
+130,844,920-byte native and 255,833,911-byte cumulative records: 461,144,571 bytes
+plus serialization under one 5s wrapper. Its 4,223 diagnostics/189 evidence
+entries include large direct 32D payloads. Individual old write durations were
+not measured. Exact-value inspection finds ten full 640-sample snapshots, two
+byte-equal sample arrays and 77,068 hit-stack descriptor occurrences with only
+fifteen exact descriptor values; distinct timestamps/order remain necessary.
+
+The scoped publisher now retains immutable exact-value tables and fixed lossless
+array chunks, then authenticated compact boundary/document references through an
+owned ordered index. Required raw writes are read back and verified before commit;
+queue tokens freeze diagnostic values, and timeout invalidates the writer owner.
+Late completion can leave orphan bytes but cannot overwrite failed/terminal
+state or publish acceptance. Failed publication bypasses a stalled predecessor,
+retains the original Error, and preserves required native restoration/cleanup.
+A separate failed-after-restoration boundary retains successful image/UI/resource
+observations with the new error; historical frozen observations stay distinct.
+Required final evidence still precedes lifecycle acceptance, with one PNG and the
+same production 5s limits. Earlier 31F/32A report behavior is preserved.
+
+Strict parent replay authenticates exact tree/owner/schema/path/hash/length,
+complete ordered committed manifests, current pointers and all referenced raw
+values before unchanged native/lifecycle/association/file/PNG and pending-view
+assertions. Post-click before/immediate-input/after prefixes, exactly one accepted
+actual view proof and last/terminal equality remain mandatory. Missing/corrupt/
+stale/conflicting proof and failed or nonterminal authority fail. Runner copies
+include the new helper; no required group/scenario/raw proof becomes optional.
+
+Final offline exact replay retains all three historical values by deep equality,
+using 11,440,357 immutable bytes over three first/three unchanged publications;
+unchanged values add zero data nodes/packs and only compact boundary references.
+The actual ordinary retain/observe/report path completes its final triple
+publication in 209.3ms inside the original 5,000ms wrapper, adding 214,856 immutable
+bytes with twelve logical writes and six authentication reads. The next boundary
+with unchanged measured values takes 20.9ms/adds 11,792 bytes, only six new small
+report/chunk nodes; its current index is 13,991 bytes. Exact operation counts,
+bytes/durations and source/tree identity are retained externally. These are
+observed offline representation/path results, not native/browser acceptance or
+machine-speed test thresholds. Deterministic writer gates/deadlines provide the
+regressions. The [implementation audit](PHASE_32D_IMPLEMENTATION.md) records details,
+focused results and the retained interim resolver correction.
+
+All production/reference/fixture bytes, authenticated association, native input,
+complete-root capture helpers and strict pixel oracle remain intact. All prior
+61 association/65 live/55 background controls and the deterministic stalled-report
+source are byte-preserved. An earlier focused policy/workflow sweep passed 738/738,
+including fourteen new workflow controls. Final focused sweeps pass 38/38 publisher,
+16/16 actual workflow and 18/18 parent/runner controls. These seventy-two new
+controls overlap the registered full suite. Final required/full
+checks, reproduced four-error inherited lint debt and changed-file checks belong
+to the frozen-tree handoff. No dependency, geometry/selection/preparation rewrite,
+heap/concurrency change or deadline increase is added.
+
+Phase 32 remains **incomplete**. Require fresh exact-tree strict acceptance of
+all eighteen cumulative groups/nine scenarios, twelve polygonal cases, both
+native/live lifecycles, both authenticated seven-node transparent standalone
+workflows, both fifteen-entry pending workflows and final standalone before
+independent read-only completion review and the post-review matching-tree guard.
+Failed/incomplete verification or `needs_changes` blocks completion/commit. Child
+localhost EPERM leaves native work pending for the parent; it cannot establish
+acceptance. No child review/commit/push is claimed; commit/push remain with the
+parent. Earlier entries below retain their historical outcomes and identities.
+
 Authenticated standalone correspondence follow-up (2026-10-12): clean entry HEAD
 is `ff72e61c43ebc2da3f09513b023e89543719aa3c`, fingerprint
 `cb929c9a5ae2c113fb9a059ad24665ffc7c521575d48e809432bd85b43eb2e11`.

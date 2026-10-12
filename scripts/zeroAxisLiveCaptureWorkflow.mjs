@@ -2,6 +2,7 @@ import assert from 'node:assert/strict'
 import { createHash } from 'node:crypto'
 import { readFile } from 'node:fs/promises'
 import { boundedPointDiagnostic } from './pointCheckDiagnostics.mjs'
+import { freezeEvidenceObservation } from './evidencePublication.mjs'
 import { assertZeroAxisCaptureSnapshot, assertZeroAxisCaptureTransition,
   assertZeroAxisLiveCapture } from './zeroAxisLiveCapture.mjs'
 
@@ -13,16 +14,20 @@ export const markZeroAxisLiveCaptureFailure = (error) => { captureFailures.add(e
 
 /** A capture owns only a measured native toolbar collapse. Interaction cleanup
  * is complete before entry; neither selection nor document/camera is changed. */
-export async function captureZeroAxisLive({ page, measure, retain, pngPath, inspect, assertPixels, interaction, live = {} }) {
+export async function captureZeroAxisLive({ page, measure, retain, pngPath, inspect, assertPixels, interaction, live = {}, timeoutMs = 5000 }) {
   const capture = live.capture = { actions: [], restoration: { actions: [] }, secondaryErrors: [], cleanup: {} }
   let primary, collapseAttempted = false
-  const bounded = (name, operation) => boundedPointDiagnostic(operation, `Zero-axis live ${name}`, 5000)
+  const bounded = (name, operation) => boundedPointDiagnostic(operation, `Zero-axis live ${name}`, timeoutMs)
   const fail = (operation, error) => {
     if (primary) capture.secondaryErrors.push({ operation, message: error.message })
     else primary = error
+    capture.primary = { message: primary.message, stack: primary.stack }
   }
-  const persist = (boundary) => bounded(`${boundary} evidence`, () => retain(boundary, live))
-  const observed = () => bounded('current entire stroke measurement', measure)
+  const persist = async (boundary) => {
+    try { return await bounded(`${boundary} evidence`, () => retain(boundary, live, primary)) }
+    catch (error) { retain.fail?.(error); throw error }
+  }
+  const observed = async () => freezeEvidenceObservation(await bounded('current entire stroke measurement', measure))
   const nativeToggle = async (name, purpose, beforeState, before, actions) => {
     const controlName = `${name === 'collapse' ? 'Collapse' : 'Expand'} preview toolbar`
     const action = { name, purpose, controlName, stateBefore: beforeState, before,
@@ -157,6 +162,11 @@ export async function captureZeroAxisLive({ page, measure, retain, pngPath, insp
     if (primary) capture.primary = { message: primary.message, stack: primary.stack }
     try { await persist('restored-after-image-attempt') } catch (error) { fail('final evidence', error) }
     if (primary) capture.primary = { message: primary.message, stack: primary.stack }
+    if (primary && retain.fail) {
+      // This is a new failed boundary, never a retrofit of the frozen image/UI
+      // observations queued before the timeout. Cleanup is already complete.
+      try { await persist('failed-after-restoration') } catch (error) { fail('failed final evidence', error) }
+    }
   }
   if (!primary) {
     try { assertZeroAxisLiveCapture(live, interaction, live.pixels) }

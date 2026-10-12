@@ -12,6 +12,7 @@ import { createHash } from 'node:crypto'
 import { decodeConnectedPaintPng } from './connectedLivePaintOracle.mjs'
 import { assertZeroAxisLiveCapture } from './zeroAxisLiveCapture.mjs'
 import { assertSignedPointStandaloneAssociation, assertSignedPointStandaloneGeometry } from './signedPointStandaloneAssociation.mjs'
+import { readEvidenceDocumentSync } from './evidencePublication.mjs'
 
 export const layoutAnchorGroup = 'point-node-layout-anchors-combined'
 export const layoutShapes = ['circle', 'rectangle', 'square', 'triangle', 'ellipse', 'diamond', 'regular polygon',
@@ -141,7 +142,7 @@ export function assertLayoutPostClickViewDiagnostic(evidence, reportRecords) {
   assert.deepEqual(related.at(-1).postClickView, evidence.postClickView, 'The last view diagnostic matches terminal acceptance')
   assert.deepEqual(accepted[0].postClickView, evidence.postClickView, 'The accepted diagnostic matches terminal control and geometry proof')
 }
-export function assertLayoutStandaloneEvidence(evidence, raw, artifactDir) {
+export function assertLayoutStandaloneEvidence(evidence, raw, artifactDir, { checkout } = {}) {
   assertLayoutAnchorEvidence(evidence, evidence.scenario)
   assert.ok(evidence.scenario.startsWith('point-layout-pending-'))
   assertStandaloneReopeningRecord(raw, evidence, artifactDir)
@@ -149,13 +150,13 @@ export function assertLayoutStandaloneEvidence(evidence, raw, artifactDir) {
   assert.deepEqual(raw.pendingPreparation, evidence.pendingPreparation, 'Retained standalone record preserves the accepted native pending preparation')
   assert.deepEqual(raw.beforeExportClick, evidence.beforeExportClick, 'Retained standalone record preserves the held request immediately before export')
   assert.deepEqual(raw.capturedRelease, evidence.capturedRelease, 'Retained standalone record preserves the intended post-click release')
-  const preparation = JSON.parse(readFileSync(resolve(artifactDir, `${evidence.scenario}-preparation.json`), 'utf8'))
+  const preparation = readEvidenceDocumentSync(artifactDir, `${evidence.scenario}-preparation.json`, { checkout })
   assert.equal(preparation.scenario, evidence.scenario); assert.equal(preparation.group, layoutAnchorGroup)
   assert.equal(preparation.result, 'observed', 'Preparation artifact retains raw observations before terminal download acceptance')
   assert.deepEqual(preparation.pendingPreparation, evidence.pendingPreparation, 'Retained native preparation matches the accepted terminal download')
   if (evidence.background === 'transparent') {
     assert.deepEqual(raw.postClickView, evidence.postClickView, 'Standalone and terminal records retain the same post-click native 2D view evidence')
-    const view = JSON.parse(readFileSync(resolve(artifactDir, `${evidence.scenario}-post-click-view.json`), 'utf8'))
+    const view = readEvidenceDocumentSync(artifactDir, `${evidence.scenario}-post-click-view.json`, { checkout })
     assert.equal(view.scenario, `${evidence.scenario}-post-click-view`, 'The raw 2D view artifact belongs to this pending download')
     assert.equal(view.group, layoutAnchorGroup)
     assert.equal(view.result, 'observed', 'The raw 2D view artifact precedes terminal download acceptance')
@@ -891,7 +892,7 @@ export function assertSignedPolygonalZeroAxisEvidence(evidence) {
     assertZeroAxisPixelEvidence(download.strokePixels)
   }
 }
-export function assertSignedPolygonalStandaloneEvidence(evidence, raw, artifactDir, ambientDimension) {
+export function assertSignedPolygonalStandaloneEvidence(evidence, raw, artifactDir, ambientDimension, { checkout } = {}) {
   assertLayoutAnchorEvidence(evidence, signedPolygonalScenario)
   const download = evidence.downloads.find((entry) => entry.ambientDimension === ambientDimension)
   const stem = `${signedPolygonalScenario}-${ambientDimension}d`
@@ -915,11 +916,11 @@ export function assertSignedPolygonalStandaloneEvidence(evidence, raw, artifactD
     pngPath: resolve(artifactDir, `${stem}.png`), root: raw.document.root })
   assert.deepEqual(raw.strokePixels, download.strokePixels)
   assert.deepEqual(observeZeroAxisPixels(readFileSync(resolve(artifactDir, `${stem}.png`)), binding.zeroAxis.screenCTM), raw.strokePixels)
-  const native = JSON.parse(readFileSync(resolve(artifactDir, `${stem}-native.json`), 'utf8'))
+  const native = readEvidenceDocumentSync(artifactDir, `${stem}-native.json`, { checkout })
   assert.equal(native.scenario, signedPolygonalScenario); assert.equal(native.group, layoutAnchorGroup); assert.equal(native.result, 'observed')
   assert.deepEqual(native.polygonalCases, evidence.polygonalCases.filter((entry) => entry.ambientDimension === ambientDimension))
   assert.deepEqual(native.zeroAxisCase, evidence.zeroAxisCases.find((entry) => entry.ambientDimension === ambientDimension))
-  const capture = JSON.parse(readFileSync(resolve(artifactDir, `${stem}-live-capture.json`), 'utf8'))
+  const capture = readEvidenceDocumentSync(artifactDir, `${stem}-live-capture.json`, { checkout })
   assert.deepEqual(capture, native.zeroAxisCase.liveObservation, 'Parent replays the actual complete capture lifecycle raw file')
   assert.equal(capture.capture.image.path, resolve(artifactDir, `${stem}-live.png`), 'Live PNG path is the exact owned artifact')
   const liveBytes = readFileSync(capture.capture.image.path)

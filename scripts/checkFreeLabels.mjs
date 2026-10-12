@@ -2,6 +2,7 @@ import { phase32cProfile, resolveVerificationProfile, mechanismNotRun } from './
 import { runPointNodeGeometricShapeChecks } from './checkPointNodeGeometricShapes.mjs'
 import { runPointLayoutAnchorChecks } from './checkPointLayoutAnchors.mjs'
 import { layoutAnchorGroup } from './pointLayoutAnchorsContract.mjs'
+import { createEvidenceReportStorage } from './evidencePublication.mjs'
 /**
  * Actual-browser Phase 31C checks against production SvgDiagram and its event
  * handlers. Uses the existing external-Playwright convention; adds no package.
@@ -58,14 +59,16 @@ let browser, server, page
 let stage = 'playwright-import'
 let checkpoint = null
 let primaryFailure
+const reportStorage = createEvidenceReportStorage({ artifactDir, checkout })
 async function save(result, error) {
-  await writeFile(resolve(artifactDir, 'free-labels-evidence.json'), JSON.stringify({ result, stage, environment, checkout, profile,
+  if (error) reportStorage.publisher.fail(error)
+  await reportStorage.save({ result, stage, environment, checkout, profile,
     deferredScenarios: profile === phase32cProfile ? [mechanismNotRun()] : [],
     checkpoint, started, checkpoints, completed, incompleteGroups: scenarios.filter((name) => !completed.includes(name)),
     unexecuted: scenarios.filter((name) => !started.includes(name)),
     coverageNote: 'Started/checkpoints and diagnostics describe execution, not passing assertions. Evidence records passed scenarios; groups complete only after all their assertions return.',
     diagnostics, evidence, pageErrors,
-    error: error ? { message: error.message, stack: error.stack, code: error.code } : undefined }, null, 2) + '\n')
+    error: error ? { message: error.message, stack: error.stack, code: error.code } : undefined })
 }
 async function startGroup(group, name = group) {
   assert.ok(scenarios.includes(group), `Known scenario group: ${group}`)
@@ -87,7 +90,7 @@ async function completeGroup(group) {
 async function observe(name, details) {
   checkpoint = { group: details.group ?? checkpoint?.group, name }
   checkpoints.push(checkpoint)
-  diagnostics.push({ name, ...details })
+  diagnostics.push(reportStorage.capture({ name, ...details }))
   await save('running')
 }
 function secondaryFailure(name, error) {
@@ -153,7 +156,7 @@ try {
     await page.mouse.click(found.rect.x + found.rect.width / 2, found.rect.y + found.rect.height / 2)
   }
   async function record(name, details = {}) {
-    evidence.push({ name, ...details })
+    evidence.push(reportStorage.capture({ name, ...details }))
     console.log(JSON.stringify({ result: 'passed', name }))
     await save('running')
   }
@@ -481,7 +484,8 @@ try {
   await runPointNodePaintChecks({ page, browser, origin, record, observe, artifactDir, startGroup, completeGroup, profile,
     setStage: (value) => { stage = value } })
   await runPointNodeGeometricShapeChecks({ browser, origin, record, observe, artifactDir, startGroup, completeGroup, setStage: (value) => { stage = value } })
-  if (profile !== phase32cProfile) await runPointLayoutAnchorChecks({ browser, origin, record, observe, artifactDir, startGroup, completeGroup, setStage: (value) => { stage = value } })
+  if (profile !== phase32cProfile) await runPointLayoutAnchorChecks({ browser, origin, record, observe, artifactDir, startGroup, completeGroup,
+    evidencePublisher: reportStorage.publisher, setStage: (value) => { stage = value } })
   stage = 'settled-SVG-export-standalone'
   await startGroup('settled-SVG-export-standalone')
   await runSettledSvgVisibilityChecks({ browser, page, record, observe, artifactDir })

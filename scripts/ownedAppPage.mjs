@@ -72,14 +72,16 @@ export function assertOwnedAppState(before, after) {
 
 /** Fail closed after startup. Never wait for, reload, or recreate a lost App. */
 export function createOwnedAppPage({ page, expectedUrl, artifactDir, prefix = 'point-paint-app', timeoutMs = 2000, observeDiagnostic,
-  apiName = 'stzAppLabels', stateFields = ['json', 'runtimeDiagramJson', 'history', 'labelDocumentRevision'] }) {
+  apiName = 'stzAppLabels', stateFields = ['json', 'runtimeDiagramJson', 'history', 'labelDocumentRevision'], writeEvidence }) {
   assert.ok(['stzAppLabels', 'stzLabels'].includes(apiName), 'Known owned fixture API')
   assert.ok(stateFields.includes('json') && stateFields.includes('history'), 'Owned fixture exposes model and history identity')
   const pageId = `app-${randomUUID()}`, events = [], listeners = [], transitions = []
   const requestIds = new WeakMap()
   let sequence = 0, droppedEvents = 0, socketCount = 0, droppedSockets = 0, requestCount = 0
   let crashed = false, expected, startup, lastState, failureRecord
-  const evidencePath = resolve(artifactDir, `${prefix}-lifecycle.json`)
+  const evidenceName = `${prefix}-lifecycle.json`
+  const retain = (name, value, phase) => writeEvidence ? writeEvidence(name, value, phase)
+    : writeFile(resolve(artifactDir, name), JSON.stringify(value, null, 2) + '\n')
   const diagnostic = async (operation, name, deadlineMs = timeoutMs) => {
     const started = performance.now()
     let outcome = 'passed'
@@ -157,9 +159,9 @@ export function createOwnedAppPage({ page, expectedUrl, artifactDir, prefix = 'p
     on(socket, 'socketerror', (error) => add('websocket-error', { socketId, socketUrl, error: clipped(error, 4000) }))
   })
   add('created', { expectedUrl })
-  const persist = (phase, extra = {}) => diagnostic(() => writeFile(evidencePath, JSON.stringify({
+  const persist = (phase, extra = {}) => diagnostic(() => retain(evidenceName, {
     schema: 1, pageId, expectedUrl, apiName, expected, startup, droppedEvents, socketCount, droppedSockets, events, failure: failureRecord, ...extra,
-  }, null, 2) + '\n'), `owned App lifecycle evidence (${phase})`)
+  }, phase), `owned App lifecycle evidence (${phase})`)
   async function capture(boundary, includeDom = false) {
     const snapshot = { boundary, pageId, expectedUrl, closed: page.isClosed(), crashed,
       document: await diagnostic(() => page.evaluate(observeOwnedAppDocument, { key: markerKey, includeDom, apiName }), `owned App document capture (${boundary})`) }
@@ -230,8 +232,8 @@ export function createOwnedAppPage({ page, expectedUrl, artifactDir, prefix = 'p
       const before = await checkpoint(`${name}:before-standalone`), standalonePages = [], releases = []
       const transition = { name, before, standalonePages, result: 'pending' }
       transitions.push(transition)
-      const saveTransitions = () => diagnostic(() => writeFile(resolve(artifactDir, `${prefix}-transitions.json`),
-        JSON.stringify({ schema: 1, pageId, transitions }, null, 2) + '\n'), `owned App transition evidence (${name}:${transition.result})`)
+      const saveTransitions = () => diagnostic(() => retain(`${prefix}-transitions.json`,
+        { schema: 1, pageId, transitions }, `transition:${name}:${transition.result}`), `owned App transition evidence (${name}:${transition.result})`)
       await saveTransitions()
       const trackStandalone = (standalone) => {
         assert.notEqual(standalone, page, 'Standalone SVG must own a distinct page')
@@ -275,7 +277,7 @@ export function createOwnedAppPage({ page, expectedUrl, artifactDir, prefix = 'p
       assertOwnedAppState(helperReturn.state, beforeNextLoad.state)
       const result = { schema: 1, startup, helperReturn, beforeNextLoad, transitions,
         lifecycleArtifact: `${prefix}-lifecycle.json`, transitionsArtifact: `${prefix}-transitions.json` }
-      await writeFile(resolve(artifactDir, `${prefix}-transitions.json`), JSON.stringify(result, null, 2) + '\n')
+      await retain(`${prefix}-transitions.json`, result, 'finish-transitions')
       await persist('finish')
       return result
     },
@@ -283,10 +285,9 @@ export function createOwnedAppPage({ page, expectedUrl, artifactDir, prefix = 'p
       // Save primary + lifecycle before any DOM or image operation, then update
       // the same owned artifact after each bounded best-effort diagnostic.
       const evidence = { boundary: 'owned-app-failure', pageId, expectedUrl, error: errorDetails(primary), ...details }
-      const path = resolve(artifactDir, `${prefix}-failure.json`)
       failureRecord = { error: errorDetails(primary), artifact: `${prefix}-failure.json` }
       const save = async (phase) => {
-        try { await diagnostic(() => writeFile(path, JSON.stringify(evidence, null, 2) + '\n'), `owned App primary failure evidence (${phase})`) }
+        try { await diagnostic(() => retain(`${prefix}-failure.json`, evidence, `failure:${phase}`), `owned App primary failure evidence (${phase})`) }
         catch (error) { console.error('Owned App failure evidence:', error) }
         try { await persist(`failure:${phase}`) }
         catch (error) { console.error('Owned App lifecycle evidence:', error) }

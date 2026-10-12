@@ -1,5 +1,184 @@
 # Phase 32D spacing, minima, anchors, and combined audit
 
+## Bounded lossless evidence publication follow-up (2026-10-12)
+
+The actual invocation entry is clean HEAD
+`ef06105a0d1659cc2e9e34abfabaedb157fdb6cd`, fingerprint
+`d6c6ecaf1c4dfa7c6600db467b7f617e14814252ec2ca9964ff6cff4159dffad`.
+The 1,983-file actual inventory matches the prior correspondence handoff's frozen
+inventory except the newly supplied fix prompt. The six preceding changed files
+and `signedPointStandaloneAssociation.mjs` are now tracked and preserved. Entry
+bytes, exact retained-artifact identities, measured payload structure and the
+read-only preservation audit are under
+`/private/tmp/stz-32d-evidence-audit-20261012/`. Historical fingerprints are not
+acceptance identities for this tree.
+
+The latest browser-capable parent is `tBkjSj`, whose strict report is
+`/var/folders/vk/7kf940pd4bx8f6cg3rzlmtc80000gn/T/stz-phase32d-before-review-tBkjSj/verification.json`.
+It passed tests/build/diff/label-assets, completed sixteen of eighteen cumulative
+groups, started seventeen and terminal-passed six predecessor 32D scenarios.
+Its first failure is `Timed out after 5000ms during Zero-axis live
+restored-after-image-attempt evidence`. All five 2D trusted native zero-axis
+actions, one image, internal strict pixel assertion, native toolbar restoration
+and resource observation completed. The final capture lifecycle assertion and
+normal return did not execute, so the complete live lifecycle is not accepted.
+The caller's native-before-assertion checkpoint and new correspondence workflow
+were not reached; both new standalone workflows, 3D work, both pending scenarios
+and final cumulative standalone remain unexecuted in that run. Page errors are
+empty. This actual persistence failure is distinct from child localhost EPERM
+and the historical BjrAYN association-order mismatch.
+
+The retained 2D image remains exactly 36,882 bytes, 1700×1300, SHA256
+`fab81d376069bb3ab3ee08b17a5e89b8db34ea2589ffeeee3b3e13d81cfa26b3`,
+with 632 magenta pixels and local y bounds -34.02419354838708..33.71774193548388.
+The exact file hash is retained in the artifact audit. Native Collapse/Expand each
+occur once; protected state/geometry and inherited expanded toolbar are restored,
+registries are cleared and listener count is zero. Historical raw live bytes lack
+the later timeout primary; outer failure records contain it. Those historical
+observations are not retrofitted.
+
+The actual path was `retainLive → observe → save`: each boundary rewrote full
+live, full native containing live and the accumulated report. Their retained
+sizes are 74,465,740, 130,844,920 and 255,833,911 bytes: 461,144,571 bytes across
+three full-document writes, plus serialization, inside one existing 5s wrapper.
+The cumulative report retains 4,223 diagnostics and 189 evidence entries. No
+individual serialization/write durations were recorded in that parent, so no
+measured throughput or attribution to one file is claimed. Large repeated work
+is the supported likely cause. Source permits a timed-out late running write to
+race with failed publication; retained bytes do not establish that such a race
+actually overwrote failure state.
+
+Payload inspection found ten full snapshot occurrences, each retaining all 640
+stroke samples. Their complete snapshots preserve distinct fresh timestamps;
+only two sample arrays are byte-equal (four expanded occurrences, six collapsed).
+The hit stacks contain 77,068 descriptor occurrences with 29,779,186 compact JSON
+bytes, but only fifteen exact descriptor values totaling 5,860 compact bytes.
+This supports exact subvalue sharing while retaining boundary identity, order,
+timestamps and changed observations. Large direct 32D diagnostic entries also
+repeat native interactions and body-overflow records; scoped externalization must
+retain their original values and leave unrelated 31F/32A behavior intact.
+
+The scoped `evidencePublication.mjs` publisher now stores exact data values in
+immutable authenticated packs (`stz-evidence-pack-v1`). Document pointers and
+compact boundary manifests carry schema, artifact path, exact byte length/SHA256,
+current checkout, publisher owner, sequence, name, stage and disposition. Exact
+repeated object/state/descriptor values are shared; arrays longer than 64 entries
+use fixed lossless chunks, so appending checkpoints does not rewrite thousands of
+unchanged records. Fresh snapshots retain distinct timestamps and all 640 samples,
+hit-stack order, native events, owner/source/request/revision, state/history,
+camera/UI/viewport/scroll/CTMs, image/frame/pixels and restoration/cleanup values.
+No measured field or sample is removed. Explicit tagged values also retain
+undefined, nonfinite numbers and negative zero without changing plain-data values.
+
+Only encoded immutable bytes reach the asynchronous ordinary writer. Raw packs
+and manifests are read back as regular files and authenticated by exact bytes,
+length and hash before their boundary is committed or native work continues.
+Ordered publication owns every boundary; synchronous small atomic document/index
+commits follow the owner/generation checks. Timeout invalidates the pending owner
+and preserves the original Error. Late fulfillment/rejection remains handled;
+orphan bytes cannot replace current pointers, move a failed index to running,
+publish acceptance or overwrite the primary error. Failed publication bypasses a
+stalled predecessor without deadlocking native cleanup. The index retains every
+committed manifest's sequence/name/stage/disposition/artifact and all current
+document pointers; it carries aggregate operation/byte/duration measurements and
+only the last 128 small operation rows.
+
+The actual `retainLive → observe → save` path shares this publisher across live,
+native, standalone, selection/preparation/view, owned-App lifecycle/failure and
+scoped cumulative evidence. Reporter queue tokens own each direct 32D diagnostic
+and terminal observation before later mutations. Scope activates when the
+combined layout group starts; earlier 31F/32A report behavior stays intact. Required
+final/restored publication still precedes lifecycle validation and normal return.
+After a final publication timeout a separate `failed-after-restoration` boundary
+retains the successful image/UI/resource measurements together with the new error;
+older frozen boundaries remain historical. Native restoration and resource
+observation are still attempted after evidence failure, with bounded secondary
+errors and no extra screenshot. Production publication/native/image limits remain
+5,000ms; test-only gates use their explicit 20ms deadlines.
+
+Parent loading strictly resolves these documents before the existing lifecycle,
+native, file-local association, PNG, placement and pending-view assertions. Replay
+authenticates the exact current tree, owner, paths, bytes/hash/length, stages,
+ordered complete history, current pointers and graph references. Missing,
+truncated, corrupt, conflicting, stale or unauthenticated data fails. Cumulative
+acceptance requires the current terminal report and terminal index; failed
+publication cannot establish acceptance. Ordered before/immediate-input/after
+post-click view prefixes, exactly one accepted actual view record and last/terminal
+equality remain required after resolution. Isolated runner copies include the
+new dependency; no raw proof or historical case is made optional.
+
+The final offline replay checkpoint uses publisher source SHA256
+`58b033ca969e6417f9625972468768b07550ee99802eeb4956a649acda0b3e71`.
+All three exact retained historical JSON values round-trip by deep equality:
+74,465,740-byte live, 130,844,920-byte native and 255,833,911-byte cumulative.
+Across three initial publications and three unchanged republishings, retained
+immutable pack/boundary bytes total 11,440,357, with three pack writes, six boundary
+writes, six document-pointer commits and seven index commits (including the
+historical failed primary). Each unchanged value adds zero data nodes/packs;
+its boundary adds only 1,556/1,767/1,957 bytes. First publication durations are
+141.5/157.3/272.5ms. Ordinary-write, authentication-read, pointer and index durations
+are separately recorded; these observed durations are not test thresholds.
+
+The separate ordinary-filesystem exercise invokes the actual
+`createLiveEvidenceRetainer → observe → createEvidenceReportStorage.save` path with
+those exact full-sample/native/history payloads. Initial cumulative retention takes
+270.8ms; one final restored boundary completes all three required publications
+inside the unchanged 5,000ms wrapper in 209.3ms. It adds 214,856 immutable bytes,
+three packs, three boundaries, three pointer commits, three index commits and six
+authentication reads. Repeating the unchanged measured values takes 20.9ms and
+adds 11,792 immutable bytes: only six new small report/chunk nodes, one pack,
+three compact boundaries, three pointer/index commits each and four authenticated
+reads. The final index is 13,991 bytes. Every live/native/report value resolves
+exactly. This exercise changes only the historical report's disposition to running
+to exercise that sink; it establishes neither a returned native lifecycle nor
+browser acceptance. Exact source/tree identities, all operations and replay
+artifacts are retained in `retained-publication-benchmark.json` and
+`retained-live-path-benchmark.json` under the external audit directory. An interim
+history-resolver own-property mismatch is retained separately and corrected before
+these successful final replays.
+
+New meaningful controls exercise the real publisher/observe/reporter path with
+faithful complete samples, frozen boundaries, immutable sharing, compact chunks,
+regular-file/hash/length authentication, current-tree/owner/stage/order/coverage
+faults, mutation after queue, ordinary writer errors, deterministic stalls, late
+fulfillment/rejection, failed publication competing with a late running writer,
+terminal authority and cleanup/primary-error ownership. Both ambient dimensions,
+expanded/collapsed toolbar cases, one image and complete final native/lifecycle
+replay remain. An earlier complete focused policy/workflow sweep passed 738/738,
+including the first fourteen added workflow controls. The final focused sweeps
+pass 38/38 publisher controls, 16/16 actual workflow controls and 18/18 new
+parent/isolated-runner controls: seventy-two new controls in total. Final full-tree
+required checks are recorded in the frozen-tree handoff; focused counts overlap
+the full suite.
+
+The preservation audit compares the actual clean 1,983-file entry inventory.
+All 212 production files, 1,073 fixture files and 544 authenticated reference files
+remain byte-identical, including all original/signed-basic/polygonal/zero-axis
+inventories and the former 494-entry handoff. The association module, both
+complete-root capture modules, full live observation/assertions, native
+`zeroAxisInput`, strict pixel oracle and the previous 61 association/65 live/55
+background control source blocks remain exact. The deterministic stalled-report
+suite is byte-identical, retaining its ordinary recorder, 20ms deadline, exact
+primary Error/nativeChecks, two failure writes, late rejection and complete
+resource cleanup. Only authorized evidence persistence changes the standalone
+caller wrapper and live workflow; geometry, selection, correspondence and native
+preparation/input behavior are preserved. No dependency or acceptance waiver is
+added. The four inherited lint errors remain separate baseline failures; final
+reproductions and passing changed-file checks belong to the handoff.
+
+Phase 32 remains **incomplete**. The final frozen-tree handoff records actual
+required-command results and fresh strict verifier disposition without editing
+these documents after verification starts. All eighteen cumulative groups/nine
+named 32D scenarios, both successful native/live lifecycles, twelve polygonal
+cases, both authenticated seven-node transparent standalone workflows, both
+fifteen-entry pending workflows and final standalone acceptance remain mandatory.
+Child localhost EPERM leaves native work pending for the browser-capable parent;
+it supplies no pass. Complete fresh verification precedes independent read-only
+completion review and the post-review matching-tree guard. Failed/incomplete
+verification or `needs_changes` blocks completion/commit. No independent completion
+review, child commit or push is claimed. Commit/push remain with the parent.
+Earlier entries below retain their historical results and identities.
+
 ## Authenticated standalone point correspondence follow-up (2026-10-12)
 
 This scoped follow-up starts from clean HEAD

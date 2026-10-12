@@ -1,5 +1,6 @@
 import assert from 'node:assert/strict'
 import { readFile, writeFile } from 'node:fs/promises'
+import { createLiveEvidenceRetainer } from './evidencePublication.mjs'
 import { resolve } from 'node:path'
 import { pathToFileURL } from 'node:url'
 import { layoutAnchorGroup as group, layoutShapes, layoutRegimes, layoutForShapeRegime, pointAnchorsForShape,
@@ -79,7 +80,7 @@ export async function observeLayoutPoint(page, id = 'app-point') {
 /** Own the reopened file page and retain its raw candidate before validation or
  * image work. A saved capture is still observed evidence until the caller has
  * completed the immutable download/layout assertions and terminal save. */
-export async function capturePointLayoutStandalone({ standalone, artifactDir, details, reopen, assertReopened, observe }) {
+export async function capturePointLayoutStandalone({ standalone, artifactDir, details, reopen, assertReopened, observe, evidencePublisher }) {
   const requests = [], standaloneErrors = [], cleanupErrors = []
   const candidate = { ...details, result: 'observed', requests, standaloneErrors, cleanupErrors }
   const request = (request) => requests.push(request.url())
@@ -88,11 +89,16 @@ export async function capturePointLayoutStandalone({ standalone, artifactDir, de
   const listeners = [['request', request], ['pageerror', pageerror], ['crash', crash]]
   const persist = async (capture) => {
     if (capture) candidate.capture = capture
-    await boundedPointDiagnostic(() => writeFile(resolve(artifactDir, `${details.scenario}-standalone.json`),
-      JSON.stringify(candidate, null, 2) + '\n'), 'Standalone layout evidence', 5000)
+    try {
+      await boundedPointDiagnostic(() => evidencePublisher
+        ? evidencePublisher.publish(`${details.scenario}-standalone.json`, candidate,
+          { stage: `${details.scenario}-standalone`, disposition: primary ? 'failed' : 'running' })
+        : writeFile(resolve(artifactDir, `${details.scenario}-standalone.json`), JSON.stringify(candidate, null, 2) + '\n'), 'Standalone layout evidence', 5000)
+    } catch (error) { evidencePublisher?.fail(error); throw error }
   }
   let primary
   const retainFailure = async () => {
+    evidencePublisher?.fail(primary)
     candidate.error = { message: primary.message, stack: primary.stack }
     try { await persist() } catch (error) {
       details.pageErrors.push(`Standalone layout failure evidence: ${error.message}`)
@@ -128,16 +134,18 @@ export async function capturePointLayoutStandalone({ standalone, artifactDir, de
   return candidate
 }
 
-export async function runPointLayoutAnchorChecks({ browser, origin, artifactDir, record, observe, startGroup, completeGroup, setStage }) {
+export async function runPointLayoutAnchorChecks({ browser, origin, artifactDir, record, observe, startGroup, completeGroup, setStage, evidencePublisher }) {
   const context = await browser.newContext({ viewport: { width: 1700, height: 1300 }, acceptDownloads: true })
   const pageErrors = [], waits = [], held = new Set()
   context.on('page', (page) => { page.on('pageerror', (error) => pageErrors.push(error.message)); page.on('crash', () => pageErrors.push('Owned layout page crashed')) })
   const page = await context.newPage(), url = `${origin}/stratified-tikz/scripts/fixtures/freeLabelsApp.html`
-  const app = createOwnedAppPage({ page, expectedUrl: url, artifactDir, prefix: 'point-layout-app' })
-  const diagnostic = createPointDiagnostics({ artifactDir, observe, artifactPrefix: 'point-layout-selection' })
+  const publish = (name, value, options = {}) => evidencePublisher.publish(name, value, options)
+  const app = createOwnedAppPage({ page, expectedUrl: url, artifactDir, prefix: 'point-layout-app',
+    writeEvidence: (name, value, phase) => publish(name, value, { stage: phase, disposition: primary ? 'failed' : 'running' }) })
+  const diagnostic = createPointDiagnostics({ artifactDir, observe, artifactPrefix: 'point-layout-selection', publish })
   let scenario = 'point-layout-per-shape-spacing-minima', primary, selectionSequence = 0, currentLiveCapture
   async function retainFailure(name, details) {
-    try { await writeFile(resolve(artifactDir, name), JSON.stringify(details, null, 2) + '\n') }
+    try { await publish(name, details, { stage: name, disposition: 'failed' }) }
     catch (error) { pageErrors.push(`Failure evidence ${name}: ${error.message}`); console.error(`Layout failure evidence ${name}: ${error.message}`) }
   }
   const inspector = page.locator('#preview-inspector-drawer')
@@ -168,8 +176,8 @@ export async function runPointLayoutAnchorChecks({ browser, origin, artifactDir,
   async function select(id = 'app-point', observePoint = observeLayoutPoint, pendingFixture) {
     const selection = { page, readState: state, observePoint, diagnose: async (details) => {
       await diagnostic(group, scenario, details)
-      if (details.pendingPreparation) await writeFile(resolve(artifactDir, `${scenario}-preparation.json`),
-        JSON.stringify({ scenario, group, result: 'observed', pendingPreparation: details.pendingPreparation }, null, 2) + '\n')
+      if (details.pendingPreparation) await publish(`${scenario}-preparation.json`,
+        { scenario, group, result: 'observed', pendingPreparation: details.pendingPreparation })
     },
       secondaryErrors: pageErrors, scenario, sequence: ++selectionSequence, id, boundary: true }
     const rendered = pendingFixture
@@ -436,7 +444,7 @@ export async function runPointLayoutAnchorChecks({ browser, origin, artifactDir,
   async function save(details) {
     const evidence = { scenario, group, result: 'passed', pageErrors: [...pageErrors], ...details }
     assertLayoutAnchorEvidence(evidence, scenario)
-    await writeFile(resolve(artifactDir, `${scenario}.json`), JSON.stringify(evidence, null, 2) + '\n')
+    await publish(`${scenario}.json`, evidence)
     await record(scenario, { group, result: 'passed', artifacts: layoutAnchorArtifacts(scenario) })
   }
   async function tikzArtifacts(stem = scenario) {
@@ -817,20 +825,13 @@ export async function runPointLayoutAnchorChecks({ browser, origin, artifactDir,
       const rendered = await select('zero-overlap')
       const zeroAxisCase = { ambientDimension, layout: structuredClone(zeroAxisLayout), rendered, state: await state() }
       zeroAxisCase.axisInteraction = await zeroAxisInput()
-      await writeFile(resolve(artifactDir, `${stem}-native.json`), JSON.stringify({ scenario, group, result: 'observed',
-        polygonalCases: inDimension, zeroAxisCase }, null, 2) + '\n')
+      await publish(`${stem}-native.json`, { scenario, group, result: 'observed', polygonalCases: inDimension, zeroAxisCase })
       await observe(`${scenario}-${ambientDimension}d-zero-axis-traversal`, { group, result: 'observed', artifact: `${stem}-native.json` })
       assertZeroAxisTraversal(rendered)
       zeroAxisCase.liveObservation = {}
       currentLiveCapture = zeroAxisCase
-      const retainLive = async (boundary, live) => {
-        if (live.pixels) zeroAxisCase.livePaint = live.pixels
-        await writeFile(resolve(artifactDir, `${stem}-live-capture.json`), JSON.stringify(live, null, 2) + '\n')
-        await writeFile(resolve(artifactDir, `${stem}-native.json`), JSON.stringify({ scenario, group, result: 'observed',
-          polygonalCases: inDimension, zeroAxisCase }, null, 2) + '\n')
-        await observe(`${stem}-live-paint-${boundary}`, { group, result: 'observed',
-          artifact: `${stem}-live-capture.json`, nativeArtifact: `${stem}-native.json`, image: live.capture.image })
-      }
+      const retainLive = createLiveEvidenceRetainer({ publisher: evidencePublisher, stem, scenario, group,
+        zeroAxisCase, polygonalCases: inDimension, observe })
       await captureZeroAxisLive({ page, pngPath: resolve(artifactDir, `${stem}-live.png`),
         live: zeroAxisCase.liveObservation, interaction: zeroAxisCase.axisInteraction,
         measure: async () => {
@@ -841,8 +842,7 @@ export async function runPointLayoutAnchorChecks({ browser, origin, artifactDir,
         }, retain: retainLive, inspect: observeZeroAxisPixels, assertPixels: assertZeroAxisPixelEvidence })
       zeroAxisCase.livePaint = zeroAxisCase.liveObservation.pixels
       zeroAxisCases.push(zeroAxisCase)
-      await writeFile(resolve(artifactDir, `${stem}-native.json`), JSON.stringify({ scenario, group, result: 'observed',
-        polygonalCases: inDimension, zeroAxisCase }, null, 2) + '\n')
+      await publish(`${stem}-native.json`, { scenario, group, result: 'observed', polygonalCases: inDimension, zeroAxisCase })
       await observe(`${stem}-native-before-assertion`, { group, result: 'observed',
         artifact: `${stem}-native.json`, captureArtifact: `${stem}-live-capture.json` })
       assertZeroAxisPixelEvidence(zeroAxisCase.livePaint)
@@ -884,7 +884,7 @@ export async function runPointLayoutAnchorChecks({ browser, origin, artifactDir,
       const svgPath = resolve(artifactDir, `${stem}.svg`); await download.saveAs(svgPath)
       const xml = await readFile(svgPath, 'utf8'), fileUrl = pathToFileURL(svgPath).href
       const standalone = await context.newPage()
-      const raw = await capturePointLayoutStandalone({ standalone, artifactDir,
+      const raw = await capturePointLayoutStandalone({ standalone, artifactDir, evidencePublisher,
         details: { scenario: stem, group, background: 'transparent', ambientDimension, svgPath, fileUrl, pageErrors, expected, click, outputs, xml, savedJson, beforeExportState, preExport },
         observe: (candidate) => observe(`${stem}-standalone-observed`, { group, result: 'observed', candidate }),
         reopen: async (standalone) => {
@@ -902,7 +902,7 @@ export async function runPointLayoutAnchorChecks({ browser, origin, artifactDir,
         } })
       const { zeroAxis } = assertSignedPointStandaloneAssociation(raw, xml)
       raw.strokePixels = observeZeroAxisPixels(await readFile(resolve(artifactDir, `${stem}.png`)), zeroAxis.screenCTM)
-      await writeFile(resolve(artifactDir, `${stem}-standalone.json`), JSON.stringify(raw, null, 2) + '\n')
+      await publish(`${stem}-standalone.json`, raw)
       await observe(`${stem}-standalone-pixels-before-assertion`, { group, result: 'observed', raw })
       assertZeroAxisPixelEvidence(raw.strokePixels)
       downloads.push({ scenario: stem, group, background: 'transparent', ambientDimension, expected, click, outputs, savedJson, beforeExportState, preExport,
@@ -938,7 +938,7 @@ export async function runPointLayoutAnchorChecks({ browser, origin, artifactDir,
           postClickView = await changePendingLayoutView({ page, scenario, source: captured, click, secondaryErrors: pageErrors,
             persist: async (view) => {
               const entry = { scenario: `${scenario}-post-click-view`, group, result: 'observed', postClickView: structuredClone(view) }
-              await writeFile(resolve(artifactDir, `${scenario}-post-click-view.json`), JSON.stringify(entry, null, 2) + '\n')
+              await publish(`${scenario}-post-click-view.json`, entry)
               await observe(entry.scenario, entry)
             } })
         } else await load(await document('rectangle', { anchor: 'west', minimumWidth: 110 }, 'replacement $loaded$'))
@@ -959,7 +959,7 @@ export async function runPointLayoutAnchorChecks({ browser, origin, artifactDir,
       for (const code of Object.values(outputs)) { assert.ok(code.includes('anchor=base')); assert.ok(code.includes('anchor=shape center')) }
       assertPointTikzSourceByMode(outputs, captured)
       const standalone = await context.newPage(), fileUrl = pathToFileURL(svgPath).href
-      const standaloneEvidence = await capturePointLayoutStandalone({ standalone, artifactDir,
+      const standaloneEvidence = await capturePointLayoutStandalone({ standalone, artifactDir, evidencePublisher,
         details: { scenario, group, background, svgPath, fileUrl, pageErrors, expected, click, pending, outputs, xml,
           pendingPreparation, beforeExportClick, capturedRelease, ...(postClickView ? { postClickView } : {}) },
         observe: (candidate) => observe(`${scenario}-standalone-observed`, { group, result: 'observed', candidate }),
@@ -1001,6 +1001,7 @@ export async function runPointLayoutAnchorChecks({ browser, origin, artifactDir,
     assert.deepEqual(pageErrors, []); await completeGroup(group)
   } catch (error) {
     primary = error
+    evidencePublisher.fail(error)
     if (currentLiveCapture) markZeroAxisLiveCaptureFailure(error)
     const liveCapture = isZeroAxisLiveCaptureFailure(error) ? currentLiveCapture : undefined
     await retainFailure('point-layout-failure.json', { scenario, group, result: 'failed', pageErrors, liveCapture, error: { message: error.message, stack: error.stack } })

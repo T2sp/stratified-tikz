@@ -54,7 +54,7 @@ function fixture(t, phase = '31B', options = {}) {
   // The verifier independently checks generated post-key paint. Keep its real
   // oracle and transitive helpers in the isolated checkout so both the parent
   // identity import and each fresh verification worker load the same modules.
-  for (const file of ['standaloneSvgCapture.mjs', 'standaloneSvgCaptureContract.mjs', 'pointSourceVisibility.mjs', 'pointGeometricShapesContract.mjs', 'pointLayoutAnchorsContract.mjs', 'signedPointStandaloneAssociation.mjs', 'zeroAxisLiveCapture.mjs', 'zeroAxisLiveCaptureWorkflow.mjs', 'pointLayoutPendingPreparation.mjs', 'pointLayoutPendingFixture.mjs', 'pointLayoutPendingView.mjs', 'pointUnsupportedDiagnosticContract.mjs', 'pointNativeDrag.mjs', 'pointGeometricSelection.mjs', 'pointPaintOracle.mjs', 'pointCheckDiagnostics.mjs', 'pointResponsiveFraming.mjs', 'pointPolygonJoinContract.mjs', 'pointDashCapContract.mjs', 'pointDashCapMechanismContract.mjs', 'connectedLivePaintOracle.mjs', 'connectedPaintSampling.mjs']) {
+  for (const file of ['standaloneSvgCapture.mjs', 'standaloneSvgCaptureContract.mjs', 'pointSourceVisibility.mjs', 'pointGeometricShapesContract.mjs', 'pointLayoutAnchorsContract.mjs', 'evidencePublication.mjs', 'signedPointStandaloneAssociation.mjs', 'zeroAxisLiveCapture.mjs', 'zeroAxisLiveCaptureWorkflow.mjs', 'pointLayoutPendingPreparation.mjs', 'pointLayoutPendingFixture.mjs', 'pointLayoutPendingView.mjs', 'pointUnsupportedDiagnosticContract.mjs', 'pointNativeDrag.mjs', 'pointGeometricSelection.mjs', 'pointPaintOracle.mjs', 'pointCheckDiagnostics.mjs', 'pointResponsiveFraming.mjs', 'pointPolygonJoinContract.mjs', 'pointDashCapContract.mjs', 'pointDashCapMechanismContract.mjs', 'connectedLivePaintOracle.mjs', 'connectedPaintSampling.mjs']) {
     cpSync(join(automationDir, '..', file), join(cwd, 'scripts', file))
   }
   mkdirSync(join(cwd, 'src/rendering'), { recursive: true })
@@ -112,11 +112,26 @@ if (stage === 'free-browser') {
   const dir = process.env.STZ_SMOKE_ARTIFACT_DIR;
   mkdirSync(dir, { recursive: true });
   const groups = JSON.parse(process.env.STZ_TEST_FREE_LABEL_GROUPS);
-  writeFileSync(join(dir, 'free-labels-evidence.json'), JSON.stringify({
+  const report = {
     result: 'passed', stage: 'complete', environment: { browserVersion: 'fixture-browser' },
     completed: groups, incompleteGroups: [], unexecuted: [], pageErrors: [],
     ...JSON.parse(process.env.STZ_TEST_FREE_EVIDENCE_OVERRIDE || '{}'),
-  }));
+  };
+  if (process.env.STZ_TEST_REFERENCED_REPORT) {
+    const publish = async () => {
+      const { pathToFileURL } = require('node:url');
+      const { createEvidencePublisher } = await import(pathToFileURL(join(process.cwd(), 'scripts/evidencePublication.mjs')).href);
+      const { captureCheckoutIdentity } = await import(pathToFileURL(join(process.cwd(), 'scripts/automation/phase-verification.mjs')).href);
+      const publisher = createEvidencePublisher({ artifactDir: dir, checkout: captureCheckoutIdentity() });
+      await publisher.publish('free-labels-evidence.json', report, { stage: 'complete', disposition: 'passed' });
+      if (process.env.STZ_TEST_REFERENCED_REPORT === 'missing-boundary') {
+        const { readFileSync, unlinkSync } = require('node:fs');
+        const document = JSON.parse(readFileSync(join(dir, 'free-labels-evidence.json'), 'utf8'));
+        unlinkSync(join(dir, document.artifact.path));
+      }
+    };
+    publish().catch(error => { console.error(error); process.exitCode = 1; });
+  } else writeFileSync(join(dir, 'free-labels-evidence.json'), JSON.stringify(report));
 }
 `)
   const codex = join(cwd, 'codex-fixture.cjs')
@@ -364,6 +379,35 @@ test('post-implementation loading refreshes participating verifier dependencies 
   assert.match(readFileSync(join(setup.cwd, 'logs/review-prompt.txt'), 'utf8'), /check:free-labels: passed, exit 0/)
   assert.equal(readFileSync(join(setup.cwd, verifierFile), 'utf8'), indirectVerifier, 'Only the participating dependency changed')
   assert.equal(setup.git('rev-parse', 'HEAD'), setup.initialHead)
+})
+
+test('fresh isolated runner resolves an authenticated cumulative report from its copied publisher dependency', async t => {
+  const setup = fixture(t, '31F')
+  const result = await setup.run('verify', {
+    STZ_TEST_FREE_LABEL_GROUPS: JSON.stringify(combinedLabelGroups), STZ_TEST_REFERENCED_REPORT: 'yes',
+  })
+  assert.equal(result.status, 0, runnerDiagnostics(result))
+  const report = reportFromOutput(result), check = report.checks.find(check => check.name === 'check:free-labels')
+  assert.equal(report.status, 'passed')
+  const document = JSON.parse(readFileSync(join(check.artifactDir, 'free-labels-evidence.json'), 'utf8'))
+  assert.equal(document.schema, 'stz-evidence-document-v1')
+  assert.equal(document.identity.checkout.fingerprint, report.checkout.fingerprint)
+  assert.equal(document.identity.disposition, 'passed')
+  assert.ok(readFileSync(join(check.artifactDir, document.artifact.path)).length > 0)
+  assert.equal(setup.git('rev-parse', 'HEAD'), setup.initialHead)
+})
+
+test('fresh isolated runner rejects a missing referenced raw boundary before review or commit', async t => {
+  const setup = fixture(t, '31F')
+  const result = await setup.run('implement', {
+    STZ_TEST_FREE_LABEL_GROUPS: JSON.stringify(combinedLabelGroups), STZ_TEST_REFERENCED_REPORT: 'missing-boundary',
+  })
+  assertStoppedBeforeReview(setup, result)
+  const report = reportFromOutput(result)
+  assert.equal(report.status, 'failed')
+  assert.equal(report.failedCheck, 'check:free-labels')
+  assert.equal(report.checks.at(-1).exitCode, 0, 'A successful command cannot replace its missing authenticated raw proof')
+  assert.match(report.checks.at(-1).error, /ENOENT/)
 })
 
 test('a live child updates the policy and old eleven-group evidence fails with command exit zero', async t => {
