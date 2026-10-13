@@ -1,5 +1,65 @@
 # Phase 32 Plan: Point-node math, paint, geometric shapes, and layout
 
+Singular-cylinder / deterministic writer follow-up (2026-10-12): actual clean
+entry HEAD is `f4dbfd7c7930515f6cd1d57db17ad32a96fc4d47`, fingerprint
+`21796531870c52a3af2508226f45a92b96667a45fad4c777a75d486a18e11444`.
+The preceding empty-body/publication/native work and three shared fixtures are
+tracked and preserved. Latest supplied independent review is **needs_changes**,
+Critical 0 / Medium 2 / Low 0, `ready_to_commit:false`. Its normal full suite
+passed 6,974/6,975 with zero skips; the isolated timeout rerun passed 1/1.
+The failed primary was the ordinary PNG-file deadline before writer entry.
+
+The exact HoyCdl parent passed five checks, all eighteen groups and nine 32D
+scenarios on historical fingerprint
+`4da475401c30e0562982de816fc85ad81381876a3a525bef16dfb18b8f3c718f`.
+Its authenticated resolved report is complete with 202 records / 4,547 diagnostics
+and no page errors/incomplete/unexecuted groups. This preserves historical native/
+download acceptance without overriding review rejection or verifying new bytes.
+
+The narrow cylinder branch diagnoses computed `ry === 0` after fitting/rotation/
+incircle/minimumWidth, before PGF's undefined division. Existing warning/body
+rendering suppresses requested contours, seam and custom regions, with visible
+picking/selection only. Valid signed/zero-axis neighbors and raw model/source/
+units/history/coordinates/both TikZ modes remain. Separate authenticated PGF
+failure/neighbor references retain complete inputs/logs/partial raw observations,
+actual generated source/wrapper and engine/PGF/source/artifact hashes. All prior
+reference bytes, tolerances and sampling limits stay intact.
+
+The tenth mandatory 32D scenario adds ordinary native singular-cylinder controls,
+warning picking/far clearing and warning-only downloaded/reopened SVG/PNG/TikZ
+in both dimensions. A separate strict diagnostic artifact context authenticates
+exact model/source/owner/revision/raw click/capture/file eligibility, complete empty
+body shell and actual warning before parent acceptance; legacy defaults and the
+seven-owner signed route remain. Parent corruption controls cannot pass on a
+filename, terminal flag or copied warning alone.
+
+Only the intended real gated writer boundary receives the test's controlled
+20ms deadline, armed after actual writer entry. Normal I/O/measurements/image/
+cleanup/publisher limits stay 5,000ms. Controlled ordinary PNG gating beyond the
+old budget precedes the genuine selected timeout; rejection ownership begins at
+startup. All eight final and both pre-restoration stalls retain one PNG/strict
+pixels, exact native restoration/cleanup/state and lossless failed publication
+with late completion/rejection unable to replace primary or terminal authority.
+Older deterministic stalled-report controls and normal concurrency remain.
+
+Final focused checks pass 48 cylinder, 41 native/artifact helper, 28 parent-dispatch
+and five isolated runner controls, alongside the preserved 825 and publication/
+diagnostic 797 checkpoints. These sweeps overlap the full registered suite;
+configured direct browser commands fail at localhost EPERM before Chrome.
+Changed-code lint/strict TypeScript/build pass separately from the reproduced
+four inherited lint errors.
+
+The [implementation audit](PHASE_32D_IMPLEMENTATION.md) details both scoped fixes,
+independent inventory, meaningful tests and historical/current distinctions.
+Actual final checks, baseline failures, preservation hashes and exact tree/report
+identity belong to `/private/tmp/stz-32d-cylinder-timeout-fix-20261012/HANDOFF.json`.
+Phase 32 remains **incomplete** until fresh strict exact-tree verification of all
+cumulative/native/artifact gates and matching independent read-only completion
+review pass, followed by the post-review identity guard. Failed/incomplete checks
+or `needs_changes` stop before commit; restricted browser startup remains pending
+for the parent runner. No review/commit/push is claimed. Earlier entries follow
+as history.
+
 Authenticated empty-body parent SVG gate follow-up (2026-10-12): the actual clean
 entry HEAD is `470866616c46216c4459f3b7ff84b8cd3efbb981`, fingerprint
 `0a6486310c1f6210a6224b23a67c7479154e413b69fe72570aaed0a501080cfc`.

@@ -333,8 +333,11 @@ function cylinder(input: PointNodeShapeInput, p: Parameters, initialX: number, i
   let halfLength = x
   const rx = p.aspect * y
   const ry = Math.max(y, input.minimumWidth / 2)
+  // PGF divides by this fitted transverse radius before applying the axial
+  // minimum. A zero radius (including signed zero) has no cylinder contour.
+  if (ry === 0) throw new RangeError('Cylinder effective transverse radius is zero; PGF’s fitting division is undefined.')
   const innerYSep = !p.borderUsesIncircle && (rotation === 90 || rotation === 270) ? input.innerXSep : input.innerYSep
-  const sineAngle = ry === 0 ? 0 : (ry - innerYSep) / ry
+  const sineAngle = (ry - innerYSep) / ry
   if (Math.abs(sineAngle) > 1 + 1e-10) throw new RangeError('Cylinder inner separation exceeds PGF’s asin domain; negative inner y separation is unsupported by this PGF fitting branch.')
   const bodyExtension = rx * Math.sqrt(Math.max(0, 1 - sineAngle * sineAngle))
   const axialLength = halfLineWidth + 2 * halfLength + 3 * rx - bodyExtension

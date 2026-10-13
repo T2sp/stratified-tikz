@@ -1,257 +1,304 @@
-# Phase 32D Fix for singular-cylinder diagnostics and deterministic timeout tests
+# Phase 32D Fix for cylinder fitting/anchors and repeatable reviewer verification
 
 ## Objective and scope
 
-The current strict parent verification passed on its exact checkout. Independent
-read-only completion review returned needs_changes with zero Critical and two
-Medium issues. Fix both before another completion review:
+The matching strict parent passed. New independent read-only review returned
+needs_changes, Critical0 / Medium3 / Low0, ready_to_commit:false.
+Fix all three current issues:
 
-1. Diagnose cylinder layouts whose effective transverse radius is zero instead
-   of substituting a finite result for PGF's undefined division.
-2. Make the required writer-timeout regression control only its intended gated
-   writer boundary, keeping normal I/O/measurement/cleanup and production limits.
+1. Cylinder anchor construction loses fitted signs and end/base role ordering
+   by reconstructing them from painted bounds.
+2. Cylinder zero-divisor diagnosis ignores TeX dimension scanning/fitting and
+   therefore misses dimensions that become zero scaled points.
+3. The freezing regression has a machine-dependent real1s deadline; the required
+   reviewer suite also stalls/cancels with an unresolved verifier promise.
 
-Limit production changes to the evidenced cylinder singular-domain branch and
-small testable helpers/deadline seams needed for these fixes.
-Retain valid degenerate shapes, authored options/units/source/model coordinates,
-existing unsupported-layout diagnostics, saved version2, native input/capture,
-association, empty-body gate and lossless publication.
-No unrelated geometry, renderer, exporter, dependency or test-concurrency rewrite.
-Permit the narrow parent artifact integration required by the new diagnosed case.
+Limit production work to runtime cylinder fitting/anchor metadata and the
+PGF-equivalent cylinder domain classification needed for these reproductions.
+Limit test/automation work to deterministic freezing/deadline/promise ownership
+and required regressions/native/file replay integration.
+Preserve raw model/options/units/text, valid signed/degenerate geometry,
+previous singular-cylinder diagnostic, deterministic live-writer scheduling,
+existing native/capture/association/empty-body/publication contracts.
+No unrelated model/schema, renderer, math/exporter or concurrency rewrite.
 
-Read `AGENTS.md`, `prompts/phase-32d-implement.md`,
-`prompts/phase-32d-review.md`, `docs/PHASE_32D_IMPLEMENTATION.md` and
-`docs/PHASE_32_PLAN.md`. Inspect the independent evidence and exact test race.
-Maintain verification-before-review/commit and post-review matching-tree guard.
-The passed parent does not override needs_changes. Phase32 remains incomplete.
+Read `AGENTS.md`, implementation/review prompts and both Phase32 docs.
+Inspect authenticated PGF/actual-generated reproductions and complete reviewer
+log before edits. The passed parent cannot override needs_changes.
+Phase32 remains incomplete; verification-before-review/commit and matching-tree
+guards remain mandatory.
 
-## Latest accepted verification, review and identity
+## Latest review, accepted parent and identity
 
-Newest independent review is the user's supplied read-only review:
-needs_changes, Critical0, Medium2, Low0, ready_to_commit:false.
-Reviewer full-suite log: `/private/tmp/stz-32d-review-npm-test.log`.
-Independent cylinder reproduction: `/private/tmp/stz-review-cylinder-zero-IrjltG/`,
-including fixed-box input/raw/compiler log, production layout/SVG and actual
-generated/wrapped TikZ compilation.
+Newest review:
+`/Users/takamatoshinori/.codex/attachments/07495896-70ab-4961-9698-51b4e3bb7c8f/Pasted text.txt`.
+Reviewer records:
+`/private/tmp/stz-32d-review-1791812464902/review-verification.json` and
+`npm-test.log` in that directory.
+Independent PGF/production reproductions:
+`/private/tmp/stz-review-cylinder-empty-folded-2yP0XK/comparison.json`;
+`/private/tmp/stz-review-cylinder-subsp-y0liua/comparison.json`,
+with all sibling TeX/raw/compiler/generated/production artifacts.
 
 Matching passed parent:
-`/var/folders/vk/7kf940pd4bx8f6cg3rzlmtc80000gn/T/stz-phase32d-before-review-HoyCdl/verification.json`.
-Its `05-check-free-labels/artifacts/` contains accepted browser report,
-authenticated packs/pointers and native/live/association/SVG/PNG/TikZ evidence.
-Resolve pointers with `readEvidenceDocumentSync` and that exact checkout.
-Implemented empty-body handoff:
-`/private/tmp/stz-32d-empty-body-20261012/HANDOFF.json`.
-Its child startup failure is historical; HoyCdl is the canonical passed parent.
-Do not use old HMy8AM/Zm4oWG review records as this review's identity.
+`/var/folders/vk/7kf940pd4bx8f6cg3rzlmtc80000gn/T/stz-phase32d-before-review-dTPBzJ/verification.json`.
+Fresh reviewer policy replay/audit:
+`/private/tmp/stz-phase32d-review-evidence-20261012/browser-evidence-audit.json`.
+Resolve its authenticated browser artifacts with `readEvidenceDocumentSync` and
+the exact checkout. Previous implementation handoff:
+`/private/tmp/stz-32d-cylinder-timeout-fix-20261012/HANDOFF.json`.
+The child T6o1A2 startup failure is historical; dTPBzJ is the accepted parent.
 
 Branch: `phase/32d-margin-minsize-anchor`.
-HEAD: `470866616c46216c4459f3b7ff84b8cd3efbb981`.
-Pre-prompt tree matches parent before/after:
+HEAD: `f4dbfd7c7930515f6cd1d57db17ad32a96fc4d47`.
+Pre-prompt identity matches parent/review before/after:
 
 ~~~text
-4da475401c30e0562982de816fc85ad81381876a3a525bef16dfb18b8f3c718f
+55b5887a001d5bb2f7a8182aaf7802c6049b39276372d7572d36e3d196c48452
 ~~~
 
 Tracked-diff SHA256:
-`b2236ce19ad5d220316755b7072af63fc6d49b1a34cd16f97887a75619b573cb`.
-Preserve seven modified tracked files: both Phase32 documents;
+`44aaf730e6bfd80aa02a3e4b9d2c29733e645b6fe1a116aaf34f0c27de50eb9b`.
+Preserve13 modified tracked files: both Phase32 docs; `package.json`;
 `scripts/automation/phase-verification.mjs`,
-`scripts/signedPointStandaloneAssociation.mjs`,
+`scripts/checkPointLayoutAnchors.mjs`, `scripts/pointCheckDiagnostics.mjs`,
+`scripts/pointLayoutAnchorsContract.mjs`,
+`scripts/zeroAxisLiveCaptureWorkflow.mjs`,
+`src/geometry/pointNodeShapes/solve.ts`,
+`tests/scripts/phase32dParentEvidenceFixture.mjs`,
 `tests/scripts/phase32dVerification.test.mjs`,
 `tests/scripts/runPhaseRunner.test.mjs` and
 `tests/scripts/runPhaseVerification.test.mjs`.
-Preserve three untracked shared fixtures:
-`tests/scripts/phase32abParentEvidenceFixture.mjs` —
-`e968fbf236d6ed81c701fce466e8b3a7531e35f87a1baa2ce4ccc284bb6f125f`;
-`tests/scripts/phase32dParentEvidenceFixture.mjs` —
-`4c5edd06875f96e414b8d31a6de877f06ca5fb9f09844c2d4bc4d1155fd7d263`;
-`tests/scripts/signedPointStandaloneFixture.mjs` —
-`b08c0196cb1133d3c4e4c5fb2ad6f3055d52e97c278915ef263314cecca0c795`.
-Keep earlier references/publication/capture/native work in HEAD.
-The prompt changes identity; capture actual current tracked/untracked bytes for
-future acceptance rather than reusing a historical fingerprint.
+Preserve116 untracked files:110 additive evidence files under
+`tests/fixtures/point-node-anchors/cylinder-domain/` plus
+`scripts/singularCylinderDiagnostic.mjs`,
+`scripts/singularCylinderDiagnosticContract.mjs`,
+`tests/geometry/pointNodeCylinderDomainReferences.test.ts`,
+`tests/rendering/svgPointNodeCylinderDomain.test.ts`,
+`tests/scripts/singularCylinderDiagnostic.test.mjs` and
+`tests/scripts/singularCylinderFixture.mjs`.
+Use the handoff/report's exact inventories/hashes; do not reset/drop prior work.
+Prompt edits change identity; future gates must capture actual tracked/untracked
+bytes rather than reuse this fingerprint.
 
 | Evidence | Actual result |
 | --- | --- |
-| HoyCdl parent | All five required checks passed, including6,975 tests, build/diff/label-assets/free-labels. Exact checkout before/after matches. |
-| Resolved browser report | passed/complete;18/18 groups, all nine32D scenarios,202 records/4,547 diagnostics, no page errors/incomplete/unexecuted groups. Empty-body dispatch and downstream authenticated targeted/file/pixel/reference replay passed. |
-| Reviewer full suite | 6,974 passed,1 failed, total6,975, exit1, zero skips. Failure is the timeout regression's earlier PNG-file read deadline, not native acceptance. |
-| Other reviewer checks | Focused runtime/model/export79/79 and isolated timeout1/1 passed. Build, strict TypeScript, diff/syntax passed; focused lint had no new findings. Unchanged _role reproduced against HEAD; repo-wide lint not rerun. |
-| Review decision | Cylinder conformance and timing-dependent regression remain. needs_changes blocks completion/commit despite parent acceptance. Review read-only; no commit followed it. |
+| Matching parent | All five checks passed,7,094/7,094 tests, zero failures/skips; both browser checks accepted. Node26.9.0 / Chrome154.0.8037.98, unchanged exact checkout. |
+| Browser/reviewer policy | All18 groups and10 layout scenarios accepted,203 records/4,625 diagnostics; no missing artifacts, page errors, incomplete/unexecuted groups. |
+| Reviewer full suite | 7,055 observed:7,053 passed,1 failed,1 cancelled. Interrupted after no progress for over two hours; incomplete. These counts are not complete registered-suite acceptance. |
+| Other reviewer checks | Isolated freezing/closed-title retries each1/1 passed; geometry/reference/render538/538 and model/layout/TikZ/export74/74 passed. Build, strict app/new-test TypeScript, changed-code lint,14 syntax checks/diff passed. Four scoped baseline lint errors reproduced; repo-wide lint not run. |
+| Review disposition | Two production defects plus unsuccessful full reviewer verification remain. No Critical/Low issues; needs_changes, ready_to_commit:false, no checkout changes or commit. |
 
-Preserve complete native/download/standalone evidence as historical acceptance.
-Fresh verification of the changed tree remains mandatory.
-Earlier startup, root-only, association-order, publication and empty-body-gate
-blockers are resolved; do not repeat them as current fixes.
+The raw-ry0 guard, diagnostic-download parent route and intended live-writer
+deadline fix are implemented predecessors. Preserve them rather than redoing
+the prior review. HoyCdl and earlier blockers are history.
+Complete parent acceptance does not excuse reviewer failures or missing PGF
+conformance; fresh verification/review of the next tree is required.
 
-## Cylinder zero-divisor diagnosis
+## Retain signed cylinder construction and declared end/base roles
 
-Reproduction: empty cylinder with Inner sep=0pt and Minimum size=0pt.
-Retained `production-layout.json` reports limitation:null and requested path
-`M 0 0 L 0 0 L 0 0 L 0.24 0 L 0.24 0 L 0.24 0 Z`.
-Live/settled preview paints invented tiny geometry without a warning.
-Independent PGF3.1.11a fixed-box and document-wrapped actual generated TikZ fail:
+Folded reproduction: empty body, innerXSep−30pt, innerYSep5pt, minima1pt,
+outer sep0, line width0.4pt, anchor bottom.
+Independent PGF succeeds; expected bottom(4.6,0)pt, production(0.6,0)pt.
+The4pt error becomes4.8 SVG units at1.2 units/pt and shifts preview/picking/
+settled placement. Shape center is PGF≈5.09999 versus production3.1;
+several compass/text-side/numeric anchors fail, maximum retained residual≈5.33625pt.
+
+This case has positive `rx=ry=5`. Axial minimum produces halfLength≈−4.6,
+actual endCenter≈0.6 and baseCenter=9.6: their geometric left/right order folds.
+At `anchors.ts:589`, bounds-derived radius magnitudes and
+`baseCenter=bounds.minX+rx` reconstruct base≈5.6, losing the true role.
+A negative-radius-only or bottom-only fix leaves evidenced errors.
+
+Preserve signed fitted radii, actual unrotated end/base centers, top/bottom
+role points and needed fitting state from `solve.ts` as runtime-only metadata,
+following the existing signed-axes/polygonal fitting pattern.
+Anchor resolution must use that construction, not min/max paint envelopes.
+Keep stored model/history/clipboard/TikZ schema unchanged.
+Document the coordinate frame and apply SVG Y conversion/rotation exactly once.
+
+Keep painted bounds ordered and paint outline/seam/custom regions independent
+from clearance. Do not reorder end/base by x, take absolute radii for fitting,
+reject folded layouts or move model coordinates to hide the mismatch.
+Preserve PGF end-arc clearance `max(outerXSep,outerYSep)` and side-point
+`outerYSep`, signed external-radius behavior, named/text-side/numeric anchors,
+declared segment/angle branch order, infinite-line selection and bounded arc
+bisection/finite-work guards.
+Confirm upstream semantics rather than infer geometric “outward” conventions.
+
+Add a separate authenticated full-anchor bundle for the retained folded case:
+all23 named anchors including cylinder/text sides, plus meaningful numeric
+spellings/angles. Existing domain controls cover only8 anchors normally and
+5 for the deeply signed control, so they cannot close this finding.
+Add compact independent neighbors for signed nonzero fitting, axial/transverse
+minima, `rx0/ry>0`, rotation90/270/incircle, unequal signed outer sep and unitScale.
+Check paint paths/seam/regions separately from all anchor/placement results.
+Keep existing inputs/raw/compiler/source hashes and Y-frame provenance,
+0.025pt anchor/0.03pt contour tolerances and original references unchanged.
+
+## Diagnose TeX-scanned zero transverse dimensions
+
+Subsp reproduction: empty cylinder, innerXSep0, innerYSep0.000001pt,
+minimumWidth0, minimumHeight80pt, line0.4pt, anchor center.
+Actual generated/wrapped TikZ retains those options and fails PGF divide-by-zero.
+Production still paints an approximately96-SVG-unit narrow cylinder with
+selection radius≈48.4594 and no warning.
+`solve.ts:338` tests raw JavaScript `ry === 0`, missing the register-domain zero.
+
+One scaled point is1/65536pt≈0.0000152587890625pt.
+The retained1e−6pt scans to zero. Implement a small unit-aware PGF/TeX
+dimension-domain evaluation at the same stages as upstream cylinder fitting,
+using `unitScale ?? 1` to classify in TeX points.
+Do not use an epsilon threshold, raw JS equality alone or round only the final
+floating expression.
+
+Authenticate the relevant upstream stages: inner-separation dimension scanning,
+separate body-width/height/depth half-products/advances, rotation/innerSep
+exchange or incircle fitting, scanned minimumWidth and its dimensional halving,
+then the final transverse register used by PGF division.
+Half-products/cancellation order can differ from rounding a combined expression.
+The existing `pgfRound=Math.round` is asymmetric at negative half-sp ties;
+do not assume it is a faithful dimension scanner without independent controls.
+Keep dimensional scanning distinct from scalar/reciprocal arithmetic.
+
+Use staged quantization only where required for cylinder PGF-domain classification;
+avoid blanket rounding of model values or unrelated geometry/reference results.
+Preserve authored0.000001pt/unit source/em/ex context, saved values, history,
+coordinates and raw TikZ; do not canonicalize tiny authored values to0.
+Classify PGF-equivalent zero before division via the existing RangeError/limitation
+route, preserving warning-only live/settled/picking/export behavior and no
+invented contour/seam/custom regions/large hidden selection region.
+
+Extend independent references additively with below-half-sp, signed/tie
+boundaries and first nonzero±sp neighbors, dimension half-product/cancellation,
+rotations/incircle and unitScale/contextual-unit controls.
+MinimumWidth1sp halves to0 while2sp can yield1sp; authenticate both.
+For negative surviving radii, use minima that do not independently clamp them
+to0; retain genuinely valid neighbors instead of blanket rejection.
+MinimumHeight80/outerSep/lineWidth must not rescue an earlier zero divisor.
+Keep current raw-zero11 failure controls/12 valid controls/93 recorded control
+anchors and all110 evidence files byte-for-byte.
+
+## Shared placement/native/artifact regression coverage
+
+Add shared live/pending/settled/model/TikZ regressions for BOTH reproductions
+in2D/3D. Folded bottom/full-anchor placement must match PGF while model coordinates,
+painted contour and authored negative padding remain intact.
+Subsp zero must use the existing warning, empty requested painted bounds, no
+contour/seam/regions/internal border, visible body/warning picking and far miss.
+Verify same-owner valid→invalid→valid transitions, current source/request/
+revision, raw units/context, JSON/history/reload and both TikZ modes.
+
+Extend required current native coverage within the existing cumulative32D
+workflow: normal load/Inspector/native input, fresh owner/CTM/projection,
+folded anchor placement/contour picking and subsp warning-only behavior across
+both ambient dimensions. Persist before-assert observations and real downloads/
+reopening/complete PNG/TikZ with exact immutable provenance.
+No DEV geometry/selection mutation or contour-only synthetic success.
+
+Preserve all ten existing named layout scenarios, including
+`point-layout-singular-cylinder-diagnostic`; register added cases/artifacts and
+parent counts honestly without dropping predecessors.
+The singular warning-only download uses its dedicated authenticated diagnostic
+context, not a filename skip or the seven-owner empty-body route.
+Extend its strict raw/model/source/domain/owner/file/PNG replay for the subsp
+case, preserving all absence-of-requested-paint and legacy body-gate controls.
+Keep generic publication/ref/association/root/CTM validations mandatory.
+
+## Deterministic freezing test and owned verifier progress
+
+Reviewer full log has one explicit failure:
+`evidencePublication.test.mjs:130–133`,
+`queued observations are frozen before awaiting a writer or another publication`:
 
 ~~~text
-PGF Math Error: You've asked me to divide 0.0 by 0.0
+Timed out after 1000ms during evidence publication before
 ~~~
 
-Use `fixed-box.tex`, `geometry.txt`, `compilation.txt`,
-`actual-generated.tex`, `actual-generated-wrapped.tex` and
-`actual-generated-wrapped-compilation.txt` in the reproduction directory.
-Fixed-box raw stops at CASE/FONT before paint/anchors.
-The wrapperless compilation's Undefined control sequence is a separate document
-context failure and is not the cylinder-domain evidence.
+The test stalls the first ordinary writer, then constructs/clones/queues a full
+fixture and mutates it before releasing the writer. All that ordinary work is
+charged to a real1s first-publication budget.
+It tests freezing/queue semantics, not a deliberate timeout; heavy full-suite
+scheduling can make it fail while isolated execution passes.
 
-At `src/geometry/pointNodeShapes/solve.ts:330–338`, cylinder fits rotation/incircle
-axes then sets `rx = aspect * y`, `ry = max(y, minimumWidth / 2)`.
-Line337 substitutes sineAngle0 for `ry === 0`. Upstream divides by that effective
-transverse radius before asin and later axial-minimum work.
-The narrow singular condition is computed `ry === 0`, including signed zero,
-after fitting/rotation/incircle/minimumWidth.
-Do not predicate solely on empty text, input-y0 or a general zero-axis condition.
+Use deterministic entered/release gates and a scoped scheduler/deadline seam
+so the freezing property does not depend on machine speed.
+Prepare expensive independent fixture/expected values before starting the
+deliberately held publication when possible.
+Keep actual async ordinary writes, queued snapshot freezing BEFORE subsequent
+mutation, exact corrupted-field controls, artifact resolution and lossless
+equality. The test must still prove data was frozen at enqueue, not after release.
+Retain production5,000ms/default bounded persistence and legitimate timeout tests.
+Do not merely increase a real1s/whole-test wall budget or remove the queued
+mutation/write/replay proof.
+No global clock mock, fake success, concurrency/heap flag change or skipped
+case may make the test pass.
 
-Use the existing RangeError/geometry.limitation route before constructing
-requested cylinder contours/seam/regions. Keep the existing asin-domain error.
-Do not substitute zero/epsilon, invent another shape, clamp minima or reject
-the valid authored model. MinimumHeight, outerSep and line width cannot cure
-this division because they operate elsewhere/afterward.
+Attach rejection ownership immediately to first/queued publications while
+awaiting entry; unexpected early failure must fail the test promptly rather
+than leave an unresolved entry gate.
+Own both gates and all pending outcomes in finally/test cleanup, settle/drain
+late fulfillment/rejection and prevent orphan/unhandled operations.
+Preserve publisher primary Error identity, terminal/failed pointer authority,
+immutable byte refs and generation guards.
 
-Preserve `rx === 0` with `ry > 0` where independently valid, supported negative
-nonzero radii, positive-minimumWidth controls, rotation90/270 axis exchange and
-incircle fitting. Do not suppress valid ellipse/basic zero-axis shapes or
-corrected partial/reversed/signed traversal.
+The same reviewer run stopped progressing and was interrupted:
+file-level `tests/scripts/runPhaseVerification.test.mjs:1` cancellation says
+`Promise resolution is still pending but the event loop has already resolved`.
+7,055 observed is incomplete; the parent registers7,094 tests.
+The logs do not identify a unique root cause or prove this cancellation was
+caused by the freezing failure.
+An isolated closed-title or freezing pass is not full-file/full-suite acceptance.
 
-Use shared `svgPointNodeGeometry` RangeError handling to show the existing
-warning in live/pending/settled SVG. Keep upright body/source placement.
-No requested cylinder contour, seam, custom body/end region or internal border
-may leak into rendering/export/picking. Requested painted bounds remain empty;
-selection/picking follow visible body, if any, and warning with current tolerance/
-visibility/lock/filter guards. No hidden requested-shape hit region or oversized
-selection bounds.
+Investigate the REAL verifier test path with bounded stage/subtest progress,
+owned pending-promise/gate/writer state and cleanup observations.
+The last retained contextual missing-title subtest took roughly8.55million ms;
+later publication-authority checks follow in source. Use that only as a
+localization clue, not as proof of which operation hung.
+Inspect awaited subtests, fixture mutations/restoration, publication queue/
+authority operations, parser progress and pending gates at the stalled boundary.
+Ensure unexpected rejection/cancellation cannot leave a promise waiting forever
+or silently let a file appear complete.
 
-Preserve raw layout/units/context/provenance, saved/history reload, coordinates
-and both TikZ modes' authored cylinder intent. Do not rewrite shape/minima to
-make TeX compile or claim compilation success for intentional unsupported input.
+Fix the actual ownership/progress defect once established; preserve independent
+corruption/whole-parent/raw-file replay assertions.
+Do not add a long sleep, bypass the stalled cases, accept cancellation, mock
+mandatory validation or treat forced interruption as a completed test run.
+Use deterministic injected stalled/failing operations to prove progress,
+proper error propagation, gate settlement and complete cleanup.
+Keep normal project settings and both existing scoped live-writer deadline
+cases (including pre-restoration cleanup); do not regress the prior20ms fix.
 
-## Independent cylinder evidence and regressions
+Run the affected file and registered full suite to completion with zero failures/
+cancellations/skips. Demonstrate controlled contention without relying on repeated
+reruns until lucky. Record exact first outcomes and total test counts; individual
+diagnostic retries cannot replace complete reviewer verification.
 
-Add an authenticated independent PGF expected-failure bundle:
-complete TeX input, actual generated source/correct wrapper, engine/PGF3.1.11a/
-upstream hashes, command/no-shell-escape flags, nonzero exit, compiler log and
-partial raw observations. Keep original172 boxes/4,925 anchors/11 failure
-references byte-for-byte; register additions separately.
-Do not derive oracle expectations from production or regenerate old fixtures.
+## Preserve completed contracts and independent references
 
-Use compact PGF-confirmed cases for effective-ry0: empty zero spacing/minima,
-axial extent without transverse radius, rotation/incircle and minimumHeight/
-outerSep/line-width non-rescue. Include positive minimumWidth rescue, valid
-`rx0/ry>0` and basic/ellipse zero-axis neighbors.
-Authenticate nonempty-body cancellation/signed branches before new assertions.
-Retain old negative-separation/asin and valid-cylinder references.
+Keep the prior raw-zero cylinder domain guard/diagnostic,11 failure references,
+12 controls/93 anchors,110 artifacts and actual-generated wrapper evidence.
+Keep native diagnostic case, exact warning structure/pixels/placement and its
+strict parent artifact context separate from seven-node empty-body handling.
+Keep valid zero-axis ellipse/basic shapes and signed cylinder neighbors.
 
-Add geometry/model/TikZ and shared live/settled regressions in both ambient
-dimensions: diagnostic, contour/seam/region suppression including custom fills,
-visible body/warning picking and far miss, exact raw options/context/history/
-JSON/coordinates/TikZ and valid→singular→valid owner/request transitions.
-Add narrow mandatory actual native singular-cylinder coverage to the existing
-cumulative32D workflow in2D/3D, without dropping any predecessor/named scenario.
-Observe current warning/model/source/owner/request/revision, trusted warning
-picking/far-clear and warning-only downloaded/reopened SVG.
-Use normal load/Inspector/native controls, no DEV geometry/selection mutation.
-Keep raw TikZ intent, file/background/capture contracts and before-assert raw
-evidence; register new raw/count/dependency requirements honestly.
+Retain earlier67 empty-body,72 publication,61 correspondence,65 live-capture and
+55 background controls plus the current cylinder/deadline suites.
+Preserve source-proven association, actual DOM order, derived ownership,
+file-local contour/body/root/placement/paint proof, owner-bound CTM and exact
+SVG/PNG/TikZ/model/click/history records.
+Keep lossless refs/pack hashes/current checkout, scoped native input/capture,
+full-stroke sample data, one PNG, inherited UI restoration and late-writer
+failure authority. No reference data or tolerance widening can hide conformance.
 
-Register the new empty-cylinder warning-only SVG through a strict diagnostic
-artifact context in parent replay. The legacy envelope requires body glyph paint;
-the existing seven-owner signed-point allowance does not apply to this case.
-Authenticate exact new case/file eligibility from current model/source/owner/
-revision and raw diagnostic/click/capture records, then replay the actual warning,
-complete empty body shell, placement and exact SVG/PNG bytes. Require absence of
-requested cylinder contour/seam/custom regions, plus normal forbidden/external/
-background checks. Add real parent-dispatch positives and damaged/missing warning,
-wrong source/owner/file/context/ref negatives. Preserve legacy defaults and the
-seven-owner route; no dummy glyph/contour or filename-only skip may grant acceptance.
-
-## Deterministic intended writer deadline
-
-Reviewer log `/private/tmp/stz-32d-review-npm-test.log` fails
-`actual 2D final writer timeout owns late fulfillment after expanded toolbar cleanup`
-at `phase32dVerification.test.mjs:1642/1650`. First actual Error is:
-
-~~~text
-Timed out after 20ms during Zero-axis live PNG file identity
-~~~
-
-The isolated rerun passes; that does not correct the full-suite race.
-At lines1616–1617, `liveWorkflowPublication` sets workflow `timeoutMs:20`
-for stalledFinal/stallBoundary. `captureZeroAxisLive` applies it to every bounded
-operation, including normal PNG `readFile`, measurements and cleanup.
-The deliberate manifest writer gate is later, so unrelated I/O may own primary
-before entry. The publisher fixture's separate1,000ms deadline is not this
-observed failure; keep its role explicit and avoid competing short deadlines.
-
-Control only the selected writer/evidence boundary after its real `entered`
-signal. Use a small scoped test deadline/scheduler seam if needed while retaining
-the actual ordinary writer→publisher→retain→observe/report path.
-Normal I/O/measurement/image/cleanup keep production-equivalent limits;
-actual production defaults remain5,000ms.
-No global timer mock or short whole-workflow override may drive this regression.
-
-Start/fire the selected controlled timeout only after the stalled writer has
-actually entered. Do not include pre-gate encoding, pack writes, PNG reads or
-ordinary scheduling in that20ms test budget.
-A boundary-name-only20ms wrapper around all retain preparation is insufficient
-if it can expire before entry.
-Own asynchronous rejection immediately, so unexpected earlier failure does not
-hang awaiting `entered` or leak an unhandled rejection.
-Keep exact primary Error identity and a genuine selected-boundary timeout.
-Do not throw a fabricated writer Error or broaden the matcher to any timeout.
-
-Preserve all eight final combinations (2D/3D × inherited expanded/collapsed ×
-late fulfillment/rejection) and both pre-restoration stalled-writer cases.
-For pre-restoration, prove failed publication cannot prevent native cleanup.
-Add controlled ordinary PNG-I/O delay beyond the old20ms but within the normal
-budget; intended writer must still be reached and become the first controlled
-failure. Use gates/scoped deterministic scheduling rather than sleeps or
-machine-speed assertions.
-
-Keep one PNG/strict pixels before final failure, exact toolbar restoration,
-state/history/source/owner/CTMs, resource cleanup and lossless
-failed-after-restoration publication.
-Late completion/rejection must not overwrite failed records, report/checkpoint
-authority or primary Error. Replay exact failed artifact bytes and reject
-success after timeout.
-Preserve publisher generations/atomic pointers, lossless refs,5s production
-limits and existing deadline/error ownership.
-
-Retain legitimate earlier targeted stalled-report controls and normal heap/
-concurrency. Do not lower concurrency, raise production deadlines, skip controls
-or rerun until lucky. Run corrected gated controls under normal full-suite
-settings; report first failures honestly and use targeted controlled contention
-to demonstrate deterministic ordering.
-
-## Preserve completed native/artifact/publication gates
-
-Keep all67 empty-body gate,72 publication,61 correspondence,65 live-capture and
-55 background controls and inherited predecessor tests.
-Empty-body SVG acceptance remains scoped to authenticated downloads after
-complete native/association/file-local SVG/PNG/TikZ replay.
-Preserve legacy nonempty absent-ink rejection and full empty body/ink/content
-shell, title forms, exact source/root/order/placement/paint checks.
-Lossless publication keeps frozen observations, authentic refs/bytes/hashes/
-identity, deterministic replay and late-authority protection.
-Keep actual DOM order distinct from model/click order and zero-axis CTM bound
-to its authenticated owner.
-
-Keep original32C, signed-basic8 boxes/192 anchors,54 polygonal boxes/1,386 anchors,
-12 arithmetic controls/four dart traces/one singular control,
-eleven zero-axis paths/37 rendering records and490 additive files.
-Add cylinder evidence separately.
-Keep0.025pt anchor/0.03pt contour tolerances,0.005 precision/2048 limit,
-shared placement, committed picking, coordinate dragging, diamond's authenticated
-outer-separation exception and valid signed/degenerate shapes.
-Keep both TikZ modes, codim convention and2D z=0/3D active-plane semantics.
+Preserve original172 boxes/4,925 anchors/11 original failures, signed-basic8/
+192,54 polygonal/1,386,12 arithmetic controls/four dart traces/one singular control,
+eleven zero-axis paths/37 render records and490 additive files.
+Add new folded/full-anchor/subsp evidence separately with complete independent
+inputs/raw/compiler/command/engine/source hashes, nonzero failure status where
+appropriate and single PGF-Y conversion.
+Keep0.025pt anchor/0.03pt contour tolerances,0.005 precision/2048 finite-work budget.
+No TeX/runtime dependency or saved-schema change; strict TypeScript without any.
 
 ## Preserve completed corrections and contracts
 
@@ -262,8 +309,9 @@ Retain deterministic stalled-report injected ordinary-write recorder,20ms
 deadline, exact primary Error/nativeChecks count, two stalled failure writes,
 late rejection ownership and complete listener/page/browser/server cleanup.
 The earlier stalled-report race was resolved; preserve that targeted control.
-The current global20ms live-writer test race is separate and must be corrected
-without weakening the earlier deterministic deadline/error checks.
+The global20ms live-writer race was corrected with scoped scheduler control;
+preserve that fix. The newest freezing-test deadline and unresolved verifier
+promise are separate current blockers.
 
 Keep explicit resolved preview schema (six dimensions, anchor, effective font
 context) separate from exact authored units/source/context.
@@ -319,15 +367,16 @@ byte validation, artifact inventories, raw-policy checks and runner copies.
 
 ## Fresh verification, review and handoff
 
-Use strict TypeScript without `any`, small pure functions and separated model/
-geometry/rendering/TikZ/UI. Add no dependency without explaining why.
-Update Phase32 docs to both fixes, independent failure-reference inventory,
-deterministic deadline scope and actual results.
-Distinguish passed parent, reviewer full-suite failure and isolated pass.
+Use strict TypeScript, small pure helpers and separated model/geometry/rendering/
+TikZ/UI. Add no dependency without explaining why.
+Update Phase32 docs to the three actual findings/fixes, additive reference
+inventory and real completed outcomes. Separate parent pass, incomplete reviewer
+run, focused/isolated diagnostics and new verification.
+Do not mark Phase32 complete based on the passed parent alone.
 
-Run focused cylinder PGF/domain/render/picking/model/TikZ controls, gated
-final/pre-restoration writer tests and preserved native/publication/association/
-empty-body/pending/standalone/runner checks.
+Run focused full-cylinder-anchor/scanning/neighbor/placement/render/picking/
+model/TikZ cases, deterministic freezing/progress/owned-promise regressions and
+preserved native/publication/association/artifact/pending/standalone/runner checks.
 Use Homebrew Node>=22.12.0 and normal project settings:
 
 ~~~bash
@@ -338,43 +387,40 @@ PATH=/opt/homebrew/bin:$PATH npm run check:label-assets
 PATH=/opt/homebrew/bin:$PATH npm run check:free-labels
 ~~~
 
-Run applicable focused strict TypeScript/lint and changed-script syntax.
-Scoped inherited lint includes two geometric-caller no-unsafe-finally findings,
-verifier _role and layers defaultCurveStyle.
-The empty-body handoff also records older repo-wide baseline79 errors/7 warnings;
-latest reviewer did not rerun it.
-Keep failed baseline checks separate from passing changed-code checks.
-Do not imply repository-wide lint passes or clean unrelated debt.
+Run focused strict TypeScript, changed-code lint and script syntax/diff.
+Keep four reproduced scoped inherited lint findings separate from new-code
+checks. Latest reviewer did not run repo-wide lint; older debt remains documented.
+Do not clean unrelated debt or claim unperformed checks.
 
-Run fresh browser-capable strict parent verification on actual changed bytes:
+Run fresh browser-capable strict parent verification on changed actual bytes:
 
 ~~~bash
 PATH=/opt/homebrew/bin:$PATH node scripts/automation/run-phase.mjs 32D verify
 ~~~
 
-Require all18 cumulative groups: twelve31F including final standalone,
-three32A and one each for32B/32C/32D; all nine existing32D scenarios plus
-mandatory singular-cylinder evidence, both native/live/standalone dimensions,
-twelve polygonal cases, both pending workflows/PNG/TikZ, complete parent artifact/
-targeted/ref replay and no page errors.
-Do not reuse HoyCdl after edits or substitute isolated/synthetic results.
-Failed full-suite/incomplete native checks stop before review/commit.
+Require all18 groups and all ten current layout scenarios plus mandatory new
+folded/subsp coverage, both ambient dimensions/native/live/standalone records,
+all old polygonal/zero-axis/singular cases, both pending transparent/white
+workflows/PNG/TikZ, complete artifact/targeted/reference replay and no page errors.
+Do not reuse dTPBzJ after edits or substitute scoped/synthetic/isolated passes.
+Complete full-suite success and native/file acceptance are required before review.
 
-Preserve clean-tree rules; do not reset/stash/discard/commit unfinished work
-to bypass them.
-If child startup hits EPERM, retain failure/exact tree and obtain approved
-browser-capable parent execution without weakening required coverage.
+Preserve clean-tree rules; do not reset/stash/discard/commit unfinished work.
+If child startup hits EPERM, record exact failure/tree and use approved
+browser-capable parent execution without relaxing coverage.
 
-After required checks pass, obtain fresh independent read-only completion review
-using `prompts/phase-32d-review.md` on exact matching tracked/untracked bytes.
-Inspect resolved reports/artifacts and require BOTH findings resolved:
-authenticated cylinder diagnostic/raw intent, valid neighbors, deterministic
-full-suite success, complete native/artifact acceptance and preserved old gates.
-Keep post-review identity guard.
-needs_changes blocks completion/commit even when parent verification passes.
+After required checks completely pass, obtain fresh independent read-only
+completion review using `prompts/phase-32d-review.md` on exact matching tracked/
+untracked bytes and inspect actual resolved reports/artifacts.
+Require ALL three findings resolved: PGF full-anchor conformance, TeX-scanned
+domain diagnosis with valid neighbors, deterministic COMPLETE reviewer/full-suite
+verification and fresh cumulative acceptance.
+An incomplete/cancelled reviewer run or needs_changes blocks completion/commit.
+Keep post-review matching-tree guard.
 
-Report both scoped fixes, additive independent references, meaningful regressions,
-changed files, focused/full checks, baseline failures, exact tree/report identity
-and fresh independent review result.
+Report scoped cylinder/runtime metadata/domain and test-progress fixes,
+additive independent evidence, meaningful regressions, changed files,
+focused/full COMPLETED checks, baseline failures, exact identity/report hashes
+and independent review outcome.
 Keep Phase32 incomplete until every gate passes.
 Leave commit/push to the parent after verification and review.

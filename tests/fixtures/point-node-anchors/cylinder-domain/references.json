@@ -1,0 +1,2712 @@
+{
+  "schema": "stz-pgf-cylinder-domain-v1",
+  "pgfVersion": "3.1.11a",
+  "upstream": "https://github.com/pgf-tikz/pgf/releases/tag/3.1.11a",
+  "engine": "pdfTeX 3.141592653-2.6-1.40.29 (TeX Live 2026)",
+  "engineBinarySha256": "3ead7baeffb81c638fe75599602278566370e6319c0469f6ab00ff62bff4b0eb",
+  "sourceHashes": {
+    "/usr/local/texlive/2026/texmf-dist/tex/generic/pgf/libraries/shapes/pgflibraryshapes.geometric.code.tex": "bbd6abe9df51153e2f4f61cca3ad669de34a6648cf37795df44da931402b69ee",
+    "/usr/local/texlive/2026/texmf-dist/tex/generic/pgf/modules/pgfmoduleshapes.code.tex": "01dd81e3f2c56a8db7864916ada1a5036964aff2e8176aafd4773244e236bb27",
+    "/usr/local/texlive/2026/texmf-dist/tex/generic/pgf/basiclayer/pgfcorepoints.code.tex": "7533dd80c95a5124726b0a617a5f458226d4a7490bcd209e3fd7e717e24dc127",
+    "/usr/local/texlive/2026/texmf-dist/tex/generic/pgf/math/pgfmathcalc.code.tex": "58fcc94547646458470315a6d10953a9729e7962e3def5273633b06fb444a5aa",
+    "/usr/local/texlive/2026/texmf-dist/tex/generic/pgf/math/pgfmathfunctions.trigonometric.code.tex": "1c8834abe00807467a52d31ef96032d5084b2560eea45995018084d13a3cde3c",
+    "/usr/local/texlive/2026/texmf-dist/tex/generic/pgf/math/pgfmathfunctions.basic.code.tex": "c94abbd89ad0556546d9e5053af16b58ce7f38d19c379b27309e5fefd23908f8",
+    "/usr/local/texlive/2026/texmf-dist/tex/generic/pgf/basiclayer/pgfcoretransformations.code.tex": "bdea875774b4ad7a1e12debc67c46286245031f5c2e287c9e192f3ca4b6193b6"
+  },
+  "originalReferenceSha256": "d88d83fdecd840cd9c8ebfc2a23b69d2254164a33d2cec35360ccbc22de4cd8e",
+  "generatorSha256": "0f49852439ceda9fb04da3fea5b6cb595842a2c2f61792c9d0b64722cce4a625",
+  "units": "TeX pt; raw PGF positive-Y-up is reversed once in parsed paint and anchor coordinates",
+  "retainedReviewPath": "/private/tmp/stz-review-cylinder-zero-IrjltG/",
+  "retainedReviewHashes": {
+    "fixed-box.tex": "6d7fa133baf614a6940226e23e235f5ba76f3e5cee395d7e58b3ddc777d2f456",
+    "fixed-box.log": "b76547d622df1187256568c1126c0df16636e9fc511d6937379274b587240ebf",
+    "geometry.txt": "128f1740381cef24c60bae9ed27e37586a01cb56066f6cc8881a937a4e1cb324",
+    "compilation.txt": "4c4658c40b0e91dc8a3576607cf4c3f116582bda0868dda3ce9af10af784044f",
+    "actual-generated.tex": "184f176ba7d5f990213da1ab2e51fe222b689fd89c4a264d12c43c7f7c510583",
+    "actual-generated-wrapped.tex": "aa39c2f2d1d7b2dab5e5012201e4757c7af3cc167d589638124fe5d54c4e1d00",
+    "actual-generated-wrapped.log": "da8aa2af253e673b4166e8eeea01473670f3101221f64570b005dc5dd27bffca",
+    "actual-generated-wrapped-compilation.txt": "47729da75be4a5fe53e29c2c34857158ec9385293ab77c87020155c0a3254fc6",
+    "production-layout.json": "4522db6b77e89104221a77488cd6392d1a88131bbb2e87798c9068331ed36c63",
+    "production.svg": "ceb2e7f1924982382240b9a09083b22263da263c18075a3ec9702ad6e3298754"
+  },
+  "artifactHashes": {
+    "failures/empty-zero/fixed-box.tex": "cdd32d0e45d7827eb2d4d7beb6beefea3e113cee0087fe7abad8576ff71cecd3",
+    "failures/empty-zero/geometry.txt": "f5a6dc024e6253d0b66c4a53548433fa37ebe2fd33124586a2f8ae834f1b5e9a",
+    "failures/empty-zero/compilation.txt": "1ce45685cc3c584f4d86e96b1ff598deb82087f392b412cace9dd7bb669cf2b7",
+    "failures/empty-zero/fixed-box.log": "c5db77e7701253207fd93d09dd24f07db1155f6ffa1c0e04d590448077a4e039",
+    "failures/axial-only/fixed-box.tex": "faef98b92429e06bbc09d1c0b30f2d6c788a1ab1fc3a185865c68b59963e81cb",
+    "failures/axial-only/geometry.txt": "d192f980d707a1e4551feab07455031ae88620518bcf07bcc0731d72fe3ee08b",
+    "failures/axial-only/compilation.txt": "1ce45685cc3c584f4d86e96b1ff598deb82087f392b412cace9dd7bb669cf2b7",
+    "failures/axial-only/fixed-box.log": "20741308e2d274c124473b7f2752954c0f3a288387e07044ca162b893d4234f4",
+    "failures/rotation90-zero/fixed-box.tex": "3003ee639cda211b59c7f7e08089eec5ab236a921de8d36e52ae024819f9bfe1",
+    "failures/rotation90-zero/geometry.txt": "7d370492eb5a36dea91776d6f932b88f4e8fc52212ca09dc6cf2487253aa5f71",
+    "failures/rotation90-zero/compilation.txt": "1ce45685cc3c584f4d86e96b1ff598deb82087f392b412cace9dd7bb669cf2b7",
+    "failures/rotation90-zero/fixed-box.log": "ac9593ea6f644998404b3c76b4842f52862926309263e6f26bcd91705d8c3de0",
+    "failures/rotation270-zero/fixed-box.tex": "0a5b3b695805df3e777d9cbd1a6be08473db7929d6aa5b24ddc633dd2bd0b8ca",
+    "failures/rotation270-zero/geometry.txt": "e709ab40da28bbaa2bdf11314331520e8cd704af60f78956de00e72020e74b03",
+    "failures/rotation270-zero/compilation.txt": "1ce45685cc3c584f4d86e96b1ff598deb82087f392b412cace9dd7bb669cf2b7",
+    "failures/rotation270-zero/fixed-box.log": "ac9593ea6f644998404b3c76b4842f52862926309263e6f26bcd91705d8c3de0",
+    "failures/incircle-zero/fixed-box.tex": "2e91f8f9afe4c6b44f67c54cd93f9c08247099f7a2f5dfc15253b6a7910dc341",
+    "failures/incircle-zero/geometry.txt": "a3745cd4a7a09c78bd257827203262585dca14b5fe3e098ac3685566b1d97d53",
+    "failures/incircle-zero/compilation.txt": "1ce45685cc3c584f4d86e96b1ff598deb82087f392b412cace9dd7bb669cf2b7",
+    "failures/incircle-zero/fixed-box.log": "266de45fd4a2d886a96e53e7aa08cbb395a733d1bef8fd12b3c92db76070828c",
+    "failures/nonempty-cancellation/fixed-box.tex": "b689650612e112bfde59600ce9fd2ae7694a617c3c97f3f5317471810450de92",
+    "failures/nonempty-cancellation/geometry.txt": "ddd43b558d97d4beae6a4f7340b7222b312e4eb98ecad42deef8289a0f17b453",
+    "failures/nonempty-cancellation/compilation.txt": "50fe07f3686cea04da78b1fd037a790e987bf0401b8c110f537f3bb769d132d1",
+    "failures/nonempty-cancellation/fixed-box.log": "856fd59a97c3ae3acd7a5bb7003c4a4726cf40cf48b5ccd44a7642f5b907499f",
+    "failures/signed-radius-clamped-zero/fixed-box.tex": "de1ae26150e2a9fc1ae8d965dbf434965a4f1b38ba43dd37b3f23b198a7953e3",
+    "failures/signed-radius-clamped-zero/geometry.txt": "9ed8e98c966333e743861a3e60afff46503413360cf5a92c09837cf6864da544",
+    "failures/signed-radius-clamped-zero/compilation.txt": "5ed271f25b736a45dc4d67d76ed2eb4f254d71d73c505d6788dc5ecb45a48758",
+    "failures/signed-radius-clamped-zero/fixed-box.log": "f1073dbcd1f6571851f7b734a1ff26a1bc3679b0c7d353cdaa82a897541f9dfb",
+    "failures/incircle-nonempty-cancellation/fixed-box.tex": "3e4ca495006ed88118718f3a49d73fbadff60fd374cf81e680c4f6753082f4b2",
+    "failures/incircle-nonempty-cancellation/geometry.txt": "7ca255b2e9a76f7eed8c40e64200bf227578b3559bce7c7c8b0356b4840883ed",
+    "failures/incircle-nonempty-cancellation/compilation.txt": "50fe07f3686cea04da78b1fd037a790e987bf0401b8c110f537f3bb769d132d1",
+    "failures/incircle-nonempty-cancellation/fixed-box.log": "7c52967335fb4ae3826ac89aec4dafbf59aaf9c7c1cc5b113a474050c57cd773",
+    "failures/axial-minimum-nonrescue/fixed-box.tex": "06ba5d68184f29cb59ef98e3317c59799c6154357de5479b94171bba24db2570",
+    "failures/axial-minimum-nonrescue/geometry.txt": "7861d218aae9753d0825328abe4180e0726632f3ad0dbbb2b557214941b51269",
+    "failures/axial-minimum-nonrescue/compilation.txt": "1ce45685cc3c584f4d86e96b1ff598deb82087f392b412cace9dd7bb669cf2b7",
+    "failures/axial-minimum-nonrescue/fixed-box.log": "c5db77e7701253207fd93d09dd24f07db1155f6ffa1c0e04d590448077a4e039",
+    "failures/outer-separation-nonrescue/fixed-box.tex": "a511d99fb83a123dacd700ca31071bc1051141253a887e227fa073aa6e36a074",
+    "failures/outer-separation-nonrescue/geometry.txt": "27d36441d40df4cd68ff8f8527996ffb888897d7f62ea72cb16a64203283a470",
+    "failures/outer-separation-nonrescue/compilation.txt": "1ce45685cc3c584f4d86e96b1ff598deb82087f392b412cace9dd7bb669cf2b7",
+    "failures/outer-separation-nonrescue/fixed-box.log": "c5db77e7701253207fd93d09dd24f07db1155f6ffa1c0e04d590448077a4e039",
+    "failures/line-width-custom-fill-nonrescue/fixed-box.tex": "e20c520f5c8edadcb73295a8c539fbda42fe7fec5ca02e107e9309b72ae7481d",
+    "failures/line-width-custom-fill-nonrescue/geometry.txt": "e0aeaf09485cc1b799a3801026a8635da1f485a4bfc957af5529cc913420545e",
+    "failures/line-width-custom-fill-nonrescue/compilation.txt": "1ce45685cc3c584f4d86e96b1ff598deb82087f392b412cace9dd7bb669cf2b7",
+    "failures/line-width-custom-fill-nonrescue/fixed-box.log": "917cc2e95544e79f22bd3226a1c3fffe6db16f50aec5c5d009e5154e968cfdec",
+    "controls/positive-minimum-width-rescue/fixed-box.tex": "630447e459186326bdcc8a2e35341539de9d928936224094b9c4ea864883911a",
+    "controls/positive-minimum-width-rescue/geometry.txt": "c892b3112575f4ea6200e2be4fe47e6114304f7cb07f105311e0418ad94feeed",
+    "controls/positive-minimum-width-rescue/compilation.txt": "47a2603c98fb8ac64a671f641400c5e27fc8f4ab46206da88f65d5892bbf2a5d",
+    "controls/positive-minimum-width-rescue/fixed-box.log": "42078ab5bdc2ca303e941df6865321cc0b43ed719cb47dce67f17649afa0d8fd",
+    "controls/positive-minimum-width-nonempty-rescue/fixed-box.tex": "30e740a2ea08786f59b9e7e2c8c55e360314ba1f82b73fe99becfe42c74f726d",
+    "controls/positive-minimum-width-nonempty-rescue/geometry.txt": "608de866977dffc85fab52cb20bb1aeaf74aa6b7f45c1d4a865539062ff47682",
+    "controls/positive-minimum-width-nonempty-rescue/compilation.txt": "c54197b96bc0b55b2be7bab5f7f1f0d9f727cbc1feced0852af416519152e228",
+    "controls/positive-minimum-width-nonempty-rescue/fixed-box.log": "6ba4838b5c59c397a69b19285431ff308d67649a9623d03bca523e7f9df89119",
+    "controls/rx-zero-ry-positive/fixed-box.tex": "fcf2f1c7ae7199e04d0d7360a4f98d81a3801687ab7b4bd6110d5ef46b6a6d59",
+    "controls/rx-zero-ry-positive/geometry.txt": "ccac68951bd3820303729f07f957766f7dd4643cf012717abfeda7a6e3b5840d",
+    "controls/rx-zero-ry-positive/compilation.txt": "f35578286847ba84f972ceb413a8821dd234cbf22b9f2e2d3ee1a0b6f9de5ef3",
+    "controls/rx-zero-ry-positive/fixed-box.log": "aaeb2c31b88902501a41fbb2caaeb143fed925f7359e14315af3e1a080157507",
+    "controls/rotation90-exchange-rescue/fixed-box.tex": "1aeaf221ae79cb2fbcc3b579979f4f86623a2f554b73c99bd1d3eb99aa4885d1",
+    "controls/rotation90-exchange-rescue/geometry.txt": "c50a3962f59f3ff4fc5963b57aa7bb5cd4198bb21141b69fba7c99b8ba29fe00",
+    "controls/rotation90-exchange-rescue/compilation.txt": "6c799463da82de24e2b79b4d81d32d2ef6444bfaab9fd767fa5d87393af04a75",
+    "controls/rotation90-exchange-rescue/fixed-box.log": "e92f4237e7f4543f33496c59df9c18413f538b621e804fc738ba244a4df5767b",
+    "controls/rotation270-exchange-rescue/fixed-box.tex": "5dede7f1d058ed7ce8326b2d4c13e0a7a3dd0ff238019dd91082217b6bc3eedc",
+    "controls/rotation270-exchange-rescue/geometry.txt": "f52d8ba45c49a0a998e8dde59712762f800acd4ae150a905f916b516d54827a4",
+    "controls/rotation270-exchange-rescue/compilation.txt": "e9ec85408539ce2aa5c5142260367d22723a0ef84ac387697502ebd5c151f349",
+    "controls/rotation270-exchange-rescue/fixed-box.log": "3ef298291517d6def0c0e1afb05b6cb181d166dd1d197561974e6917c70a75b9",
+    "controls/incircle-axial-rescue/fixed-box.tex": "294316b521fd7413968bcad2cc55acda25f1cc94b0c867d71b48bd51cab33ee1",
+    "controls/incircle-axial-rescue/geometry.txt": "b5d0d399228f78e3301e4d974b2164eb20750ff8e02297edb8229ef4dd405915",
+    "controls/incircle-axial-rescue/compilation.txt": "144f14b5224ae2a7d3ee4e2694ecf3a039a67b06b2285e2b6e268e7883ec6b5d",
+    "controls/incircle-axial-rescue/fixed-box.log": "126cf709da47cc1eedb1c0e2e89f07f30ff2530bf65873f17d768eb547e70662",
+    "controls/signed-nonzero-radii/fixed-box.tex": "ed3b87c17de9fe8107473f8c72820a121fe37791d5daecc078efa33fd05962b6",
+    "controls/signed-nonzero-radii/geometry.txt": "12add88b7e415b17d2b82792d7c2e260b2a7a5ad8268048653be81da91232c0b",
+    "controls/signed-nonzero-radii/compilation.txt": "e706e6d55846235a5fa67956b5568d3d2f6c1106214d4c69d7c5f45f01805194",
+    "controls/signed-nonzero-radii/fixed-box.log": "7eb3b09987edc9f3ba74ea08cbbd898b76e605a9edee030519653253b46c07c9",
+    "controls/ellipse-zero-axes/fixed-box.tex": "5b2c5fccdc8c5b651d2bdcdc418a382ecfa66ea5a9ed0249bac9baafa60bcc52",
+    "controls/ellipse-zero-axes/geometry.txt": "259510ef77dad1ee840494e93c4503f6c16ce43e37dd65cf85af1249b92ffe82",
+    "controls/ellipse-zero-axes/compilation.txt": "d17506a3aebd52f5b56503367374001660980ad5a3a2831bb6b0dd3aab997d33",
+    "controls/ellipse-zero-axes/fixed-box.log": "569928f7a0a710916272f49699e5cd8d8d3b4c787e641d9102110588b034df3b",
+    "controls/ellipse-zero-x/fixed-box.tex": "cb1b53cc18fade5428da8ed9cdac2effe1aaed859fd28965b45864112cc266d4",
+    "controls/ellipse-zero-x/geometry.txt": "98f1d034f3aea0e0d4d4f45dc4ea2ac65f4019e2e744a9ed852e4114e20f8860",
+    "controls/ellipse-zero-x/compilation.txt": "45474adc0126d95275439ecd98d2378fbde11a6dfad70d8d1dae42d06a55c87a",
+    "controls/ellipse-zero-x/fixed-box.log": "4626e528c4f4aa19910ec2a9e33bdb4d7b6f5ac768040187bcec216d59828d2e",
+    "controls/ellipse-zero-y/fixed-box.tex": "024176566f4185dd8b5e7a6cb815b4a09dd0605507f73335659a2bb1d85507c4",
+    "controls/ellipse-zero-y/geometry.txt": "cc3b938e54d601e87e7a2672edef7f5e6d3da84063fd30191b070f939af3b0bb",
+    "controls/ellipse-zero-y/compilation.txt": "45474adc0126d95275439ecd98d2378fbde11a6dfad70d8d1dae42d06a55c87a",
+    "controls/ellipse-zero-y/fixed-box.log": "8c0b37961ffffb2e1cb0fc2886b3a89bcf38dfd3df8f5b400c82e5473b307a07",
+    "controls/rectangle-zero-axes/fixed-box.tex": "955da5157c6d4457852a19e6082b37f1abe880a5b01f38cda5c8295f624b19e2",
+    "controls/rectangle-zero-axes/geometry.txt": "c2ff74b80542ef82ddc49be6922b393a3c96aba907db2b9ff7ce433e831aa83b",
+    "controls/rectangle-zero-axes/compilation.txt": "b986b4839ef3434d9a37886529bb3cf56b49f5943fe5fb271ead10dc48bf32ff",
+    "controls/rectangle-zero-axes/fixed-box.log": "1cd15176a59cfb94635a7b21c56cfbcd351329fb4d033c7f9c027ec6e5bc4592",
+    "controls/circle-zero-axes/fixed-box.tex": "eb6d788e53fc5c1c3bb6f81074ea32c78df544599b92fd6451adb108d0588ca9",
+    "controls/circle-zero-axes/geometry.txt": "183b185f28375d760060663b0ff5da053720e0d2481b7652e8ef9d60cdf9f7c5",
+    "controls/circle-zero-axes/compilation.txt": "d17506a3aebd52f5b56503367374001660980ad5a3a2831bb6b0dd3aab997d33",
+    "controls/circle-zero-axes/fixed-box.log": "46ad16a829cf5366563c650e3c92f73b6a601c7f1c4140aa559b57cd3b3f3be2",
+    "actual-generated.tex": "184f176ba7d5f990213da1ab2e51fe222b689fd89c4a264d12c43c7f7c510583",
+    "actual-generated-wrapped.tex": "c9393758638a40f33412dfdddf6ae1b4b9ed24808847dbb0a30098819bbf9989",
+    "actual-generated-wrapped-compilation.txt": "175326dab35b9f5e1f11eb01ece31234296ca4dfb2f86520b4ffdb8ff9928e65",
+    "actual-generated-wrapped.log": "61c9f2667cb112756e3135d61e58024048c7684b4905e18534df0d3ffee697c0"
+  },
+  "actualGenerated": {
+    "provenance": "Exact retained independent reviewer production generateTikz source; recompiled in the complete correct wrapper.",
+    "command": [
+      "/Library/TeX/texbin/pdflatex",
+      "-no-shell-escape",
+      "-interaction=nonstopmode",
+      "-halt-on-error",
+      "actual-generated-wrapped.tex"
+    ],
+    "exitCode": 1,
+    "expectedError": "You've asked me to divide"
+  },
+  "failures": [
+    {
+      "id": "empty-zero",
+      "shape": "cylinder",
+      "body": {
+        "width": 0,
+        "height": 0,
+        "depth": 0
+      },
+      "innerXSep": 0,
+      "innerYSep": 0,
+      "outerXSep": 0,
+      "outerYSep": 0,
+      "minimumWidth": 0,
+      "minimumHeight": 0,
+      "lineWidth": 0.4,
+      "anchors": [
+        "center",
+        "text",
+        "base",
+        "mid",
+        "east",
+        "north",
+        "south",
+        "west"
+      ],
+      "exitCode": 1,
+      "command": [
+        "/Library/TeX/texbin/pdflatex",
+        "-no-shell-escape",
+        "-interaction=nonstopmode",
+        "-halt-on-error",
+        "fixed-box.tex"
+      ],
+      "artifacts": {
+        "input": "failures/empty-zero/fixed-box.tex",
+        "geometry": "failures/empty-zero/geometry.txt",
+        "compilation": "failures/empty-zero/compilation.txt",
+        "compilerLog": "failures/empty-zero/fixed-box.log"
+      },
+      "expectedError": "You've asked me to divide",
+      "expectedAnchors": {},
+      "paints": []
+    },
+    {
+      "id": "axial-only",
+      "shape": "cylinder",
+      "body": {
+        "width": 20,
+        "height": 0,
+        "depth": 0
+      },
+      "innerXSep": 0,
+      "innerYSep": 0,
+      "outerXSep": 0,
+      "outerYSep": 0,
+      "minimumWidth": 0,
+      "minimumHeight": 0,
+      "lineWidth": 0.4,
+      "anchors": [
+        "center",
+        "text",
+        "base",
+        "mid",
+        "east",
+        "north",
+        "south",
+        "west"
+      ],
+      "exitCode": 1,
+      "command": [
+        "/Library/TeX/texbin/pdflatex",
+        "-no-shell-escape",
+        "-interaction=nonstopmode",
+        "-halt-on-error",
+        "fixed-box.tex"
+      ],
+      "artifacts": {
+        "input": "failures/axial-only/fixed-box.tex",
+        "geometry": "failures/axial-only/geometry.txt",
+        "compilation": "failures/axial-only/compilation.txt",
+        "compilerLog": "failures/axial-only/fixed-box.log"
+      },
+      "expectedError": "You've asked me to divide",
+      "expectedAnchors": {},
+      "paints": []
+    },
+    {
+      "id": "rotation90-zero",
+      "shape": "cylinder",
+      "body": {
+        "width": 0,
+        "height": 8,
+        "depth": 2
+      },
+      "innerXSep": 0,
+      "innerYSep": 0,
+      "outerXSep": 0,
+      "outerYSep": 0,
+      "minimumWidth": 0,
+      "minimumHeight": 0,
+      "lineWidth": 0.4,
+      "anchors": [
+        "center",
+        "text",
+        "base",
+        "mid",
+        "east",
+        "north",
+        "south",
+        "west"
+      ],
+      "parameters": {
+        "borderRotate": 90
+      },
+      "options": [
+        "/pgf/shape border rotate=90"
+      ],
+      "exitCode": 1,
+      "command": [
+        "/Library/TeX/texbin/pdflatex",
+        "-no-shell-escape",
+        "-interaction=nonstopmode",
+        "-halt-on-error",
+        "fixed-box.tex"
+      ],
+      "artifacts": {
+        "input": "failures/rotation90-zero/fixed-box.tex",
+        "geometry": "failures/rotation90-zero/geometry.txt",
+        "compilation": "failures/rotation90-zero/compilation.txt",
+        "compilerLog": "failures/rotation90-zero/fixed-box.log"
+      },
+      "expectedError": "You've asked me to divide",
+      "expectedAnchors": {},
+      "paints": []
+    },
+    {
+      "id": "rotation270-zero",
+      "shape": "cylinder",
+      "body": {
+        "width": 0,
+        "height": 8,
+        "depth": 2
+      },
+      "innerXSep": 0,
+      "innerYSep": 0,
+      "outerXSep": 0,
+      "outerYSep": 0,
+      "minimumWidth": 0,
+      "minimumHeight": 0,
+      "lineWidth": 0.4,
+      "anchors": [
+        "center",
+        "text",
+        "base",
+        "mid",
+        "east",
+        "north",
+        "south",
+        "west"
+      ],
+      "parameters": {
+        "borderRotate": 270
+      },
+      "options": [
+        "/pgf/shape border rotate=270"
+      ],
+      "exitCode": 1,
+      "command": [
+        "/Library/TeX/texbin/pdflatex",
+        "-no-shell-escape",
+        "-interaction=nonstopmode",
+        "-halt-on-error",
+        "fixed-box.tex"
+      ],
+      "artifacts": {
+        "input": "failures/rotation270-zero/fixed-box.tex",
+        "geometry": "failures/rotation270-zero/geometry.txt",
+        "compilation": "failures/rotation270-zero/compilation.txt",
+        "compilerLog": "failures/rotation270-zero/fixed-box.log"
+      },
+      "expectedError": "You've asked me to divide",
+      "expectedAnchors": {},
+      "paints": []
+    },
+    {
+      "id": "incircle-zero",
+      "shape": "cylinder",
+      "body": {
+        "width": 0,
+        "height": 0,
+        "depth": 0
+      },
+      "innerXSep": 0,
+      "innerYSep": 0,
+      "outerXSep": 0,
+      "outerYSep": 0,
+      "minimumWidth": 0,
+      "minimumHeight": 0,
+      "lineWidth": 0.4,
+      "anchors": [
+        "center",
+        "text",
+        "base",
+        "mid",
+        "east",
+        "north",
+        "south",
+        "west"
+      ],
+      "parameters": {
+        "borderUsesIncircle": true,
+        "borderRotate": 37
+      },
+      "options": [
+        "/pgf/shape border uses incircle=true",
+        "/pgf/shape border rotate=37"
+      ],
+      "exitCode": 1,
+      "command": [
+        "/Library/TeX/texbin/pdflatex",
+        "-no-shell-escape",
+        "-interaction=nonstopmode",
+        "-halt-on-error",
+        "fixed-box.tex"
+      ],
+      "artifacts": {
+        "input": "failures/incircle-zero/fixed-box.tex",
+        "geometry": "failures/incircle-zero/geometry.txt",
+        "compilation": "failures/incircle-zero/compilation.txt",
+        "compilerLog": "failures/incircle-zero/fixed-box.log"
+      },
+      "expectedError": "You've asked me to divide",
+      "expectedAnchors": {},
+      "paints": []
+    },
+    {
+      "id": "nonempty-cancellation",
+      "shape": "cylinder",
+      "body": {
+        "width": 20,
+        "height": 8,
+        "depth": 2
+      },
+      "innerXSep": 0,
+      "innerYSep": -5,
+      "outerXSep": 0,
+      "outerYSep": 0,
+      "minimumWidth": 0,
+      "minimumHeight": 0,
+      "lineWidth": 0.4,
+      "anchors": [
+        "center",
+        "text",
+        "base",
+        "mid",
+        "east",
+        "north",
+        "south",
+        "west"
+      ],
+      "exitCode": 1,
+      "command": [
+        "/Library/TeX/texbin/pdflatex",
+        "-no-shell-escape",
+        "-interaction=nonstopmode",
+        "-halt-on-error",
+        "fixed-box.tex"
+      ],
+      "artifacts": {
+        "input": "failures/nonempty-cancellation/fixed-box.tex",
+        "geometry": "failures/nonempty-cancellation/geometry.txt",
+        "compilation": "failures/nonempty-cancellation/compilation.txt",
+        "compilerLog": "failures/nonempty-cancellation/fixed-box.log"
+      },
+      "expectedError": "You've asked me to divide",
+      "expectedAnchors": {},
+      "paints": []
+    },
+    {
+      "id": "signed-radius-clamped-zero",
+      "shape": "cylinder",
+      "body": {
+        "width": 0,
+        "height": 0,
+        "depth": 0
+      },
+      "innerXSep": -4,
+      "innerYSep": -3,
+      "outerXSep": 0,
+      "outerYSep": 0,
+      "minimumWidth": 0,
+      "minimumHeight": -20,
+      "lineWidth": 0.4,
+      "anchors": [
+        "center",
+        "text",
+        "base",
+        "mid",
+        "east",
+        "north",
+        "south",
+        "west"
+      ],
+      "exitCode": 1,
+      "command": [
+        "/Library/TeX/texbin/pdflatex",
+        "-no-shell-escape",
+        "-interaction=nonstopmode",
+        "-halt-on-error",
+        "fixed-box.tex"
+      ],
+      "artifacts": {
+        "input": "failures/signed-radius-clamped-zero/fixed-box.tex",
+        "geometry": "failures/signed-radius-clamped-zero/geometry.txt",
+        "compilation": "failures/signed-radius-clamped-zero/compilation.txt",
+        "compilerLog": "failures/signed-radius-clamped-zero/fixed-box.log"
+      },
+      "expectedError": "You've asked me to divide",
+      "expectedAnchors": {},
+      "paints": []
+    },
+    {
+      "id": "incircle-nonempty-cancellation",
+      "shape": "cylinder",
+      "body": {
+        "width": 20,
+        "height": 8,
+        "depth": 2
+      },
+      "innerXSep": -10,
+      "innerYSep": -5,
+      "outerXSep": 0,
+      "outerYSep": 0,
+      "minimumWidth": 0,
+      "minimumHeight": 0,
+      "lineWidth": 0.4,
+      "anchors": [
+        "center",
+        "text",
+        "base",
+        "mid",
+        "east",
+        "north",
+        "south",
+        "west"
+      ],
+      "parameters": {
+        "borderUsesIncircle": true
+      },
+      "options": [
+        "/pgf/shape border uses incircle=true"
+      ],
+      "exitCode": 1,
+      "command": [
+        "/Library/TeX/texbin/pdflatex",
+        "-no-shell-escape",
+        "-interaction=nonstopmode",
+        "-halt-on-error",
+        "fixed-box.tex"
+      ],
+      "artifacts": {
+        "input": "failures/incircle-nonempty-cancellation/fixed-box.tex",
+        "geometry": "failures/incircle-nonempty-cancellation/geometry.txt",
+        "compilation": "failures/incircle-nonempty-cancellation/compilation.txt",
+        "compilerLog": "failures/incircle-nonempty-cancellation/fixed-box.log"
+      },
+      "expectedError": "You've asked me to divide",
+      "expectedAnchors": {},
+      "paints": []
+    },
+    {
+      "id": "axial-minimum-nonrescue",
+      "shape": "cylinder",
+      "body": {
+        "width": 0,
+        "height": 0,
+        "depth": 0
+      },
+      "innerXSep": 0,
+      "innerYSep": 0,
+      "outerXSep": 0,
+      "outerYSep": 0,
+      "minimumWidth": 0,
+      "minimumHeight": 80,
+      "lineWidth": 0.4,
+      "anchors": [
+        "center",
+        "text",
+        "base",
+        "mid",
+        "east",
+        "north",
+        "south",
+        "west"
+      ],
+      "exitCode": 1,
+      "command": [
+        "/Library/TeX/texbin/pdflatex",
+        "-no-shell-escape",
+        "-interaction=nonstopmode",
+        "-halt-on-error",
+        "fixed-box.tex"
+      ],
+      "artifacts": {
+        "input": "failures/axial-minimum-nonrescue/fixed-box.tex",
+        "geometry": "failures/axial-minimum-nonrescue/geometry.txt",
+        "compilation": "failures/axial-minimum-nonrescue/compilation.txt",
+        "compilerLog": "failures/axial-minimum-nonrescue/fixed-box.log"
+      },
+      "expectedError": "You've asked me to divide",
+      "expectedAnchors": {},
+      "paints": []
+    },
+    {
+      "id": "outer-separation-nonrescue",
+      "shape": "cylinder",
+      "body": {
+        "width": 0,
+        "height": 0,
+        "depth": 0
+      },
+      "innerXSep": 0,
+      "innerYSep": 0,
+      "outerXSep": 20,
+      "outerYSep": 25,
+      "minimumWidth": 0,
+      "minimumHeight": 0,
+      "lineWidth": 0.4,
+      "anchors": [
+        "center",
+        "text",
+        "base",
+        "mid",
+        "east",
+        "north",
+        "south",
+        "west"
+      ],
+      "exitCode": 1,
+      "command": [
+        "/Library/TeX/texbin/pdflatex",
+        "-no-shell-escape",
+        "-interaction=nonstopmode",
+        "-halt-on-error",
+        "fixed-box.tex"
+      ],
+      "artifacts": {
+        "input": "failures/outer-separation-nonrescue/fixed-box.tex",
+        "geometry": "failures/outer-separation-nonrescue/geometry.txt",
+        "compilation": "failures/outer-separation-nonrescue/compilation.txt",
+        "compilerLog": "failures/outer-separation-nonrescue/fixed-box.log"
+      },
+      "expectedError": "You've asked me to divide",
+      "expectedAnchors": {},
+      "paints": []
+    },
+    {
+      "id": "line-width-custom-fill-nonrescue",
+      "shape": "cylinder",
+      "body": {
+        "width": 0,
+        "height": 0,
+        "depth": 0
+      },
+      "innerXSep": 0,
+      "innerYSep": 0,
+      "outerXSep": 0,
+      "outerYSep": 0,
+      "minimumWidth": 0,
+      "minimumHeight": 0,
+      "lineWidth": 9,
+      "anchors": [
+        "center",
+        "text",
+        "base",
+        "mid",
+        "east",
+        "north",
+        "south",
+        "west"
+      ],
+      "parameters": {
+        "cylinderUsesCustomFill": true,
+        "cylinderBodyFill": "#1122AA",
+        "cylinderEndFill": "#CC3322"
+      },
+      "options": [
+        "/pgf/cylinder uses custom fill=true",
+        "/pgf/cylinder body fill=blue",
+        "/pgf/cylinder end fill=red"
+      ],
+      "exitCode": 1,
+      "command": [
+        "/Library/TeX/texbin/pdflatex",
+        "-no-shell-escape",
+        "-interaction=nonstopmode",
+        "-halt-on-error",
+        "fixed-box.tex"
+      ],
+      "artifacts": {
+        "input": "failures/line-width-custom-fill-nonrescue/fixed-box.tex",
+        "geometry": "failures/line-width-custom-fill-nonrescue/geometry.txt",
+        "compilation": "failures/line-width-custom-fill-nonrescue/compilation.txt",
+        "compilerLog": "failures/line-width-custom-fill-nonrescue/fixed-box.log"
+      },
+      "expectedError": "You've asked me to divide",
+      "expectedAnchors": {},
+      "paints": []
+    }
+  ],
+  "controls": [
+    {
+      "id": "positive-minimum-width-rescue",
+      "shape": "cylinder",
+      "body": {
+        "width": 0,
+        "height": 0,
+        "depth": 0
+      },
+      "innerXSep": 0,
+      "innerYSep": 0,
+      "outerXSep": 0,
+      "outerYSep": 0,
+      "minimumWidth": 10,
+      "minimumHeight": 0,
+      "lineWidth": 0.4,
+      "anchors": [
+        "center",
+        "text",
+        "base",
+        "mid",
+        "east",
+        "north",
+        "south",
+        "west"
+      ],
+      "exitCode": 0,
+      "command": [
+        "/Library/TeX/texbin/pdflatex",
+        "-no-shell-escape",
+        "-interaction=nonstopmode",
+        "-halt-on-error",
+        "fixed-box.tex"
+      ],
+      "artifacts": {
+        "input": "controls/positive-minimum-width-rescue/fixed-box.tex",
+        "geometry": "controls/positive-minimum-width-rescue/geometry.txt",
+        "compilation": "controls/positive-minimum-width-rescue/compilation.txt",
+        "compilerLog": "controls/positive-minimum-width-rescue/fixed-box.log"
+      },
+      "expectedAnchors": {
+        "center": {
+          "x": 0,
+          "y": 0
+        },
+        "text": {
+          "x": 0,
+          "y": 0
+        },
+        "base": {
+          "x": 0,
+          "y": 0
+        },
+        "mid": {
+          "x": 0,
+          "y": -2.15277
+        },
+        "east": {
+          "x": 0.2,
+          "y": -0.00092
+        },
+        "north": {
+          "x": 0,
+          "y": 0
+        },
+        "south": {
+          "x": 0,
+          "y": 3.53554
+        },
+        "west": {
+          "x": 0,
+          "y": 0
+        }
+      },
+      "paints": [
+        {
+          "action": "stroke",
+          "tokens": [
+            {
+              "kind": "movetotoken",
+              "x": 0,
+              "y": -5
+            },
+            {
+              "kind": "curvetosupportatoken",
+              "x": 0,
+              "y": -5
+            },
+            {
+              "kind": "curvetosupportbtoken",
+              "x": 0,
+              "y": -2.76146
+            },
+            {
+              "kind": "curvetotoken",
+              "x": 0,
+              "y": 0
+            },
+            {
+              "kind": "curvetosupportatoken",
+              "x": 0,
+              "y": 2.76146
+            },
+            {
+              "kind": "curvetosupportbtoken",
+              "x": 0,
+              "y": 5
+            },
+            {
+              "kind": "curvetotoken",
+              "x": 0,
+              "y": 5
+            },
+            {
+              "kind": "linetotoken",
+              "x": 0.2,
+              "y": 5
+            },
+            {
+              "kind": "curvetosupportatoken",
+              "x": 0.2,
+              "y": 5
+            },
+            {
+              "kind": "curvetosupportbtoken",
+              "x": 0.2,
+              "y": 2.76146
+            },
+            {
+              "kind": "curvetotoken",
+              "x": 0.2,
+              "y": 0
+            },
+            {
+              "kind": "curvetosupportatoken",
+              "x": 0.2,
+              "y": -2.76146
+            },
+            {
+              "kind": "curvetosupportbtoken",
+              "x": 0.2,
+              "y": -5
+            },
+            {
+              "kind": "curvetotoken",
+              "x": 0.2,
+              "y": -5
+            },
+            {
+              "kind": "closepathtoken",
+              "x": 0,
+              "y": -5
+            },
+            {
+              "kind": "movetotoken",
+              "x": 0.2,
+              "y": -5
+            },
+            {
+              "kind": "curvetosupportatoken",
+              "x": 0.2,
+              "y": -5
+            },
+            {
+              "kind": "curvetosupportbtoken",
+              "x": 0.2,
+              "y": -2.76146
+            },
+            {
+              "kind": "curvetotoken",
+              "x": 0.2,
+              "y": 0
+            },
+            {
+              "kind": "curvetosupportatoken",
+              "x": 0.2,
+              "y": 2.76146
+            },
+            {
+              "kind": "curvetosupportbtoken",
+              "x": 0.2,
+              "y": 5
+            },
+            {
+              "kind": "curvetotoken",
+              "x": 0.2,
+              "y": 5
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "positive-minimum-width-nonempty-rescue",
+      "shape": "cylinder",
+      "body": {
+        "width": 20,
+        "height": 8,
+        "depth": 2
+      },
+      "innerXSep": 0,
+      "innerYSep": 0,
+      "outerXSep": 0,
+      "outerYSep": 0,
+      "minimumWidth": 20,
+      "minimumHeight": 0,
+      "lineWidth": 0.4,
+      "anchors": [
+        "center",
+        "text",
+        "base",
+        "mid",
+        "east",
+        "north",
+        "south",
+        "west"
+      ],
+      "exitCode": 0,
+      "command": [
+        "/Library/TeX/texbin/pdflatex",
+        "-no-shell-escape",
+        "-interaction=nonstopmode",
+        "-halt-on-error",
+        "fixed-box.tex"
+      ],
+      "artifacts": {
+        "input": "controls/positive-minimum-width-nonempty-rescue/fixed-box.tex",
+        "geometry": "controls/positive-minimum-width-nonempty-rescue/geometry.txt",
+        "compilation": "controls/positive-minimum-width-nonempty-rescue/compilation.txt",
+        "compilerLog": "controls/positive-minimum-width-nonempty-rescue/fixed-box.log"
+      },
+      "expectedAnchors": {
+        "center": {
+          "x": 0,
+          "y": 0
+        },
+        "text": {
+          "x": -10,
+          "y": 3
+        },
+        "base": {
+          "x": 0,
+          "y": 3
+        },
+        "mid": {
+          "x": 0,
+          "y": 0.84723
+        },
+        "east": {
+          "x": 20.19992,
+          "y": -0.00092
+        },
+        "north": {
+          "x": 0.00177,
+          "y": -10.00237
+        },
+        "south": {
+          "x": 0.00177,
+          "y": 10.00127
+        },
+        "west": {
+          "x": -15,
+          "y": 0
+        }
+      },
+      "paints": [
+        {
+          "action": "stroke",
+          "tokens": [
+            {
+              "kind": "movetotoken",
+              "x": -10,
+              "y": -10
+            },
+            {
+              "kind": "curvetosupportatoken",
+              "x": -12.76146,
+              "y": -10
+            },
+            {
+              "kind": "curvetosupportbtoken",
+              "x": -15,
+              "y": -5.52292
+            },
+            {
+              "kind": "curvetotoken",
+              "x": -15,
+              "y": 0
+            },
+            {
+              "kind": "curvetosupportatoken",
+              "x": -15,
+              "y": 5.52292
+            },
+            {
+              "kind": "curvetosupportbtoken",
+              "x": -12.76146,
+              "y": 10
+            },
+            {
+              "kind": "curvetotoken",
+              "x": -10,
+              "y": 10
+            },
+            {
+              "kind": "linetotoken",
+              "x": 15.2,
+              "y": 10
+            },
+            {
+              "kind": "curvetosupportatoken",
+              "x": 17.96146,
+              "y": 10
+            },
+            {
+              "kind": "curvetosupportbtoken",
+              "x": 20.2,
+              "y": 5.52292
+            },
+            {
+              "kind": "curvetotoken",
+              "x": 20.2,
+              "y": 0
+            },
+            {
+              "kind": "curvetosupportatoken",
+              "x": 20.2,
+              "y": -5.52292
+            },
+            {
+              "kind": "curvetosupportbtoken",
+              "x": 17.96146,
+              "y": -10
+            },
+            {
+              "kind": "curvetotoken",
+              "x": 15.2,
+              "y": -10
+            },
+            {
+              "kind": "closepathtoken",
+              "x": -10,
+              "y": -10
+            },
+            {
+              "kind": "movetotoken",
+              "x": 15.2,
+              "y": -10
+            },
+            {
+              "kind": "curvetosupportatoken",
+              "x": 12.43854,
+              "y": -10
+            },
+            {
+              "kind": "curvetosupportbtoken",
+              "x": 10.2,
+              "y": -5.52292
+            },
+            {
+              "kind": "curvetotoken",
+              "x": 10.2,
+              "y": 0
+            },
+            {
+              "kind": "curvetosupportatoken",
+              "x": 10.2,
+              "y": 5.52292
+            },
+            {
+              "kind": "curvetosupportbtoken",
+              "x": 12.43854,
+              "y": 10
+            },
+            {
+              "kind": "curvetotoken",
+              "x": 15.2,
+              "y": 10
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "rx-zero-ry-positive",
+      "shape": "cylinder",
+      "body": {
+        "width": 0,
+        "height": 0,
+        "depth": 0
+      },
+      "innerXSep": 0,
+      "innerYSep": 0,
+      "outerXSep": 0,
+      "outerYSep": 0,
+      "minimumWidth": 10,
+      "minimumHeight": 20,
+      "lineWidth": 0.4,
+      "anchors": [
+        "center",
+        "text",
+        "base",
+        "mid",
+        "east",
+        "north",
+        "south",
+        "west"
+      ],
+      "exitCode": 0,
+      "command": [
+        "/Library/TeX/texbin/pdflatex",
+        "-no-shell-escape",
+        "-interaction=nonstopmode",
+        "-halt-on-error",
+        "fixed-box.tex"
+      ],
+      "artifacts": {
+        "input": "controls/rx-zero-ry-positive/fixed-box.tex",
+        "geometry": "controls/rx-zero-ry-positive/geometry.txt",
+        "compilation": "controls/rx-zero-ry-positive/compilation.txt",
+        "compilerLog": "controls/rx-zero-ry-positive/fixed-box.log"
+      },
+      "expectedAnchors": {
+        "center": {
+          "x": 0,
+          "y": 0
+        },
+        "text": {
+          "x": 0,
+          "y": 0
+        },
+        "base": {
+          "x": 0,
+          "y": 0
+        },
+        "mid": {
+          "x": 0,
+          "y": -2.15277
+        },
+        "east": {
+          "x": 10.09999,
+          "y": -0.00092
+        },
+        "north": {
+          "x": 0,
+          "y": -5.00116
+        },
+        "south": {
+          "x": 0,
+          "y": 5.00116
+        },
+        "west": {
+          "x": -9.9,
+          "y": 0
+        }
+      },
+      "paints": [
+        {
+          "action": "stroke",
+          "tokens": [
+            {
+              "kind": "movetotoken",
+              "x": -9.9,
+              "y": -5
+            },
+            {
+              "kind": "curvetosupportatoken",
+              "x": -9.9,
+              "y": -5
+            },
+            {
+              "kind": "curvetosupportbtoken",
+              "x": -9.9,
+              "y": -2.76146
+            },
+            {
+              "kind": "curvetotoken",
+              "x": -9.9,
+              "y": 0
+            },
+            {
+              "kind": "curvetosupportatoken",
+              "x": -9.9,
+              "y": 2.76146
+            },
+            {
+              "kind": "curvetosupportbtoken",
+              "x": -9.9,
+              "y": 5
+            },
+            {
+              "kind": "curvetotoken",
+              "x": -9.9,
+              "y": 5
+            },
+            {
+              "kind": "linetotoken",
+              "x": 10.09999,
+              "y": 5
+            },
+            {
+              "kind": "curvetosupportatoken",
+              "x": 10.09999,
+              "y": 5
+            },
+            {
+              "kind": "curvetosupportbtoken",
+              "x": 10.09999,
+              "y": 2.76146
+            },
+            {
+              "kind": "curvetotoken",
+              "x": 10.09999,
+              "y": 0
+            },
+            {
+              "kind": "curvetosupportatoken",
+              "x": 10.09999,
+              "y": -2.76146
+            },
+            {
+              "kind": "curvetosupportbtoken",
+              "x": 10.09999,
+              "y": -5
+            },
+            {
+              "kind": "curvetotoken",
+              "x": 10.09999,
+              "y": -5
+            },
+            {
+              "kind": "closepathtoken",
+              "x": -9.9,
+              "y": -5
+            },
+            {
+              "kind": "movetotoken",
+              "x": 10.09999,
+              "y": -5
+            },
+            {
+              "kind": "curvetosupportatoken",
+              "x": 10.09999,
+              "y": -5
+            },
+            {
+              "kind": "curvetosupportbtoken",
+              "x": 10.09999,
+              "y": -2.76146
+            },
+            {
+              "kind": "curvetotoken",
+              "x": 10.09999,
+              "y": 0
+            },
+            {
+              "kind": "curvetosupportatoken",
+              "x": 10.09999,
+              "y": 2.76146
+            },
+            {
+              "kind": "curvetosupportbtoken",
+              "x": 10.09999,
+              "y": 5
+            },
+            {
+              "kind": "curvetotoken",
+              "x": 10.09999,
+              "y": 5
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "rotation90-exchange-rescue",
+      "shape": "cylinder",
+      "body": {
+        "width": 20,
+        "height": 0,
+        "depth": 0
+      },
+      "innerXSep": 0,
+      "innerYSep": 0,
+      "outerXSep": 0,
+      "outerYSep": 0,
+      "minimumWidth": 0,
+      "minimumHeight": 0,
+      "lineWidth": 0.4,
+      "anchors": [
+        "center",
+        "text",
+        "base",
+        "mid",
+        "east",
+        "north",
+        "south",
+        "west"
+      ],
+      "parameters": {
+        "borderRotate": 90
+      },
+      "options": [
+        "/pgf/shape border rotate=90"
+      ],
+      "exitCode": 0,
+      "command": [
+        "/Library/TeX/texbin/pdflatex",
+        "-no-shell-escape",
+        "-interaction=nonstopmode",
+        "-halt-on-error",
+        "fixed-box.tex"
+      ],
+      "artifacts": {
+        "input": "controls/rotation90-exchange-rescue/fixed-box.tex",
+        "geometry": "controls/rotation90-exchange-rescue/geometry.txt",
+        "compilation": "controls/rotation90-exchange-rescue/compilation.txt",
+        "compilerLog": "controls/rotation90-exchange-rescue/fixed-box.log"
+      },
+      "expectedAnchors": {
+        "center": {
+          "x": 0,
+          "y": 0
+        },
+        "text": {
+          "x": -10,
+          "y": 0
+        },
+        "base": {
+          "x": 0,
+          "y": 0
+        },
+        "mid": {
+          "x": 0,
+          "y": -2.15277
+        },
+        "east": {
+          "x": 9.99985,
+          "y": 0
+        },
+        "north": {
+          "x": -0.00092,
+          "y": -20.19984
+        },
+        "south": {
+          "x": 0,
+          "y": 10
+        },
+        "west": {
+          "x": -9.99985,
+          "y": 0
+        }
+      },
+      "paints": [
+        {
+          "action": "stroke",
+          "tokens": [
+            {
+              "kind": "movetotoken",
+              "x": -10,
+              "y": 0
+            },
+            {
+              "kind": "curvetosupportatoken",
+              "x": -10,
+              "y": 5.52292
+            },
+            {
+              "kind": "curvetosupportbtoken",
+              "x": -5.52292,
+              "y": 10
+            },
+            {
+              "kind": "curvetotoken",
+              "x": 0,
+              "y": 10
+            },
+            {
+              "kind": "curvetosupportatoken",
+              "x": 5.52292,
+              "y": 10
+            },
+            {
+              "kind": "curvetosupportbtoken",
+              "x": 10,
+              "y": 5.52292
+            },
+            {
+              "kind": "curvetotoken",
+              "x": 10,
+              "y": 0
+            },
+            {
+              "kind": "linetotoken",
+              "x": 10,
+              "y": -10.2
+            },
+            {
+              "kind": "curvetosupportatoken",
+              "x": 10,
+              "y": -15.72292
+            },
+            {
+              "kind": "curvetosupportbtoken",
+              "x": 5.52292,
+              "y": -20.2
+            },
+            {
+              "kind": "curvetotoken",
+              "x": 0,
+              "y": -20.2
+            },
+            {
+              "kind": "curvetosupportatoken",
+              "x": -5.52292,
+              "y": -20.2
+            },
+            {
+              "kind": "curvetosupportbtoken",
+              "x": -10,
+              "y": -15.72292
+            },
+            {
+              "kind": "curvetotoken",
+              "x": -10,
+              "y": -10.2
+            },
+            {
+              "kind": "closepathtoken",
+              "x": -10,
+              "y": 0
+            },
+            {
+              "kind": "movetotoken",
+              "x": -10,
+              "y": -10.2
+            },
+            {
+              "kind": "curvetosupportatoken",
+              "x": -10,
+              "y": -4.67708
+            },
+            {
+              "kind": "curvetosupportbtoken",
+              "x": -5.52292,
+              "y": -0.2
+            },
+            {
+              "kind": "curvetotoken",
+              "x": 0,
+              "y": -0.2
+            },
+            {
+              "kind": "curvetosupportatoken",
+              "x": 5.52292,
+              "y": -0.2
+            },
+            {
+              "kind": "curvetosupportbtoken",
+              "x": 10,
+              "y": -4.67708
+            },
+            {
+              "kind": "curvetotoken",
+              "x": 10,
+              "y": -10.2
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "rotation270-exchange-rescue",
+      "shape": "cylinder",
+      "body": {
+        "width": 20,
+        "height": 0,
+        "depth": 0
+      },
+      "innerXSep": 0,
+      "innerYSep": 0,
+      "outerXSep": 0,
+      "outerYSep": 0,
+      "minimumWidth": 0,
+      "minimumHeight": 0,
+      "lineWidth": 0.4,
+      "anchors": [
+        "center",
+        "text",
+        "base",
+        "mid",
+        "east",
+        "north",
+        "south",
+        "west"
+      ],
+      "parameters": {
+        "borderRotate": 270
+      },
+      "options": [
+        "/pgf/shape border rotate=270"
+      ],
+      "exitCode": 0,
+      "command": [
+        "/Library/TeX/texbin/pdflatex",
+        "-no-shell-escape",
+        "-interaction=nonstopmode",
+        "-halt-on-error",
+        "fixed-box.tex"
+      ],
+      "artifacts": {
+        "input": "controls/rotation270-exchange-rescue/fixed-box.tex",
+        "geometry": "controls/rotation270-exchange-rescue/geometry.txt",
+        "compilation": "controls/rotation270-exchange-rescue/compilation.txt",
+        "compilerLog": "controls/rotation270-exchange-rescue/fixed-box.log"
+      },
+      "expectedAnchors": {
+        "center": {
+          "x": 0,
+          "y": 0
+        },
+        "text": {
+          "x": -10,
+          "y": 0
+        },
+        "base": {
+          "x": 0,
+          "y": 0
+        },
+        "mid": {
+          "x": 0,
+          "y": -2.15277
+        },
+        "east": {
+          "x": 9.99985,
+          "y": 0
+        },
+        "north": {
+          "x": 0,
+          "y": -10
+        },
+        "south": {
+          "x": 0.00092,
+          "y": 20.19984
+        },
+        "west": {
+          "x": -9.99985,
+          "y": 0
+        }
+      },
+      "paints": [
+        {
+          "action": "stroke",
+          "tokens": [
+            {
+              "kind": "movetotoken",
+              "x": 10,
+              "y": 0
+            },
+            {
+              "kind": "curvetosupportatoken",
+              "x": 10,
+              "y": -5.52292
+            },
+            {
+              "kind": "curvetosupportbtoken",
+              "x": 5.52292,
+              "y": -10
+            },
+            {
+              "kind": "curvetotoken",
+              "x": 0,
+              "y": -10
+            },
+            {
+              "kind": "curvetosupportatoken",
+              "x": -5.52292,
+              "y": -10
+            },
+            {
+              "kind": "curvetosupportbtoken",
+              "x": -10,
+              "y": -5.52292
+            },
+            {
+              "kind": "curvetotoken",
+              "x": -10,
+              "y": 0
+            },
+            {
+              "kind": "linetotoken",
+              "x": -10,
+              "y": 10.2
+            },
+            {
+              "kind": "curvetosupportatoken",
+              "x": -10,
+              "y": 15.72292
+            },
+            {
+              "kind": "curvetosupportbtoken",
+              "x": -5.52292,
+              "y": 20.2
+            },
+            {
+              "kind": "curvetotoken",
+              "x": 0,
+              "y": 20.2
+            },
+            {
+              "kind": "curvetosupportatoken",
+              "x": 5.52292,
+              "y": 20.2
+            },
+            {
+              "kind": "curvetosupportbtoken",
+              "x": 10,
+              "y": 15.72292
+            },
+            {
+              "kind": "curvetotoken",
+              "x": 10,
+              "y": 10.2
+            },
+            {
+              "kind": "closepathtoken",
+              "x": 10,
+              "y": 0
+            },
+            {
+              "kind": "movetotoken",
+              "x": 10,
+              "y": 10.2
+            },
+            {
+              "kind": "curvetosupportatoken",
+              "x": 10,
+              "y": 4.67708
+            },
+            {
+              "kind": "curvetosupportbtoken",
+              "x": 5.52292,
+              "y": 0.2
+            },
+            {
+              "kind": "curvetotoken",
+              "x": 0,
+              "y": 0.2
+            },
+            {
+              "kind": "curvetosupportatoken",
+              "x": -5.52292,
+              "y": 0.2
+            },
+            {
+              "kind": "curvetosupportbtoken",
+              "x": -10,
+              "y": 4.67708
+            },
+            {
+              "kind": "curvetotoken",
+              "x": -10,
+              "y": 10.2
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "incircle-axial-rescue",
+      "shape": "cylinder",
+      "body": {
+        "width": 20,
+        "height": 0,
+        "depth": 0
+      },
+      "innerXSep": 0,
+      "innerYSep": 0,
+      "outerXSep": 0,
+      "outerYSep": 0,
+      "minimumWidth": 0,
+      "minimumHeight": 0,
+      "lineWidth": 0.4,
+      "anchors": [
+        "center",
+        "text",
+        "base",
+        "mid",
+        "east",
+        "north",
+        "south",
+        "west"
+      ],
+      "parameters": {
+        "borderUsesIncircle": true,
+        "borderRotate": 37
+      },
+      "options": [
+        "/pgf/shape border uses incircle=true",
+        "/pgf/shape border rotate=37"
+      ],
+      "exitCode": 0,
+      "command": [
+        "/Library/TeX/texbin/pdflatex",
+        "-no-shell-escape",
+        "-interaction=nonstopmode",
+        "-halt-on-error",
+        "fixed-box.tex"
+      ],
+      "artifacts": {
+        "input": "controls/incircle-axial-rescue/fixed-box.tex",
+        "geometry": "controls/incircle-axial-rescue/geometry.txt",
+        "compilation": "controls/incircle-axial-rescue/compilation.txt",
+        "compilerLog": "controls/incircle-axial-rescue/fixed-box.log"
+      },
+      "expectedAnchors": {
+        "center": {
+          "x": 0,
+          "y": 0
+        },
+        "text": {
+          "x": -10,
+          "y": 0
+        },
+        "base": {
+          "x": 0,
+          "y": 0
+        },
+        "mid": {
+          "x": 0,
+          "y": -2.15277
+        },
+        "east": {
+          "x": 23.49971,
+          "y": 0
+        },
+        "north": {
+          "x": 0.00056,
+          "y": -17.70906
+        },
+        "south": {
+          "x": 0.00056,
+          "y": 17.70915
+        },
+        "west": {
+          "x": -22.58855,
+          "y": -0.00008
+        }
+      },
+      "paints": [
+        {
+          "action": "stroke",
+          "tokens": [
+            {
+              "kind": "movetotoken",
+              "x": -19.8056,
+              "y": -2.78351
+            },
+            {
+              "kind": "curvetosupportatoken",
+              "x": -26.04349,
+              "y": 1.91707
+            },
+            {
+              "kind": "curvetosupportbtoken",
+              "x": -27.28969,
+              "y": 10.78421
+            },
+            {
+              "kind": "curvetotoken",
+              "x": -22.58911,
+              "y": 17.0221
+            },
+            {
+              "kind": "curvetosupportatoken",
+              "x": -17.88853,
+              "y": 23.25998
+            },
+            {
+              "kind": "curvetosupportbtoken",
+              "x": -9.0214,
+              "y": 24.50618
+            },
+            {
+              "kind": "curvetotoken",
+              "x": -2.78351,
+              "y": 19.8056
+            },
+            {
+              "kind": "linetotoken",
+              "x": 31.25989,
+              "y": -5.84792
+            },
+            {
+              "kind": "curvetosupportatoken",
+              "x": 37.49777,
+              "y": -10.5485
+            },
+            {
+              "kind": "curvetosupportbtoken",
+              "x": 38.74397,
+              "y": -19.41563
+            },
+            {
+              "kind": "curvetotoken",
+              "x": 34.0434,
+              "y": -25.65352
+            },
+            {
+              "kind": "curvetosupportatoken",
+              "x": 29.34282,
+              "y": -31.8914
+            },
+            {
+              "kind": "curvetosupportbtoken",
+              "x": 20.47568,
+              "y": -33.1376
+            },
+            {
+              "kind": "curvetotoken",
+              "x": 14.2378,
+              "y": -28.43703
+            },
+            {
+              "kind": "closepathtoken",
+              "x": -19.8056,
+              "y": -2.78351
+            },
+            {
+              "kind": "movetotoken",
+              "x": 14.2378,
+              "y": -28.43703
+            },
+            {
+              "kind": "curvetosupportatoken",
+              "x": 7.99991,
+              "y": -23.73645
+            },
+            {
+              "kind": "curvetosupportbtoken",
+              "x": 6.75371,
+              "y": -14.86931
+            },
+            {
+              "kind": "curvetotoken",
+              "x": 11.45428,
+              "y": -8.63142
+            },
+            {
+              "kind": "curvetosupportatoken",
+              "x": 16.15486,
+              "y": -2.39354
+            },
+            {
+              "kind": "curvetosupportbtoken",
+              "x": 25.022,
+              "y": -1.14734
+            },
+            {
+              "kind": "curvetotoken",
+              "x": 31.25989,
+              "y": -5.84792
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "signed-nonzero-radii",
+      "shape": "cylinder",
+      "body": {
+        "width": 0,
+        "height": 0,
+        "depth": 0
+      },
+      "innerXSep": -4,
+      "innerYSep": -3,
+      "outerXSep": 0,
+      "outerYSep": 0,
+      "minimumWidth": -20,
+      "minimumHeight": -20,
+      "lineWidth": 0.4,
+      "anchors": [
+        "center",
+        "text",
+        "base",
+        "mid",
+        "west"
+      ],
+      "exitCode": 0,
+      "command": [
+        "/Library/TeX/texbin/pdflatex",
+        "-no-shell-escape",
+        "-interaction=nonstopmode",
+        "-halt-on-error",
+        "fixed-box.tex"
+      ],
+      "artifacts": {
+        "input": "controls/signed-nonzero-radii/fixed-box.tex",
+        "geometry": "controls/signed-nonzero-radii/geometry.txt",
+        "compilation": "controls/signed-nonzero-radii/compilation.txt",
+        "compilerLog": "controls/signed-nonzero-radii/fixed-box.log"
+      },
+      "expectedAnchors": {
+        "center": {
+          "x": 0,
+          "y": 0
+        },
+        "text": {
+          "x": 0,
+          "y": 0
+        },
+        "base": {
+          "x": 0,
+          "y": 0
+        },
+        "mid": {
+          "x": 0,
+          "y": -2.15277
+        },
+        "west": {
+          "x": -9.79996,
+          "y": 0.00055
+        }
+      },
+      "paints": [
+        {
+          "action": "stroke",
+          "tokens": [
+            {
+              "kind": "movetotoken",
+              "x": 1,
+              "y": 3
+            },
+            {
+              "kind": "curvetosupportatoken",
+              "x": 2.65688,
+              "y": 3
+            },
+            {
+              "kind": "curvetosupportbtoken",
+              "x": 4,
+              "y": 1.65688
+            },
+            {
+              "kind": "curvetotoken",
+              "x": 4,
+              "y": 0
+            },
+            {
+              "kind": "curvetosupportatoken",
+              "x": 4,
+              "y": -1.65688
+            },
+            {
+              "kind": "curvetosupportbtoken",
+              "x": 2.65688,
+              "y": -3
+            },
+            {
+              "kind": "curvetotoken",
+              "x": 1,
+              "y": -3
+            },
+            {
+              "kind": "linetotoken",
+              "x": -6.8,
+              "y": -3
+            },
+            {
+              "kind": "curvetosupportatoken",
+              "x": -8.45688,
+              "y": -3
+            },
+            {
+              "kind": "curvetosupportbtoken",
+              "x": -9.8,
+              "y": -1.65688
+            },
+            {
+              "kind": "curvetotoken",
+              "x": -9.8,
+              "y": 0
+            },
+            {
+              "kind": "curvetosupportatoken",
+              "x": -9.8,
+              "y": 1.65688
+            },
+            {
+              "kind": "curvetosupportbtoken",
+              "x": -8.45688,
+              "y": 3
+            },
+            {
+              "kind": "curvetotoken",
+              "x": -6.8,
+              "y": 3
+            },
+            {
+              "kind": "closepathtoken",
+              "x": 1,
+              "y": 3
+            },
+            {
+              "kind": "movetotoken",
+              "x": -6.8,
+              "y": 3
+            },
+            {
+              "kind": "curvetosupportatoken",
+              "x": -5.14313,
+              "y": 3
+            },
+            {
+              "kind": "curvetosupportbtoken",
+              "x": -3.8,
+              "y": 1.65688
+            },
+            {
+              "kind": "curvetotoken",
+              "x": -3.8,
+              "y": 0
+            },
+            {
+              "kind": "curvetosupportatoken",
+              "x": -3.8,
+              "y": -1.65688
+            },
+            {
+              "kind": "curvetosupportbtoken",
+              "x": -5.14313,
+              "y": -3
+            },
+            {
+              "kind": "curvetotoken",
+              "x": -6.8,
+              "y": -3
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "ellipse-zero-axes",
+      "shape": "ellipse",
+      "body": {
+        "width": 0,
+        "height": 0,
+        "depth": 0
+      },
+      "innerXSep": 0,
+      "innerYSep": 0,
+      "outerXSep": 0,
+      "outerYSep": 0,
+      "minimumWidth": 0,
+      "minimumHeight": 0,
+      "lineWidth": 0.4,
+      "anchors": [
+        "center",
+        "text",
+        "base",
+        "mid",
+        "east",
+        "north",
+        "south",
+        "west"
+      ],
+      "exitCode": 0,
+      "command": [
+        "/Library/TeX/texbin/pdflatex",
+        "-no-shell-escape",
+        "-interaction=nonstopmode",
+        "-halt-on-error",
+        "fixed-box.tex"
+      ],
+      "artifacts": {
+        "input": "controls/ellipse-zero-axes/fixed-box.tex",
+        "geometry": "controls/ellipse-zero-axes/geometry.txt",
+        "compilation": "controls/ellipse-zero-axes/compilation.txt",
+        "compilerLog": "controls/ellipse-zero-axes/fixed-box.log"
+      },
+      "expectedAnchors": {
+        "center": {
+          "x": 0,
+          "y": 0
+        },
+        "text": {
+          "x": 0,
+          "y": 0
+        },
+        "base": {
+          "x": 0,
+          "y": 0
+        },
+        "mid": {
+          "x": 0,
+          "y": -2.15277
+        },
+        "east": {
+          "x": 0,
+          "y": 0
+        },
+        "north": {
+          "x": 0,
+          "y": 0
+        },
+        "south": {
+          "x": 0,
+          "y": 0
+        },
+        "west": {
+          "x": 0,
+          "y": 0
+        }
+      },
+      "paints": [
+        {
+          "action": "stroke",
+          "tokens": [
+            {
+              "kind": "movetotoken",
+              "x": 0,
+              "y": 0
+            },
+            {
+              "kind": "curvetosupportatoken",
+              "x": 0,
+              "y": 0
+            },
+            {
+              "kind": "curvetosupportbtoken",
+              "x": 0,
+              "y": 0
+            },
+            {
+              "kind": "curvetotoken",
+              "x": 0,
+              "y": 0
+            },
+            {
+              "kind": "curvetosupportatoken",
+              "x": 0,
+              "y": 0
+            },
+            {
+              "kind": "curvetosupportbtoken",
+              "x": 0,
+              "y": 0
+            },
+            {
+              "kind": "curvetotoken",
+              "x": 0,
+              "y": 0
+            },
+            {
+              "kind": "curvetosupportatoken",
+              "x": 0,
+              "y": 0
+            },
+            {
+              "kind": "curvetosupportbtoken",
+              "x": 0,
+              "y": 0
+            },
+            {
+              "kind": "curvetotoken",
+              "x": 0,
+              "y": 0
+            },
+            {
+              "kind": "curvetosupportatoken",
+              "x": 0,
+              "y": 0
+            },
+            {
+              "kind": "curvetosupportbtoken",
+              "x": 0,
+              "y": 0
+            },
+            {
+              "kind": "curvetotoken",
+              "x": 0,
+              "y": 0
+            },
+            {
+              "kind": "closepathtoken",
+              "x": 0,
+              "y": 0
+            },
+            {
+              "kind": "movetotoken",
+              "x": 0,
+              "y": 0
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "ellipse-zero-x",
+      "shape": "ellipse",
+      "body": {
+        "width": 0,
+        "height": 0,
+        "depth": 0
+      },
+      "innerXSep": 0,
+      "innerYSep": 5,
+      "outerXSep": 0,
+      "outerYSep": 0,
+      "minimumWidth": 0,
+      "minimumHeight": 0,
+      "lineWidth": 0.4,
+      "anchors": [
+        "center",
+        "text",
+        "base",
+        "mid",
+        "east",
+        "north",
+        "south",
+        "west"
+      ],
+      "exitCode": 0,
+      "command": [
+        "/Library/TeX/texbin/pdflatex",
+        "-no-shell-escape",
+        "-interaction=nonstopmode",
+        "-halt-on-error",
+        "fixed-box.tex"
+      ],
+      "artifacts": {
+        "input": "controls/ellipse-zero-x/fixed-box.tex",
+        "geometry": "controls/ellipse-zero-x/geometry.txt",
+        "compilation": "controls/ellipse-zero-x/compilation.txt",
+        "compilerLog": "controls/ellipse-zero-x/fixed-box.log"
+      },
+      "expectedAnchors": {
+        "center": {
+          "x": 0,
+          "y": 0
+        },
+        "text": {
+          "x": 0,
+          "y": 0
+        },
+        "base": {
+          "x": 0,
+          "y": 0
+        },
+        "mid": {
+          "x": 0,
+          "y": -2.15277
+        },
+        "east": {
+          "x": 0,
+          "y": 0
+        },
+        "north": {
+          "x": 0,
+          "y": -7.07108
+        },
+        "south": {
+          "x": 0,
+          "y": 7.07108
+        },
+        "west": {
+          "x": 0,
+          "y": 0
+        }
+      },
+      "paints": [
+        {
+          "action": "stroke",
+          "tokens": [
+            {
+              "kind": "movetotoken",
+              "x": 0,
+              "y": 0
+            },
+            {
+              "kind": "curvetosupportatoken",
+              "x": 0,
+              "y": -3.90529
+            },
+            {
+              "kind": "curvetosupportbtoken",
+              "x": 0,
+              "y": -7.07108
+            },
+            {
+              "kind": "curvetotoken",
+              "x": 0,
+              "y": -7.07108
+            },
+            {
+              "kind": "curvetosupportatoken",
+              "x": 0,
+              "y": -7.07108
+            },
+            {
+              "kind": "curvetosupportbtoken",
+              "x": 0,
+              "y": -3.90529
+            },
+            {
+              "kind": "curvetotoken",
+              "x": 0,
+              "y": 0
+            },
+            {
+              "kind": "curvetosupportatoken",
+              "x": 0,
+              "y": 3.90529
+            },
+            {
+              "kind": "curvetosupportbtoken",
+              "x": 0,
+              "y": 7.07108
+            },
+            {
+              "kind": "curvetotoken",
+              "x": 0,
+              "y": 7.07108
+            },
+            {
+              "kind": "curvetosupportatoken",
+              "x": 0,
+              "y": 7.07108
+            },
+            {
+              "kind": "curvetosupportbtoken",
+              "x": 0,
+              "y": 3.90529
+            },
+            {
+              "kind": "curvetotoken",
+              "x": 0,
+              "y": 0
+            },
+            {
+              "kind": "closepathtoken",
+              "x": 0,
+              "y": 0
+            },
+            {
+              "kind": "movetotoken",
+              "x": 0,
+              "y": 0
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "ellipse-zero-y",
+      "shape": "ellipse",
+      "body": {
+        "width": 0,
+        "height": 0,
+        "depth": 0
+      },
+      "innerXSep": 5,
+      "innerYSep": 0,
+      "outerXSep": 0,
+      "outerYSep": 0,
+      "minimumWidth": 0,
+      "minimumHeight": 0,
+      "lineWidth": 0.4,
+      "anchors": [
+        "center",
+        "text",
+        "base",
+        "mid",
+        "east",
+        "north",
+        "south",
+        "west"
+      ],
+      "exitCode": 0,
+      "command": [
+        "/Library/TeX/texbin/pdflatex",
+        "-no-shell-escape",
+        "-interaction=nonstopmode",
+        "-halt-on-error",
+        "fixed-box.tex"
+      ],
+      "artifacts": {
+        "input": "controls/ellipse-zero-y/fixed-box.tex",
+        "geometry": "controls/ellipse-zero-y/geometry.txt",
+        "compilation": "controls/ellipse-zero-y/compilation.txt",
+        "compilerLog": "controls/ellipse-zero-y/fixed-box.log"
+      },
+      "expectedAnchors": {
+        "center": {
+          "x": 0,
+          "y": 0
+        },
+        "text": {
+          "x": 0,
+          "y": 0
+        },
+        "base": {
+          "x": 0,
+          "y": 0
+        },
+        "mid": {
+          "x": 0,
+          "y": -2.15277
+        },
+        "east": {
+          "x": 7.07108,
+          "y": 0
+        },
+        "north": {
+          "x": 0,
+          "y": 0
+        },
+        "south": {
+          "x": 0,
+          "y": 0
+        },
+        "west": {
+          "x": -7.07108,
+          "y": 0
+        }
+      },
+      "paints": [
+        {
+          "action": "stroke",
+          "tokens": [
+            {
+              "kind": "movetotoken",
+              "x": 7.07108,
+              "y": 0
+            },
+            {
+              "kind": "curvetosupportatoken",
+              "x": 7.07108,
+              "y": 0
+            },
+            {
+              "kind": "curvetosupportbtoken",
+              "x": 3.90529,
+              "y": 0
+            },
+            {
+              "kind": "curvetotoken",
+              "x": 0,
+              "y": 0
+            },
+            {
+              "kind": "curvetosupportatoken",
+              "x": -3.90529,
+              "y": 0
+            },
+            {
+              "kind": "curvetosupportbtoken",
+              "x": -7.07108,
+              "y": 0
+            },
+            {
+              "kind": "curvetotoken",
+              "x": -7.07108,
+              "y": 0
+            },
+            {
+              "kind": "curvetosupportatoken",
+              "x": -7.07108,
+              "y": 0
+            },
+            {
+              "kind": "curvetosupportbtoken",
+              "x": -3.90529,
+              "y": 0
+            },
+            {
+              "kind": "curvetotoken",
+              "x": 0,
+              "y": 0
+            },
+            {
+              "kind": "curvetosupportatoken",
+              "x": 3.90529,
+              "y": 0
+            },
+            {
+              "kind": "curvetosupportbtoken",
+              "x": 7.07108,
+              "y": 0
+            },
+            {
+              "kind": "curvetotoken",
+              "x": 7.07108,
+              "y": 0
+            },
+            {
+              "kind": "closepathtoken",
+              "x": 7.07108,
+              "y": 0
+            },
+            {
+              "kind": "movetotoken",
+              "x": 0,
+              "y": 0
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "rectangle-zero-axes",
+      "shape": "rectangle",
+      "body": {
+        "width": 0,
+        "height": 0,
+        "depth": 0
+      },
+      "innerXSep": 0,
+      "innerYSep": 0,
+      "outerXSep": 0,
+      "outerYSep": 0,
+      "minimumWidth": 0,
+      "minimumHeight": 0,
+      "lineWidth": 0.4,
+      "anchors": [
+        "center",
+        "text",
+        "base",
+        "mid",
+        "east",
+        "north",
+        "south",
+        "west"
+      ],
+      "exitCode": 0,
+      "command": [
+        "/Library/TeX/texbin/pdflatex",
+        "-no-shell-escape",
+        "-interaction=nonstopmode",
+        "-halt-on-error",
+        "fixed-box.tex"
+      ],
+      "artifacts": {
+        "input": "controls/rectangle-zero-axes/fixed-box.tex",
+        "geometry": "controls/rectangle-zero-axes/geometry.txt",
+        "compilation": "controls/rectangle-zero-axes/compilation.txt",
+        "compilerLog": "controls/rectangle-zero-axes/fixed-box.log"
+      },
+      "expectedAnchors": {
+        "center": {
+          "x": 0,
+          "y": 0
+        },
+        "text": {
+          "x": 0,
+          "y": 0
+        },
+        "base": {
+          "x": 0,
+          "y": 0
+        },
+        "mid": {
+          "x": 0,
+          "y": -2.15277
+        },
+        "east": {
+          "x": 0,
+          "y": 0
+        },
+        "north": {
+          "x": 0,
+          "y": 0
+        },
+        "south": {
+          "x": 0,
+          "y": 0
+        },
+        "west": {
+          "x": 0,
+          "y": 0
+        }
+      },
+      "paints": [
+        {
+          "action": "stroke",
+          "tokens": [
+            {
+              "kind": "rectcornertoken",
+              "x": 0,
+              "y": 0
+            },
+            {
+              "kind": "rectsizetoken",
+              "x": 0,
+              "y": 0
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "circle-zero-axes",
+      "shape": "circle",
+      "body": {
+        "width": 0,
+        "height": 0,
+        "depth": 0
+      },
+      "innerXSep": 0,
+      "innerYSep": 0,
+      "outerXSep": 0,
+      "outerYSep": 0,
+      "minimumWidth": 0,
+      "minimumHeight": 0,
+      "lineWidth": 0.4,
+      "anchors": [
+        "center",
+        "text",
+        "base",
+        "mid",
+        "east",
+        "north",
+        "south",
+        "west"
+      ],
+      "exitCode": 0,
+      "command": [
+        "/Library/TeX/texbin/pdflatex",
+        "-no-shell-escape",
+        "-interaction=nonstopmode",
+        "-halt-on-error",
+        "fixed-box.tex"
+      ],
+      "artifacts": {
+        "input": "controls/circle-zero-axes/fixed-box.tex",
+        "geometry": "controls/circle-zero-axes/geometry.txt",
+        "compilation": "controls/circle-zero-axes/compilation.txt",
+        "compilerLog": "controls/circle-zero-axes/fixed-box.log"
+      },
+      "expectedAnchors": {
+        "center": {
+          "x": 0,
+          "y": 0
+        },
+        "text": {
+          "x": 0,
+          "y": 0
+        },
+        "base": {
+          "x": 0,
+          "y": 0
+        },
+        "mid": {
+          "x": 0,
+          "y": -2.15277
+        },
+        "east": {
+          "x": 0,
+          "y": 0
+        },
+        "north": {
+          "x": 0,
+          "y": 0
+        },
+        "south": {
+          "x": 0,
+          "y": 0
+        },
+        "west": {
+          "x": 0,
+          "y": 0
+        }
+      },
+      "paints": [
+        {
+          "action": "stroke",
+          "tokens": [
+            {
+              "kind": "movetotoken",
+              "x": 0,
+              "y": 0
+            },
+            {
+              "kind": "curvetosupportatoken",
+              "x": 0,
+              "y": 0
+            },
+            {
+              "kind": "curvetosupportbtoken",
+              "x": 0,
+              "y": 0
+            },
+            {
+              "kind": "curvetotoken",
+              "x": 0,
+              "y": 0
+            },
+            {
+              "kind": "curvetosupportatoken",
+              "x": 0,
+              "y": 0
+            },
+            {
+              "kind": "curvetosupportbtoken",
+              "x": 0,
+              "y": 0
+            },
+            {
+              "kind": "curvetotoken",
+              "x": 0,
+              "y": 0
+            },
+            {
+              "kind": "curvetosupportatoken",
+              "x": 0,
+              "y": 0
+            },
+            {
+              "kind": "curvetosupportbtoken",
+              "x": 0,
+              "y": 0
+            },
+            {
+              "kind": "curvetotoken",
+              "x": 0,
+              "y": 0
+            },
+            {
+              "kind": "curvetosupportatoken",
+              "x": 0,
+              "y": 0
+            },
+            {
+              "kind": "curvetosupportbtoken",
+              "x": 0,
+              "y": 0
+            },
+            {
+              "kind": "curvetotoken",
+              "x": 0,
+              "y": 0
+            },
+            {
+              "kind": "closepathtoken",
+              "x": 0,
+              "y": 0
+            },
+            {
+              "kind": "movetotoken",
+              "x": 0,
+              "y": 0
+            }
+          ]
+        }
+      ]
+    }
+  ]
+}

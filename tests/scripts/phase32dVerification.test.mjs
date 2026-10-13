@@ -1,5 +1,6 @@
 import assert from 'node:assert/strict'
 import { existsSync, mkdtempSync, readFileSync, rmSync, writeFileSync, unlinkSync } from 'node:fs'
+import { readFile } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import test from 'node:test'
@@ -12,6 +13,8 @@ import { captureZeroAxisLive, isZeroAxisLiveCaptureFailure } from '../../scripts
 import { createEvidencePublisher, createEvidenceReportStorage, createLiveEvidenceRetainer, readEvidenceDocumentSync } from '../../scripts/evidencePublication.mjs'
 import { capturePointLayoutStandalone } from '../../scripts/checkPointLayoutAnchors.mjs'
 import { syntheticStandalonePointDownload } from './standalonePointDownloadFixture.mjs'
+import { syntheticSingularCylinderStandalone } from './singularCylinderFixture.mjs'
+import { singularCylinderScenario } from '../../scripts/singularCylinderDiagnosticContract.mjs'
 import { pointNodeAnchorSupport } from '../../src/geometry/pointNodeShapes/index.ts'
 import { createEmptyDiagram, createPointStratum } from '../../src/model/constructors.ts'
 import { generateTikz } from '../../src/tikz/generateTikz.ts'
@@ -791,13 +794,16 @@ for (const ambientDimension of [2, 3]) {
   }
 }
 
-test('32D named group and every artifact are registered cumulatively', () => {
+test('32D named group and every artifact are registered cumulatively', (t) => {
   assert.deepEqual(allPointNodeScenarios[layoutAnchorGroup], layoutAnchorScenarios)
   assert.equal(Object.keys(allPointNodeScenarios).length, 6)
   assert.equal(layoutShapes.length, 15)
   for (const name of layoutAnchorScenarios) {
     assert.deepEqual(pointNodeScenarioArtifacts(name), layoutAnchorArtifacts(name))
-    assertLayoutAnchorEvidence(evidence(name), name)
+    const candidate = name === singularCylinderScenario
+      ? syntheticSingularCylinderStandalone(syntheticPolicyDirectory(t, 'stz-singular-registration-'), 2).evidence
+      : evidence(name)
+    assertLayoutAnchorEvidence(candidate, name)
   }
 })
 for (const spec of signedAnchorCases) for (const fault of ['missing', 'duplicate', 'wrong-sign-with-correct-paint',
@@ -1573,24 +1579,119 @@ function controlledPublicationGate() {
   return { promise, resolve, reject }
 }
 
+// Only the selected retain deadline uses this clock. Registration precedes
+// encoding/writes, but the writer's actual entered signal arms its countdown.
+function controlledWriterDeadline() {
+  let clockMs = 0, scheduled, armedAt, expirations = 0, cancellations = 0
+  return {
+    scheduleDeadline(expire, timeoutMs) {
+      assert.equal(scheduled, undefined, 'One selected evidence boundary owns the controlled deadline')
+      scheduled = { expire, timeoutMs }
+      return () => { scheduled = undefined; cancellations++ }
+    },
+    arm() {
+      assert.ok(scheduled, 'Selected deadline is registered before its real writer enters')
+      assert.equal(armedAt, undefined, 'Only the first stalled writer arms this deadline')
+      armedAt = clockMs
+    },
+    advance(milliseconds) {
+      assert.ok(milliseconds >= 0)
+      clockMs += milliseconds
+      if (scheduled && armedAt !== undefined && clockMs - armedAt >= scheduled.timeoutMs) {
+        expirations++; scheduled.expire(); scheduled = undefined
+      }
+    },
+    get clockMs() { return clockMs },
+    get armedAt() { return armedAt },
+    get registered() { return scheduled !== undefined },
+    get expirations() { return expirations },
+    get cancellations() { return cancellations },
+  }
+}
+
+// Install rejection ownership at startup. Waiting for a writer/I/O gate must
+// also reject immediately if an earlier ordinary operation has already failed.
+function ownLiveWorkflowOutcome(args) {
+  return captureZeroAxisLive(args).then((value) => ({ ok: true, value }), (error) => ({ ok: false, error }))
+}
+async function waitForLiveWorkflowGate(gate, outcome) {
+  await Promise.race([gate.promise, outcome.then((result) => {
+    if (!result.ok) throw result.error
+    assert.fail('Live workflow completed before its intended controlled boundary')
+  })])
+}
+async function assertControlledWriterTimeout(control, outcome, boundary) {
+  const { deadline } = control
+  assert.equal(deadline.armedAt, 50, 'PNG I/O and selected retain preparation are outside the writer deadline')
+  deadline.advance(19)
+  assert.equal(deadline.expirations, 0, 'The entered writer retains its full 20ms budget')
+  deadline.advance(1)
+  assert.equal(deadline.expirations, 1, 'The selected boundary genuinely expires through its deadline scheduler')
+  let primary
+  await assert.rejects(async () => {
+    const result = await outcome
+    if (!result.ok) throw result.error
+    return result.value
+  }, (error) => {
+    primary = error
+    return error.message === `Timed out after 20ms during Zero-axis live ${boundary} evidence`
+  })
+  assert.equal(deadline.cancellations, 1, 'Settled diagnostic releases its scoped scheduler')
+  return primary
+}
+async function releaseControlledPngIo(control, outcome) {
+  await waitForLiveWorkflowGate(control.pngEntered, outcome)
+  assert.equal(control.deadline.armedAt, undefined, 'The writer has not entered during ordinary PNG file I/O')
+  // Keep the real ordinary read gated until a scoped signal passes the former
+  // 20ms budget. No elapsed-time threshold is asserted; an earlier failure is
+  // already owned and races this signal. Ordinary I/O keeps its real 5000ms
+  // deadline, so restoring the broad 20ms override makes this control fail.
+  const formerBudgetPassed = controlledPublicationGate()
+  const formerBudgetTimer = setTimeout(formerBudgetPassed.resolve, 25)
+  try { await waitForLiveWorkflowGate(formerBudgetPassed, outcome) }
+  finally { clearTimeout(formerBudgetTimer) }
+  // The selected writer clock accounts for that pre-gate interval separately.
+  control.deadline.advance(25)
+  assert.equal(control.deadline.expirations, 0, 'PNG I/O beyond the old whole-workflow 20ms does not own a timeout')
+  assert.equal(control.assertions.pixels, 0, 'The actual PNG file read remains gated before strict pixel inspection')
+  control.pngGate.resolve()
+  await waitForLiveWorkflowGate(control.preparationEntered, outcome)
+  assert.equal(control.deadline.registered, true, 'Selected evidence deadline is registered during actual publisher pack preparation')
+  assert.equal(control.deadline.armedAt, undefined, 'Selected evidence registration cannot begin a countdown before its boundary writer')
+  control.deadline.advance(25)
+  assert.equal(control.deadline.expirations, 0, 'Ordinary publisher pack preparation is outside the selected writer budget')
+  control.preparationGate.resolve()
+  await waitForLiveWorkflowGate(control.entered, outcome)
+}
+
 function liveWorkflowPublication(t, options = {}) {
   const fixture = syntheticLiveWorkflow(t, options), artifactDir = join(fixture.args.pngPath, '..')
   const checkout = { fingerprint: 'publication-controlled-tree', revision: 'publication-controlled-head',
     trackedDiffSha256: 'controlled-tracked', untrackedSha256: { 'evidencePublication.mjs': 'controlled-untracked' } }
   const gate = controlledPublicationGate(), entered = controlledPublicationGate(), finished = controlledPublicationGate()
+  const pngGate = controlledPublicationGate(), pngEntered = controlledPublicationGate(), deadline = controlledWriterDeadline()
+  const preparationGate = controlledPublicationGate(), preparationEntered = controlledPublicationGate()
+  const stalledBoundary = options.stallBoundary ?? (options.stalledFinal ? 'restored-after-image-attempt' : undefined)
   const writes = []
-  let withheld = false
-  const publisher = createEvidencePublisher({ artifactDir, checkout, timeoutMs: 1000, write: async (path, bytes) => {
+  let withheld = false, preparationWithheld = false
+  // The publisher's independent production watchdog stays at 5000ms. It is
+  // never the selected 20ms control or a competing short test deadline.
+  const publisher = createEvidencePublisher({ artifactDir, checkout, write: async (path, bytes) => {
     if (options.writerFailure === 'no-write') return
     if (options.writerFailure === 'corrupt') {
       const corrupted = Buffer.from(bytes); corrupted[0] ^= 1; writeFileSync(path, corrupted); return
     }
     const boundary = path.endsWith('.boundary.json') ? JSON.parse(bytes.toString()) : null
-    const shouldStall = (options.stalledFinal === true || options.stallBoundary) && !withheld
-      && boundary?.identity.stage === (options.stallBoundary ?? 'restored-after-image-attempt')
+    const pack = path.endsWith('.pack.json') ? JSON.parse(bytes.toString()) : null
+    if (stalledBoundary && !publisher.primary && !preparationWithheld && pack?.identity.stage === stalledBoundary) {
+      preparationWithheld = true; preparationEntered.resolve()
+      await preparationGate.promise
+    }
+    const shouldStall = stalledBoundary && !withheld && boundary?.identity.stage === stalledBoundary
+      && boundary.identity.disposition === 'running'
     writes.push({ path, bytes: bytes.length, stage: boundary?.identity.stage })
     if (shouldStall) {
-      withheld = true; entered.resolve()
+      withheld = true; deadline.arm(); entered.resolve()
       try { await gate.promise; writeFileSync(path, bytes) } finally { finished.resolve() }
     } else writeFileSync(path, bytes)
   } })
@@ -1613,9 +1714,17 @@ function liveWorkflowPublication(t, options = {}) {
   retain.fail = actualRetain.fail
   const assertions = { pixels: 0 }
   const assertPixels = fixture.args.assertPixels
-  fixture.args = { ...fixture.args, retain, timeoutMs: options.stalledFinal || options.stallBoundary ? 20 : 5000,
+  fixture.args = { ...fixture.args, retain,
+    evidenceDeadlineFor: (boundary) => boundary === stalledBoundary
+      ? { timeoutMs: 20, scheduleDeadline: deadline.scheduleDeadline } : undefined,
+    readPngFile: async (path) => {
+      if (stalledBoundary) { pngEntered.resolve(); await pngGate.promise }
+      if (options.pngIoFailure) throw options.pngIoFailure
+      return readFile(path)
+    },
     assertPixels: (pixels) => { assertions.pixels++; assertPixels(pixels) } }
-  return { fixture, artifactDir, checkout, publisher, storage, stem, report, gate, entered, finished, writes, retained, assertions }
+  return { fixture, artifactDir, checkout, publisher, storage, stem, report, gate, entered, finished,
+    pngGate, pngEntered, preparationGate, preparationEntered, deadline, writes, retained, assertions }
 }
 
 for (const ambientDimension of [2, 3]) for (const inheritedCollapsed of [false, true]) {
@@ -1641,16 +1750,12 @@ for (const ambientDimension of [2, 3]) for (const inheritedCollapsed of [false, 
   })
   for (const late of ['fulfillment', 'rejection']) test(`actual ${ambientDimension}D final writer timeout owns late ${late} after ${inheritedCollapsed ? 'collapsed' : 'expanded'} toolbar cleanup`, async (t) => {
     const control = liveWorkflowPublication(t, { ambientDimension, inheritedCollapsed, stalledFinal: true })
-    const { fixture, artifactDir, checkout, publisher, storage, stem, report, gate, entered, finished } = control
+    const { fixture, artifactDir, checkout, publisher, storage, stem, report, gate, finished } = control
     const unhandled = [], onUnhandled = (error) => unhandled.push(error)
     process.on('unhandledRejection', onUnhandled); t.after(() => process.off('unhandledRejection', onUnhandled))
-    let primary
-    const outcome = captureZeroAxisLive(fixture.args)
-    await entered.promise
-    await assert.rejects(outcome, (error) => {
-      primary = error
-      return /^Timed out after 20ms during Zero-axis live restored-after-image-attempt evidence$/.test(error.message)
-    })
+    const outcome = ownLiveWorkflowOutcome(fixture.args)
+    await releaseControlledPngIo(control, outcome)
+    const primary = await assertControlledWriterTimeout(control, outcome, 'restored-after-image-attempt')
     assert.equal(publisher.primary, primary)
     assert.equal(isZeroAxisLiveCaptureFailure(primary), true)
     assert.equal(control.assertions.pixels, 1, 'Actual PNG passed strict pixel inspection before final evidence timeout')
@@ -1689,14 +1794,10 @@ for (const ambientDimension of [2, 3]) for (const inheritedCollapsed of [false, 
 
 for (const ambientDimension of [2, 3]) test(`actual ${ambientDimension}D stalled pre-restoration writer cannot block owned native cleanup`, async (t) => {
   const control = liveWorkflowPublication(t, { ambientDimension, stallBoundary: 'before-restoration' })
-  const { fixture, artifactDir, checkout, publisher, stem, gate, entered, finished } = control
-  let primary
-  const outcome = captureZeroAxisLive(fixture.args)
-  await entered.promise
-  await assert.rejects(outcome, (error) => {
-    primary = error
-    return /^Timed out after 20ms during Zero-axis live before-restoration evidence$/.test(error.message)
-  })
+  const { fixture, artifactDir, checkout, publisher, stem, gate, finished } = control
+  const outcome = ownLiveWorkflowOutcome(fixture.args)
+  await releaseControlledPngIo(control, outcome)
+  const primary = await assertControlledWriterTimeout(control, outcome, 'before-restoration')
   assert.equal(publisher.primary, primary)
   assert.equal(control.assertions.pixels, 1)
   assert.equal(fixture.calls.screenshots.length, 1)
@@ -1714,6 +1815,32 @@ for (const ambientDimension of [2, 3]) test(`actual ${ambientDimension}D stalled
   await finished.promise; await new Promise((resolve) => setImmediate(resolve))
   assert.deepEqual(readFileSync(join(artifactDir, `${stem}-live-capture.json`)), authoritative)
   assert.equal(publisher.primary, primary)
+})
+
+test('actual selected writer gate owns an earlier ordinary PNG I/O rejection without hanging or changing primary', async (t) => {
+  const primary = new Error('controlled ordinary PNG file rejection')
+  const control = liveWorkflowPublication(t, { ambientDimension: 2, stalledFinal: true, pngIoFailure: primary })
+  const unhandled = [], onUnhandled = (error) => unhandled.push(error)
+  process.on('unhandledRejection', onUnhandled); t.after(() => process.off('unhandledRejection', onUnhandled))
+  const outcome = ownLiveWorkflowOutcome(control.fixture.args)
+  await waitForLiveWorkflowGate(control.pngEntered, outcome)
+  control.pngGate.resolve()
+  await assert.rejects(waitForLiveWorkflowGate(control.entered, outcome), (error) => error === primary)
+  assert.equal(control.publisher.primary, primary)
+  assert.equal(isZeroAxisLiveCaptureFailure(primary), true)
+  assert.equal(control.deadline.armedAt, undefined, 'Earlier ordinary failure never entered or armed the selected writer')
+  assert.equal(control.deadline.expirations, 0)
+  assert.equal(control.assertions.pixels, 0)
+  assert.equal(control.fixture.calls.screenshots.length, 1)
+  assert.deepEqual(control.fixture.calls.native, ['Collapse preview toolbar', 'Expand preview toolbar'])
+  assert.equal(control.fixture.isCollapsed(), false)
+  assert.equal(control.fixture.calls.resourceObservations, 1)
+  assert.deepEqual(control.fixture.live.capture.inheritedState, control.fixture.live.capture.restoration.stateAfter)
+  assert.equal(control.retained.at(-1).boundary, 'failed-after-restoration')
+  assert.equal(control.retained.at(-1).primary, primary)
+  assert.deepEqual(readEvidenceDocumentSync(control.artifactDir, `${control.stem}-live-capture.json`, { checkout: control.checkout }), control.fixture.live)
+  await new Promise((resolve) => setImmediate(resolve))
+  assert.deepEqual(unhandled, [])
 })
 
 for (const writerFailure of ['no-write', 'corrupt']) test(`actual live capture attempts no native or image action after ordinary ${writerFailure} artifact authentication fails`, async (t) => {

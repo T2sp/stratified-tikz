@@ -1,5 +1,130 @@
 # Phase 32D spacing, minima, anchors, and combined audit
 
+## Singular-cylinder domain and deterministic writer follow-up (2026-10-12)
+
+The actual invocation entry is clean HEAD
+`f4dbfd7c7930515f6cd1d57db17ad32a96fc4d47`, fingerprint
+`21796531870c52a3af2508226f45a92b96667a45fad4c777a75d486a18e11444`.
+The prompt commit already tracks the preceding seven modified files and three
+shared fixtures. Their accepted empty-body/publication/native/capture behavior
+is preserved. Historical fingerprints do not identify this changed tree.
+
+The newest supplied independent read-only completion review is **needs_changes**,
+Critical 0 / Medium 2 / Low 0, `ready_to_commit:false`. Its full-suite log
+`/private/tmp/stz-32d-review-npm-test.log` reports 6,974 passed / one failed out
+of 6,975, zero skips. The first error in the final 2D writer regression was
+`Timed out after 20ms during Zero-axis live PNG file identity`, before the
+selected manifest writer entered. The isolated 1/1 rerun and focused 79/79 pass
+are historical checks; they do not resolve that ordering defect.
+
+The matching HoyCdl parent passed all five required checks on its exact earlier
+checkout. Its authenticated report was resolved with `readEvidenceDocumentSync`
+and the recorded checkout: passed/complete, all eighteen cumulative groups,
+all nine existing 32D scenarios, 202 records / 4,547 diagnostics, no page errors
+or incomplete/unexecuted groups. Its exact fingerprint is
+`4da475401c30e0562982de816fc85ad81381876a3a525bef16dfb18b8f3c718f`.
+That historical acceptance remains intact; the review rejection still blocks
+completion, and HoyCdl cannot verify later edits. Older HMy8AM/Zm4oWG records
+are not this review's identity.
+
+Cylinder now raises the existing geometry `RangeError` when its **computed**
+transverse radius `ry === 0` (including signed zero), after rotation/incircle
+fitting and the transverse `minimumWidth` maximum. The check precedes division,
+contours, seam and custom regions. It does not substitute sine zero, epsilon or
+another shape. The existing asin-domain diagnostic remains. Axial minima,
+outer separation and line width cannot rescue that earlier division; positive
+minimum width, valid `rx === 0` / `ry > 0`, supported signed nonzero radii and
+rotation/incircle axis exchanges retain their own independent controls. Basic
+and ellipse zero-axis geometry remain supported.
+
+The shared live/pending/settled layout displays the existing warning and upright
+body without requested cylinder paint, seam, regions, internal border, hidden
+hit region or inflated selection bounds. Authored model/layout/units/context,
+raw source, coordinates, history and saved version 2 remain authoritative.
+Both TikZ modes preserve the authored cylinder intent, including intentionally
+unsupported input; compilation success is not claimed for it.
+
+New independent references are registered separately under
+`tests/fixtures/point-node-anchors/cylinder-domain/`. Complete fixed-box inputs,
+partial raw observations, nonzero compiler exits/logs, actual generated source
+and the correct document wrapper authenticate PGF 3.1.11a's zero-divisor failure.
+The wrapperless undefined-control-sequence result is a document-context failure,
+not cylinder-domain evidence. Engine/source/input/artifact/generator hashes and
+`-no-shell-escape` commands accompany the additive cases. Oracle generation
+imports no production solver. The additive inventory has eleven expected
+failures, twelve valid controls and 93 independently recorded control anchors
+in 110 files, including a scoped exception that keeps compiler logs in Git
+identity. The deeply signed control authenticates unchanged contours and compact
+body/text/west anchors; it makes no general radial-anchor claim. Original 172 boxes / 4,925 anchors / eleven
+failure references, signed-basic/polygonal/zero-axis evidence and tolerances are
+preserved byte for byte.
+
+The cumulative 32D workflow additionally requires native singular-cylinder
+coverage in both ambient dimensions through normal load/Inspector controls,
+current warning/model/source/owner/request/revision observations, trusted warning
+picking and far clearing, and actual downloaded/reopened warning-only empty-body
+SVG/PNG plus raw TikZ intent. Its parent diagnostic-artifact context is separate
+from the seven-owner signed empty-body route. Only full model/native/click/file
+replay authenticates the exact new file. Warning structure, complete empty
+body/ink/content shell, placement, exact SVG/PNG bytes and normal forbidden,
+external and background checks are mandatory. No filename-only allowance or
+dummy paint supplies eligibility.
+
+The live-writer fixture no longer gives the entire workflow a 20ms timeout.
+Normal writer/publisher, I/O, measurement, image and cleanup keep production
+5,000ms limits. A per-call scheduler seam controls only the selected evidence
+boundary, and its countdown starts at that writer's actual `entered` signal.
+The actual writer → publisher → retain → observe/report path, exact primary
+Error and failed-after-restoration authority remain required. Scoped PNG gates
+survive a former-budget signal before writer entry; no global timer mock,
+concurrency reduction, sleeps, retry or machine-speed threshold is used.
+All eight final dimension/toolbar/late-result combinations and both pre-restoration
+stalls retain one image/strict pixels, native restoration, exact state/history/
+source/owner/CTMs, owned cleanup and late-authority rejection. Asynchronous
+rejection is owned immediately while waiting for a gate. The older deterministic
+stalled-report controls remain unchanged.
+
+Executed focused checkpoints pass 48/48 new cylinder controls, 825/825 preserved
+geometry/runtime/model/TikZ controls, 17/17 writer controls and the 797/797
+publication/diagnostic sweep. The first parent diagnostic checkpoint passes
+26/26. Final focused helper checks pass 41/41, the targeted parent sweep passes
+28/28 and all five isolated runner controls pass, including both new damaged
+cylinder gates stopping before review/commit. Exact coordinate/capture/cleanup
+and final-transition causal binding are enforced before the full run. These overlapping checkpoints are not additive
+acceptance counts. All 544 existing shape/anchor reference files match HEAD
+byte for byte. Application strict TypeScript, cylinder TypeScript lint and the
+build pass. An initial changed-script lint check found an unused new observer
+argument, corrected before final checks. A misspelled baseline command failed
+before lint; its corrected invocation reproduces the three inherited script
+findings separately. The initial parallel writer check could not load the new
+contract before it existed; that failure is transcribed explicitly, distinct
+from an original retained command log.
+
+Configured direct label-assets and free-labels attempts both fail at localhost
+`listen EPERM 127.0.0.1` before Chrome. Static label assets alone pass (four
+entries, 43 worker chunks, 85 references, 40 fonts); no native/browser pass is
+claimed. The final frozen-tree strict runner records its actual full-suite,
+build/diff/browser disposition and matching before/after checkout externally.
+
+Current commands, additive inventories, focused/full results, exact tracked and
+untracked bytes, strict-parent disposition and preservation audit are retained
+under `/private/tmp/stz-32d-cylinder-timeout-fix-20261012/HANDOFF.json`.
+Changed-code checks are separate from inherited lint debt (two geometric caller
+`no-unsafe-finally`, verifier `_role`, layers `defaultCurveStyle`); the older
+repo-wide 79 errors / seven warnings remain historical baseline evidence, not
+a repository-wide lint pass. No unrelated cleanup or dependency is added.
+
+Phase 32 remains **incomplete**. Fresh exact-tree strict parent verification must
+pass all eighteen cumulative groups, nine predecessor scenarios plus mandatory
+singular-cylinder evidence, both native/live/standalone dimensions, both pending
+workflows and full artifact/reference replay before independent read-only
+completion review with `prompts/phase-32d-review.md`. Failed or incomplete
+verification stops before review/commit; `needs_changes` blocks completion even
+with a passing parent. Retain the post-review matching-tree guard. Restricted
+child browser startup leaves that result pending for the browser-capable parent.
+No completion review, commit or push is claimed; commit/push remain with the parent.
+Earlier entries below preserve their historical results.
+
 ## Authenticated empty-body parent SVG gate follow-up (2026-10-12)
 
 The actual invocation entry is clean HEAD

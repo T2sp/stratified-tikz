@@ -14,17 +14,19 @@ export const markZeroAxisLiveCaptureFailure = (error) => { captureFailures.add(e
 
 /** A capture owns only a measured native toolbar collapse. Interaction cleanup
  * is complete before entry; neither selection nor document/camera is changed. */
-export async function captureZeroAxisLive({ page, measure, retain, pngPath, inspect, assertPixels, interaction, live = {}, timeoutMs = 5000 }) {
+export async function captureZeroAxisLive({ page, measure, retain, pngPath, inspect, assertPixels, interaction,
+  live = {}, timeoutMs = 5000, evidenceDeadlineFor, readPngFile = readFile }) {
   const capture = live.capture = { actions: [], restoration: { actions: [] }, secondaryErrors: [], cleanup: {} }
   let primary, collapseAttempted = false
-  const bounded = (name, operation) => boundedPointDiagnostic(operation, `Zero-axis live ${name}`, timeoutMs)
+  const bounded = (name, operation, deadline) => boundedPointDiagnostic(operation, `Zero-axis live ${name}`,
+    deadline?.timeoutMs ?? timeoutMs, deadline?.scheduleDeadline)
   const fail = (operation, error) => {
     if (primary) capture.secondaryErrors.push({ operation, message: error.message })
     else primary = error
     capture.primary = { message: primary.message, stack: primary.stack }
   }
   const persist = async (boundary) => {
-    try { return await bounded(`${boundary} evidence`, () => retain(boundary, live, primary)) }
+    try { return await bounded(`${boundary} evidence`, () => retain(boundary, live, primary), evidenceDeadlineFor?.(boundary)) }
     catch (error) { retain.fail?.(error); throw error }
   }
   const observed = async () => freezeEvidenceObservation(await bounded('current entire stroke measurement', measure))
@@ -120,7 +122,7 @@ export async function captureZeroAxisLive({ page, measure, retain, pngPath, insp
     for (const kind of ['canvas', 'point', 'contour']) for (const matrix of ['CTM', 'screenCTM']) {
       assert.deepEqual(live.afterSnapshot.geometry[kind][matrix], live.snapshot.geometry[kind][matrix], 'Single PNG retains fresh capture-frame geometry')
     }
-    const file = await bounded('PNG file identity', () => readFile(pngPath))
+    const file = await bounded('PNG file identity', () => readPngFile(pngPath))
     assert.deepEqual(file, bytes, 'Actual live PNG file equals returned screenshot bytes')
     live.pixels = inspect(bytes, live.snapshot.geometry.contour.screenCTM)
     await persist('pixels-before-assertion')

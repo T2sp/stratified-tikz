@@ -1,20 +1,28 @@
 import { writeFile } from 'node:fs/promises'
 import { resolve } from 'node:path'
 
-/** Bound page/evidence diagnostics and own late rejections after a deadline. */
-export async function boundedPointDiagnostic(operation, name, timeoutMs = 2000) {
+const schedulePointDiagnosticDeadline = (expire, timeoutMs) => {
+  const timer = setTimeout(expire, timeoutMs)
+  return () => clearTimeout(timer)
+}
+
+/** Bound page/evidence diagnostics and own late rejections after a deadline.
+ * A scoped scheduler can control one gated boundary without replacing timers
+ * for ordinary I/O, measurements, image capture or cleanup. */
+export async function boundedPointDiagnostic(operation, name, timeoutMs = 2000,
+  scheduleDeadline = schedulePointDiagnosticDeadline) {
   if (!Number.isFinite(timeoutMs) || timeoutMs <= 0) throw new Error('Point diagnostic timeout must be finite and positive')
-  let timer
+  let cancelDeadline
   const outcome = Promise.resolve().then(operation).then(
     (value) => ({ ok: true, value }), (error) => ({ ok: false, error }))
   try {
     const result = await Promise.race([outcome, new Promise((resolve) => {
-      timer = setTimeout(() => resolve({ ok: false,
+      cancelDeadline = scheduleDeadline(() => resolve({ ok: false,
         error: new Error(`Timed out after ${timeoutMs}ms during ${name}`) }), timeoutMs)
     })])
     if (!result.ok) throw result.error
     return result.value
-  } finally { clearTimeout(timer) }
+  } finally { cancelDeadline?.() }
 }
 
 /** Called before assertions. Diagnostic records never count as passing scenarios. */

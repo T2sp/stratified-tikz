@@ -11,6 +11,7 @@ import { layoutAnchorGroup, assertLayoutStandaloneEvidence, assertLayoutPostClic
 import { syntheticStandalonePointDownload } from './standalonePointDownloadFixture.mjs'
 import { populatePhase32dParentEvidence } from './phase32dParentEvidenceFixture.mjs'
 import { syntheticZeroPng } from './signedPointStandaloneFixture.mjs'
+import { singularCylinderScenario, singularCylinderWarningPath } from '../../scripts/singularCylinderDiagnosticContract.mjs'
 import { pointGroups, importRegressionScenarios, correctionScenarios, continuityScenarios, targetedPaintScenarios, synchronizeClearSnapshot, polygonJoinEvidence, completePointEvidence } from './phase32abParentEvidenceFixture.mjs'
 
 import { dashCapScenario, dashCapArtifacts } from '../../scripts/pointDashCapContract.mjs'
@@ -1470,5 +1471,100 @@ test('32D real parent empty-body route retains current scenario/native/live/stan
       assert.throws(() => validateBrowserEvidence('check:free-labels', fixture.artifactDir, '32D', controls.checkout),
         error => !/Invalid whole-point SVG artifact/.test(error.message), 'Authentication must fail before an empty body can be accepted')
     } finally { for (const [name, bytes] of originals) writeFileSync(join(fixture.artifactDir, name), bytes) }
+  })
+})
+
+test('32D complete parent dispatch authenticates separate warning-only cylinder files in both dimensions', t => {
+  const fixture = completePhase32dParentFixture(t)
+  assert.equal(fixture.report.completed.length, 18)
+  assert.equal(fixture.report.evidence.filter(({ group }) => group === layoutAnchorGroup).length, 10)
+  for (const { raw } of fixture.singular) {
+    assert.equal(hasWholePointSvg(raw.xml), false, 'Legacy glyph/contour envelope still rejects a warning-only file')
+    assert.ok(raw.xml.includes(singularCylinderWarningPath))
+    assert.equal((raw.xml.match(/<path\b/gu) ?? []).length, 1)
+  }
+  validateBrowserEvidence('check:free-labels', fixture.artifactDir, '32D', fixture.checkout)
+})
+
+test('32D parent diagnostic context rejects missing or damaged proof before legacy classification', async t => {
+  const fixture = completePhase32dParentFixture(t), scenario = singularCylinderScenario, stem = `${scenario}-2d`
+  const faults = [
+    ['missing-scenario', f => f.json('free-labels-evidence.json', report => { report.evidence = report.evidence.filter(({ name }) => name !== scenario) })],
+    ['missing-exact-file', f => f.json('free-labels-evidence.json', report => { const record = report.evidence.find(({ name }) => name === scenario); record.artifacts = record.artifacts.filter(name => name !== `${stem}.svg`) })],
+    ['foreign-file', f => { f.write('foreign-cylinder.svg', f.raw().xml); f.json('free-labels-evidence.json', report => report.evidence.find(({ name }) => name === scenario).artifacts.push('foreign-cylinder.svg')) }],
+    ['wrong-case-source', f => f.json(`${scenario}.json`, evidence => { evidence.downloads[0].expected[0].source = 'foreign' })],
+    ['wrong-owner', f => f.json(`${scenario}.json`, evidence => { evidence.downloads[0].click.snapshot.points[0].owner = '["point-node",100,"foreign"]' })],
+    ['wrong-request', f => f.json(`${scenario}.json`, evidence => { evidence.downloads[0].click.snapshot.points[0].pointRequest = 'foreign' })],
+    ['wrong-revision', f => f.json(`${scenario}.json`, evidence => { evidence.downloads[0].click.snapshot.runtime.documentRevision += 1 })],
+    ['wrong-file-context', f => f.json(`${stem}-standalone.json`, raw => { raw.svgPath = join(fixture.artifactDir, 'foreign-cylinder.svg') })],
+    ['missing-warning', f => f.xml(xml => xml.replace(/<path\b[^>]*>[\s\S]*?<\/path>/u, ''))],
+    ['damaged-warning-path', f => f.xml(xml => xml.replace(singularCylinderWarningPath, 'M 0 0 L 1 1'))],
+    ['damaged-warning-title', f => f.xml(xml => xml.replace('Shape preview unavailable:', 'Foreign diagnostic:'))],
+    ['missing-empty-title', f => f.xml(xml => xml.replace(/<title\s*\/>|<title><\/title>/u, ''))],
+    ['invented-cylinder-contour', f => f.xml(xml => xml.replace('</svg>', '<path d="M 0 0 L 10 10"/></svg>'))],
+    ['invented-custom-region', f => f.xml(xml => xml.replace('</svg>', '<g><path d="M 0 0 Z" fill="#00FF00"/></g></svg>'))],
+    ['changed-warning-paint', f => f.xml(xml => xml.replace('#B45309', '#00FF00'))],
+    ['changed-placement', f => f.xml(xml => xml.replace(/translate\([^)]*\)/u, 'translate(0 0)'))],
+    ['missing-native-record', f => f.remove(`${stem}-native.json`)],
+    ['wrong-native-warning-owner', f => f.json(`${stem}-native.json`, native => { native.case.native.clicks[1].observation.owner = '["point-node",100,"foreign"]' })],
+    ['wrong-png-bytes', f => f.write(`${stem}.png`, fixture.signed[0].png)],
+    ['lost-authored-tikz', f => f.write(`${stem}-standalone.tex`, '\\node at (0,0) {};')],
+    ['coherent-wrong-tikz-coordinate', f => f.tikz(source => {
+      assert.ok(source.includes('at (3,3)'))
+      return source.replaceAll('at (3,3)', 'at (4,3)')
+    })],
+  ]
+  for (const [fault, mutate] of faults) await t.test(fault, () => {
+    const originals = new Map()
+    const remember = name => {
+      if (!originals.has(name)) { try { originals.set(name, readFileSync(join(fixture.artifactDir, name))) }
+        catch (error) { if (error.code !== 'ENOENT') throw error; originals.set(name, null) } }
+    }
+    const write = (name, bytes) => { remember(name); writeFileSync(join(fixture.artifactDir, name), bytes) }
+    const json = (name, change) => { const value = fixture.readJson(name); change(value); write(name, JSON.stringify(value)) }
+    const controls = { write, json, raw: () => fixture.readJson(`${stem}-standalone.json`),
+      remove: name => { remember(name); unlinkSync(join(fixture.artifactDir, name)) },
+      tikz: change => {
+        const raw = fixture.readJson(`${stem}-standalone.json`), value = fixture.readJson(`${scenario}.json`)
+        for (const mode of ['standalone', 'inlineMath']) {
+          raw.outputs[mode] = change(raw.outputs[mode])
+          value.downloads[0].outputs[mode] = raw.outputs[mode]
+          write(`${stem}-${mode}.tex`, raw.outputs[mode])
+        }
+        write(`${stem}-standalone.json`, JSON.stringify(raw)); write(`${scenario}.json`, JSON.stringify(value))
+      },
+      xml: change => { const raw = fixture.readJson(`${stem}-standalone.json`); raw.xml = change(raw.xml);
+        write(`${stem}.svg`, raw.xml); write(`${stem}-standalone.json`, JSON.stringify(raw)) } }
+    try {
+      mutate(controls)
+      assert.ok(originals.size > 0)
+      assert.throws(() => validateBrowserEvidence('check:free-labels', fixture.artifactDir, '32D', fixture.checkout),
+        error => fault === 'foreign-file' || !/Invalid whole-point SVG artifact/.test(error.message),
+        'Exact diagnostic replay rejects damaged context before the legacy glyph envelope')
+    } finally {
+      for (const [name, bytes] of originals) if (bytes === null) unlinkSync(join(fixture.artifactDir, name)); else writeFileSync(join(fixture.artifactDir, name), bytes)
+    }
+  })
+})
+
+test('32D diagnostic files require current authenticated native and standalone references', async t => {
+  const fixture = completePhase32dParentFixture(t), stem = `${singularCylinderScenario}-2d`
+  const publisher = createEvidencePublisher({ artifactDir: fixture.artifactDir, checkout: fixture.checkout })
+  const names = [`${singularCylinderScenario}.json`, `${stem}-native.json`, `${stem}-standalone.json`], stale = {}
+  for (const name of names) {
+    const value = fixture.readJson(name)
+    await publisher.publish(name, value, { stage: 'observed-diagnostic' })
+    stale[name] = readFileSync(join(fixture.artifactDir, name))
+    await publisher.publish(name, value, { stage: 'current-diagnostic' })
+  }
+  await publisher.publish('free-labels-evidence.json', fixture.report, { stage: 'complete', disposition: 'passed' })
+  validateBrowserEvidence('check:free-labels', fixture.artifactDir, '32D', fixture.checkout)
+  for (const name of names) await t.test(`stale ${name}`, () => {
+    const current = readFileSync(join(fixture.artifactDir, name))
+    try {
+      writeFileSync(join(fixture.artifactDir, name), stale[name])
+      assert.throws(() => validateBrowserEvidence('check:free-labels', fixture.artifactDir, '32D', fixture.checkout),
+        error => !/Invalid whole-point SVG artifact/.test(error.message))
+    } finally { writeFileSync(join(fixture.artifactDir, name), current) }
   })
 })

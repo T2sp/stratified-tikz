@@ -24,6 +24,7 @@ import { observePostExternalPointPaint, assertPostExternalPointPaint, observeLit
 import { dashCapMechanismStem, dashCapMechanismArtifacts, assertDashCapMechanismEvidence } from "../pointDashCapMechanismContract.mjs";
 import { dashCapScenario, dashCapArtifacts, assertDashCapEvidence } from "../pointDashCapContract.mjs";
 import { readEvidenceDocumentSync } from "../evidencePublication.mjs";
+import { singularCylinderScenario, assertSingularCylinderStandaloneEvidence } from "../singularCylinderDiagnosticContract.mjs";
 
 import { polygonJoinScenario, polygonJoinArtifacts, assertPolygonJoinEvidence } from "../pointPolygonJoinContract.mjs";
 import { inspectConnectedLivePaintPng } from "../connectedLivePaintOracle.mjs";
@@ -289,6 +290,12 @@ function validateTargetedPaintEvidence(artifactDir, name, group, profile = "stri
     if (name === signedPolygonalScenario) for (const ambientDimension of [2, 3]) {
       const raw = evidenceObject(artifactDir, `${name}-${ambientDimension}d-standalone.json`, checkout);
       assertSignedPolygonalStandaloneEvidence(evidence, raw, artifactDir, ambientDimension, { checkout });
+    }
+    if (name === singularCylinderScenario) {
+      return [2, 3].map((ambientDimension) => {
+        const raw = evidenceObject(artifactDir, `${name}-${ambientDimension}d-standalone.json`, checkout);
+        return assertSingularCylinderStandaloneEvidence(evidence, raw, artifactDir, ambientDimension, { checkout });
+      });
     }
     if (name.startsWith('point-layout-pending-')) {
       const standalone = evidenceObject(artifactDir, `${name}-standalone.json`, checkout);
@@ -864,10 +871,26 @@ export function validateBrowserEvidence(name, artifactDir, phase, checkout, prof
         // that successful replay supplies their envelope classification; neither
         // a filename nor a blank title grants an empty-body allowance.
         const authenticatedEmptyPointSvgs = new Set();
+        const authenticatedDiagnosticPointSvgs = new Map();
         if (group === layoutAnchorGroup && name === signedPolygonalScenario) {
           validateTargetedPaintEvidence(artifactDir, name, group, profile, checkout);
           for (const ambientDimension of [2, 3]) {
             authenticatedEmptyPointSvgs.add(`${signedPolygonalScenario}-${ambientDimension}d.svg`);
+          }
+        }
+        // Warning-only downloads require their own exact diagnostic context.
+        // Full model/native/click/file replay supplies eligibility before the
+        // legacy envelope is examined; the signed seven-owner route is separate.
+        if (group === layoutAnchorGroup && name === singularCylinderScenario) {
+          const contexts = validateTargetedPaintEvidence(artifactDir, name, group, profile, checkout);
+          assert.equal(contexts.length, 2);
+          for (const context of contexts) {
+            assert.equal(context.schema, 'stz-singular-cylinder-diagnostic-artifact-v1');
+            assert.ok([2, 3].includes(context.ambientDimension));
+            const artifact = `${singularCylinderScenario}-${context.ambientDimension}d.svg`;
+            assert.equal(context.svgPath, resolve(artifactDir, artifact));
+            assert.equal(authenticatedDiagnosticPointSvgs.has(artifact), false);
+            authenticatedDiagnosticPointSvgs.set(artifact, context);
           }
         }
         for (const artifact of records[0].artifacts) {
@@ -882,11 +905,15 @@ export function validateBrowserEvidence(name, artifactDir, phase, checkout, prof
             if (!value || typeof value !== "object") throw new Error(`Invalid point-node JSON: ${artifact}`);
           } else if (artifact.endsWith(".svg")) {
             const svg = bytes.toString();
+            const diagnosticContext = authenticatedDiagnosticPointSvgs.get(artifact);
+            if (diagnosticContext) assert.equal(sha256(bytes), diagnosticContext.svgSha256,
+              'Diagnostic envelope belongs to the exact authenticated warning-only file');
             if ((artifact.startsWith(`${polygonJoinScenario}-`) || artifact.startsWith(`${dashCapScenario}-`) || artifact.startsWith(`${dashCapMechanismStem}-`))
               && (artifact.endsWith(".input.svg") || artifact.startsWith(`${dashCapMechanismStem}-`) && artifact.endsWith(".live.svg"))) {
               if (!/^<svg\s[^>]*><(polygon|circle)\s[^>]*><\/\1><\/svg>$/u.test(svg)
                 || /(?:href|onload|script|data-)=/u.test(svg)) throw new Error(`Invalid polygon stroke SVG input: ${artifact}`);
-            } else if (!authenticatedEmptyPointSvgs.has(artifact) && !hasWholePointSvg(svg)) {
+            } else if (!authenticatedEmptyPointSvgs.has(artifact)
+              && !authenticatedDiagnosticPointSvgs.has(artifact) && !hasWholePointSvg(svg)) {
               throw new Error(`Invalid whole-point SVG artifact: ${artifact}`);
             }
           } else if (artifact.endsWith(".png") && (bytes.length < 24
@@ -894,7 +921,7 @@ export function validateBrowserEvidence(name, artifactDir, phase, checkout, prof
             throw new Error(`Invalid point-node PNG artifact: ${artifact}`);
           }
         }
-        if (authenticatedEmptyPointSvgs.size === 0) {
+        if (authenticatedEmptyPointSvgs.size === 0 && authenticatedDiagnosticPointSvgs.size === 0) {
           validateTargetedPaintEvidence(artifactDir, name, group, profile, checkout);
         }
         if (name === 'point-layout-pending-transparent-edit') {

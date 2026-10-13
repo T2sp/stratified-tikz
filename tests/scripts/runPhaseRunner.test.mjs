@@ -74,11 +74,15 @@ function fixture(t, phase = '31B', options = {}) {
   // The verifier independently checks generated post-key paint. Keep its real
   // oracle and transitive helpers in the isolated checkout so both the parent
   // identity import and each fresh verification worker load the same modules.
-  for (const file of ['standaloneSvgCapture.mjs', 'standaloneSvgCaptureContract.mjs', 'pointSourceVisibility.mjs', 'pointGeometricShapesContract.mjs', 'pointLayoutAnchorsContract.mjs', 'evidencePublication.mjs', 'signedPointStandaloneAssociation.mjs', 'zeroAxisLiveCapture.mjs', 'zeroAxisLiveCaptureWorkflow.mjs', 'pointLayoutPendingPreparation.mjs', 'pointLayoutPendingFixture.mjs', 'pointLayoutPendingView.mjs', 'pointUnsupportedDiagnosticContract.mjs', 'pointNativeDrag.mjs', 'pointGeometricSelection.mjs', 'pointPaintOracle.mjs', 'pointCheckDiagnostics.mjs', 'pointResponsiveFraming.mjs', 'pointPolygonJoinContract.mjs', 'pointDashCapContract.mjs', 'pointDashCapMechanismContract.mjs', 'connectedLivePaintOracle.mjs', 'connectedPaintSampling.mjs']) {
+  for (const file of ['standaloneSvgCapture.mjs', 'standaloneSvgCaptureContract.mjs', 'pointSourceVisibility.mjs', 'pointGeometricShapesContract.mjs', 'pointLayoutAnchorsContract.mjs', 'singularCylinderDiagnosticContract.mjs', 'evidencePublication.mjs', 'signedPointStandaloneAssociation.mjs', 'zeroAxisLiveCapture.mjs', 'zeroAxisLiveCaptureWorkflow.mjs', 'pointLayoutPendingPreparation.mjs', 'pointLayoutPendingFixture.mjs', 'pointLayoutPendingView.mjs', 'pointUnsupportedDiagnosticContract.mjs', 'pointNativeDrag.mjs', 'pointGeometricSelection.mjs', 'pointPaintOracle.mjs', 'pointCheckDiagnostics.mjs', 'pointResponsiveFraming.mjs', 'pointPolygonJoinContract.mjs', 'pointDashCapContract.mjs', 'pointDashCapMechanismContract.mjs', 'connectedLivePaintOracle.mjs', 'connectedPaintSampling.mjs']) {
     cpSync(join(automationDir, '..', file), join(cwd, 'scripts', file))
   }
   mkdirSync(join(cwd, 'src/rendering'), { recursive: true })
   cpSync(join(automationDir, '../../src/rendering/svgRenderSort.ts'), join(cwd, 'src/rendering/svgRenderSort.ts'))
+  // The diagnostic verifier reconstructs authored TikZ and model-coordinate
+  // placement through pure helpers. Copy its literal dependency closure for
+  // every isolated runner, including failure-before-browser controls.
+  copyRelativeFixtureModules(cwd, ['scripts/singularCylinderDiagnosticContract.mjs'])
   if (options.faithful32d) {
     // The full controlled runner records use the same pure model/projection/TikZ
     // fixture builders as the parent-dispatch suite. Keep their dependencies in
@@ -164,6 +168,16 @@ if (stage === 'free-browser') {
         raw.xml = raw.xml.replace('<g/></g></g>', '<g>foreign</g></g></g>');
         writeFileSync(join(dir, stem + '.svg'), raw.xml);
         complete.save(stem + '-standalone.json', raw);
+      }
+      const cylinderStem = 'point-layout-singular-cylinder-diagnostic-2d';
+      if (process.env.STZ_TEST_FAITHFUL_32D === 'missing-cylinder-warning') {
+        const raw = complete.readJson(cylinderStem + '-standalone.json');
+        raw.xml = raw.xml.replace(/<path\\b[^>]*>[\\s\\S]*?<\\/path>/u, '');
+        writeFileSync(join(dir, cylinderStem + '.svg'), raw.xml);
+        complete.save(cylinderStem + '-standalone.json', raw);
+      }
+      if (process.env.STZ_TEST_FAITHFUL_32D === 'missing-cylinder-context') {
+        require('node:fs').unlinkSync(join(dir, cylinderStem + '-native.json'));
       }
       const publisher = createEvidencePublisher({ artifactDir: dir, checkout: earlier.checkout });
       const name = stem + '-standalone.json';
@@ -686,7 +700,7 @@ test('32D isolated real runner verifies faithful complete empty-body artifacts w
   assert.doesNotMatch(result.stdout, /\$ git (?:add|commit|push)\b/)
 })
 
-for (const fault of ['corrupt-content', 'missing-boundary']) test(`32D isolated real runner rejects ${fault} before review or commit`, async t => {
+for (const fault of ['corrupt-content', 'missing-boundary', 'missing-cylinder-warning', 'missing-cylinder-context']) test(`32D isolated real runner rejects ${fault} before review or commit`, async t => {
   const { cwd, git, run, initialHead } = fixture(t, '32D', { faithful32d: true })
   const result = await run('implement', { STZ_TEST_FAITHFUL_32D: fault })
   assert.notEqual(result.status, 0, runnerDiagnostics(result))
