@@ -26,10 +26,13 @@ import { preparePendingLayoutPoint, capturePendingLayoutPreparation,
 import { changePendingLayoutView } from './pointLayoutPendingView.mjs'
 import { observeZeroAxisCapture } from './zeroAxisLiveCapture.mjs'
 import { captureZeroAxisLive, isZeroAxisLiveCaptureFailure, markZeroAxisLiveCaptureFailure } from './zeroAxisLiveCaptureWorkflow.mjs'
-import { singularCylinderScenario, singularCylinderOwner, singularCylinderLayout, singularCylinderParameters,
+import { cylinderDiagnosticScenarios, cylinderDiagnosticLayout, singularCylinderOwner, singularCylinderParameters,
   assertSingularCylinderSvg, assertSingularCylinderObservation, observeSingularCylinderPixels, assertSingularCylinderPixels } from './singularCylinderDiagnosticContract.mjs'
 import { observeSingularCylinderPoint, observeSingularCylinderPreExport, observeSingularCylinderReopening,
   runSingularCylinderNative } from './singularCylinderDiagnostic.mjs'
+import { foldedCylinderScenario, foldedCylinderOwner, foldedCylinderLayout, foldedCylinderReference,
+  assertFoldedCylinderPlacement, assertFoldedCylinderSvg, observeFoldedCylinderReopening,
+  observeFoldedCylinderPixels, assertFoldedCylinderPixels } from './foldedCylinderContract.mjs'
 import { observeSignedPointPreExport, observeSignedPointReopening, signedPointRenderOrderProof,
   createSignedPointAssociationCandidate, assertSignedPointStandaloneAssociation,
   assertSignedPointStandaloneGeometry } from './signedPointStandaloneAssociation.mjs'
@@ -67,7 +70,10 @@ export async function observeLayoutPoint(page, id = 'app-point') {
       anchorOffset, placementOffset: { x: contourLocal.e, y: contourLocal.f }, bodyOrigin: pair('data-point-body-origin'), baseline: Number(node.getAttribute('data-point-body-baseline')),
       placement: coordinate(new DOMPoint().matrixTransform(node.getScreenCTM())),
       placedAnchor: anchorOffset && coordinate(new DOMPoint(anchorOffset.x, anchorOffset.y).matrixTransform(matrix)),
-      boundary: coordinate(at), center: coordinate(at), contour: clean(contour), nodeTransform: node.getAttribute('transform'), bodyTransform: body.getAttribute('transform'),
+      boundary: coordinate(at), center: coordinate(at), contour: clean(contour),
+      seams: [...node.querySelectorAll('[data-point-internal-border]')].map(clean), warningCount: node.querySelectorAll('[data-point-shape-warning]').length,
+      paintRegionCount: node.querySelectorAll('[data-point-paint-region]').length,
+      nodeTransform: node.getAttribute('transform'), bodyTransform: body.getAttribute('transform'),
       bounds: { x: bounds.x, y: bounds.y, width: bounds.width, height: bounds.height },
       contourScreenBounds: { x: screenBounds.x, y: screenBounds.y, width: screenBounds.width, height: screenBounds.height },
       shapeBounds: node.getAttribute('data-point-shape-bounds'), paintedBounds: node.getAttribute('data-point-painted-bounds'),
@@ -918,11 +924,12 @@ export async function runPointLayoutAnchorChecks({ browser, origin, artifactDir,
     // The PGF zero-divisor input is authored and valid model data. Native
     // Inspector edits change only the intended minimum-width option; the live
     // warning and warning-only download retain that raw cylinder intent.
-    scenario = singularCylinderScenario
+    for (const diagnosticScenario of cylinderDiagnosticScenarios) {
+    scenario = diagnosticScenario
     const singularCases = [], singularDownloads = []
     for (const ambientDimension of [2, 3]) {
       const stem = `${scenario}-${ambientDimension}d`, id = singularCylinderOwner
-      const initialLayout = structuredClone(singularCylinderLayout)
+      const initialLayout = structuredClone(cylinderDiagnosticLayout(scenario))
       initialLayout.minimumWidth = 12
       initialLayout.units.minimumWidth = { source: '12pt', unit: 'pt', texPoints: 12 }
       const input = await document('cylinder', initialLayout, '', ambientDimension)
@@ -981,6 +988,59 @@ export async function runPointLayoutAnchorChecks({ browser, origin, artifactDir,
       await page.evaluate(() => window.stzAppLabels.releasePointExportClick())
     }
     await save({ cases: singularCases, downloads: singularDownloads })
+    }
+
+    scenario = foldedCylinderScenario
+    const foldedCases = [], foldedDownloads = [], reference = foldedCylinderReference()
+    for (const ambientDimension of [2, 3]) {
+      const stem = `${scenario}-${ambientDimension}d`, id = foldedCylinderOwner
+      const input = await document('cylinder', foldedCylinderLayout, '', ambientDimension)
+      input.diagram.strata[0].id = id; input.diagram.strata[0].style.shapeParameters = { aspect: 1 }
+      await load(input); await settle(); await select(id)
+      const entry = { ambientDimension, anchors: [] }
+      for (const anchor of reference.anchors) {
+        const field = await nativeField('anchor', anchor), current = await state(), rendered = await observeLayoutPoint(page, id)
+        const observed = { ambientDimension, anchor, field, state: current, rendered }
+        entry.anchors.push(observed)
+        await publish(`${stem}-native.json`, { scenario, group, result: 'observed', reference, case: entry })
+        await observe(`${stem}-anchor-${anchor}-before-assertion`, { group, result: 'observed', artifact: `${stem}-native.json` })
+        assertFoldedCylinderPlacement(observed, reference)
+      }
+      const field = await nativeField('anchor', 'bottom'), rendered = await select(id)
+      entry.final = { ambientDimension, anchor: 'bottom', field, state: await state(), rendered }
+      foldedCases.push(entry)
+      await publish(`${stem}-native.json`, { scenario, group, result: 'observed', reference, case: entry })
+      await observe(`${stem}-native-before-assertion`, { group, result: 'observed', artifact: `${stem}-native.json` })
+      assertFoldedCylinderPlacement(entry.final, reference)
+      const saved = await saveAppJson({ page, artifactDir, name: `${stem}-saved`, owned: waits,
+        diagnose: details => observe(`${stem}-save`, { group, details }) })
+      const savedJson = saved.json
+      await load(savedJson); await settle()
+      const expected = [{ id, source: '', shape: 'cylinder', modelPoint: JSON.parse(savedJson).diagram.strata[0], rendered: await observeLayoutPoint(page, id) }]
+      const outputs = await tikzArtifacts(stem)
+      await page.getByLabel('SVG export background', { exact: true }).selectOption('transparent')
+      await page.evaluate(ids => window.stzAppLabels.armPointExportClick(ids), [id])
+      const beforeExportState = await state(), preExport = await page.evaluate(observeSignedPointPreExport)
+      await observe(`${stem}-before-export-click`, { group, result: 'observed', expected, beforeExportState, preExport })
+      const { event: download } = await event(stem, 'download', () => page.getByRole('button', { name: 'Export current diagram view as SVG', exact: true }).click())
+      const click = await page.evaluate(() => window.stzAppLabels.pointExportClick())
+      const svgPath = resolve(artifactDir, `${stem}.svg`); await download.saveAs(svgPath)
+      const xml = await readFile(svgPath, 'utf8'), fileUrl = pathToFileURL(svgPath).href
+      const raw = await capturePointLayoutStandalone({ standalone: await context.newPage(), artifactDir, evidencePublisher,
+        details: { scenario: stem, group, background: 'transparent', ambientDimension, svgPath, fileUrl, pageErrors,
+          expected, click, outputs, xml, savedJson, beforeExportState, preExport },
+        observe: candidate => observe(`${stem}-standalone-observed`, { group, result: 'observed', candidate }),
+        reopen: standalone => standalone.evaluate(observeFoldedCylinderReopening),
+        assertReopened: candidate => { assertFoldedCylinderSvg(candidate, xml); assert.deepEqual(candidate.requests, [fileUrl]) } })
+      raw.paintPixels = observeFoldedCylinderPixels(await readFile(resolve(artifactDir, `${stem}.png`)), raw.reopened[0].matrices.outlineScreenCTM)
+      await publish(`${stem}-standalone.json`, raw)
+      await observe(`${stem}-pixels-before-assertion`, { group, result: 'observed', raw })
+      assertFoldedCylinderPixels(raw.paintPixels)
+      foldedDownloads.push({ scenario: stem, group, background: 'transparent', ambientDimension, expected, click, outputs, savedJson,
+        beforeExportState, preExport, capture: raw.capture, paintPixels: raw.paintPixels })
+      await page.evaluate(() => window.stzAppLabels.releasePointExportClick())
+    }
+    await save({ reference, cases: foldedCases, downloads: foldedDownloads })
 
     for (const background of ['transparent', 'white']) {
       scenario = `point-layout-pending-${background}-${background === 'transparent' ? 'edit' : 'load'}`
@@ -1084,7 +1144,7 @@ export async function runPointLayoutAnchorChecks({ browser, origin, artifactDir,
   } finally {
     for (const wait of waits) wait.dispose()
     const pendingCleanup = { scenario, result: 'observed', primary: primary?.message, holds: [], errors: [] }
-    if (scenario.startsWith('point-layout-pending-') || scenario === signedPolygonalScenario || scenario === singularCylinderScenario) {
+    if (scenario.startsWith('point-layout-pending-') || scenario === signedPolygonalScenario || scenario === foldedCylinderScenario || cylinderDiagnosticScenarios.includes(scenario)) {
       try {
         await boundedPointDiagnostic(() => page.evaluate(() => window.stzAppLabels.releasePointExportClick()), 'Pending export listener cleanup')
         pendingCleanup.exportListenerReleased = true

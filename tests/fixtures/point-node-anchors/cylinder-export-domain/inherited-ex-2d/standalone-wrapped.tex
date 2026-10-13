@@ -1,0 +1,83 @@
+\documentclass{article}
+\usepackage{tikz}
+\usepackage{tikz-3dplot}
+\usetikzlibrary{shapes.geometric,shapes.symbols}
+\typeout{STZ PGF VERSION \pgfversion}
+\input{tiny-cylinder.sty}
+\begin{document}
+\makeatletter
+\newwrite\domainout\immediate\openout\domainout=domain.txt
+\let\originaldivide\pgfmathdivide@
+\def\pgfmathdivide@#1#2{\immediate\write\domainout{DIVIDE #1; #2}\originaldivide{#1}{#2}}
+\makeatother
+% ----------------------------------------------------------------------------
+% Styles and colors
+% ----------------------------------------------------------------------------
+
+% Required TikZ libraries for non-circular point shapes:
+% \usetikzlibrary{shapes.geometric,shapes.symbols}
+
+% External TikZ styles referenced below.
+% Load these files in your LaTeX preamble or before the picture:
+% - tiny-cylinder.sty
+% Suggested:
+%   \input{tiny-cylinder.sty}
+
+\definecolor{stzPointpFill}{HTML}{000000}
+\definecolor{stzPointpStroke}{HTML}{000000}
+\definecolor{stzPointpText}{HTML}{000000}
+\pgfdeclarelayer{stratifiedLayer0}
+\pgfsetlayers{stratifiedLayer0,main}
+
+\begin{tikzpicture}[
+    line cap=round,
+    line join=round
+]
+
+    % ----------------------------------------------------------------------------
+    % Coordinates
+    % ----------------------------------------------------------------------------
+
+    \coordinate (pointPoint0p0) at (0,0);
+
+    % ----------------------------------------------------------------------------
+    % Layered drawing commands
+    % ----------------------------------------------------------------------------
+
+    % Layer 0: stratifiedLayer0
+    \begin{pgfonlayer}{stratifiedLayer0}
+        %----------------------------------------
+        % Codimension 2 strata: points
+        %----------------------------------------
+        \node[
+            cylinder,
+            inner sep=1.5pt,
+            inner xsep=0pt,
+            inner ysep=0.000032pt,
+            outer xsep=0pt,
+            outer ysep=0pt,
+            minimum width=0pt,
+            minimum height=80pt,
+            tinyCylinder,
+            fill=stzPointpFill,
+            draw=stzPointpStroke,
+            text=stzPointpText,
+            fill opacity=1,
+            draw opacity=1,
+            text opacity=1,
+            line width=0.4pt,
+            solid,
+            dash phase=0pt,
+            line cap=butt,
+            line join=miter
+        ] at (pointPoint0p0) {};
+
+    \end{pgfonlayer}
+
+    % Codimension 0 strata: regions
+    % Codimension 1 strata: curves
+    % Labels
+
+\end{tikzpicture}
+
+\end{document}

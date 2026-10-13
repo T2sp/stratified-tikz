@@ -10,19 +10,20 @@ import { circleStrokeVertices } from '../geometry/circleStrokeContour.ts'
 import { resolvePointShapeParameters } from '../model/pointShapeParameters.ts'
 import { defaultPointNodeFontContext, pointLayoutIdentity, resolvePointNodeLayoutOptions } from '../model/pointNodeLayout.ts'
 import { solvePointNodeShape } from '../geometry/pointNodeShapes/index.ts'
+import { cylinderDomainContextForStyle, type CylinderDomainContext } from '../geometry/pointNodeShapes/cylinderDomain.ts'
 
-export function svgPointNodeLayout(style: PointStyle, state: SvgLabelState) {
+export function svgPointNodeLayout(style: PointStyle, state: SvgLabelState, cylinderDomainContext?: CylinderDomainContext) {
   const centeredBody = placeSvgLabel(state.layout, svgPointNodeTextFontSize, 'center')
   const strokeSettings = effectiveSvgPointStroke(style)
   const geometry = svgPointNodeGeometry(style, state.source === '' ? { width: 0, height: 0 } : {
     width: centeredBody.bounds.maxX - centeredBody.bounds.minX, height: centeredBody.bounds.maxY - centeredBody.bounds.minY,
     depth: Math.max(0, state.layout.bounds.maxY * svgPointNodeTextFontSize),
     originX: centeredBody.offsetX,
-  }, undefined, strokeSettings.width)
+  }, undefined, strokeSettings.width, cylinderDomainContext)
   const layoutOptions = resolvePointNodeLayoutOptions(style, strokeSettings.width / svgPointNodeTexPointScale)
   // Legacy paths keep their exact accepted vertex/perimeter arithmetic. Their
   // anchor clearance still comes from the same PGF resolver as edited nodes.
-  const anchorSolution = geometry.solution ?? solveLegacyAnchorLayout(style, state, geometry, strokeSettings.width, centeredBody.offsetX)
+  const anchorSolution = geometry.solution ?? solveLegacyAnchorLayout(style, state, geometry, strokeSettings.width, centeredBody.offsetX, cylinderDomainContext)
   const selectedAnchor = anchorSolution?.placementAnchor ?? { x: 0, y: 0 }
   const placementOffset = { x: -selectedAnchor.x || 0, y: -selectedAnchor.y || 0 }
   const body = { ...centeredBody,
@@ -77,15 +78,24 @@ export function svgPointNodeLayout(style: PointStyle, state: SvgLabelState) {
     textOrigin: { x: body.offsetX, y: body.offsetY },
     baseline: state.source === '' ? placementOffset.y : centeredBody.offsetY + placementOffset.y,
     layoutOptions,
-    layoutIdentity: pointLayoutIdentity(style),
+    layoutIdentity: svgPointNodeLayoutIdentity(style, cylinderDomainContext),
     paintedBounds: translateBounds(geometry.limitation ? { minX: 0, minY: 0, maxX: 0, maxY: 0 } : paintedBounds, placementOffset),
     warningBounds: warningBounds ? translateBounds(warningBounds, placementOffset) : undefined,
     anchorClearanceBounds: translateBounds(anchorSolution?.anchorBounds ?? paintedBounds, placementOffset), stroke, strokeJoin,
     shapeParametersIdentity: svgPointShapeParametersIdentity(style),
     strokeContour, strokeRegion, strokeSettings, dashCaps, selectionRadius }
 }
+
+/** A same-valued native edit can replace inherited raw units with emitted pt.
+ * Bind that runtime input alongside existing resolved layout without touching
+ * model identity or the body typesetting request/cache. */
+function svgPointNodeLayoutIdentity(style: PointStyle, cylinderDomainContext?: CylinderDomainContext): string {
+  const layout = pointLayoutIdentity(style)
+  return style.shape === 'cylinder' ? JSON.stringify([layout,
+    cylinderDomainContext ?? cylinderDomainContextForStyle(style)]) : layout
+}
 function solveLegacyAnchorLayout(style: PointStyle, state: SvgLabelState,
-  geometry: ReturnType<typeof svgPointNodeGeometry>, lineWidth: number, originX: number) {
+  geometry: ReturnType<typeof svgPointNodeGeometry>, lineWidth: number, originX: number, cylinderDomainContext?: CylinderDomainContext) {
   const scale = svgPointNodeTexPointScale
   const layout = resolvePointNodeLayoutOptions(style, lineWidth / scale)
   const bodyWidth = geometry.contentBounds.maxX - geometry.contentBounds.minX
@@ -100,6 +110,10 @@ function solveLegacyAnchorLayout(style: PointStyle, state: SvgLabelState,
       minimumWidth: layout.minimumWidth * scale, minimumHeight: layout.minimumHeight * scale,
       anchor: layout.anchor, lineWidth, fontContext: { em: defaultPointNodeFontContext.fontSizePt * scale,
         ex: defaultPointNodeFontContext.xHeightPt * scale },
+      ...(style.shape === 'cylinder' ? {
+        dimensionSources: (cylinderDomainContext ?? cylinderDomainContextForStyle(style)).dimensionSources,
+        cylinderDomainParameters: cylinderDomainContext ?? cylinderDomainContextForStyle(style),
+      } : {}),
       parameters: { ...parameters, starPointHeight: parameters.starPointHeight * scale } })
   } catch (error) {
     if (!(error instanceof RangeError)) throw error
@@ -125,31 +139,31 @@ export function svgPointNodeOwner(documentRevision: number | string, id: string)
 }
 
 export function currentSvgPointNodeGeometry(point: PointStratum, commits: SvgPointNodeCommits,
-  documentRevision: number | string, fontGeneration: number) {
-  return currentSvgPointNodeLayout(point, commits, documentRevision, fontGeneration)?.geometry ?? null
+  documentRevision: number | string, fontGeneration: number, cylinderDomainContext?: CylinderDomainContext) {
+  return currentSvgPointNodeLayout(point, commits, documentRevision, fontGeneration, cylinderDomainContext)?.geometry ?? null
 }
 
 export function currentSvgPointNodeLayout(point: PointStratum, commits: SvgPointNodeCommits,
-  documentRevision: number | string, fontGeneration: number) {
+  documentRevision: number | string, fontGeneration: number, cylinderDomainContext?: CylinderDomainContext) {
   const entry = commits.get(point.id)
   const strokeSettings = effectiveSvgPointStroke(point.style)
   return entry?.ownerIdentity === svgPointNodeOwner(documentRevision, point.id)
     && entry.source === (point.text ?? '') && entry.fontGeneration === fontGeneration
     && entry.shape === point.style.shape && entry.size === point.style.size
-    && entry.layout.layoutIdentity === pointLayoutIdentity(point.style)
+    && entry.layout.layoutIdentity === svgPointNodeLayoutIdentity(point.style, cylinderDomainContext)
     && entry.layout.shapeParametersIdentity === svgPointShapeParametersIdentity(point.style)
     && sameSvgPointStroke(entry.layout.strokeSettings, strokeSettings) ? entry.layout : null
 }
 
 /** Nonmounted callers use the same bounded full-source pending policy. */
-export function pendingSvgPointNodeGeometry(point: PointStratum) {
-  return pendingSvgPointNodeLayout(point).geometry
+export function pendingSvgPointNodeGeometry(point: PointStratum, cylinderDomainContext?: CylinderDomainContext) {
+  return pendingSvgPointNodeLayout(point, cylinderDomainContext).geometry
 }
 
-export function pendingSvgPointNodeLayout(point: PointStratum) {
+export function pendingSvgPointNodeLayout(point: PointStratum, cylinderDomainContext?: CylinderDomainContext) {
   const request = { source: point.text ?? '',
     settings: svgLabelLayoutSettings(svgPointNodeTextFontSize, svgPointNodeTextFontFamily) }
   const state: SvgLabelState = { source: request.source, requestIdentity: svgLabelRequestIdentity(request),
     status: 'pending', ...literalSvgLabelLayout(request.source, request.settings) }
-  return svgPointNodeLayout(point.style, state)
+  return svgPointNodeLayout(point.style, state, cylinderDomainContext)
 }

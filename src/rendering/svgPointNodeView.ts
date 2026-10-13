@@ -14,7 +14,7 @@ export function SvgPointNodeView({ capture, state, selected = false, elementRef,
 }): ReactElement {
   if (!capture.pointStyle) throw new Error('Missing point style')
   const style = capture.pointStyle
-  const layout = svgPointNodeLayout(style, state)
+  const layout = svgPointNodeLayout(style, state, capture.pointCylinderDomainContext)
   const { geometry, strokeContour } = layout
   const bodyBounds = layout.body.bounds
   const hasBodyTarget = previewBodyTarget && state.source !== ''

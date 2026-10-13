@@ -3,12 +3,16 @@ import type { LabelLayoutSettings } from './labels/labelMetrics.ts'
 import { normalizeSvgLabelFontSize, svgLabelFontFamily } from './labels/svgLabelLayout.ts'
 import type { SvgLabelRuntime } from './labels/svgLabelRuntime.ts'
 import { clonePointStyle } from '../model/styles.ts'
+import { clonePointNodeDimensionSource } from '../model/pointNodeLayout.ts'
+import type { CylinderDomainContext } from '../geometry/pointNodeShapes/cylinderDomain.ts'
 
 /** Runtime-only committed label inputs. No model objects or callbacks are retained. */
 export type SvgLabelExportCapture = Readonly<{
   runtime: SvgLabelRuntime
   /** When present this capture owns the entire point, including its contour. */
   pointStyle?: Readonly<PointStyle>
+  /** Actual cylinder dimension source at this click; separate from saved style. */
+  pointCylinderDomainContext?: Readonly<CylinderDomainContext>
   source: string
   position: Readonly<{ x: number; y: number }>
   fontSize: number
@@ -30,6 +34,9 @@ export function captureSvgLabelExport(input: SvgLabelExportCaptureInput): SvgLab
   return Object.freeze({
     runtime: input.runtime,
     pointStyle: input.pointStyle === undefined ? undefined : freezePointStyle(input.pointStyle),
+    ...(input.pointCylinderDomainContext === undefined ? {} : {
+      pointCylinderDomainContext: freezeCylinderDomainContext(input.pointCylinderDomainContext),
+    }),
     source: input.source,
     position: Object.freeze({ x: input.position.x, y: input.position.y }),
     fontSize: normalizeSvgLabelFontSize(input.fontSize),
@@ -47,6 +54,15 @@ export function captureSvgLabelExport(input: SvgLabelExportCaptureInput): SvgLab
       lineGapEm: input.settings.lineGapEm,
     }),
   })
+}
+
+function freezeCylinderDomainContext(context: Readonly<CylinderDomainContext>): Readonly<CylinderDomainContext> {
+  const dimensionSources = Object.freeze(Object.fromEntries(Object.entries(context.dimensionSources).map(([field, value]) => {
+    const source = clonePointNodeDimensionSource(value)
+    if (source.fontContext) Object.freeze(source.fontContext)
+    return [field, Object.freeze(source)]
+  })))
+  return Object.freeze({ dimensionSources, borderRotate: context.borderRotate, borderUsesIncircle: context.borderUsesIncircle })
 }
 
 function freezePointStyle(style: PointStyle): Readonly<PointStyle> {

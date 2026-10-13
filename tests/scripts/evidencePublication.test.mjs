@@ -7,6 +7,7 @@ import { basename, join } from 'node:path'
 import test from 'node:test'
 import { createEvidencePublisher, createEvidenceReportStorage, createLiveEvidenceRetainer,
   readEvidenceDocumentSync } from '../../scripts/evidencePublication.mjs'
+import { awaitPublicationEntry, ownPublication, publicationGate, publicationValue } from './ownedPublicationProgressFixture.mjs'
 
 const checkout = { fingerprint: 'a'.repeat(64), head: 'b'.repeat(40), trackedDiffSha256: 'c'.repeat(64), untrackedSha256: 'd'.repeat(64) }
 
@@ -128,22 +129,52 @@ test('legacy complete documents still resolve without changing existing proof va
 })
 
 test('queued observations are frozen before awaiting a writer or another publication', async (t) => {
-  const artifactDir = await directory(t), entered = deferred(), release = deferred()
+  const artifactDir = await directory(t), entered = publicationGate(), release = publicationGate(), finished = publicationGate()
+  // Construct independent expensive inputs before holding the actual ordinary
+  // writer. These observations prove enqueue-time freezing, not wall speed.
+  const next = liveFixture(3), expected = structuredClone(next), deadlines = [], outcomes = []
+  const own = promise => {
+    const outcome = ownPublication(promise)
+    outcomes.push(outcome)
+    return outcome
+  }
   let stalled = false
-  const publisher = createEvidencePublisher({ artifactDir, checkout, timeoutMs: 1000, write: async (path, bytes) => {
-    if (!stalled) { stalled = true; entered.resolve(); await release.promise }
+  const publisher = createEvidencePublisher({ artifactDir, checkout, scheduleDeadline: (expire, timeoutMs) => {
+    const deadline = { expire, timeoutMs, cancelled: false }
+    deadlines.push(deadline)
+    return () => { deadline.cancelled = true }
+  }, write: async (path, bytes) => {
+    if (!stalled) {
+      stalled = true; entered.resolve()
+      try { await release.promise; await writeFile(path, bytes) } finally { finished.resolve() }
+      return
+    }
     await writeFile(path, bytes)
   } })
-  const first = publisher.publish('first.json', { stage: 'before', value: 1 }, { stage: 'before' })
-  await entered.promise
-  const next = liveFixture(3), expected = structuredClone(next)
-  const queued = publisher.publish('second.json', next, { stage: 'after' })
-  next.snapshot.captureGeometry.samples[639].local.y = 999
-  next.state.history = 'mutated after queue'
-  next.capture.actions[0].events[0].source = 'mutated owner event'
-  release.resolve()
-  await first; await queued
-  assert.deepEqual(readEvidenceDocumentSync(artifactDir, 'second.json', { checkout }), expected)
+  try {
+    const first = own(publisher.publish('first.json', { stage: 'before', value: 1 }, { stage: 'before' }))
+    // An unexpected rejection before writer entry cannot orphan the entry gate.
+    await awaitPublicationEntry(entered, first)
+    const queued = own(publisher.publish('second.json', next, { stage: 'after' }))
+    assert.equal(deadlines.length, 2)
+    assert.ok(deadlines.every(deadline => deadline.timeoutMs === 5000 && !deadline.cancelled))
+    next.snapshot.captureGeometry.samples[639].local.y = 999
+    next.state.history = 'mutated after queue'
+    next.capture.actions[0].events[0].source = 'mutated owner event'
+    assert.equal(publisher.metrics.boundaries, 0, 'Neither publication has committed when queued inputs change')
+    // Deterministic contention keeps a queued root behind a still-held ordinary
+    // write while another event-loop turn observes the corrupted input.
+    await new Promise(resolve => setImmediate(resolve))
+    assert.equal(publisher.metrics.boundaries, 0)
+    release.resolve()
+    publicationValue(await first); publicationValue(await queued)
+    assert.deepEqual(readEvidenceDocumentSync(artifactDir, 'second.json', { checkout }), expected)
+    assert.ok(deadlines.every(deadline => deadline.cancelled), 'Every scoped deadline is cancelled')
+  } finally {
+    entered.resolve(); release.resolve()
+    if (stalled) await finished.promise
+    await Promise.all(outcomes)
+  }
 })
 
 for (const late of ['fulfillment', 'rejection']) test(`stalled final publication owns late ${late} and cannot replace authoritative failure`, async (t) => {

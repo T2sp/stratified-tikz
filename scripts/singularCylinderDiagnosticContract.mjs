@@ -2,6 +2,7 @@ import assert from 'node:assert/strict'
 import { createHash } from 'node:crypto'
 import { readFileSync } from 'node:fs'
 import { resolve } from 'node:path'
+import { isDeepStrictEqual } from 'node:util'
 import { parseSignedPointSvg, signedPointStandaloneRootAttributes } from './signedPointStandaloneAssociation.mjs'
 import { assertStandaloneReopeningRecord, validateStandaloneSvgCaptureEvidence } from './standaloneSvgCaptureContract.mjs'
 import { generateTikzForUi } from '../src/ui/tikzExportMode.ts'
@@ -21,6 +22,22 @@ export const singularCylinderLayout = Object.freeze({ innerXSep: 0, innerYSep: 0
   units: Object.fromEntries(['innerXSep', 'innerYSep', 'outerXSep', 'outerYSep', 'minimumWidth', 'minimumHeight']
     .map((key) => [key, { source: '0pt', unit: 'pt', texPoints: 0 }])),
   fontContext: { fontSizePt: 10, xHeightPt: 4.30554 } })
+export const subspCylinderScenario = 'point-layout-cylinder-subsp-diagnostic'
+export const subspCylinderLayout = Object.freeze({ ...structuredClone(singularCylinderLayout), innerYSep: .000001, minimumHeight: 80,
+  units: { ...structuredClone(singularCylinderLayout.units), innerYSep: { source: '0.000001pt', unit: 'pt', texPoints: .000001 },
+    minimumHeight: { source: '80pt', unit: 'pt', texPoints: 80 } } })
+export const cylinderDiagnosticScenarios = [singularCylinderScenario, subspCylinderScenario]
+export function cylinderDiagnosticLayout(scenario) {
+  assert.ok(cylinderDiagnosticScenarios.includes(scenario), 'A registered cylinder diagnostic scenario is required')
+  return scenario === subspCylinderScenario ? subspCylinderLayout : singularCylinderLayout
+}
+function diagnosticScenarioFromLayout(layout) {
+  const zeroMinimum = { ...structuredClone(layout), minimumWidth: 0,
+    units: { ...structuredClone(layout.units), minimumWidth: { source: '0pt', unit: 'pt', texPoints: 0 } } }
+  const matches = cylinderDiagnosticScenarios.filter(scenario => isDeepStrictEqual(zeroMinimum, cylinderDiagnosticLayout(scenario)))
+  assert.equal(matches.length, 1, 'Raw authored dimensions belong to one registered cylinder diagnostic')
+  return matches[0]
+}
 export const singularCylinderParameters = Object.freeze({ aspect: .55, cylinderUsesCustomFill: true,
   cylinderBodyFill: '#00FF00', cylinderEndFill: '#FF00FF' })
 export const singularCylinderWarningPath = 'M -8 -2 h 2 v 7 h -2 Z M -8 8 h 2 v 2 h -2 Z'
@@ -60,6 +77,7 @@ function pointFromState(state) {
   assert.equal(point.text, ''); assert.equal(point.style.shape, 'cylinder'); assert.equal(point.layer, 0)
   assert.deepEqual(point.position, { x: 3, y: 3, z: diagram.ambientDimension === 3 ? .5 : 0 })
   assert.deepEqual(point.style.shapeParameters, singularCylinderParameters)
+  diagnosticScenarioFromLayout(point.style.layout)
   return { point, diagram }
 }
 function assertCurrentOwner(observed, state) {
@@ -88,7 +106,7 @@ export function assertSingularCylinderObservation(observed, state, { singular = 
   assert.deepEqual(observed.inkChildTags, ['g']); assert.deepEqual(observed.contentChildTags, [])
   assert.equal(observed.bodyTitle, ''); assert.equal(observed.bodyTitleCount, 1)
   if (singular) {
-    assert.deepEqual(point.style.layout, singularCylinderLayout)
+    assert.deepEqual(point.style.layout, cylinderDiagnosticLayout(diagnosticScenarioFromLayout(point.style.layout)))
     assert.equal(observed.limitation, singularCylinderLimitation)
     assert.equal(observed.warningTitle, singularCylinderWarning)
     assert.deepEqual(observed.warning, { tag: 'path', attributes: { d: singularCylinderWarningPath, fill: '#B45309' } })
@@ -170,7 +188,7 @@ export function assertSingularCylinderNative(entry) {
   assert.deepEqual(entry.after, entry.restoration.after)
 }
 export function assertSingularCylinderEvidence(evidence) {
-  assert.equal(evidence.scenario, singularCylinderScenario); assert.equal(evidence.group, 'point-node-layout-anchors-combined')
+  assert.ok(cylinderDiagnosticScenarios.includes(evidence.scenario)); assert.equal(evidence.group, 'point-node-layout-anchors-combined')
   assert.equal(evidence.result, 'passed'); assert.deepEqual(evidence.pageErrors, [])
   assert.equal(evidence.cases.length, 2); assert.equal(evidence.downloads.length, 2)
   for (const ambientDimension of [2, 3]) {
@@ -179,6 +197,8 @@ export function assertSingularCylinderEvidence(evidence) {
     assert.equal(entry.transitions.length, 4)
     for (const [index, transition] of entry.transitions.entries()) {
       const singular = index % 2 === 1
+      assert.equal(diagnosticScenarioFromLayout(pointFromState(transition.state).point.style.layout), evidence.scenario,
+        'Every native transition belongs to this diagnostic scenario')
       assertSingularCylinderObservation(transition.rendered, transition.state, { singular })
       if (index > 0) {
         const previous = entry.transitions[index - 1], field = transition.field
@@ -197,7 +217,7 @@ export function assertSingularCylinderEvidence(evidence) {
       'Native diagnostic starts from the final recorded Inspector transition')
     assertSingularCylinderNative(entry.native)
     const download = evidence.downloads.find((item) => item.ambientDimension === ambientDimension)
-    assert.ok(download); assert.equal(download.scenario, `${singularCylinderScenario}-${ambientDimension}d`)
+    assert.ok(download); assert.equal(download.scenario, `${evidence.scenario}-${ambientDimension}d`)
     assert.equal(download.group, evidence.group); assert.equal(download.background, 'transparent')
     assertCurrentDownload(download)
     assert.deepEqual(download.expected[0].modelPoint, pointFromState(entry.native.after).point, 'Saved/reloaded export preserves the actual native diagnostic point')
@@ -208,7 +228,9 @@ function assertCurrentDownload(input) {
   const { beforeExportState, click, expected, preExport, savedJson } = input, snapshot = click.snapshot
   assert.equal(click.error, undefined); assert.equal(snapshot.documentUnchanged, true)
   const { point, diagram } = pointFromState(beforeExportState)
-  assert.deepEqual(point.style.layout, singularCylinderLayout); assert.equal(diagram.ambientDimension, input.ambientDimension)
+  const scenario = diagnosticScenarioFromLayout(point.style.layout)
+  assert.equal(input.scenario, `${scenario}-${input.ambientDimension}d`)
+  assert.deepEqual(point.style.layout, cylinderDiagnosticLayout(scenario)); assert.equal(diagram.ambientDimension, input.ambientDimension)
   assert.deepEqual(JSON.parse(savedJson).diagram.strata, diagram.strata); assert.equal(JSON.parse(savedJson).version, 2)
   assert.equal(expected.length, 1); assert.equal(expected[0].id, point.id); assert.deepEqual(expected[0].modelPoint, point)
   assert.equal(expected[0].shape, 'cylinder'); assert.equal(expected[0].source, '')
@@ -238,8 +260,10 @@ function assertCurrentDownload(input) {
   for (const mode of ['standalone', 'inlineMath']) {
     const source = input.outputs[mode]
     assert.equal(source, generateTikzForUi(diagram, { ...ui, exportMode: mode }), 'Both TikZ modes reproduce the entire current authored model/source/coordinate/options')
-    assert.ok(source.includes('cylinder') && source.includes('inner xsep=0pt') && source.includes('inner ysep=0pt')
-      && source.includes('minimum width=0pt') && source.includes('minimum height=0pt') && source.includes('cylinder uses custom fill'), 'TikZ retains authored unsupported cylinder intent')
+    const layout = cylinderDiagnosticLayout(scenario)
+    assert.ok(source.includes('cylinder') && source.includes('inner xsep=0pt') && source.includes(`inner ysep=${layout.units.innerYSep.source}`)
+      && source.includes('minimum width=0pt') && source.includes(`minimum height=${layout.units.minimumHeight.source}`)
+      && source.includes('cylinder uses custom fill'), 'TikZ retains authored unsupported cylinder intent')
     assert.ok(/\{\};/u.test(source)); assert.ok(!source.includes('preview unavailable'))
   }
 }
@@ -332,7 +356,7 @@ export function assertSingularCylinderStandaloneEvidence(evidence, raw, artifact
   for (const field of ['savedJson', 'outputs', 'beforeExportState', 'preExport', 'capture']) assert.deepEqual(raw[field], download[field])
   const stem = download.scenario
   const native = readEvidenceDocumentSync(artifactDir, `${stem}-native.json`, { checkout })
-  assert.equal(native.scenario, singularCylinderScenario); assert.equal(native.result, 'observed'); assert.equal(native.group, evidence.group)
+  assert.equal(native.scenario, evidence.scenario); assert.equal(native.result, 'observed'); assert.equal(native.group, evidence.group)
   assert.deepEqual(native.case, evidence.cases.find((entry) => entry.ambientDimension === ambientDimension))
   assert.equal(readFileSync(resolve(artifactDir, `${stem}-saved.json`), 'utf8'), raw.savedJson)
   for (const mode of ['standalone', 'inlineMath']) assert.equal(readFileSync(resolve(artifactDir, `${stem}-${mode}.tex`), 'utf8'), raw.outputs[mode])

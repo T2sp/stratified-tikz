@@ -1,4 +1,4 @@
-import type { PointShape, PointShapeParameters, Vec2 } from '../../model/types.ts'
+import type { PointNodeDimensionField, PointNodeDimensionSource, PointShape, PointShapeParameters, Vec2 } from '../../model/types.ts'
 
 export type PointShapeBounds = {
   minX: number
@@ -27,6 +27,12 @@ export type PointNodeShapeInput = {
   anchor?: string
   /** Current font dimensions, in the same geometry units (used by mid anchors). */
   fontContext?: { em: number; ex: number }
+  /** Effective emitted pt or inherited raw unit/context sources, consulted only
+   * for TeX-domain cylinder classification. Authored model/paint stay intact. */
+  dimensionSources?: Partial<Record<PointNodeDimensionField, PointNodeDimensionSource>>
+  /** Effective inherited/local flags for the domain guard only. Paint retains
+   * the caller's construction parameters; no saved shape state is changed. */
+  cylinderDomainParameters?: { borderRotate: number; borderUsesIncircle: boolean }
 }
 
 export type PointShapeContour = {
@@ -50,6 +56,21 @@ export type PointPolygonalFitting =
   | { kind: 'dart'; tipLength: number; tailLength: number; halfSeparation: number; offset: number;
       tipMiter: Vec2; tailCenterMiter: Vec2; leftTailMiter: Vec2; rightTailMiter: Vec2 }
 
+/** Cylinder construction in unrotated PGF coordinates, relative to the upright
+ * text-box center (Y up). Anchor conversion applies rotation and the SVG Y reversal once; paint
+ * contours independently transform the same construction in their builder.
+ * End/base are declared roles, even when axial fitting folds their x ordering. */
+export type PointCylinderFitting = {
+  rx: number
+  ry: number
+  halfLength: number
+  bodyExtension: number
+  endCenter: Vec2
+  baseCenter: Vec2
+  beforeTop: Vec2
+  afterBottom: Vec2
+}
+
 export type PointNodeShapeSolution = {
   /** The outer closed contour is first; cylinder adds its open end seam. */
   contours: PointShapeContour[]
@@ -65,6 +86,8 @@ export type PointNodeShapeSolution = {
   signedFittedAxes?: Vec2
   /** Runtime-only PGF parameters; no saved model or history fields are added. */
   polygonalFitting?: PointPolygonalFitting
+  /** Runtime-only signed fitting; never reconstructed from ordered paint bounds. */
+  cylinderFitting?: PointCylinderFitting
   /** Clearance is separate from the path and paint and is never a hit region. */
   anchorBounds: PointShapeBounds
   /** Supported named anchors, relative to the upright text-box center, SVG y down. */

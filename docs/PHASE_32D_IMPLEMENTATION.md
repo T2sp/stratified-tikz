@@ -1,5 +1,273 @@
 # Phase 32D spacing, minima, anchors, and combined audit
 
+## Cylinder construction, scanned dimensions, and verifier progress (2026-10-13)
+
+This fix starts at clean HEAD `afe1bd642f8bf5a97671c0ade2b3a2c5565ffcbf`,
+fingerprint `e830af22f561da5256d21788d907ca2e954213286c348f5d2da4bb093f22a4c7`.
+That prompt commit includes the thirteen previously modified files and all 116
+previously untracked files. The accepted predecessor is `dTPBzJ`, not the
+historical restricted child `T6o1A2`. New identities include actual changed
+tracked and untracked bytes; the supplied pre-prompt fingerprint is historical.
+
+The latest independent review is **needs_changes**, Critical 0 / Medium 3 /
+Low 0, `ready_to_commit:false`. It establishes three current findings:
+
+- A valid empty cylinder with `inner xsep=-30pt`, `inner ysep=5pt`, minima
+  `1pt`, outer separation `0`, line width `.4pt`, and anchor `bottom` loses its
+  construction roles when anchors are reconstructed from painted bounds. PGF
+  places bottom at `(4.6,0)pt`; the reviewed implementation gives `(.6,0)pt`.
+  Positive radii do not prevent folded end/base ordering. Shape center,
+  compass, text-side and numeric anchors also fail; a bottom-only correction
+  cannot close the finding.
+- An empty cylinder with `inner ysep=.000001pt`, `inner xsep=0`, minimum
+  width `0`, minimum height `80pt`, and line width `.4pt` retains nonzero
+  JavaScript padding but has a zero TeX transverse dimension. Actual generated
+  and correctly wrapped TikZ fails PGF division. The reviewed preview paints
+  an approximately 96-unit cylinder without a warning.
+- The queued freezing regression times out its first deliberately held writer
+  after a real 1,000ms, charging fixture preparation to a machine-dependent
+  budget. Reviewer verification later cancels the verifier file with an
+  unresolved promise. The log does not establish that freezing caused that
+  cancellation. The 8,555,226ms missing-title subtest completed before later
+  controls, so its duration is a localization clue, not proof of the unresolved
+  operation.
+
+The complete reviewer log is `/private/tmp/stz-32d-review-1791812464902/npm-test.log`
+(SHA256 `baba12cc62b59f5d8c0a01c8cc7565e2b95cd84572bb0c8e23679768ce6fd4c5`).
+It observed 7,055 tests: 7,053 passed, one failed, one cancelled, zero skipped;
+the interrupted run is **incomplete**. Its isolated freezing/closed-title
+retries each passed 1/1. The focused geometry/rendering 538/538 and
+model/layout/TikZ/export 74/74 checks passed. Those diagnostics do not replace
+complete registered-suite acceptance.
+
+The matching historical parent passed 7,094/7,094 tests and all five checks.
+Its authenticated browser documents were resolved again using
+`readEvidenceDocumentSync` with the recorded historical checkout: all eighteen
+groups and ten layout scenarios, 203 records / 4,625 diagnostics, no page errors
+or incomplete/unexecuted groups. This supports preservation of existing
+contracts, but cannot override the review or verify new bytes. The 110 retained
+raw-zero cylinder evidence files match their recorded hashes byte for byte.
+
+Implementation results and fresh verification for this invocation are recorded
+below after the scoped work completes. Phase 32 remains **incomplete** until
+complete fresh strict verification and matching independent read-only review
+pass. Browser startup restrictions leave native/file acceptance pending for the
+browser-capable parent; no review, commit or push is implied by focused tests.
+
+### Scoped corrections and additive acceptance
+
+Cylinder construction now retains runtime-only `cylinderFitting`: signed `rx`
+and `ry`, actual declared end/base centers, side role points, signed half-length
+and body extension. These coordinates are unrotated PGF Y-up coordinates relative
+to the upright body-box center. The anchor resolver transforms that metadata
+once into its rotated SVG Y-down frame. Paint contours, the seam and custom
+body/end regions retain their independent construction and ordered bounds.
+Anchors no longer recover signs or roles from paint envelopes. End-arc clearance
+still uses the signed `max(outerXSep,outerYSep)`; side points use `outerYSep`.
+Declared branch order, infinite-line intersections and bounded arc bisection
+remain unchanged. No model/history/clipboard/export schema fields were added.
+
+`cylinderDomain.ts` evaluates the relevant dimensional register stages in TeX
+scaled points using `unitScale ?? 1`. It separately scans inner separation,
+body width/height/depth, each dimensional half-product and advance, rotation's
+axis/inner-separation exchange or incircle fitting, and scanned minimum width
+followed by its dimensional halving. It classifies the final transverse divisor
+before the existing division/RangeError route. Scalar division/reciprocal
+arithmetic remains distinct. Signed scanner ties apply the sign after magnitude
+rounding; dimensional half-products truncate towards zero.
+
+Dimension scanning uses the effective source that the existing exporter emits.
+Local/direct and overridden fields emit six-decimal resolved `pt` literals;
+unchanged inherited fields may be replaced by raw named-style options later in
+the option sequence. The runtime resolver reads the current associated imported
+reference and its resolution context, including valid legacy layouts without an
+intent snapshot. It applies the existing override-field and matching-preset
+rules. A historical baseline alone cannot replace current reference text.
+Scanning a tiny inherited `em`/`ex` coefficient before multiplying its unit can
+differ from scanning the local resolved point literal. Authored numbers, units,
+source/context, raw text and exporter output remain unchanged. This runtime input
+is frozen separately in click capture and bound into cylinder layout reuse;
+a same-valued native edit can change the effective source and invalidate the old
+commit without changing the text request. Current inherited rotation/incircle
+flags are carried only for those classifier stages; a changed current named
+reference can change the divisor even when saved fitting snapshots are stale.
+Actual generated PGF controls authenticate that case. Paint still uses the
+preserved model parameters. Quantization is limited to cylinder
+domain classification, leaving paint and other shape calculations unchanged.
+The existing warning-only layout/picking/export route suppresses requested
+contours, seam, regions and hidden selection areas.
+
+Separate evidence lives under
+`tests/fixtures/point-node-anchors/cylinder-fitting-scanning/`. It authenticates
+the retained folded case with all 23 supported named anchors and 14 numeric
+spellings, compact signed/minimum/rotation/incircle/outer-separation neighbors,
+and scanner ties, half-product cancellation, one-/two-scaled-point minima and
+physical/contextual units. The bundle distinguishes zero-divisor failures,
+genuine compiler successes and nonzero-divisor cases that fail later with
+PGF's reciprocal `Dimension too large` error. A surviving first scaled point
+is not described as a successful whole-node compilation. Original raw inputs,
+compiler/generated reviewer bytes and their hashes are copied additively;
+oracle generation imports no production solver. Tests retain one PGF Y
+conversion, .025pt anchor / .03pt contour tolerances and the existing finite
+work/precision limits. All 654 preceding shape/anchor reference files, including
+the 110 raw-zero cylinder artifacts, match HEAD and recorded historical hashes.
+
+The additive bundle contains 173 files: thirteen authenticated zero-divisor
+failures, thirteen actual compiler-success controls with 254 recorded anchors,
+and twelve distinct nonzero-register reciprocal-overflow controls. Regeneration
+uses `node tests/fixtures/point-node-anchors/cylinder-fitting-scanning/generate.mjs`
+with the recorded TeX Live 2026 / PGF 3.1.11a engine and source hashes. Compiler
+logs are explicitly included in checkout identity by the scoped `.gitignore`.
+
+Shared tests cover the two reproductions in 2D/3D pending/live/settled placement,
+paint/seam/custom regions, picking/far misses, exact authored padding and units,
+JSON/history/reload, current owners/requests/revisions, same-owner
+folded→subsp→folded recovery, and standalone/inline TikZ. Runtime metadata is
+absent from saved documents. Independent contour checks remain separate from
+placement checks.
+
+The cumulative eighteen-group workflow retains all ten predecessor scenarios
+and registers two additional mandatory scenarios:
+`point-layout-cylinder-folded-anchors` and
+`point-layout-cylinder-subsp-diagnostic`. Folded coverage uses ordinary load,
+Inspector/native anchor inputs and fresh current owner/projection/CTM observations
+for the complete anchor bundle, contour picking and actual complete-root SVG/PNG/
+TikZ downloads and reopening. Subsp uses the strict existing dedicated cylinder
+diagnostic context, with exact raw/model/source/domain/owner/request/revision,
+warning/body absence-of-requested-paint and real file/PNG replay. Neither new
+file route is eligible by filename or through the seven-owner signed empty-body
+route. Publication/ref/association/root/CTM and legacy body gates remain required.
+Synthetic corruption fixtures prove policy rejection; they do not establish
+native browser acceptance.
+
+The freezing regression prepares its expensive independent fixture and expected
+value before holding an actual asynchronous ordinary writer. A per-publisher
+scheduler seam controls only that test's owner deadlines; production still uses
+5,000ms and intentional timeout controls remain. The queued root is frozen
+before exact field mutations while the first writer stays held, then actual
+bytes are written/resolved and compared losslessly. Shared entry waits race
+immediately owned publication outcomes, propagating an early primary rejection
+instead of leaving an entry promise pending. Finally blocks release/settle gates
+and drain outcomes/late writes.
+
+The real verifier's contextual corruption, publication authority and diagnostic
+replay paths now record stages before awaited subtests/publications, assert
+exact mutation restoration and complete subtest/stage counts, and drain owned
+publication outcomes. Deterministic injected early writer failure and a selected
+held-writer deadline exercise the complete cumulative fixture's actual native/
+standalone publications, exact primary Error propagation, terminal failure
+authority, late writer settlement and cleanup. Instrumentation does not claim
+to identify the unique cause of the interrupted reviewer run. Complete fresh
+affected-file/full-suite outcomes remain the acceptance evidence.
+
+### Completed focused checks and browser disposition
+
+Homebrew-first Node 26.9.0 completed the final cylinder/reference/shared sweep
+114/114 and expanded preserved geometry/reference/render/model/TikZ sweep
+720/720, zero failures/cancellations/skips. The initial oracle assumed a
+one-scaled-point reciprocal would compile; authenticating its later overflow
+corrected that assumption without discarding the failure artifacts. Initial
+test API/export precision assertions were corrected to the existing public APIs
+and six-digit export convention; production/exporter behavior was not changed
+to satisfy those assertions. Exact initial outcomes remain in the scoped handoff.
+
+Native/artifact policy checkpoints completed 74/74 initially, 25/25 after final
+folded provenance strengthening, and the entire affected 32D policy file
+741/741 on its first full run, zero failures/cancellations/skips. These are
+synthetic/helper checks, distinct from required real browser acceptance.
+
+Both affected publication/verifier files completed their first combined run
+679/679, zero failures/cancellations/skips. Immediate raw stdout exposed entry
+and restoration stages while the file was running; `t.diagnostic` alone is
+buffered. Real contextual/authority/diagnostic replay counts are 48/48, 12/12
+and 21/21, with exact restored bytes and zero pending outcomes. The pre-edit
+full verifier also completed 639/639 during diagnosis; this does not identify
+the cause of the historical cancellation.
+
+The first complete registered `npm test` run passes **7,195/7,195**, exit 0,
+zero failures/cancellations/skips/todos in 1,037,436.429417ms, using normal
+project settings. It adds 101 tests to the preceding 7,094-test suite, with no
+predecessor removed. That run began before the lint-only unused-import removal
+and final documentation updates. An intermediate strict runner then completed
+7,195/7,195, zero failures/cancellations/skips/todos, on unchanged matching bytes
+(`284d204ff3aabe15960899673d30c4d1efc73b55617a667110dddd436f561a17`).
+Build and diff passed; label-assets failed at server `listen EPERM`, and the runner
+stopped before free-labels. Report:
+`/var/folders/vk/7kf940pd4bx8f6cg3rzlmtc80000gn/T/stz-phase32d-manual-q0YyPN/verification.json`
+(SHA256 `f3a6cc4ff17e81a0d21384e7fc4e9f90e101719d32f2f2148f6c122382f4b164`).
+This intermediate run is superseded by subsequent substantive source-domain and
+placed-DOM test corrections, not reused as final-tree acceptance.
+
+The final source audit authenticated a local `.0000074em` input whose actual
+export resolves to `.000074pt` and compiles, while its inherited raw named-style
+form scans to zero and fails division. A same-valued local override compiles;
+the initial classifier warned on both local forms. Valid legacy imported-layout
+and changed-current-reference controls expose why style snapshots alone are
+insufficient. The first new export-domain test file observed 22 passed / one
+failed out of 23: a stale same-owner commit survived a changed effective source.
+That is a retained failing regression, not a retry accepted as final verification.
+Additive model/actual-generated/inline-and-standalone compiler evidence is under
+`tests/fixtures/point-node-anchors/cylinder-export-domain/`, separate from the
+unchanged first 173-file bundle. The second bundle contains 389 files and 33
+validated models / 66 actual compiler runs across both export modes: fifteen
+compiler-success model controls, sixteen zero-divisor controls and two distinct
+nonzero-divisor later-failure controls. It also authenticates the actual 3D
+occluded preset-only case: dimming breaks named-preset matching, so emitted local
+`pt` literals govern classification. Selection receives the same existing
+occlusion-derived dim state only for source resolution; visibility policy is
+unchanged. The five final cylinder files complete 154/154 with zero failures,
+cancellations/skips. The extended preserved geometry/reference/render/picking/
+capture/model/TikZ sweep completes 909/909 with the same zero-failure disposition.
+The first final-source file run observed 39/40: its JSON
+comparison mixed parser-normalized key order with original fixture key order.
+The correction compares serialization before/after the same loaded model;
+original artifact bytes/hashes and decoded model/generated-source checks remain.
+Exact initial/final logs, inventory and fresh complete final-tree runner are
+recorded in the external handoff. All 562 new independent files are additive.
+
+Read-only native audit also corrected the folded artifact contract to distinguish
+placed DOM body origin/baseline from the unplaced solver frame. The final focused
+contract run completes 27/27, with controls rejecting the mistaken zero body
+origin at bottom and zero baseline at mid. The final frozen-tree runner captures
+all actual tracked/untracked bytes before/after and runs the full registered
+suite again. Prior passes and isolated diagnostics cannot substitute for it.
+
+Build, strict application/new-test TypeScript, changed TypeScript lint (seven
+files), script syntax (seventeen files) and diff checks passed. Changed-script
+lint found one newly unused test import, removed without changing assertions;
+the corrected scoped seventeen-file check passes. The verifier's unchanged
+`_role` unused argument is excluded only in that scoped new-code check.
+Read-only HEAD lint separately reproduces four inherited errors: `_role`, two
+geometric caller unsafe-finally statements and the layers test unused import.
+The first baseline command omitted browser globals and reported extra no-undef
+findings; its corrected configuration reproduces exactly those four errors.
+The final changed-source/new-test TypeScript check covers sixteen files; it
+passes with only the separately reproduced `react-hooks/refs` rule excluded for
+`SvgDiagram`. Full-file lint of that newly touched propagation caller reports
+one inherited refs finding at line 979; read-only HEAD reproduces the same
+unchanged callback at line 978. This additional finding is separate from the
+four previously scoped inherited findings. Eighteen final scripts pass syntax
+and recommended scoped lint, excluding only the unchanged exact `_role`
+argument in the verifier. Final strict application/all three new-test TypeScript
+and diff checks pass. Repository-wide lint was not run; inherited debt remains.
+
+Bare required browser commands first failed to import the uninstalled project
+Playwright package. Using the existing cached Playwright and installed Chrome
+without adding dependencies, both configured commands fail at fresh server
+`listen EPERM 127.0.0.1`, before Chrome starts. Static label asset graph validation
+passes (four entries / 43 worker chunks / 85 references / 40 font modules).
+Strict free-labels records failed startup, zero completed/started groups and all
+eighteen unexecuted. No new native, SVG/PNG download or browser pass is claimed.
+Logs are under `/private/tmp/stz-32d-fitting-progress-fix-20261013/`; configured
+free-label failure artifacts are `/private/tmp/stz-free-labels-1791874348867/`.
+
+The complete registered suite and final frozen-tree strict-runner disposition
+are recorded in this invocation's external handoff. Required browser-capable
+parent verification must still run all eighteen groups/twelve layout scenarios,
+both dimensions, all predecessor/native/pending/standalone/file/reference gates
+on the final actual bytes before fresh independent read-only completion review.
+An incomplete/cancelled run or `needs_changes` continues to block completion.
+
 ## Singular-cylinder domain and deterministic writer follow-up (2026-10-12)
 
 The actual invocation entry is clean HEAD

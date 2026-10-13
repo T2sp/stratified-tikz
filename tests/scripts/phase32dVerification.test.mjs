@@ -14,7 +14,9 @@ import { createEvidencePublisher, createEvidenceReportStorage, createLiveEvidenc
 import { capturePointLayoutStandalone } from '../../scripts/checkPointLayoutAnchors.mjs'
 import { syntheticStandalonePointDownload } from './standalonePointDownloadFixture.mjs'
 import { syntheticSingularCylinderStandalone } from './singularCylinderFixture.mjs'
-import { singularCylinderScenario } from '../../scripts/singularCylinderDiagnosticContract.mjs'
+import { cylinderDiagnosticScenarios } from '../../scripts/singularCylinderDiagnosticContract.mjs'
+import { foldedCylinderScenario } from '../../scripts/foldedCylinderContract.mjs'
+import { syntheticFoldedCylinderStandalone } from './foldedCylinderFixture.mjs'
 import { pointNodeAnchorSupport } from '../../src/geometry/pointNodeShapes/index.ts'
 import { createEmptyDiagram, createPointStratum } from '../../src/model/constructors.ts'
 import { generateTikz } from '../../src/tikz/generateTikz.ts'
@@ -800,8 +802,9 @@ test('32D named group and every artifact are registered cumulatively', (t) => {
   assert.equal(layoutShapes.length, 15)
   for (const name of layoutAnchorScenarios) {
     assert.deepEqual(pointNodeScenarioArtifacts(name), layoutAnchorArtifacts(name))
-    const candidate = name === singularCylinderScenario
-      ? syntheticSingularCylinderStandalone(syntheticPolicyDirectory(t, 'stz-singular-registration-'), 2).evidence
+    const candidate = cylinderDiagnosticScenarios.includes(name)
+      ? syntheticSingularCylinderStandalone(syntheticPolicyDirectory(t, 'stz-singular-registration-'), 2, name).evidence
+      : name === foldedCylinderScenario ? syntheticFoldedCylinderStandalone(syntheticPolicyDirectory(t, 'stz-folded-registration-'), 2).evidence
       : evidence(name)
     assertLayoutAnchorEvidence(candidate, name)
   }

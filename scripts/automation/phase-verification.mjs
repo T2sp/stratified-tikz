@@ -24,7 +24,8 @@ import { observePostExternalPointPaint, assertPostExternalPointPaint, observeLit
 import { dashCapMechanismStem, dashCapMechanismArtifacts, assertDashCapMechanismEvidence } from "../pointDashCapMechanismContract.mjs";
 import { dashCapScenario, dashCapArtifacts, assertDashCapEvidence } from "../pointDashCapContract.mjs";
 import { readEvidenceDocumentSync } from "../evidencePublication.mjs";
-import { singularCylinderScenario, assertSingularCylinderStandaloneEvidence } from "../singularCylinderDiagnosticContract.mjs";
+import { cylinderDiagnosticScenarios, assertSingularCylinderStandaloneEvidence } from "../singularCylinderDiagnosticContract.mjs";
+import { foldedCylinderScenario, assertFoldedCylinderStandaloneEvidence } from "../foldedCylinderContract.mjs";
 
 import { polygonJoinScenario, polygonJoinArtifacts, assertPolygonJoinEvidence } from "../pointPolygonJoinContract.mjs";
 import { inspectConnectedLivePaintPng } from "../connectedLivePaintOracle.mjs";
@@ -291,12 +292,16 @@ function validateTargetedPaintEvidence(artifactDir, name, group, profile = "stri
       const raw = evidenceObject(artifactDir, `${name}-${ambientDimension}d-standalone.json`, checkout);
       assertSignedPolygonalStandaloneEvidence(evidence, raw, artifactDir, ambientDimension, { checkout });
     }
-    if (name === singularCylinderScenario) {
+    if (cylinderDiagnosticScenarios.includes(name)) {
       return [2, 3].map((ambientDimension) => {
         const raw = evidenceObject(artifactDir, `${name}-${ambientDimension}d-standalone.json`, checkout);
         return assertSingularCylinderStandaloneEvidence(evidence, raw, artifactDir, ambientDimension, { checkout });
       });
     }
+    if (name === foldedCylinderScenario) return [2, 3].map((ambientDimension) => {
+      const raw = evidenceObject(artifactDir, `${name}-${ambientDimension}d-standalone.json`, checkout);
+      return assertFoldedCylinderStandaloneEvidence(evidence, raw, artifactDir, ambientDimension, { checkout });
+    });
     if (name.startsWith('point-layout-pending-')) {
       const standalone = evidenceObject(artifactDir, `${name}-standalone.json`, checkout);
       assertLayoutStandaloneEvidence(evidence, standalone, artifactDir, { checkout });
@@ -881,13 +886,25 @@ export function validateBrowserEvidence(name, artifactDir, phase, checkout, prof
         // Warning-only downloads require their own exact diagnostic context.
         // Full model/native/click/file replay supplies eligibility before the
         // legacy envelope is examined; the signed seven-owner route is separate.
-        if (group === layoutAnchorGroup && name === singularCylinderScenario) {
+        if (group === layoutAnchorGroup && cylinderDiagnosticScenarios.includes(name)) {
           const contexts = validateTargetedPaintEvidence(artifactDir, name, group, profile, checkout);
           assert.equal(contexts.length, 2);
           for (const context of contexts) {
             assert.equal(context.schema, 'stz-singular-cylinder-diagnostic-artifact-v1');
             assert.ok([2, 3].includes(context.ambientDimension));
-            const artifact = `${singularCylinderScenario}-${context.ambientDimension}d.svg`;
+            const artifact = `${name}-${context.ambientDimension}d.svg`;
+            assert.equal(context.svgPath, resolve(artifactDir, artifact));
+            assert.equal(authenticatedDiagnosticPointSvgs.has(artifact), false);
+            authenticatedDiagnosticPointSvgs.set(artifact, context);
+          }
+        }
+        if (group === layoutAnchorGroup && name === foldedCylinderScenario) {
+          const contexts = validateTargetedPaintEvidence(artifactDir, name, group, profile, checkout);
+          assert.equal(contexts.length, 2);
+          for (const context of contexts) {
+            assert.equal(context.schema, 'stz-folded-cylinder-artifact-v1');
+            assert.ok([2, 3].includes(context.ambientDimension));
+            const artifact = `${name}-${context.ambientDimension}d.svg`;
             assert.equal(context.svgPath, resolve(artifactDir, artifact));
             assert.equal(authenticatedDiagnosticPointSvgs.has(artifact), false);
             authenticatedDiagnosticPointSvgs.set(artifact, context);

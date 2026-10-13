@@ -4,13 +4,13 @@ import { join } from 'node:path'
 import { tmpdir } from 'node:os'
 import test from 'node:test'
 import { assertSingularCylinderEvidence, assertSingularCylinderStandaloneEvidence, assertSingularCylinderNative,
-  assertSingularCylinderSvg } from '../../scripts/singularCylinderDiagnosticContract.mjs'
+  assertSingularCylinderSvg, singularCylinderScenario, subspCylinderScenario } from '../../scripts/singularCylinderDiagnosticContract.mjs'
 import { syntheticSingularCylinderStandalone } from './singularCylinderFixture.mjs'
 
-function fixture(run) {
+function fixture(run, scenario = singularCylinderScenario) {
   const directory = mkdtempSync(join(tmpdir(), 'stz-singular-cylinder-policy-'))
   try {
-    const pair = [2, 3].map(dimension => syntheticSingularCylinderStandalone(directory, dimension)), evidence = pair[0].evidence
+    const pair = [2, 3].map(dimension => syntheticSingularCylinderStandalone(directory, dimension, scenario)), evidence = pair[0].evidence
     evidence.downloads[1] = pair[1].download
     run({ directory, pair, evidence })
   } finally { rmSync(directory, { recursive: true, force: true }) }
@@ -100,6 +100,25 @@ test('synthetic singular cylinder rejects a normal PNG from the other owned file
 test('synthetic singular cylinder requires both real native dimensions', () => fixture(({ evidence }) => {
   evidence.cases.pop(); assert.throws(() => assertSingularCylinderEvidence(evidence))
 }))
+
+for (const dimension of [2, 3]) test(`synthetic sub-scaled-point cylinder replays exact ${dimension}D authored tiny dimension, warning-only file/native/PNG/TikZ proof`, () => fixture(({ directory, pair, evidence }) => {
+  const context = assertSingularCylinderStandaloneEvidence(evidence, pair[dimension - 2].raw, directory, dimension)
+  assert.equal(context.schema, 'stz-singular-cylinder-diagnostic-artifact-v1')
+  const model = JSON.parse(pair[dimension - 2].raw.savedJson).diagram.strata[0]
+  assert.equal(model.style.layout.innerYSep, .000001); assert.equal(model.style.layout.units.innerYSep.source, '0.000001pt')
+  assert.equal(model.style.layout.minimumHeight, 80)
+  assert.ok(pair[dimension - 2].raw.outputs.standalone.includes('inner ysep=0.000001pt'))
+}, subspCylinderScenario))
+for (const [name, mutate] of [
+  ['original raw-zero scenario transplanted', value => { value.scenario = singularCylinderScenario }],
+  ['invented narrow contour', value => { value.cases[0].native.clicks[1].observation.contourCount = 1 }],
+  ['hidden seam', value => { value.cases[0].native.clicks[1].observation.internalBorderCount = 1 }],
+  ['hidden custom paint regions', value => { value.cases[0].native.clicks[1].observation.paintRegionCount = 2 }],
+  ['ninety-six-unit hidden painted bounds', value => { value.cases[0].native.clicks[1].observation.paintedBounds.maxX = 48 }],
+  ['large hidden selection region', value => { value.cases[0].native.clicks[2].observation.ring.r = 48.4594 }],
+]) test(`synthetic sub-scaled-point cylinder rejects ${name}`, () => fixture(({ evidence }) => {
+  const current = structuredClone(evidence); mutate(current); assert.throws(() => assertSingularCylinderEvidence(current))
+}, subspCylinderScenario))
 
 // The fake browser schedules the ordinary UI/input/observer path; it never
 // supplies native acceptance. It catches preparation and error-ownership bugs.

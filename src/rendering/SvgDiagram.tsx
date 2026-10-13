@@ -83,6 +83,7 @@ import {
 import { projectToSvgPoint } from './svgProjection'
 import { SvgPointNode } from './SvgPointNode.tsx'
 import { svgPointNodeOwner, type SvgPointNodeCommit } from './svgPointNodeLayout.ts'
+import { resolveCylinderDomainContext } from './cylinderDomainSourceResolution.ts'
 import {
   curveStyleToSvgStrokeAttributes,
   filledSurfaceStyleToSvgAttributes,
@@ -2528,6 +2529,7 @@ function renderPoint(
       >
         <SvgPointNode runtime={labelRendering.runtime} source={point.text ?? ''}
           position={center} style={style} selected={isSelected}
+          cylinderDomainContext={resolveCylinderDomainContext(diagram, point, style)}
           ownerIdentity={svgPointNodeOwner(labelRendering.documentRevision, point.id)}
           onLayout={(snapshot) => {
             if (snapshot === null) labelRendering.pointCommits.delete(point.id)

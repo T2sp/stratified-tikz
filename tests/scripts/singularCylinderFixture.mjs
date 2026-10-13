@@ -3,7 +3,7 @@ import { join } from 'node:path'
 import { pathToFileURL } from 'node:url'
 import { deflateSync } from 'node:zlib'
 import { createEmptyDiagram, createPointStratum } from '../../src/model/constructors.ts'
-import { singularCylinderScenario, singularCylinderOwner, singularCylinderLayout, singularCylinderParameters,
+import { singularCylinderScenario, singularCylinderOwner, cylinderDiagnosticLayout, singularCylinderParameters,
   singularCylinderWarning, singularCylinderWarningPath, singularCylinderLimitation, observeSingularCylinderPixels } from '../../scripts/singularCylinderDiagnosticContract.mjs'
 import { generateTikzForUi } from '../../src/ui/tikzExportMode.ts'
 import { resolveSvgCamera } from '../../src/rendering/svgCamera.ts'
@@ -14,8 +14,8 @@ import { signedPointStandaloneRootAttributes } from '../../scripts/signedPointSt
 // Fabricated records and raster exercise strict offline policy only. Native
 // acceptance always comes from the real App workflow and actual download.
 const group = 'point-node-layout-anchors-combined', identity = { a: 1, b: 0, c: 0, d: 1, e: 0, f: 0 }
-function state(dimension, width = 0, selection = null, revision = 100) {
-  const diagram = createEmptyDiagram({ ambientDimension: dimension }), layout = structuredClone(singularCylinderLayout)
+function state(dimension, width = 0, selection = null, revision = 100, scenario = singularCylinderScenario) {
+  const diagram = createEmptyDiagram({ ambientDimension: dimension }), layout = structuredClone(cylinderDiagnosticLayout(scenario))
   layout.minimumWidth = width; layout.units.minimumWidth = { source: `${width}pt`, unit: 'pt', texPoints: width }
   diagram.strata = [createPointStratum({ id: singularCylinderOwner, ambientDimension: dimension, text: '', layer: 0,
     position: { x: 3, y: 3, z: dimension === 3 ? .5 : 0 }, style: { kind: 'pointStyle', size: 8, shape: 'cylinder', color: '#203040', opacity: 1, fill: 'filled',
@@ -43,13 +43,13 @@ function observation(current, singular = true) {
     ring: current.selection ? { r: 19, cx: 0, cy: 0 } : null,
     matrices: { nodeCTM: matrix, nodeScreenCTM: matrix, bodyCTM: matrix, bodyScreenCTM: matrix } }
 }
-function nativeCase(dimension) {
+function nativeCase(dimension, scenario = singularCylinderScenario) {
   const selected = { kind: 'stratum', id: singularCylinderOwner }, transitions = [12, 0, 12, 0].map((width, index) => {
-    const current = state(dimension, width, selected)
+    const current = state(dimension, width, selected, 100, scenario)
     return { state: current, rendered: observation(current, width === 0), ...(index ? { field: { key: 'minimumWidth', value: `${width}pt`, modelValue: width,
       requestsUnchanged: true, events: [{ type: 'input', trusted: true, value: `${width}pt` }] } } : {}) }
   })
-  const before = structuredClone(transitions.at(-1).state), token = `${singularCylinderScenario}-${dimension}d:synthetic-diagnostic`
+  const before = structuredClone(transitions.at(-1).state), token = `${scenario}-${dimension}d:synthetic-diagnostic`
   const native = { result: 'passed', token, ambientDimension: dimension, before, preparation: { before, after: before, actions: [],
     uiBefore: { inspectorOpen: false, toolbarCollapsed: true }, selectPressed: 'true' }, clicks: [], secondaryErrors: [],
     cleanup: { observerPresentBefore: true, observerAbsentAfter: true } }
@@ -94,13 +94,13 @@ function warningPng(ctm) {
   const header = Buffer.alloc(13); header.writeUInt32BE(width); header.writeUInt32BE(height, 4); header[8] = 8; header[9] = 6
   return Buffer.concat([Buffer.from([137, 80, 78, 71, 13, 10, 26, 10]), chunk('IHDR', header), chunk('IDAT', deflateSync(scanlines)), chunk('IEND', Buffer.alloc(0))])
 }
-export function syntheticSingularCylinderStandalone(directory, ambientDimension = 2) {
-  const evidence = { scenario: singularCylinderScenario, group, result: 'passed', pageErrors: [], cases: [2, 3].map(nativeCase), downloads: [] }
+export function syntheticSingularCylinderStandalone(directory, ambientDimension = 2, scenario = singularCylinderScenario) {
+  const evidence = { scenario, group, result: 'passed', pageErrors: [], cases: [2, 3].map(dimension => nativeCase(dimension, scenario)), downloads: [] }
   let png
   for (const dimension of [2, 3]) {
-    const current = state(dimension, 0, null, 101), rendered = observation(current), point = JSON.parse(current.runtimeDiagramJson).strata[0]
+    const current = state(dimension, 0, null, 101, scenario), rendered = observation(current), point = JSON.parse(current.runtimeDiagramJson).strata[0]
     const runtime = { identity: 'fixture-runtime', fontGeneration: 0, documentRevision: 101 }
-    const download = { scenario: `${singularCylinderScenario}-${dimension}d`, group, background: 'transparent', ambientDimension: dimension,
+    const download = { scenario: `${scenario}-${dimension}d`, group, background: 'transparent', ambientDimension: dimension,
       beforeExportState: current, savedJson: current.json, expected: [{ id: point.id, source: '', shape: 'cylinder', modelPoint: point, rendered }],
       outputs: Object.fromEntries(['standalone', 'inlineMath'].map((mode) => [mode, generateTikzForUi(JSON.parse(current.runtimeDiagramJson), { ...JSON.parse(current.uiSettings), exportMode: mode })])),
       preExport: { url: 'http://localhost:5173/stratified-tikz/scripts/fixtures/freeLabelsApp.html', rootCount: 1, rootConnected: true,
@@ -134,7 +134,7 @@ export function syntheticSingularCylinderStandalone(directory, ambientDimension 
         rootBounds: { x: 0, y: 0, width: 520, height: 360 }, contentType: 'image/svg+xml', readyState: 'complete', scroll: { x: 0, y: 0 }, viewport: { width: 1500, height: 1150 } } } }
   const xml = `<svg ${Object.entries(raw.document.rootAttributes).map(([key, value]) => `${key}="${value}"`).join(' ')}><g><g><g transform="${nodeTransform}"><path d="${singularCylinderWarningPath}" fill="#B45309"><title>${singularCylinderWarning}</title></path><g transform="translate(0 0)"><title/><g transform="translate(0 0)" opacity="1" fill="#203040" color="#203040" pointer-events="none"><g/></g></g></g></g></g></svg>`
   raw.xml = xml
-  const native = { scenario: singularCylinderScenario, group, result: 'observed', case: evidence.cases.find(({ ambientDimension: dimension }) => dimension === ambientDimension) }
+  const native = { scenario, group, result: 'observed', case: evidence.cases.find(({ ambientDimension: dimension }) => dimension === ambientDimension) }
   writeFileSync(svgPath, xml); writeFileSync(pngPath, png); writeFileSync(join(directory, `${stem}-native.json`), JSON.stringify(native))
   writeFileSync(join(directory, `${stem}-saved.json`), download.savedJson)
   for (const [mode, source] of Object.entries(download.outputs)) writeFileSync(join(directory, `${stem}-${mode}.tex`), source)

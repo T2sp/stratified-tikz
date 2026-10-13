@@ -30,8 +30,10 @@ const fileName = (name) => {
 
 /** Only immutable bytes reach an asynchronous sink. A synchronous, small atomic
  * pointer commit cannot still be pending when its deadline fires. Late ordinary
- * writers can leave orphan packs/manifests, but never change current authority. */
-export function createEvidencePublisher({ artifactDir, checkout, write = writeFile, timeoutMs = 5000 }) {
+ * writers can leave orphan packs/manifests, but never change current authority.
+ * The optional deadline scheduler scopes deterministic writer-gate controls to
+ * one publisher; ordinary production persistence keeps the 5,000ms scheduler. */
+export function createEvidencePublisher({ artifactDir, checkout, write = writeFile, timeoutMs = 5000, scheduleDeadline }) {
   assert.ok(checkout && typeof checkout === 'object', 'Evidence publication requires its current checkout')
   assert.ok(Number.isFinite(timeoutMs) && timeoutMs > 0)
   const owner = randomUUID(), tree = freezeEvidenceObservation(structuredClone(checkout))
@@ -199,7 +201,7 @@ export function createEvidencePublisher({ artifactDir, checkout, write = writeFi
     // Failed publication is independent of a stalled predecessor. Its new pack
     // includes every uncommitted node needed by its frozen root.
     const previous = disposition === 'failed' ? Promise.resolve() : tail
-    const pending = boundedPointDiagnostic(async () => { await previous; return operation() }, `evidence publication ${stage}`, timeoutMs)
+    const pending = boundedPointDiagnostic(async () => { await previous; return operation() }, `evidence publication ${stage}`, timeoutMs, scheduleDeadline)
       .catch((error) => { alive = false; fail(error); throw error })
     tail = pending.then(() => undefined, () => undefined)
     return pending

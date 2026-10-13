@@ -1,0 +1,15 @@
+CASE half-product-cancellation
+FONT 10.00002pt,4.30554pt
+STAGE innerXSp; 0
+STAGE innerYSp; -2
+STAGE initialXSp; 0
+STAGE initialYSp; 0
+STAGE fittedXSp; 0
+STAGE fittedYSp; 0
+STAGE transverseInnerSepSp; -2
+STAGE minimumWidthSp; 0
+STAGE divisorSp; 0
+STAGE bodyWidthHalfSp; 0
+STAGE bodyHeightHalfSp; 1
+STAGE bodyDepthHalfSp; 1
+STAGE minimumWidthHalfSp; 0

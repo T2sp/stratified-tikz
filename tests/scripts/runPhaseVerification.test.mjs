@@ -1,12 +1,14 @@
 import assert from 'node:assert/strict'
 import { spawnSync } from 'node:child_process'
 import { createHash } from 'node:crypto'
-import { mkdirSync, mkdtempSync, readFileSync, realpathSync, rmSync, unlinkSync, writeFileSync } from 'node:fs'
+import { existsSync, mkdirSync, mkdtempSync, readFileSync, realpathSync, rmSync, unlinkSync, writeFileSync } from 'node:fs'
+import { writeFile } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import { dirname, join, relative } from 'node:path'
 import test from 'node:test'
 import { browserChecksForPhase, pointNodeScenarios, pointNodeScenarioArtifacts, captureCheckoutIdentity, runPhaseVerification, verificationMatchesCheckout, hasWholePointSvg, validateBrowserEvidence, allPointNodeScenarios } from '../../scripts/automation/phase-verification.mjs'
 import { createEvidencePublisher, readEvidenceDocumentSync } from '../../scripts/evidencePublication.mjs'
+import { awaitPublicationEntry, ownPublication, publicationGate, publicationValue } from './ownedPublicationProgressFixture.mjs'
 import { layoutAnchorGroup, assertLayoutStandaloneEvidence, assertLayoutPostClickViewDiagnostic } from '../../scripts/pointLayoutAnchorsContract.mjs'
 import { syntheticStandalonePointDownload } from './standalonePointDownloadFixture.mjs'
 import { populatePhase32dParentEvidence } from './phase32dParentEvidenceFixture.mjs'
@@ -1202,6 +1204,140 @@ function referencedParentFixture(t) {
   return { artifactDir, checkout, publisher, report }
 }
 
+// These records precede the awaited operation. A stalled boundary therefore
+// identifies its actual owner/stage instead of leaving only a containing file
+// cancellation. Publisher deadlines remain bounded at their production default.
+function publicationProgress(publisher) {
+  const stages = [], pending = new Set()
+  const publish = (name, value, options) => {
+    const record = { name, stage: options.stage, outcome: 'pending', before: publisher.metrics.boundaries }
+    stages.push(record)
+    console.log(`[32D verifier] publication entered: ${options.stage}: ${name}`)
+    let publication
+    try { publication = publisher.publish(name, value, options) } catch (error) { publication = Promise.reject(error) }
+    const outcome = ownPublication(publication).then(result => {
+      record.outcome = result.ok ? 'fulfilled' : 'rejected'
+      record.after = publisher.metrics.boundaries
+      if (!result.ok) record.error = result.error
+      return result
+    })
+    pending.add(outcome)
+    // Install both fulfillment and rejection ownership before callers await an
+    // entry gate. Never reject a secondary observer that nobody owns.
+    void outcome.then(() => { pending.delete(outcome) })
+    return outcome
+  }
+  return { publish, stages, pending, drain: async () => { await Promise.all([...pending]) } }
+}
+
+async function publishParentStage(t, publisher, name, value, options) {
+  const progress = publicationProgress(publisher)
+  try { return publicationValue(await progress.publish(name, value, options)) }
+  finally {
+    await progress.drain(); assert.equal(progress.pending.size, 0)
+    t.diagnostic(`publication drained: ${options.stage}: ${name}: ${progress.stages[0]?.outcome}`)
+  }
+}
+
+function restoreReplayFiles(artifactDir, originals) {
+  for (const [name, bytes] of originals) {
+    const path = join(artifactDir, name)
+    if (bytes === null) { if (existsSync(path)) unlinkSync(path); assert.equal(existsSync(path), false) }
+    else { writeFileSync(path, bytes); assert.deepEqual(readFileSync(path), bytes, `Exact control fixture restored: ${name}`) }
+  }
+}
+
+function replayProgress(records, fault) {
+  const record = { fault, stages: ['entered'] }
+  records.push(record)
+  console.log(`[32D verifier] replay entered: ${fault}`)
+  return record
+}
+
+function assertReplayComplete(records, count) {
+  assert.equal(records.length, count, 'Every declared replay subtest was awaited')
+  for (const record of records) assert.deepEqual(record.stages, ['entered', 'mutated', 'rejected', 'restored'],
+    `The complete exact-file replay and cleanup finished: ${record.fault}`)
+}
+
+for (const fault of ['failure-before-entry', 'held-writer-deadline']) {
+  test(`32D real parent publication progress owns ${fault}, queued outcomes and cleanup`, async t => {
+    const fixture = completePhase32dParentFixture(t), stem = 'point-layout-signed-polygonal-zero-axis-2d'
+    // Prepare the complete independently replayed values before the deliberate
+    // hold. Both operations still retain and authenticate ordinary file bytes.
+    const firstValue = fixture.readJson(`${stem}-native.json`)
+    const nextValue = fixture.readJson(`${stem}-standalone.json`)
+    const entered = publicationGate(), release = publicationGate(), finished = publicationGate(), deadlines = []
+    const injected = new Error('controlled ordinary parent writer failed before entry')
+    let held = false, controlled = true
+    const unhandled = [], onUnhandled = error => unhandled.push(error)
+    process.on('unhandledRejection', onUnhandled)
+    const publisher = createEvidencePublisher({ artifactDir: fixture.artifactDir, checkout: fixture.checkout,
+      scheduleDeadline: (expire, timeoutMs) => {
+        assert.equal(timeoutMs, 5000)
+        if (!controlled) { const timer = setTimeout(expire, timeoutMs); return () => clearTimeout(timer) }
+        const deadline = { expire, cancelled: false }; deadlines.push(deadline)
+        return () => { deadline.cancelled = true }
+      }, write: async (path, bytes) => {
+        if (controlled && !held) {
+          if (fault === 'failure-before-entry') throw injected
+          held = true; entered.resolve()
+          try { await release.promise; await writeFile(path, bytes) } finally { finished.resolve() }
+          return
+        }
+        await writeFile(path, bytes)
+      } })
+    const progress = publicationProgress(publisher)
+    let first, queued, primary
+    try {
+      first = progress.publish(`${stem}-native.json`, firstValue, { stage: 'actual-native-before-authority' })
+      queued = progress.publish(`${stem}-standalone.json`, nextValue, { stage: 'actual-standalone-queued-authority' })
+      if (fault === 'failure-before-entry') {
+        await assert.rejects(awaitPublicationEntry(entered, first), error => error === injected)
+        assert.equal(entered.settled, false, 'The entry wait fails promptly without fabricating writer entry')
+      } else {
+        await awaitPublicationEntry(entered, first)
+        assert.equal(progress.pending.size, 2)
+        assert.equal(publisher.metrics.boundaries, 0)
+        // Fire only this owner's selected deadline after actual writer entry.
+        // The test does not charge fixture construction or scheduling latency.
+        deadlines[0].expire()
+      }
+      const firstOutcome = await first, queuedOutcome = await queued
+      assert.equal(firstOutcome.ok, false); assert.equal(queuedOutcome.ok, false)
+      primary = firstOutcome.error
+      if (fault === 'failure-before-entry') assert.equal(primary, injected)
+      else assert.match(primary.message, /Timed out after 5000ms during evidence publication actual-native-before-authority/)
+      assert.equal(queuedOutcome.error, primary, 'Queued publication propagates the exact primary before entering its writer')
+      assert.equal(publisher.primary, primary)
+      assert.deepEqual(progress.stages.map(({ outcome }) => outcome), ['rejected', 'rejected'])
+      controlled = false
+      await publishParentStage(t, publisher, 'free-labels-evidence.json', { ...fixture.report, result: 'failed',
+        error: { message: primary.message, stack: primary.stack } }, { stage: 'complete', disposition: 'failed' })
+      const authority = readFileSync(join(fixture.artifactDir, 'free-labels-evidence.json'))
+      assert.throws(() => validateBrowserEvidence('check:free-labels', fixture.artifactDir, '32D', fixture.checkout),
+        /did not reach complete/, 'A failed actual parent publication cannot appear accepted')
+      release.resolve()
+      if (held) await finished.promise
+      await new Promise(resolve => setImmediate(resolve))
+      assert.deepEqual(readFileSync(join(fixture.artifactDir, 'free-labels-evidence.json')), authority)
+      assert.equal(publisher.primary, primary)
+    } finally {
+      entered.resolve(); release.resolve()
+      if (held) await finished.promise
+      await progress.drain()
+      await new Promise(resolve => setImmediate(resolve))
+      process.off('unhandledRejection', onUnhandled)
+    }
+    assert.equal(progress.pending.size, 0)
+    assert.equal(entered.settled, true); assert.equal(release.settled, true)
+    if (held) assert.equal(finished.settled, true, 'The late ordinary write finished before fixture removal')
+    t.diagnostic(`publication cleanup complete: ${fault}: pending=0 writer=${held ? 'finished' : 'never-entered'}`)
+    assert.ok(deadlines.every(({ cancelled }) => cancelled), 'All scoped owner deadlines are cancelled')
+    assert.deepEqual(unhandled, [])
+  })
+}
+
 async function publishParentReport(fixture, disposition = 'passed') {
   const { artifactDir, publisher, report } = fixture
   await publisher.publish('preserved-observation.json', report.diagnostics[0], { stage: 'before-current-report' })
@@ -1316,12 +1452,15 @@ test('32D parent pending file replay and ordered post-click prefixes consume res
 })
 
 function completePhase32dParentFixture(t) {
+  console.log('[32D verifier] complete parent fixture preparation entered')
   const earlier = checkoutFixture(t)
   const base = completePointEvidence(earlier)
   const artifactDir = realpathSync(mkdtempSync(join(tmpdir(), 'stz-authenticated-empty-parent-')))
   t.after(() => rmSync(artifactDir, { recursive: true, force: true }))
-  return populatePhase32dParentEvidence(artifactDir, base.checkout,
+  const fixture = populatePhase32dParentEvidence(artifactDir, base.checkout,
     JSON.parse(earlier.env.STZ_TEST_POINT_ARTIFACT_VALUES), combinedLabelGroups)
+  console.log(`[32D verifier] complete parent fixture ready: ${fixture.report.completed.length} groups; ${fixture.report.evidence.length} records`)
+  return fixture
 }
 
 test('32D real complete parent artifact loop accepts seven native empty-source bodies in both dimensions', t => {
@@ -1413,10 +1552,13 @@ const emptyParentFaults = [
 
 test('32D real parent contextual empty-body failures reach mandatory full replay with exact-file mutations', async t => {
   const fixture = completePhase32dParentFixture(t)
-  const scenario = 'point-layout-signed-polygonal-zero-axis', stem = `${scenario}-2d`
+  const scenario = 'point-layout-signed-polygonal-zero-axis', stem = `${scenario}-2d`, progress = []
   // Share the unchanged cumulative predecessor bytes and complete PNGs. Each
   // independent control restores only its own changed files before the next.
-  for (const [fault, mutate] of emptyParentFaults) await t.test(fault, () => {
+  for (const [fault, mutate] of emptyParentFaults) {
+    t.diagnostic(`awaiting contextual replay: ${fault}`)
+    await t.test(fault, () => {
+    const stage = replayProgress(progress, fault)
     const originals = new Map()
     const write = (name, value) => {
       if (!originals.has(name)) { try { originals.set(name, readFileSync(join(fixture.artifactDir, name))) } catch (error) { if (error.code !== 'ENOENT') throw error; originals.set(name, null) } }
@@ -1429,14 +1571,22 @@ test('32D real parent contextual empty-body failures reach mandatory full replay
         write(`${stem}.svg`, raw.xml); write(`${stem}-standalone.json`, JSON.stringify(raw)) } }
     try {
       mutate(controls)
+      stage.stages.push('mutated')
       assert.ok(originals.size > 0)
       assert.throws(() => validateBrowserEvidence('check:free-labels', fixture.artifactDir, '32D', fixture.checkout),
         error => ['foreign-artifact', 'legacy-reuse'].includes(fault) || !/Invalid whole-point SVG artifact/.test(error.message),
         `Mandatory targeted replay rejects ${fault}; the generic painted-body envelope cannot mask the rejection`)
+      stage.stages.push('rejected')
     } finally {
-      for (const [name, bytes] of originals) if (bytes === null) unlinkSync(join(fixture.artifactDir, name)); else writeFileSync(join(fixture.artifactDir, name), bytes)
+      restoreReplayFiles(fixture.artifactDir, originals)
+      stage.stages.push('restored')
+      console.log(`[32D verifier] replay restored: ${fault}: ${originals.size} exact files`)
     }
-  })
+    })
+    t.diagnostic(`contextual replay awaited: ${fault}`)
+  }
+  assertReplayComplete(progress, emptyParentFaults.length)
+  t.diagnostic(`contextual replay cleanup complete: ${progress.length}/${emptyParentFaults.length}`)
 })
 
 test('32D real parent empty-body route retains current scenario/native/live/standalone publication authority', async t => {
@@ -1446,11 +1596,11 @@ test('32D real parent empty-body route retains current scenario/native/live/stan
   const stale = {}
   for (const name of names) {
     const value = fixture.readJson(name)
-    await publisher.publish(name, value, { stage: 'first-exact-raw' })
+    await publishParentStage(t, publisher, name, value, { stage: 'first-exact-raw' })
     stale[name] = readFileSync(join(fixture.artifactDir, name))
-    await publisher.publish(name, value, { stage: 'current-exact-raw' })
+    await publishParentStage(t, publisher, name, value, { stage: 'current-exact-raw' })
   }
-  await publisher.publish('free-labels-evidence.json', fixture.report, { stage: 'complete', disposition: 'passed' })
+  await publishParentStage(t, publisher, 'free-labels-evidence.json', fixture.report, { stage: 'complete', disposition: 'passed' })
   validateBrowserEvidence('check:free-labels', fixture.artifactDir, '32D', fixture.checkout)
   const controls = [
     ...names.map(name => [`missing-${name}`, ({ remove }) => remove(name)]),
@@ -1460,7 +1610,11 @@ test('32D real parent empty-body route retains current scenario/native/live/stan
     ['wrong-standalone-file-binding', ({ write }) => write(`${stem}-standalone.json`, readFileSync(join(fixture.artifactDir, `${stem}-native.json`)))],
     ['wrong-current-checkout', controls => { controls.checkout = { ...fixture.checkout, trackedDiffSha256: 'f'.repeat(64) } }],
   ]
-  for (const [fault, change] of controls) await t.test(fault, () => {
+  const progress = []
+  for (const [fault, change] of controls) {
+    t.diagnostic(`awaiting publication authority replay: ${fault}`)
+    await t.test(fault, () => {
+    const stage = replayProgress(progress, fault)
     const originals = new Map()
     const retain = name => { if (!originals.has(name)) originals.set(name, readFileSync(join(fixture.artifactDir, name))) }
     const controls = { checkout: fixture.checkout,
@@ -1468,16 +1622,21 @@ test('32D real parent empty-body route retains current scenario/native/live/stan
       remove: name => { retain(name); unlinkSync(join(fixture.artifactDir, name)) } }
     try {
       change(controls)
+      stage.stages.push('mutated')
       assert.throws(() => validateBrowserEvidence('check:free-labels', fixture.artifactDir, '32D', controls.checkout),
         error => !/Invalid whole-point SVG artifact/.test(error.message), 'Authentication must fail before an empty body can be accepted')
-    } finally { for (const [name, bytes] of originals) writeFileSync(join(fixture.artifactDir, name), bytes) }
-  })
+      stage.stages.push('rejected')
+    } finally { restoreReplayFiles(fixture.artifactDir, originals); stage.stages.push('restored') }
+    })
+  }
+  assertReplayComplete(progress, controls.length)
+  t.diagnostic(`publication authority cleanup complete: ${progress.length}/${controls.length}`)
 })
 
 test('32D complete parent dispatch authenticates separate warning-only cylinder files in both dimensions', t => {
   const fixture = completePhase32dParentFixture(t)
   assert.equal(fixture.report.completed.length, 18)
-  assert.equal(fixture.report.evidence.filter(({ group }) => group === layoutAnchorGroup).length, 10)
+  assert.equal(fixture.report.evidence.filter(({ group }) => group === layoutAnchorGroup).length, 12)
   for (const { raw } of fixture.singular) {
     assert.equal(hasWholePointSvg(raw.xml), false, 'Legacy glyph/contour envelope still rejects a warning-only file')
     assert.ok(raw.xml.includes(singularCylinderWarningPath))
@@ -1514,7 +1673,11 @@ test('32D parent diagnostic context rejects missing or damaged proof before lega
       return source.replaceAll('at (3,3)', 'at (4,3)')
     })],
   ]
-  for (const [fault, mutate] of faults) await t.test(fault, () => {
+  const progress = []
+  for (const [fault, mutate] of faults) {
+    t.diagnostic(`awaiting diagnostic replay: ${fault}`)
+    await t.test(fault, () => {
+    const stage = replayProgress(progress, fault)
     const originals = new Map()
     const remember = name => {
       if (!originals.has(name)) { try { originals.set(name, readFileSync(join(fixture.artifactDir, name))) }
@@ -1537,14 +1700,20 @@ test('32D parent diagnostic context rejects missing or damaged proof before lega
         write(`${stem}.svg`, raw.xml); write(`${stem}-standalone.json`, JSON.stringify(raw)) } }
     try {
       mutate(controls)
+      stage.stages.push('mutated')
       assert.ok(originals.size > 0)
       assert.throws(() => validateBrowserEvidence('check:free-labels', fixture.artifactDir, '32D', fixture.checkout),
         error => fault === 'foreign-file' || !/Invalid whole-point SVG artifact/.test(error.message),
         'Exact diagnostic replay rejects damaged context before the legacy glyph envelope')
+      stage.stages.push('rejected')
     } finally {
-      for (const [name, bytes] of originals) if (bytes === null) unlinkSync(join(fixture.artifactDir, name)); else writeFileSync(join(fixture.artifactDir, name), bytes)
+      restoreReplayFiles(fixture.artifactDir, originals)
+      stage.stages.push('restored')
     }
-  })
+    })
+  }
+  assertReplayComplete(progress, faults.length)
+  t.diagnostic(`diagnostic replay cleanup complete: ${progress.length}/${faults.length}`)
 })
 
 test('32D diagnostic files require current authenticated native and standalone references', async t => {
@@ -1553,11 +1722,11 @@ test('32D diagnostic files require current authenticated native and standalone r
   const names = [`${singularCylinderScenario}.json`, `${stem}-native.json`, `${stem}-standalone.json`], stale = {}
   for (const name of names) {
     const value = fixture.readJson(name)
-    await publisher.publish(name, value, { stage: 'observed-diagnostic' })
+    await publishParentStage(t, publisher, name, value, { stage: 'observed-diagnostic' })
     stale[name] = readFileSync(join(fixture.artifactDir, name))
-    await publisher.publish(name, value, { stage: 'current-diagnostic' })
+    await publishParentStage(t, publisher, name, value, { stage: 'current-diagnostic' })
   }
-  await publisher.publish('free-labels-evidence.json', fixture.report, { stage: 'complete', disposition: 'passed' })
+  await publishParentStage(t, publisher, 'free-labels-evidence.json', fixture.report, { stage: 'complete', disposition: 'passed' })
   validateBrowserEvidence('check:free-labels', fixture.artifactDir, '32D', fixture.checkout)
   for (const name of names) await t.test(`stale ${name}`, () => {
     const current = readFileSync(join(fixture.artifactDir, name))

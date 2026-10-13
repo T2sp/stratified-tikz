@@ -9,8 +9,10 @@ import { syntheticGeometricSelectionEvidence } from './pointGeometricSelectionFi
 import { syntheticGeometricVisibilityEvidence } from './pointGeometricVisibilityFixture.mjs'
 import { syntheticStandalonePointDownload } from './standalonePointDownloadFixture.mjs'
 import { evidence as syntheticLayoutEvidence, syntheticSignedStandalone } from './signedPointStandaloneFixture.mjs'
-import { singularCylinderScenario } from '../../scripts/singularCylinderDiagnosticContract.mjs'
+import { cylinderDiagnosticScenarios } from '../../scripts/singularCylinderDiagnosticContract.mjs'
 import { syntheticSingularCylinderStandalone } from './singularCylinderFixture.mjs'
+import { foldedCylinderScenario } from '../../scripts/foldedCylinderContract.mjs'
+import { syntheticFoldedCylinderStandalone } from './foldedCylinderFixture.mjs'
 
 // Controlled full cumulative dispatch evidence uses the existing strong fixtures.
 // It supplies complete retained PNGs and native shells for policy tests only.
@@ -75,7 +77,7 @@ export function populatePhase32dParentEvidence(artifactDir, checkout, earlierArt
     }
   }
   for (const name of allPointNodeScenarios[layoutAnchorGroup]) {
-    if (name === signedPolygonalScenario || name === singularCylinderScenario || name.startsWith('point-layout-pending-')) continue
+    if (name === signedPolygonalScenario || name === foldedCylinderScenario || cylinderDiagnosticScenarios.includes(name) || name.startsWith('point-layout-pending-')) continue
     save(`${name}.json`, syntheticLayoutEvidence(name))
   }
   const signed = [2, 3].map(dimension => syntheticSignedStandalone(artifactDir, dimension))
@@ -84,15 +86,24 @@ export function populatePhase32dParentEvidence(artifactDir, checkout, earlierArt
   evidence.zeroAxisCases[1] = signed[1].evidence.zeroAxisCases[1]
   for (const fixture of signed) save(`${fixture.download.scenario}-standalone.json`, fixture.raw)
   save(`${signedPolygonalScenario}.json`, evidence)
-  const singular = [2, 3].map(dimension => syntheticSingularCylinderStandalone(artifactDir, dimension))
-  const singularEvidence = singular[0].evidence
-  singularEvidence.cases[1] = singular[1].evidence.cases[1]
-  singularEvidence.downloads[1] = singular[1].download
-  for (const fixture of singular) save(`${fixture.download.scenario}-standalone.json`, fixture.raw)
-  save(`${singularCylinderScenario}.json`, singularEvidence)
+  const singular = []
+  for (const scenario of cylinderDiagnosticScenarios) {
+  const pair = [2, 3].map(dimension => syntheticSingularCylinderStandalone(artifactDir, dimension, scenario))
+  singular.push(...pair)
+  const singularEvidence = pair[0].evidence
+  singularEvidence.cases[1] = pair[1].evidence.cases[1]
+  singularEvidence.downloads[1] = pair[1].download
+  for (const fixture of pair) save(`${fixture.download.scenario}-standalone.json`, fixture.raw)
+  save(`${scenario}.json`, singularEvidence)
+  }
+  const folded = [2, 3].map(dimension => syntheticFoldedCylinderStandalone(artifactDir, dimension))
+  const foldedEvidence = folded[0].evidence
+  foldedEvidence.cases[1] = folded[1].evidence.cases[1]; foldedEvidence.downloads[1] = folded[1].download
+  for (const fixture of folded) save(`${fixture.download.scenario}-standalone.json`, fixture.raw)
+  save(`${foldedCylinderScenario}.json`, foldedEvidence)
   const groups = [...earlierGroups, ...Object.keys(allPointNodeScenarios)]
   const report = { result: 'passed', stage: 'complete', environment: { browserVersion: 'controlled cumulative parent fixture' },
     checkout, started: groups, completed: groups, incompleteGroups: [], unexecuted: [], pageErrors: [], evidence: records, diagnostics }
   save('free-labels-evidence.json', report)
-  return { artifactDir, checkout, report, signed, singular, readJson: name => readEvidenceDocumentSync(artifactDir, name, { checkout }), save }
+  return { artifactDir, checkout, report, signed, singular, folded, readJson: name => readEvidenceDocumentSync(artifactDir, name, { checkout }), save }
 }

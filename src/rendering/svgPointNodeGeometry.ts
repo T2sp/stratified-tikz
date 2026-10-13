@@ -2,6 +2,7 @@ import type { PointStyle, Vec2 } from '../model/types'
 import { solvePointNodeShape, type PointNodeShapeSolution } from '../geometry/pointNodeShapes/index.ts'
 import { resolvePointShapeParameters } from '../model/pointShapeParameters.ts'
 import { defaultPointNodeFontContext, resolvePointNodeLayoutOptions } from '../model/pointNodeLayout.ts'
+import { cylinderDomainContextForStyle, type CylinderDomainContext } from '../geometry/pointNodeShapes/cylinderDomain.ts'
 
 export type SvgPointNodeContentSize = {
   width: number
@@ -46,10 +47,11 @@ export const svgPointNodeTexPointScale = 1.2
  * diamond's adjustment of both anchor clearance and the drawn contour.
  */
 export function svgPointNodeGeometry(
-  style: Pick<PointStyle, 'shape' | 'size' | 'shapeParameters' | 'layout'>,
+  style: Pick<PointStyle, 'shape' | 'size' | 'shapeParameters' | 'layout' | 'importedLayout'>,
   contentSize: SvgPointNodeContentSize,
   texPointScale = svgPointNodeTexPointScale,
   lineWidth = 0.4 * texPointScale,
+  cylinderDomainContext?: CylinderDomainContext,
 ): SvgPointNodeGeometry {
   const scale =
     Number.isFinite(texPointScale) && texPointScale > 0
@@ -82,6 +84,10 @@ export function svgPointNodeGeometry(
         outerXSep: layout.outerXSep * scale, outerYSep: layout.outerYSep * scale,
         minimumWidth: layout.minimumWidth * scale, minimumHeight: layout.minimumHeight * scale, lineWidth,
         anchor: layout.anchor,
+        ...(style.shape === 'cylinder' ? {
+          dimensionSources: (cylinderDomainContext ?? cylinderDomainContextForStyle(style)).dimensionSources,
+          cylinderDomainParameters: cylinderDomainContext ?? cylinderDomainContextForStyle(style),
+        } : {}),
         // Saved context resolves em/ex dimensions only. Typography remains the
         // existing default 10pt node font, including PGF's mid-anchor ex.
         fontContext: { em: defaultPointNodeFontContext.fontSizePt * scale,

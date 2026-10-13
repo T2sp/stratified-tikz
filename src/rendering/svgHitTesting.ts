@@ -41,6 +41,9 @@ import { currentSvgLabelBounds, type SvgFreeLabelBoundsSnapshot } from './svgLab
 import { literalSvgLabelLayout, normalizeSvgLabelFontSize, placeSvgLabel, svgLabelLayoutSettings } from './labels/svgLabelLayout.ts'
 import { maxSvgPathInlineNodePreviews } from './svgPathInlineNodes.ts'
 import { currentSvgPointNodeLayout, pendingSvgPointNodeLayout, type SvgPointNodeCommits } from './svgPointNodeLayout.ts'
+import { resolveCylinderDomainContext } from './cylinderDomainSourceResolution.ts'
+import type { CylinderDomainContext } from '../geometry/pointNodeShapes/cylinderDomain.ts'
+import { hiddenPointStyleFromBase } from '../model/visibility.ts'
 
 export type SvgPreviewHitTestTargetKind =
   | 'geometryHandle'
@@ -77,6 +80,8 @@ export type SvgPreviewSelectionCandidate = {
 
 export type SvgSelectionCandidateVisibility = {
   hiddenPointIds?: ReadonlySet<string>
+  /** Runtime styling provenance only; these points remain selectable. */
+  dimmedPointIds?: ReadonlySet<string>
   hiddenLabelIds?: ReadonlySet<string>
 }
 
@@ -358,6 +363,7 @@ export function createSvgSelectionCandidateVisibility({
       visibilityOptions.labelVisibility === 'autoHide'
         ? hiddenOcclusionIds(labelOcclusionById)
         : undefined,
+    ...(visibilityOptions.pointVisibility === 'dimHidden' ? { dimmedPointIds: hiddenOcclusionIds(pointOcclusionById) } : {}),
   }
 }
 
@@ -797,7 +803,8 @@ function collectPointStratumCandidates(
         camera,
         viewportHeight,
         point,
-        pointCommits, documentRevision, fontGeneration,
+        pointCommits, documentRevision, fontGeneration, resolveCylinderDomainContext(diagram, stratum,
+          visibility?.dimmedPointIds?.has(stratum.id) ? hiddenPointStyleFromBase(stratum.style) : stratum.style),
       ) === false
     ) {
       break
@@ -1151,6 +1158,7 @@ function collectPointCandidate(
   pointCommits: SvgPointNodeCommits | undefined,
   documentRevision: number | string,
   fontGeneration: number,
+  cylinderDomainContext?: CylinderDomainContext,
 ): boolean {
   const center = projectModelPointWithBudget(
     budget,
@@ -1168,8 +1176,8 @@ function collectPointCandidate(
   }
 
   const distance = distanceVec2(center, point)
-  const layout = pointCommits === undefined ? pendingSvgPointNodeLayout(pointStratum)
-    : currentSvgPointNodeLayout(pointStratum, pointCommits, documentRevision, fontGeneration)
+  const layout = pointCommits === undefined ? pendingSvgPointNodeLayout(pointStratum, cylinderDomainContext)
+    : currentSvgPointNodeLayout(pointStratum, pointCommits, documentRevision, fontGeneration, cylinderDomainContext)
   if (layout === null) return true
   const { geometry } = layout
   const localPoint = { x: point.x - center.x - layout.placementOffset.x,

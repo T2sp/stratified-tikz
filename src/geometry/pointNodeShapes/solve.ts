@@ -9,6 +9,7 @@ import type { PointShape, PointShapeParameters, Vec2 } from '../../model/types.t
 import { resolvePointShapeParameters } from '../../model/pointShapeParameters.ts'
 import { ellipseContour, ellipsePoint, polygonContour, ShapeContourBuilder } from './contours.ts'
 import { pointNodeAnchorLayout } from './anchors.ts'
+import { cylinderDimensionDomain } from './cylinderDomain.ts'
 import { pgfCircleRadius, pgfReciprocal, pgfSin, pgfCos, pgfTan, pgfCot, pgfMultiply, pgfDivide, pgfAtan } from './pgfMath.ts'
 import type {
   PointNodeShapeInput,
@@ -17,6 +18,7 @@ import type {
   PointShapeContour,
   PointShapePaintRegion,
   PointPolygonalFitting,
+  PointCylinderFitting,
 } from './types.ts'
 
 const degree = Math.PI / 180
@@ -26,7 +28,7 @@ const tan = pgfTan
 const cot = pgfCot
 
 type Parameters = Required<PointShapeParameters>
-type Construction = { contours: PointShapeContour[]; regions?: PointShapePaintRegion[]; rotation: number; signedFittedAxes?: Vec2; polygonalFitting?: PointPolygonalFitting }
+type Construction = { contours: PointShapeContour[]; regions?: PointShapePaintRegion[]; rotation: number; signedFittedAxes?: Vec2; polygonalFitting?: PointPolygonalFitting; cylinderFitting?: PointCylinderFitting }
 
 /**
  * Solve the PGF background path around a fixed upright box. All geometry is in
@@ -57,6 +59,7 @@ export function solvePointNodeShape(input: PointNodeShapeInput): PointNodeShapeS
     baseline: (input.body.height - input.body.depth) / 2,
     ...(construction.signedFittedAxes ? { signedFittedAxes: construction.signedFittedAxes } : {}),
     ...(construction.polygonalFitting ? { polygonalFitting: construction.polygonalFitting } : {}),
+    ...(construction.cylinderFitting ? { cylinderFitting: construction.cylinderFitting } : {}),
     anchorBounds: bounds,
     rotation: construction.rotation,
     radius: Math.max(...construction.contours.flatMap((contour) => contour.vertices.map((point) => Math.hypot(point.x, point.y)))),
@@ -335,7 +338,9 @@ function cylinder(input: PointNodeShapeInput, p: Parameters, initialX: number, i
   const ry = Math.max(y, input.minimumWidth / 2)
   // PGF divides by this fitted transverse radius before applying the axial
   // minimum. A zero radius (including signed zero) has no cylinder contour.
-  if (ry === 0) throw new RangeError('Cylinder effective transverse radius is zero; PGF’s fitting division is undefined.')
+  const domainParameters = input.cylinderDomainParameters ?? p
+  const domainRotation = domainParameters.borderUsesIncircle ? domainParameters.borderRotate : restrictedBorderRotation(domainParameters.borderRotate, true)
+  if (cylinderDimensionDomain(input, domainRotation, domainParameters.borderUsesIncircle).divisorSp === 0) throw new RangeError('Cylinder effective transverse radius is zero; PGF’s fitting division is undefined.')
   const innerYSep = !p.borderUsesIncircle && (rotation === 90 || rotation === 270) ? input.innerXSep : input.innerYSep
   const sineAngle = (ry - innerYSep) / ry
   if (Math.abs(sineAngle) > 1 + 1e-10) throw new RangeError('Cylinder inner separation exceeds PGF’s asin domain; negative inner y separation is unsupported by this PGF fitting branch.')
@@ -356,7 +361,8 @@ function cylinder(input: PointNodeShapeInput, p: Parameters, initialX: number, i
     .line({ x: top.x, y: -ry }).arc(endCenter, rx, ry, 270, 90)
     .close().finish()
   const end = ellipseContour(rx, ry, endCenter, rotation)
-  return { contours: [outline, seam], regions: [{ ...body, role: 'body' }, { ...end, role: 'end' }], rotation }
+  return { contours: [outline, seam], regions: [{ ...body, role: 'body' }, { ...end, role: 'end' }], rotation,
+    cylinderFitting: { rx, ry, halfLength, bodyExtension, endCenter, baseCenter, beforeTop: top, afterBottom: bottom } }
 }
 
 function unionBounds(bounds: readonly PointShapeBounds[]): PointShapeBounds {

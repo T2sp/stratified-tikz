@@ -1,0 +1,526 @@
+{
+  "work": "/private/tmp/stz-review-cylinder-empty-folded-2yP0XK",
+  "input": {
+    "id": "empty-positive-radii-folded",
+    "shape": "cylinder",
+    "body": {
+      "width": 0,
+      "height": 0,
+      "depth": 0
+    },
+    "innerXSep": -30,
+    "innerYSep": 5,
+    "outerXSep": 0,
+    "outerYSep": 0,
+    "minimumWidth": 1,
+    "minimumHeight": 1,
+    "lineWidth": 0.4,
+    "anchor": "bottom"
+  },
+  "exit": 0,
+  "observations": [
+    {
+      "a": "center",
+      "actual": {
+        "supported": true,
+        "position": {
+          "x": 0,
+          "y": 0
+        }
+      },
+      "expected": {
+        "x": 0,
+        "y": 0
+      },
+      "residual": 0
+    },
+    {
+      "a": "text",
+      "actual": {
+        "supported": true,
+        "position": {
+          "x": 0,
+          "y": 0
+        }
+      },
+      "expected": {
+        "x": 0,
+        "y": 0
+      },
+      "residual": 0
+    },
+    {
+      "a": "base",
+      "actual": {
+        "supported": true,
+        "position": {
+          "x": 0,
+          "y": 0
+        }
+      },
+      "expected": {
+        "x": 0,
+        "y": 0
+      },
+      "residual": 0
+    },
+    {
+      "a": "mid",
+      "actual": {
+        "supported": true,
+        "position": {
+          "x": 0,
+          "y": -2.15277
+        }
+      },
+      "expected": {
+        "x": 0,
+        "y": -2.15277
+      },
+      "residual": 0
+    },
+    {
+      "a": "east",
+      "actual": {
+        "supported": true,
+        "position": {
+          "x": 5.599923706054686,
+          "y": -0.00091552734375
+        }
+      },
+      "expected": {
+        "x": 5.59991,
+        "y": -0.00092
+      },
+      "residual": 0.000014417371084310078
+    },
+    {
+      "a": "north east",
+      "actual": {
+        "supported": true,
+        "position": {
+          "x": 0.5999999999999988,
+          "y": 0
+        }
+      },
+      "expected": {
+        "x": 4.6,
+        "y": 0
+      },
+      "residual": 4.000000000000001
+    },
+    {
+      "a": "north",
+      "actual": {
+        "supported": true,
+        "position": {
+          "x": 0.5999999999999988,
+          "y": 0
+        }
+      },
+      "expected": {
+        "x": 4.6,
+        "y": 0
+      },
+      "residual": 4.000000000000001
+    },
+    {
+      "a": "north west",
+      "actual": {
+        "supported": true,
+        "position": {
+          "x": 0.5999999999999988,
+          "y": 0
+        }
+      },
+      "expected": {
+        "x": 4.6,
+        "y": 0
+      },
+      "residual": 4.000000000000001
+    },
+    {
+      "a": "west",
+      "actual": {
+        "supported": true,
+        "position": {
+          "x": 0.9807830810546863,
+          "y": 1.913299560546875
+        }
+      },
+      "expected": {
+        "x": 6.06447,
+        "y": 3.53554
+      },
+      "residual": 5.336247439282849
+    },
+    {
+      "a": "south west",
+      "actual": {
+        "supported": true,
+        "position": {
+          "x": 0.9807830810546863,
+          "y": 1.913299560546875
+        }
+      },
+      "expected": {
+        "x": 6.06447,
+        "y": 3.53554
+      },
+      "residual": 5.336247439282849
+    },
+    {
+      "a": "south",
+      "actual": {
+        "supported": true,
+        "position": {
+          "x": 0.9807830810546863,
+          "y": 1.913299560546875
+        }
+      },
+      "expected": {
+        "x": 6.06447,
+        "y": 3.53554
+      },
+      "residual": 5.336247439282849
+    },
+    {
+      "a": "south east",
+      "actual": {
+        "supported": true,
+        "position": {
+          "x": 4.959130859374999,
+          "y": 4.95849609375
+        }
+      },
+      "expected": {
+        "x": 6.06447,
+        "y": 3.53554
+      },
+      "residual": 1.8018264790311733
+    },
+    {
+      "a": "base east",
+      "actual": {
+        "supported": true,
+        "position": {
+          "x": 5.599923706054686,
+          "y": -0.00091552734375
+        }
+      },
+      "expected": {
+        "x": 5.59991,
+        "y": -0.00092
+      },
+      "residual": 0.000014417371084310078
+    },
+    {
+      "a": "base west",
+      "actual": {
+        "supported": true,
+        "position": {
+          "x": 0.9807830810546863,
+          "y": 1.913299560546875
+        }
+      },
+      "expected": {
+        "x": 6.06447,
+        "y": 3.53554
+      },
+      "residual": 5.336247439282849
+    },
+    {
+      "a": "mid east",
+      "actual": {
+        "supported": true,
+        "position": {
+          "x": 4.135537719726561,
+          "y": -3.5355377197265625
+        }
+      },
+      "expected": {
+        "x": 6.06447,
+        "y": -3.53554
+      },
+      "residual": 1.9289322802747866
+    },
+    {
+      "a": "mid west",
+      "actual": {
+        "supported": true,
+        "position": {
+          "x": 0.5999999999999988,
+          "y": 0
+        }
+      },
+      "expected": {
+        "x": 4.6,
+        "y": 0
+      },
+      "residual": 4.000000000000001
+    },
+    {
+      "a": "shape center",
+      "actual": {
+        "supported": true,
+        "position": {
+          "x": 3.0999999999999988,
+          "y": 0
+        }
+      },
+      "expected": {
+        "x": 5.09999,
+        "y": 0
+      },
+      "residual": 1.9999900000000013
+    },
+    {
+      "a": "before top",
+      "actual": {
+        "supported": true,
+        "position": {
+          "x": 0.5999999999999988,
+          "y": -5
+        }
+      },
+      "expected": {
+        "x": 0.59999,
+        "y": -5
+      },
+      "residual": 0.000009999999998733244
+    },
+    {
+      "a": "top",
+      "actual": {
+        "supported": true,
+        "position": {
+          "x": 5.599999999999999,
+          "y": 0
+        }
+      },
+      "expected": {
+        "x": 5.59999,
+        "y": 0
+      },
+      "residual": 0.000009999999998733244
+    },
+    {
+      "a": "after top",
+      "actual": {
+        "supported": true,
+        "position": {
+          "x": 0.5999999999999988,
+          "y": 5
+        }
+      },
+      "expected": {
+        "x": 0.59999,
+        "y": 5
+      },
+      "residual": 0.000009999999998733244
+    },
+    {
+      "a": "before bottom",
+      "actual": {
+        "supported": true,
+        "position": {
+          "x": 5.599999999999999,
+          "y": 5
+        }
+      },
+      "expected": {
+        "x": 9.6,
+        "y": 5
+      },
+      "residual": 4.000000000000001
+    },
+    {
+      "a": "bottom",
+      "actual": {
+        "supported": true,
+        "position": {
+          "x": 0.5999999999999988,
+          "y": 0
+        }
+      },
+      "expected": {
+        "x": 4.6,
+        "y": 0
+      },
+      "residual": 4.000000000000001
+    },
+    {
+      "a": "after bottom",
+      "actual": {
+        "supported": true,
+        "position": {
+          "x": 5.599999999999999,
+          "y": -5
+        }
+      },
+      "expected": {
+        "x": 9.6,
+        "y": -5
+      },
+      "residual": 4.000000000000001
+    },
+    {
+      "a": "0",
+      "actual": {
+        "supported": true,
+        "position": {
+          "x": 5.599923706054686,
+          "y": -0.00091552734375
+        }
+      },
+      "expected": {
+        "x": 5.59991,
+        "y": -0.00092
+      },
+      "residual": 0.000014417371084310078
+    },
+    {
+      "a": "45",
+      "actual": {
+        "supported": true,
+        "position": {
+          "x": 0.5999999999999988,
+          "y": 0
+        }
+      },
+      "expected": {
+        "x": 4.6,
+        "y": 0
+      },
+      "residual": 4.000000000000001
+    },
+    {
+      "a": "90",
+      "actual": {
+        "supported": true,
+        "position": {
+          "x": 0.5999999999999988,
+          "y": 0
+        }
+      },
+      "expected": {
+        "x": 4.6,
+        "y": 0
+      },
+      "residual": 4.000000000000001
+    },
+    {
+      "a": "180",
+      "actual": {
+        "supported": true,
+        "position": {
+          "x": 0.9807830810546863,
+          "y": 1.913299560546875
+        }
+      },
+      "expected": {
+        "x": 6.06447,
+        "y": 3.53554
+      },
+      "residual": 5.336247439282849
+    },
+    {
+      "a": "270",
+      "actual": {
+        "supported": true,
+        "position": {
+          "x": 0.9807830810546863,
+          "y": 1.913299560546875
+        }
+      },
+      "expected": {
+        "x": 6.06447,
+        "y": 3.53554
+      },
+      "residual": 5.336247439282849
+    }
+  ],
+  "production": {
+    "model": {
+      "version": 1,
+      "ambientDimension": 2,
+      "camera": {
+        "mode": "2d",
+        "scale": 1,
+        "origin": {
+          "x": 0,
+          "y": 0
+        }
+      },
+      "coordinateAnchors": [],
+      "strata": [
+        {
+          "id": "folded-cylinder",
+          "codim": 2,
+          "geometricKind": "point",
+          "name": "Point",
+          "text": "",
+          "style": {
+            "kind": "pointStyle",
+            "color": "#000000",
+            "opacity": 1,
+            "shape": "cylinder",
+            "fill": "filled",
+            "size": 3,
+            "paint": {
+              "text": {
+                "color": "#000000",
+                "opacity": 1
+              },
+              "fill": {
+                "enabled": true,
+                "color": "#000000",
+                "opacity": 1
+              },
+              "stroke": {
+                "enabled": true,
+                "color": "#000000",
+                "opacity": 1,
+                "width": 0.4,
+                "lineStyle": "solid",
+                "dashPhase": 0,
+                "lineCap": "butt",
+                "lineJoin": "miter"
+              }
+            },
+            "layout": {
+              "innerXSep": -30,
+              "innerYSep": 5,
+              "outerXSep": 0,
+              "outerYSep": 0,
+              "minimumWidth": 1,
+              "minimumHeight": 1,
+              "anchor": "bottom"
+            }
+          },
+          "position": {
+            "x": 0,
+            "y": 0,
+            "z": 0
+          },
+          "layer": 0
+        }
+      ],
+      "labels": []
+    },
+    "anchor": {
+      "x": 0.7200000000000042,
+      "y": 0
+    },
+    "placementOffset": {
+      "x": -0.7200000000000042,
+      "y": 0
+    },
+    "shapeBounds": {
+      "minX": -6,
+      "minY": -6,
+      "maxX": 10.799999999999992,
+      "maxY": 6
+    }
+  }
+}

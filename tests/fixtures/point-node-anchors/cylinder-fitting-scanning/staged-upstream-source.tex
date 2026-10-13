@@ -1,0 +1,69 @@
+\def\tracecylinder{\begingroup
+
+        \pgfmathsetlength\pgf@xc{\pgfkeysvalueof{/pgf/inner xsep}}%
+        \immediate\write\fixtureout{STAGE innerXSp; \number\pgf@xc}%
+        \pgf@x\pgf@xc%
+        \advance\pgf@x.5\wd\pgfnodeparttextbox%
+        \pgfmathsetlength\pgf@yc{\pgfkeysvalueof{/pgf/inner ysep}}%
+        \immediate\write\fixtureout{STAGE innerYSp; \number\pgf@yc}%
+        \pgf@y\pgf@yc%
+        \advance\pgf@y.5\ht\pgfnodeparttextbox%
+        \advance\pgf@y.5\dp\pgfnodeparttextbox%
+\immediate\write\fixtureout{STAGE initialXSp; \number\pgf@x}%
+\immediate\write\fixtureout{STAGE initialYSp; \number\pgf@y}%
+        \ifpgfshapeborderusesincircle%
+            \pgfmathsetmacro\rotate{\pgfkeysvalueof{/pgf/shape border rotate}}%
+            \ifdim\pgf@x<\pgf@y%
+                \pgf@x\pgf@y%
+            \else%
+                \pgf@y\pgf@x%
+            \fi%
+            \pgf@x1.414213\pgf@x%
+            \pgf@y1.414213\pgf@y%
+        \else%
+            \pgfmathmod{\pgfkeysvalueof{/pgf/shape border rotate}}{360}%
+            \ifdim\pgfmathresult pt<0pt\relax%
+                \pgfmathadd@{\pgfmathresult}{360}%
+            \fi%
+            \pgfmathsetcount\c@pgf@counta{+\pgfmathresult}%
+            \advance\c@pgf@counta45\relax%
+            \divide\c@pgf@counta90\relax%
+            \multiply\c@pgf@counta90\relax%
+            \edef\rotate{\the\c@pgf@counta}%
+            \ifnum\c@pgf@counta=90\relax%
+                \pgf@xa\pgf@x%
+                \pgf@x\pgf@y%
+                \pgf@y\pgf@xa%
+                \pgf@yc\pgf@xc%
+            \else%
+                \ifnum\c@pgf@counta=270\relax%
+                    \pgf@xa\pgf@x%
+                    \pgf@x\pgf@y%
+                    \pgf@y\pgf@xa%
+                    \pgf@yc\pgf@xc%
+                \fi%
+            \fi%
+        \fi%
+        
+\immediate\write\fixtureout{STAGE fittedXSp; \number\pgf@x}%
+\immediate\write\fixtureout{STAGE fittedYSp; \number\pgf@y}%
+\immediate\write\fixtureout{STAGE transverseInnerSepSp; \number\pgf@yc}%
+        \pgf@xa\pgf@x%
+        \pgf@ya\pgf@y%
+        \pgfutil@tempdima\pgfshapeaspect\pgf@ya%
+        \pgfutil@tempdimb\pgf@ya%
+        %
+        % Adjust for minimum height.
+        %
+        \pgfmathsetlength\pgf@xc{\pgfkeysvalueof{/pgf/minimum width}}%
+\immediate\write\fixtureout{STAGE minimumWidthSp; \number\pgf@xc}%
+        \ifdim\pgfutil@tempdimb<.5\pgf@xc\relax%
+            \pgfutil@tempdimb.5\pgf@xc%
+            \pgf@ya\pgfutil@tempdimb%
+        \fi%
+\immediate\write\fixtureout{STAGE divisorSp; \number\pgfutil@tempdimb}%
+\pgf@xc.5\wd\pgfnodeparttextbox\immediate\write\fixtureout{STAGE bodyWidthHalfSp; \number\pgf@xc}%
+\pgf@xc.5\ht\pgfnodeparttextbox\immediate\write\fixtureout{STAGE bodyHeightHalfSp; \number\pgf@xc}%
+\pgf@xc.5\dp\pgfnodeparttextbox\immediate\write\fixtureout{STAGE bodyDepthHalfSp; \number\pgf@xc}%
+\pgfmathsetlength\pgf@xc{\pgfkeysvalueof{/pgf/minimum width}}\pgf@xc.5\pgf@xc\immediate\write\fixtureout{STAGE minimumWidthHalfSp; \number\pgf@xc}%
+\endgroup}

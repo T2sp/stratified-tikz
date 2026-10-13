@@ -13,7 +13,8 @@ import { decodeConnectedPaintPng } from './connectedLivePaintOracle.mjs'
 import { assertZeroAxisLiveCapture } from './zeroAxisLiveCapture.mjs'
 import { assertSignedPointStandaloneAssociation, assertSignedPointStandaloneGeometry } from './signedPointStandaloneAssociation.mjs'
 import { readEvidenceDocumentSync } from './evidencePublication.mjs'
-import { singularCylinderScenario, assertSingularCylinderEvidence } from './singularCylinderDiagnosticContract.mjs'
+import { singularCylinderScenario, subspCylinderScenario, cylinderDiagnosticScenarios, assertSingularCylinderEvidence } from './singularCylinderDiagnosticContract.mjs'
+import { foldedCylinderScenario, assertFoldedCylinderEvidence } from './foldedCylinderContract.mjs'
 
 export const layoutAnchorGroup = 'point-node-layout-anchors-combined'
 export const layoutShapes = ['circle', 'rectangle', 'square', 'triangle', 'ellipse', 'diamond', 'regular polygon',
@@ -60,7 +61,7 @@ export const layoutShapeParameters = {
 }
 export const layoutAnchorScenarios = ['point-layout-per-shape-spacing-minima', 'point-layout-anchor-support-rotation',
   'point-layout-native-controls-persistence', 'point-layout-import-order-units', 'point-layout-async-combined-isolation',
-  'point-layout-native-interaction-2d-3d', 'point-layout-signed-polygonal-zero-axis', 'point-layout-pending-transparent-edit', 'point-layout-pending-white-load', singularCylinderScenario]
+  'point-layout-native-interaction-2d-3d', 'point-layout-signed-polygonal-zero-axis', 'point-layout-pending-transparent-edit', 'point-layout-pending-white-load', singularCylinderScenario, subspCylinderScenario, foldedCylinderScenario]
 export const layoutFieldKeys = ['innerXSep', 'innerYSep', 'outerXSep', 'outerYSep', 'minimumWidth', 'minimumHeight', 'anchor']
 // PGF 3.1.11a's signed maximum retains -80 TeX pt fitted axes for these
 // authored dimensions. Preview uses 1.2 SVG units per TeX pt: east=-96.
@@ -104,7 +105,7 @@ export function layoutAnchorArtifacts(name) {
     files.push(`${stem}-native.json`, `${stem}-live-capture.json`, `${stem}-live.png`, `${stem}.svg`, `${stem}.png`, `${stem}-standalone.json`,
       `${stem}-saved.json`, `${stem}-standalone.tex`, `${stem}-inlineMath.tex`)
   }
-  if (name === singularCylinderScenario) for (const ambientDimension of [2, 3]) {
+  if (cylinderDiagnosticScenarios.includes(name) || name === foldedCylinderScenario) for (const ambientDimension of [2, 3]) {
     const stem = `${name}-${ambientDimension}d`
     files.push(`${stem}-native.json`, `${stem}.svg`, `${stem}.png`, `${stem}-standalone.json`,
       `${stem}-saved.json`, `${stem}-standalone.tex`, `${stem}-inlineMath.tex`)
@@ -278,8 +279,10 @@ function assertSignedCasePlacement(entry, spec) {
 export function assertLayoutAnchorEvidence(evidence, name) {
   assert.equal(evidence.scenario, name); assert.equal(evidence.group, layoutAnchorGroup); assert.equal(evidence.result, 'passed')
   assert.deepEqual(evidence.pageErrors, [])
-  if (name === singularCylinderScenario) {
+  if (cylinderDiagnosticScenarios.includes(name)) {
     assertSingularCylinderEvidence(evidence)
+  } else if (name === foldedCylinderScenario) {
+    assertFoldedCylinderEvidence(evidence)
   } else if (name === 'point-layout-per-shape-spacing-minima') {
     assert.equal(evidence.cases.length, layoutShapes.length * layoutRegimes.length)
     for (const shape of layoutShapes) for (const regime of layoutRegimes) {

@@ -1,0 +1,2446 @@
+{
+  "schema": "stz-pgf-cylinder-actual-export-domain-v1",
+  "pgfVersion": "3.1.11a",
+  "engine": "pdfTeX 3.141592653-2.6-1.40.29 (TeX Live 2026)",
+  "engineBinarySha256": "3ead7baeffb81c638fe75599602278566370e6319c0469f6ab00ff62bff4b0eb",
+  "sourceHashes": {
+    "/usr/local/texlive/2026/texmf-dist/tex/generic/pgf/libraries/shapes/pgflibraryshapes.geometric.code.tex": "bbd6abe9df51153e2f4f61cca3ad669de34a6648cf37795df44da931402b69ee",
+    "/usr/local/texlive/2026/texmf-dist/tex/generic/pgf/modules/pgfmoduleshapes.code.tex": "01dd81e3f2c56a8db7864916ada1a5036964aff2e8176aafd4773244e236bb27",
+    "/usr/local/texlive/2026/texmf-dist/tex/generic/pgf/basiclayer/pgfcorepoints.code.tex": "7533dd80c95a5124726b0a617a5f458226d4a7490bcd209e3fd7e717e24dc127",
+    "/usr/local/texlive/2026/texmf-dist/tex/generic/pgf/math/pgfmathcalc.code.tex": "58fcc94547646458470315a6d10953a9729e7962e3def5273633b06fb444a5aa",
+    "/usr/local/texlive/2026/texmf-dist/tex/generic/pgf/math/pgfmathfunctions.trigonometric.code.tex": "1c8834abe00807467a52d31ef96032d5084b2560eea45995018084d13a3cde3c",
+    "/usr/local/texlive/2026/texmf-dist/tex/generic/pgf/math/pgfmathfunctions.basic.code.tex": "c94abbd89ad0556546d9e5053af16b58ce7f38d19c379b27309e5fefd23908f8",
+    "/usr/local/texlive/2026/texmf-dist/tex/generic/pgf/basiclayer/pgfcoretransformations.code.tex": "bdea875774b4ad7a1e12debc67c46286245031f5c2e287c9e192f3ca4b6193b6",
+    "/usr/local/texlive/2026/texmf-dist/tex/generic/pgf/math/pgfmathparser.code.tex": "317b4a8059ee9afd04b052dd2974c1c9a059d1b8e301f9578efa9ac0b9984990"
+  },
+  "priorReferenceSha256": "60dd5c8e8e95331e47a74b2c168ae437ec3597e6304c2cc3fad4ec9901a839af",
+  "generatorSha256": "8e49e77c8eb99454d613f36cdb38522e6704de71ca25131deb164f4b23e3d8d6",
+  "applicationSourceHashes": {
+    "src/tikz/generateTikz.ts": "378b995d2bfc90ab7bb8710e308d0794f832a830df6d420374fb473424823a8e",
+    "src/model/pointNodeLayout.ts": "c6356ae7b36b02acc80617f16e9d7e2c0232ab77c4b8f2dfdb1befa9ee280898",
+    "src/model/importedTikzStyles.ts": "ca4931023f78f86e42e3a1f86971d2f3487c32c47295438f92f991414c9941b3",
+    "src/model/stylePresets.ts": "731c451677c4eddadb8d3865b6007cae4567e7927e86891c2b8a765cab04cdaf",
+    "src/model/styles.ts": "719bddabd35341a1f2eeab8668601ccd93559816bb4262ca778cdec05a2a9c26",
+    "src/model/serialization.ts": "4165aefe7edfe4f2230872d71182af4900a5d2861a9fc6abd9fbf5426303e27b",
+    "src/model/constructors.ts": "8c4ee70a50ca08d25ae8c2e8ab0bf411002a11146aab0eaae60ef51d87f838ad",
+    "src/model/visibility.ts": "0e479f166488df178b07ee2cd497a268f80e959f1bf44f4390303556a4608175",
+    "src/ui/contextQuickStyleBar.ts": "dc08686a424572778d5fd50c48a9bce8b482e59544a9c609863133b67f6c4f14"
+  },
+  "units": "TeX pt; raw observed PGF division arguments converted to signed integer scaled points. Actual generated source/model/external raw style bytes are immutable; no runtime geometry was used to create expectations.",
+  "artifactHashes": {
+    ".gitignore": "2e08bec5ad827cfd6459d823bffd206603b04c6606f00ef9795821256d0e9573",
+    "local-em-2d/model.json": "baf3da56299bcc6378bbf153b5d25dc1262cd33d450f41992bcc77241e7b2a77",
+    "local-em-2d/standalone-generated.tex": "1ebb1a7a0ab73f016b9bf4cf2cd678d8acd9bf4ce0eb51e106b20270f179e2fb",
+    "local-em-2d/standalone-wrapped.tex": "6644596662794b638e8defc2a5cf92371d89cfa5df442a030bef7b18f338717d",
+    "local-em-2d/standalone-domain.txt": "38155a0e4f9ea32004abfc0596373c8c78ef4968924bbec1fad388c0b03ee32f",
+    "local-em-2d/standalone-compilation.txt": "98e03ae98743d83c91ad931df9036f2e2fffbc120ce0749c75da400cbe3e730d",
+    "local-em-2d/standalone-compiler.log": "90d81ba8353e2beaf988bf03531bf166bdd8a82a1b8ab11630b35fa4cf4c898a",
+    "local-em-2d/inlineMath-generated.tex": "4c298799edf63c8c16d9f1e66b182765c1d4d9db75d31f39f8956136f1dc934d",
+    "local-em-2d/inlineMath-wrapped.tex": "7780aa3d6e72f2473cde0e00dd0290df26ac874e1627f356693b1d88600cc781",
+    "local-em-2d/inlineMath-domain.txt": "38155a0e4f9ea32004abfc0596373c8c78ef4968924bbec1fad388c0b03ee32f",
+    "local-em-2d/inlineMath-compilation.txt": "d3c908dedd1f90f8aa4a9816d0bf76bb31d02cbbdfa7779fde76fc0cf0a70c21",
+    "local-em-2d/inlineMath-compiler.log": "123e275fdd91bdfc90aa3c0c09e6d31cab70177fed8a0fb659b5ea6ca153577a",
+    "local-em-3d/model.json": "18ac64d380aa49a9cb022dd1fc06cfef4e5f64da8e28320dfa0c4303e235508c",
+    "local-em-3d/standalone-generated.tex": "17c89064b787f6a680aa353656493b8f84261e268f0e3adfcb73f13f09b7687d",
+    "local-em-3d/standalone-wrapped.tex": "40260d147b1684b0b06d94493acddeefe093468d2a3471d5d0060f677f32767c",
+    "local-em-3d/standalone-domain.txt": "38155a0e4f9ea32004abfc0596373c8c78ef4968924bbec1fad388c0b03ee32f",
+    "local-em-3d/standalone-compilation.txt": "98e03ae98743d83c91ad931df9036f2e2fffbc120ce0749c75da400cbe3e730d",
+    "local-em-3d/standalone-compiler.log": "246e734105385317a28d21aa2481b9fbddf01fb1a3225800ef00f6a1a066ec97",
+    "local-em-3d/inlineMath-generated.tex": "f47ab53f074129d7e7eb78183d35aa23ecd3fc6fda9b940a87d51e1ebf0ee042",
+    "local-em-3d/inlineMath-wrapped.tex": "dd136b52ad7b1a3b589b574e202c677c970cd523627f2aaa5ae64ca490bf4ed6",
+    "local-em-3d/inlineMath-domain.txt": "38155a0e4f9ea32004abfc0596373c8c78ef4968924bbec1fad388c0b03ee32f",
+    "local-em-3d/inlineMath-compilation.txt": "98e03ae98743d83c91ad931df9036f2e2fffbc120ce0749c75da400cbe3e730d",
+    "local-em-3d/inlineMath-compiler.log": "be37afc18771567aefe82bff2b40f842770df3ed4f37f69ef3d7cec7ada5050e",
+    "inherited-legacy-em-2d/model.json": "05f22c3948d67bba0ef6ead70e6d5cde3c6ffd783267061d91abaef739217f38",
+    "inherited-legacy-em-2d/tiny-cylinder.sty": "12d7d927950f55996ca3eb7dea4aa985d8026a852f1576892208e73467810475",
+    "inherited-legacy-em-2d/standalone-generated.tex": "51c1792e04cefa96bcdf8d8d13f5dcc460f4affbba59bde0cd61fe4bac7c245f",
+    "inherited-legacy-em-2d/standalone-wrapped.tex": "42ba7c0ccdcb8a8501de487b81b329f507a44984c75621f375e68640c9a4bdd8",
+    "inherited-legacy-em-2d/standalone-domain.txt": "5dfa246c4b275f5536a1ea90330893bd63d505a7d9fdfe6a85370d7131d93eac",
+    "inherited-legacy-em-2d/standalone-compilation.txt": "75c6ceffbe233d1cc10d171b3204517f66a96d0bbb2011ab208d7dc5be1178a2",
+    "inherited-legacy-em-2d/standalone-compiler.log": "3343c10bea0bd254bc040ba84e8ea2258e6b72fa72680810195c18e81958ddcc",
+    "inherited-legacy-em-2d/inlineMath-generated.tex": "546eaba3b711538af6d3b5553a12f9af077399a3b2f64525f3c89899f5d3a5d1",
+    "inherited-legacy-em-2d/inlineMath-wrapped.tex": "2d23cc2dd72169f987d1ab5f8098e434227617529c00d0b7e3b7a3a8c1df347e",
+    "inherited-legacy-em-2d/inlineMath-domain.txt": "5dfa246c4b275f5536a1ea90330893bd63d505a7d9fdfe6a85370d7131d93eac",
+    "inherited-legacy-em-2d/inlineMath-compilation.txt": "5c42b9b3a957062c84033b8ba77060cdb9286e78f4a136eb140c33c1c6a10775",
+    "inherited-legacy-em-2d/inlineMath-compiler.log": "15aeb6cf8eb906bec896ef5694efc06ec5058a06b80a641c30d5e95736fba484",
+    "inherited-legacy-em-3d/model.json": "77750623d08516c8d320d9a19a37db7c68ddf8ac831eecd8aa2ab2f5efe7c788",
+    "inherited-legacy-em-3d/tiny-cylinder.sty": "12d7d927950f55996ca3eb7dea4aa985d8026a852f1576892208e73467810475",
+    "inherited-legacy-em-3d/standalone-generated.tex": "75dfed4d6de6b327cb76e10d517c416a5c9f158e67c78d3e9874407e63c489f8",
+    "inherited-legacy-em-3d/standalone-wrapped.tex": "a9015f5cebed6f616d46de4e86251a6b8629cff13e2b2c1cca0a036b05b27fac",
+    "inherited-legacy-em-3d/standalone-domain.txt": "5dfa246c4b275f5536a1ea90330893bd63d505a7d9fdfe6a85370d7131d93eac",
+    "inherited-legacy-em-3d/standalone-compilation.txt": "0eedf9dcb87e5734616fc9f0d3c3067ec1d8b4089042f6ab2b7dbf42c5ed2bdb",
+    "inherited-legacy-em-3d/standalone-compiler.log": "7887f3d5d69dd669ec57083e0d0f24e3fa3f6342c661d5d1cab623025904d66b",
+    "inherited-legacy-em-3d/inlineMath-generated.tex": "95454644d2e9db643bfbf55f7d8fe28fec3b6e81bfa9924fb46708f7c8104521",
+    "inherited-legacy-em-3d/inlineMath-wrapped.tex": "cd4d331d1e84509437a24571991f8400ce2eb0dbdeb8a3e786f324cce0795011",
+    "inherited-legacy-em-3d/inlineMath-domain.txt": "5dfa246c4b275f5536a1ea90330893bd63d505a7d9fdfe6a85370d7131d93eac",
+    "inherited-legacy-em-3d/inlineMath-compilation.txt": "162fef6bcfb42601e9382ada6e7cd9a8471cd674c1fc1defa723f19d28b2b89a",
+    "inherited-legacy-em-3d/inlineMath-compiler.log": "ab1d2f6b918c40b55d7f936b486fba570ecce16e8cffd0666ab6a6da99c85a96",
+    "inherited-current-source-2d/model.json": "713265248b3b6123479d15de695aef9e4dedda82dcb0648b9615811c171604c7",
+    "inherited-current-source-2d/tiny-cylinder.sty": "fac6182242230cb218cd91dc7b596170ab8bce0acfe59d1e88b798eb188e56d7",
+    "inherited-current-source-2d/standalone-generated.tex": "51c1792e04cefa96bcdf8d8d13f5dcc460f4affbba59bde0cd61fe4bac7c245f",
+    "inherited-current-source-2d/standalone-wrapped.tex": "42ba7c0ccdcb8a8501de487b81b329f507a44984c75621f375e68640c9a4bdd8",
+    "inherited-current-source-2d/standalone-domain.txt": "dd845597324a553e2bde2bb9932bcc6fad34d93f01496bafc80473b538cf7f61",
+    "inherited-current-source-2d/standalone-compilation.txt": "c9a54c3a13b218ef6c57cb0e019c395cdf07386a6c3d4d10f747e5e380208841",
+    "inherited-current-source-2d/standalone-compiler.log": "438044ee5de71412ca441648a3b012586d101b81ae87c70a6a2a170ca5b04d37",
+    "inherited-current-source-2d/inlineMath-generated.tex": "546eaba3b711538af6d3b5553a12f9af077399a3b2f64525f3c89899f5d3a5d1",
+    "inherited-current-source-2d/inlineMath-wrapped.tex": "2d23cc2dd72169f987d1ab5f8098e434227617529c00d0b7e3b7a3a8c1df347e",
+    "inherited-current-source-2d/inlineMath-domain.txt": "dd845597324a553e2bde2bb9932bcc6fad34d93f01496bafc80473b538cf7f61",
+    "inherited-current-source-2d/inlineMath-compilation.txt": "3fcb3079a0a2d4195981f1c83897147abfa0df0e411824c98f86d196e0c7a590",
+    "inherited-current-source-2d/inlineMath-compiler.log": "a3f24193ca0644f2e61912bb721e90e6d63e68c1db4fb9aea724baad50723445",
+    "inherited-current-source-3d/model.json": "39e54e213411238d34ecabd9d522a188e89e5c51e2bd277c022732b67077e654",
+    "inherited-current-source-3d/tiny-cylinder.sty": "fac6182242230cb218cd91dc7b596170ab8bce0acfe59d1e88b798eb188e56d7",
+    "inherited-current-source-3d/standalone-generated.tex": "75dfed4d6de6b327cb76e10d517c416a5c9f158e67c78d3e9874407e63c489f8",
+    "inherited-current-source-3d/standalone-wrapped.tex": "a9015f5cebed6f616d46de4e86251a6b8629cff13e2b2c1cca0a036b05b27fac",
+    "inherited-current-source-3d/standalone-domain.txt": "dd845597324a553e2bde2bb9932bcc6fad34d93f01496bafc80473b538cf7f61",
+    "inherited-current-source-3d/standalone-compilation.txt": "c9a54c3a13b218ef6c57cb0e019c395cdf07386a6c3d4d10f747e5e380208841",
+    "inherited-current-source-3d/standalone-compiler.log": "2f0f85690d498b70151aad8f8c4fc736291e0174b836e1c4555fc075e64b555c",
+    "inherited-current-source-3d/inlineMath-generated.tex": "95454644d2e9db643bfbf55f7d8fe28fec3b6e81bfa9924fb46708f7c8104521",
+    "inherited-current-source-3d/inlineMath-wrapped.tex": "cd4d331d1e84509437a24571991f8400ce2eb0dbdeb8a3e786f324cce0795011",
+    "inherited-current-source-3d/inlineMath-domain.txt": "dd845597324a553e2bde2bb9932bcc6fad34d93f01496bafc80473b538cf7f61",
+    "inherited-current-source-3d/inlineMath-compilation.txt": "36f02cdb8d6df21ee5878a40c18ae0ac7d5c544947a63a1fda9b60ce229cd0d4",
+    "inherited-current-source-3d/inlineMath-compiler.log": "e0321c7c97ee15166b13408a519f90c18a2404c1b8222265a12b0091256105ab",
+    "inherited-preset-fallback-2d/model.json": "65e7837ac68e8ee0460274118815b489b714922b65a2f457bf710d38e80aba61",
+    "inherited-preset-fallback-2d/tiny-cylinder.sty": "12d7d927950f55996ca3eb7dea4aa985d8026a852f1576892208e73467810475",
+    "inherited-preset-fallback-2d/standalone-generated.tex": "51c1792e04cefa96bcdf8d8d13f5dcc460f4affbba59bde0cd61fe4bac7c245f",
+    "inherited-preset-fallback-2d/standalone-wrapped.tex": "42ba7c0ccdcb8a8501de487b81b329f507a44984c75621f375e68640c9a4bdd8",
+    "inherited-preset-fallback-2d/standalone-domain.txt": "5dfa246c4b275f5536a1ea90330893bd63d505a7d9fdfe6a85370d7131d93eac",
+    "inherited-preset-fallback-2d/standalone-compilation.txt": "75c6ceffbe233d1cc10d171b3204517f66a96d0bbb2011ab208d7dc5be1178a2",
+    "inherited-preset-fallback-2d/standalone-compiler.log": "3343c10bea0bd254bc040ba84e8ea2258e6b72fa72680810195c18e81958ddcc",
+    "inherited-preset-fallback-2d/inlineMath-generated.tex": "546eaba3b711538af6d3b5553a12f9af077399a3b2f64525f3c89899f5d3a5d1",
+    "inherited-preset-fallback-2d/inlineMath-wrapped.tex": "2d23cc2dd72169f987d1ab5f8098e434227617529c00d0b7e3b7a3a8c1df347e",
+    "inherited-preset-fallback-2d/inlineMath-domain.txt": "5dfa246c4b275f5536a1ea90330893bd63d505a7d9fdfe6a85370d7131d93eac",
+    "inherited-preset-fallback-2d/inlineMath-compilation.txt": "5c42b9b3a957062c84033b8ba77060cdb9286e78f4a136eb140c33c1c6a10775",
+    "inherited-preset-fallback-2d/inlineMath-compiler.log": "15aeb6cf8eb906bec896ef5694efc06ec5058a06b80a641c30d5e95736fba484",
+    "inherited-preset-fallback-3d/model.json": "3129f58bad32d597cf470fd470b20c4d09f2c236921fe2242b4607d2a625bafe",
+    "inherited-preset-fallback-3d/tiny-cylinder.sty": "12d7d927950f55996ca3eb7dea4aa985d8026a852f1576892208e73467810475",
+    "inherited-preset-fallback-3d/standalone-generated.tex": "75dfed4d6de6b327cb76e10d517c416a5c9f158e67c78d3e9874407e63c489f8",
+    "inherited-preset-fallback-3d/standalone-wrapped.tex": "a9015f5cebed6f616d46de4e86251a6b8629cff13e2b2c1cca0a036b05b27fac",
+    "inherited-preset-fallback-3d/standalone-domain.txt": "5dfa246c4b275f5536a1ea90330893bd63d505a7d9fdfe6a85370d7131d93eac",
+    "inherited-preset-fallback-3d/standalone-compilation.txt": "0eedf9dcb87e5734616fc9f0d3c3067ec1d8b4089042f6ab2b7dbf42c5ed2bdb",
+    "inherited-preset-fallback-3d/standalone-compiler.log": "7887f3d5d69dd669ec57083e0d0f24e3fa3f6342c661d5d1cab623025904d66b",
+    "inherited-preset-fallback-3d/inlineMath-generated.tex": "95454644d2e9db643bfbf55f7d8fe28fec3b6e81bfa9924fb46708f7c8104521",
+    "inherited-preset-fallback-3d/inlineMath-wrapped.tex": "cd4d331d1e84509437a24571991f8400ce2eb0dbdeb8a3e786f324cce0795011",
+    "inherited-preset-fallback-3d/inlineMath-domain.txt": "5dfa246c4b275f5536a1ea90330893bd63d505a7d9fdfe6a85370d7131d93eac",
+    "inherited-preset-fallback-3d/inlineMath-compilation.txt": "162fef6bcfb42601e9382ada6e7cd9a8471cd674c1fc1defa723f19d28b2b89a",
+    "inherited-preset-fallback-3d/inlineMath-compiler.log": "ab1d2f6b918c40b55d7f936b486fba570ecce16e8cffd0666ab6a6da99c85a96",
+    "source-rotate90-2d/model.json": "da540a589e047ba7a55e9c3b7b34cd2a4a44a797f13dab728757a940c18ea414",
+    "source-rotate90-2d/tiny-cylinder.sty": "72594ebd47c2a3e3b58f7593068997b675d6aa546f54f6cbd6adf68ce7a6d9b3",
+    "source-rotate90-2d/standalone-generated.tex": "5c28e46e12fa4d3b47cfaa2b5bf820eb0aea1e28b37af0abca9e737aa0731850",
+    "source-rotate90-2d/standalone-wrapped.tex": "ab1b32819eff4aaf7f3bea4b8d2efdca50ef4304247901c4c86dd377e2b90349",
+    "source-rotate90-2d/standalone-domain.txt": "5dfa246c4b275f5536a1ea90330893bd63d505a7d9fdfe6a85370d7131d93eac",
+    "source-rotate90-2d/standalone-compilation.txt": "75c6ceffbe233d1cc10d171b3204517f66a96d0bbb2011ab208d7dc5be1178a2",
+    "source-rotate90-2d/standalone-compiler.log": "122354b615e8c9df7f52ac699ed34774023230025cf9c938a10c168deb18892c",
+    "source-rotate90-2d/inlineMath-generated.tex": "17c85ed063fb09f1b1024d1bdf22dea124fa9e31e5a0801f479cfac36e640c80",
+    "source-rotate90-2d/inlineMath-wrapped.tex": "e12a0584f22b7dc9f67da7440f1a4e4942bd4739a28e52174e68ec757979bf4c",
+    "source-rotate90-2d/inlineMath-domain.txt": "5dfa246c4b275f5536a1ea90330893bd63d505a7d9fdfe6a85370d7131d93eac",
+    "source-rotate90-2d/inlineMath-compilation.txt": "5c42b9b3a957062c84033b8ba77060cdb9286e78f4a136eb140c33c1c6a10775",
+    "source-rotate90-2d/inlineMath-compiler.log": "65b4b14818b1532332190bba7844c8b4c7319d23357d996f4fdb4fd04add64bc",
+    "source-rotate90-3d/model.json": "10acb2ee21ad296a3223d534189926664ae6fb60acef49b4a366c7b77d39d527",
+    "source-rotate90-3d/tiny-cylinder.sty": "72594ebd47c2a3e3b58f7593068997b675d6aa546f54f6cbd6adf68ce7a6d9b3",
+    "source-rotate90-3d/standalone-generated.tex": "66cb1d62073a555e251348b1cefd1254b54be94ee58a8ac12503c515a65d650b",
+    "source-rotate90-3d/standalone-wrapped.tex": "79c9a2ca18e1716d1e29f3be53c7d80c23a7313063cd9e81fc586a565cc42aa3",
+    "source-rotate90-3d/standalone-domain.txt": "5dfa246c4b275f5536a1ea90330893bd63d505a7d9fdfe6a85370d7131d93eac",
+    "source-rotate90-3d/standalone-compilation.txt": "0eedf9dcb87e5734616fc9f0d3c3067ec1d8b4089042f6ab2b7dbf42c5ed2bdb",
+    "source-rotate90-3d/standalone-compiler.log": "fc8f9e736cbb08e5e293848dfe598406f9a16a6a76cd6197da6857b9e4dc2a2f",
+    "source-rotate90-3d/inlineMath-generated.tex": "468252a76ec6e6e2f303cd572ea4ec505c556b7df9f6e6abb0b4dd77a623a803",
+    "source-rotate90-3d/inlineMath-wrapped.tex": "265f3a658ca27b77932a5b76e41e1e23f6852ca76e654143ed8ad6b49d119a07",
+    "source-rotate90-3d/inlineMath-domain.txt": "5dfa246c4b275f5536a1ea90330893bd63d505a7d9fdfe6a85370d7131d93eac",
+    "source-rotate90-3d/inlineMath-compilation.txt": "162fef6bcfb42601e9382ada6e7cd9a8471cd674c1fc1defa723f19d28b2b89a",
+    "source-rotate90-3d/inlineMath-compiler.log": "f868d84f76777650eef1500def634a0843510babc58f98f902de8d182977f305",
+    "source-rotate270-2d/model.json": "d8ec72fe9d6d969ddd56b0f8cab10eabb3c221f0d84645638c08c4e45a4832d6",
+    "source-rotate270-2d/tiny-cylinder.sty": "55b8d8a81874adf2c50ed64727fb6164b8fa8889de9fe3517731ba776f7e92b9",
+    "source-rotate270-2d/standalone-generated.tex": "5c28e46e12fa4d3b47cfaa2b5bf820eb0aea1e28b37af0abca9e737aa0731850",
+    "source-rotate270-2d/standalone-wrapped.tex": "ab1b32819eff4aaf7f3bea4b8d2efdca50ef4304247901c4c86dd377e2b90349",
+    "source-rotate270-2d/standalone-domain.txt": "5dfa246c4b275f5536a1ea90330893bd63d505a7d9fdfe6a85370d7131d93eac",
+    "source-rotate270-2d/standalone-compilation.txt": "75c6ceffbe233d1cc10d171b3204517f66a96d0bbb2011ab208d7dc5be1178a2",
+    "source-rotate270-2d/standalone-compiler.log": "9a67ad9446353981296f0128b7febdad51a0fa62ac67faa1e4a989476eeab017",
+    "source-rotate270-2d/inlineMath-generated.tex": "17c85ed063fb09f1b1024d1bdf22dea124fa9e31e5a0801f479cfac36e640c80",
+    "source-rotate270-2d/inlineMath-wrapped.tex": "e12a0584f22b7dc9f67da7440f1a4e4942bd4739a28e52174e68ec757979bf4c",
+    "source-rotate270-2d/inlineMath-domain.txt": "5dfa246c4b275f5536a1ea90330893bd63d505a7d9fdfe6a85370d7131d93eac",
+    "source-rotate270-2d/inlineMath-compilation.txt": "5c42b9b3a957062c84033b8ba77060cdb9286e78f4a136eb140c33c1c6a10775",
+    "source-rotate270-2d/inlineMath-compiler.log": "f9d2868ed685cc6a00edbecac0fdc716ef747ad84af1fabab0d789ff867e8214",
+    "source-rotate270-3d/model.json": "cb1f8d762f91d8c47eb15940a138aeb2c832b3e3f8aa0da297bd498643a6ac7e",
+    "source-rotate270-3d/tiny-cylinder.sty": "55b8d8a81874adf2c50ed64727fb6164b8fa8889de9fe3517731ba776f7e92b9",
+    "source-rotate270-3d/standalone-generated.tex": "66cb1d62073a555e251348b1cefd1254b54be94ee58a8ac12503c515a65d650b",
+    "source-rotate270-3d/standalone-wrapped.tex": "79c9a2ca18e1716d1e29f3be53c7d80c23a7313063cd9e81fc586a565cc42aa3",
+    "source-rotate270-3d/standalone-domain.txt": "5dfa246c4b275f5536a1ea90330893bd63d505a7d9fdfe6a85370d7131d93eac",
+    "source-rotate270-3d/standalone-compilation.txt": "0eedf9dcb87e5734616fc9f0d3c3067ec1d8b4089042f6ab2b7dbf42c5ed2bdb",
+    "source-rotate270-3d/standalone-compiler.log": "1ca7616210bc2337b85e5269cc24f6b9b3b614731a07de08a52e776a1105b16b",
+    "source-rotate270-3d/inlineMath-generated.tex": "468252a76ec6e6e2f303cd572ea4ec505c556b7df9f6e6abb0b4dd77a623a803",
+    "source-rotate270-3d/inlineMath-wrapped.tex": "265f3a658ca27b77932a5b76e41e1e23f6852ca76e654143ed8ad6b49d119a07",
+    "source-rotate270-3d/inlineMath-domain.txt": "5dfa246c4b275f5536a1ea90330893bd63d505a7d9fdfe6a85370d7131d93eac",
+    "source-rotate270-3d/inlineMath-compilation.txt": "162fef6bcfb42601e9382ada6e7cd9a8471cd674c1fc1defa723f19d28b2b89a",
+    "source-rotate270-3d/inlineMath-compiler.log": "c115a5604f2a8a020105bbd94c7717f8edb48f44c0c5da4d9919633fe5b8baa7",
+    "source-incircle-disabled-2d/model.json": "77032f74a14e07037375a0d45db4a7a02b3207245967a2151b8f73baf85bf69c",
+    "source-incircle-disabled-2d/tiny-cylinder.sty": "1ec402a3643702ef702f781301739e4324792eb15103290c3af79ee7f0cf371b",
+    "source-incircle-disabled-2d/standalone-generated.tex": "cd7a8aca34bb4d119253e4e6c7ea6d57118214c49aca4afdc0f45d1803b87e6b",
+    "source-incircle-disabled-2d/standalone-wrapped.tex": "4ef60086548c7f92d6ae6e6ce987f9d36b5ff2c90f93d0e52cf575ed5cef53fc",
+    "source-incircle-disabled-2d/standalone-domain.txt": "5dfa246c4b275f5536a1ea90330893bd63d505a7d9fdfe6a85370d7131d93eac",
+    "source-incircle-disabled-2d/standalone-compilation.txt": "44691014b27671e657fe758336b8de2b288c2437b1da5ff30f57d626f55e53dc",
+    "source-incircle-disabled-2d/standalone-compiler.log": "aafaa671db2078d6178a0f9e06506414e9a1a21e07b169b8e5516a928ba1af40",
+    "source-incircle-disabled-2d/inlineMath-generated.tex": "9f37713b82f9b3b1c3ea2dff6617a317803faeaba03a0f4dbb4b475bbfef4196",
+    "source-incircle-disabled-2d/inlineMath-wrapped.tex": "d886b05cc5af1f53111413e2e2ed16a48cc065f7aa8c0a8fb9ae646075240566",
+    "source-incircle-disabled-2d/inlineMath-domain.txt": "5dfa246c4b275f5536a1ea90330893bd63d505a7d9fdfe6a85370d7131d93eac",
+    "source-incircle-disabled-2d/inlineMath-compilation.txt": "4616a9c59a921207874a3afbdcd35382d649effd2793d6f1b0979cd929e056ef",
+    "source-incircle-disabled-2d/inlineMath-compiler.log": "f051448bc933f0669808c62fc8c4e5696ecebac9d508a80ff29991d212014205",
+    "source-incircle-disabled-3d/model.json": "0f8a6aa0a9627643240d3540e17efabdfebdbfbcbe7cb18d66cbf0bd3c7b2807",
+    "source-incircle-disabled-3d/tiny-cylinder.sty": "1ec402a3643702ef702f781301739e4324792eb15103290c3af79ee7f0cf371b",
+    "source-incircle-disabled-3d/standalone-generated.tex": "9a4fa58da979b192123c359396379321ccaa24083920a426e35eb4e976a31066",
+    "source-incircle-disabled-3d/standalone-wrapped.tex": "693e24554e689256493537beba1283c318cc3d831868ae56d15a3cc4c95bcdd4",
+    "source-incircle-disabled-3d/standalone-domain.txt": "5dfa246c4b275f5536a1ea90330893bd63d505a7d9fdfe6a85370d7131d93eac",
+    "source-incircle-disabled-3d/standalone-compilation.txt": "c76dc8c09a134108ff213d4c0d6f93d33dc38bfbed2ac5ece634270f198819d1",
+    "source-incircle-disabled-3d/standalone-compiler.log": "73812119747b38bb81edb9db80ceb5e71ddc75b4aa690820a1b26a9ffdcd9b9b",
+    "source-incircle-disabled-3d/inlineMath-generated.tex": "32987f01d93d2d7757274fb7376833218171a4d7f0f17bb8a8266820c1a1fb0f",
+    "source-incircle-disabled-3d/inlineMath-wrapped.tex": "fa5e6f093ac11cb845fe88e1f85729eb668f68de3a5e1b6dadd72a2dd14da482",
+    "source-incircle-disabled-3d/inlineMath-domain.txt": "5dfa246c4b275f5536a1ea90330893bd63d505a7d9fdfe6a85370d7131d93eac",
+    "source-incircle-disabled-3d/inlineMath-compilation.txt": "c53487af34beb67812c6c4710566a97ba63ef20e87872aab9503347f4bdf9f3d",
+    "source-incircle-disabled-3d/inlineMath-compiler.log": "056de02dc712ed69b32e4775049ff3bfeba051b7a2a6214bd38ea8761f6d3714",
+    "dimmed-preset-only-3d/model.json": "c32543bc6334d16235bbc88eb9767a2488f06699f8581b818172bd24c27116bd",
+    "dimmed-preset-only-3d/tiny-cylinder.sty": "12d7d927950f55996ca3eb7dea4aa985d8026a852f1576892208e73467810475",
+    "dimmed-preset-only-3d/standalone-generated.tex": "1962e466d320440bc5c62a9e1bb23d22b8811e6e949b6f28c91f848548f7542b",
+    "dimmed-preset-only-3d/standalone-wrapped.tex": "b7ea76f3fff782c1b6a4bb2069527d7944b0dbfaa841da4fdd143ef936abcc5f",
+    "dimmed-preset-only-3d/standalone-domain.txt": "38155a0e4f9ea32004abfc0596373c8c78ef4968924bbec1fad388c0b03ee32f",
+    "dimmed-preset-only-3d/standalone-compilation.txt": "4619e587c86d7e794a1adc59d1d1fc1941dfb99cc65eb7a3e54fc9461e95f18e",
+    "dimmed-preset-only-3d/standalone-compiler.log": "984b9c48e22f0b50f885cfe1b2e36754a5550bb2fb538d4bf5342c72d86126c3",
+    "dimmed-preset-only-3d/inlineMath-generated.tex": "effb4427ba47c51263e6002b7a77483fd055f6de8901ecdf674dd23b6986e6fb",
+    "dimmed-preset-only-3d/inlineMath-wrapped.tex": "accde95263e879b78f08caf21d0e9fe53e7d133ab92074dfaa711fd081715f3a",
+    "dimmed-preset-only-3d/inlineMath-domain.txt": "38155a0e4f9ea32004abfc0596373c8c78ef4968924bbec1fad388c0b03ee32f",
+    "dimmed-preset-only-3d/inlineMath-compilation.txt": "f541a5df21f4d47297c58fbc13d4c8da0a62f623afac8a80f01954457feb646e",
+    "dimmed-preset-only-3d/inlineMath-compiler.log": "0699a2c58c0eb4a3622433b5bcf5a5f829d3451775e3945e140f73f0dc86204f",
+    "inherited-em-2d/model.json": "30b140995f9c61f0c3cec92f58917deb7c3e9e69ac81933292ace18ad2a1635e",
+    "inherited-em-2d/tiny-cylinder.sty": "12d7d927950f55996ca3eb7dea4aa985d8026a852f1576892208e73467810475",
+    "inherited-em-2d/standalone-generated.tex": "51c1792e04cefa96bcdf8d8d13f5dcc460f4affbba59bde0cd61fe4bac7c245f",
+    "inherited-em-2d/standalone-wrapped.tex": "42ba7c0ccdcb8a8501de487b81b329f507a44984c75621f375e68640c9a4bdd8",
+    "inherited-em-2d/standalone-domain.txt": "5dfa246c4b275f5536a1ea90330893bd63d505a7d9fdfe6a85370d7131d93eac",
+    "inherited-em-2d/standalone-compilation.txt": "75c6ceffbe233d1cc10d171b3204517f66a96d0bbb2011ab208d7dc5be1178a2",
+    "inherited-em-2d/standalone-compiler.log": "3343c10bea0bd254bc040ba84e8ea2258e6b72fa72680810195c18e81958ddcc",
+    "inherited-em-2d/inlineMath-generated.tex": "546eaba3b711538af6d3b5553a12f9af077399a3b2f64525f3c89899f5d3a5d1",
+    "inherited-em-2d/inlineMath-wrapped.tex": "2d23cc2dd72169f987d1ab5f8098e434227617529c00d0b7e3b7a3a8c1df347e",
+    "inherited-em-2d/inlineMath-domain.txt": "5dfa246c4b275f5536a1ea90330893bd63d505a7d9fdfe6a85370d7131d93eac",
+    "inherited-em-2d/inlineMath-compilation.txt": "5c42b9b3a957062c84033b8ba77060cdb9286e78f4a136eb140c33c1c6a10775",
+    "inherited-em-2d/inlineMath-compiler.log": "15aeb6cf8eb906bec896ef5694efc06ec5058a06b80a641c30d5e95736fba484",
+    "inherited-em-3d/model.json": "6f697a5c25611264e9c4411f4cb8dc7e35a76f3624372026c9305507bb5b6817",
+    "inherited-em-3d/tiny-cylinder.sty": "12d7d927950f55996ca3eb7dea4aa985d8026a852f1576892208e73467810475",
+    "inherited-em-3d/standalone-generated.tex": "75dfed4d6de6b327cb76e10d517c416a5c9f158e67c78d3e9874407e63c489f8",
+    "inherited-em-3d/standalone-wrapped.tex": "a9015f5cebed6f616d46de4e86251a6b8629cff13e2b2c1cca0a036b05b27fac",
+    "inherited-em-3d/standalone-domain.txt": "5dfa246c4b275f5536a1ea90330893bd63d505a7d9fdfe6a85370d7131d93eac",
+    "inherited-em-3d/standalone-compilation.txt": "0eedf9dcb87e5734616fc9f0d3c3067ec1d8b4089042f6ab2b7dbf42c5ed2bdb",
+    "inherited-em-3d/standalone-compiler.log": "7887f3d5d69dd669ec57083e0d0f24e3fa3f6342c661d5d1cab623025904d66b",
+    "inherited-em-3d/inlineMath-generated.tex": "95454644d2e9db643bfbf55f7d8fe28fec3b6e81bfa9924fb46708f7c8104521",
+    "inherited-em-3d/inlineMath-wrapped.tex": "cd4d331d1e84509437a24571991f8400ce2eb0dbdeb8a3e786f324cce0795011",
+    "inherited-em-3d/inlineMath-domain.txt": "5dfa246c4b275f5536a1ea90330893bd63d505a7d9fdfe6a85370d7131d93eac",
+    "inherited-em-3d/inlineMath-compilation.txt": "162fef6bcfb42601e9382ada6e7cd9a8471cd674c1fc1defa723f19d28b2b89a",
+    "inherited-em-3d/inlineMath-compiler.log": "ab1d2f6b918c40b55d7f936b486fba570ecce16e8cffd0666ab6a6da99c85a96",
+    "detached-em-2d/model.json": "672a407393983c983d7461a09aab1d0234978e0eba4c7d012c75028e462780bf",
+    "detached-em-2d/tiny-cylinder.sty": "12d7d927950f55996ca3eb7dea4aa985d8026a852f1576892208e73467810475",
+    "detached-em-2d/standalone-generated.tex": "1ebb1a7a0ab73f016b9bf4cf2cd678d8acd9bf4ce0eb51e106b20270f179e2fb",
+    "detached-em-2d/standalone-wrapped.tex": "c871a965e9a1a91fe9e3c27a01dda013a9b87617f13b177a1d990db0bdf5909d",
+    "detached-em-2d/standalone-domain.txt": "38155a0e4f9ea32004abfc0596373c8c78ef4968924bbec1fad388c0b03ee32f",
+    "detached-em-2d/standalone-compilation.txt": "424f7afd1eb5d385436a42afa0d662f2ac3abcbcce1ccaa418563f1e48190071",
+    "detached-em-2d/standalone-compiler.log": "38b298a9622f58ed6dbd4a5614bd4ae73f44f13f5102b5738ba8993364d8967f",
+    "detached-em-2d/inlineMath-generated.tex": "4c298799edf63c8c16d9f1e66b182765c1d4d9db75d31f39f8956136f1dc934d",
+    "detached-em-2d/inlineMath-wrapped.tex": "dfe50437fd97a90a9127e1c0ab3514f85a63a781a482ef61f6a403ac0ae7a51c",
+    "detached-em-2d/inlineMath-domain.txt": "38155a0e4f9ea32004abfc0596373c8c78ef4968924bbec1fad388c0b03ee32f",
+    "detached-em-2d/inlineMath-compilation.txt": "9ba2adb874f997e0e927a1fc26c953fc11b5a47234b9e249c803e8ada9ce8ef6",
+    "detached-em-2d/inlineMath-compiler.log": "4c89eeaded0a0f5f0d1e069a34c48081d6aa940c1b9b5c0c219c82bb9d743260",
+    "detached-em-3d/model.json": "3e5905ccec19a5a8bfbbb62c0d8eaf11767052b4966e4ba3d661f02d66b0504d",
+    "detached-em-3d/tiny-cylinder.sty": "12d7d927950f55996ca3eb7dea4aa985d8026a852f1576892208e73467810475",
+    "detached-em-3d/standalone-generated.tex": "17c89064b787f6a680aa353656493b8f84261e268f0e3adfcb73f13f09b7687d",
+    "detached-em-3d/standalone-wrapped.tex": "8befec290ab0692eb431531adbf71fff1047436c563fcc9ed872a7d3f33b10c3",
+    "detached-em-3d/standalone-domain.txt": "38155a0e4f9ea32004abfc0596373c8c78ef4968924bbec1fad388c0b03ee32f",
+    "detached-em-3d/standalone-compilation.txt": "424f7afd1eb5d385436a42afa0d662f2ac3abcbcce1ccaa418563f1e48190071",
+    "detached-em-3d/standalone-compiler.log": "ec62a75331dd97e5a94c44cadee37ce751860e333a087d8119c7aa5608c2c113",
+    "detached-em-3d/inlineMath-generated.tex": "f47ab53f074129d7e7eb78183d35aa23ecd3fc6fda9b940a87d51e1ebf0ee042",
+    "detached-em-3d/inlineMath-wrapped.tex": "14fc3e9c353dcea8c6a4c7d9ab447f40e973660cf4b37f6a0b94a2b423e60908",
+    "detached-em-3d/inlineMath-domain.txt": "38155a0e4f9ea32004abfc0596373c8c78ef4968924bbec1fad388c0b03ee32f",
+    "detached-em-3d/inlineMath-compilation.txt": "424f7afd1eb5d385436a42afa0d662f2ac3abcbcce1ccaa418563f1e48190071",
+    "detached-em-3d/inlineMath-compiler.log": "2e628750cd646815532a8938893ed3301f4c588fdd704fb94c1aa291354b2b6d",
+    "same-value-local-edit-em-2d/model.json": "395bbee9fb40ded1ffa756e8f26cdb17e8e7718db7683fa25b7e294aa1834a07",
+    "same-value-local-edit-em-2d/tiny-cylinder.sty": "12d7d927950f55996ca3eb7dea4aa985d8026a852f1576892208e73467810475",
+    "same-value-local-edit-em-2d/standalone-generated.tex": "a2e69579c3302b9eb56195b4966343099285f4a867d236960d6e64b61317808b",
+    "same-value-local-edit-em-2d/standalone-wrapped.tex": "8b949934d52171a45bac34616a44150208c56e2915dfca09d0a86dee33e22da3",
+    "same-value-local-edit-em-2d/standalone-domain.txt": "38155a0e4f9ea32004abfc0596373c8c78ef4968924bbec1fad388c0b03ee32f",
+    "same-value-local-edit-em-2d/standalone-compilation.txt": "424f7afd1eb5d385436a42afa0d662f2ac3abcbcce1ccaa418563f1e48190071",
+    "same-value-local-edit-em-2d/standalone-compiler.log": "3daee0a22780ad7fc8c0469bf4f5cf3abe6d27b5815df986b91acea70099c232",
+    "same-value-local-edit-em-2d/inlineMath-generated.tex": "f2c8c9d34bf79fc44df6a79643836053a7737859f43982f62242d2e649768d31",
+    "same-value-local-edit-em-2d/inlineMath-wrapped.tex": "963cea4f3d864782d46e61a4bce7de6b9377be787aff6dd242835b24209faa3a",
+    "same-value-local-edit-em-2d/inlineMath-domain.txt": "38155a0e4f9ea32004abfc0596373c8c78ef4968924bbec1fad388c0b03ee32f",
+    "same-value-local-edit-em-2d/inlineMath-compilation.txt": "9ba2adb874f997e0e927a1fc26c953fc11b5a47234b9e249c803e8ada9ce8ef6",
+    "same-value-local-edit-em-2d/inlineMath-compiler.log": "ff633455f964214a2c0017e97a75b04f7c568dbf84d3d6d27cf0c293b7eb3dd9",
+    "same-value-local-edit-em-3d/model.json": "f4434ea01c97ea2c4387d6d9ac0fb07b48c528eed42ed6f1407c9c5c0084238c",
+    "same-value-local-edit-em-3d/tiny-cylinder.sty": "12d7d927950f55996ca3eb7dea4aa985d8026a852f1576892208e73467810475",
+    "same-value-local-edit-em-3d/standalone-generated.tex": "ae8497d05c2dfb83257e71831d35876389faa2aea29c5ed5867c9ee768a6c774",
+    "same-value-local-edit-em-3d/standalone-wrapped.tex": "724d7734fa4f12fc3ef5d5194e11022217dfafcba5fcff905293b6c8d8868336",
+    "same-value-local-edit-em-3d/standalone-domain.txt": "38155a0e4f9ea32004abfc0596373c8c78ef4968924bbec1fad388c0b03ee32f",
+    "same-value-local-edit-em-3d/standalone-compilation.txt": "424f7afd1eb5d385436a42afa0d662f2ac3abcbcce1ccaa418563f1e48190071",
+    "same-value-local-edit-em-3d/standalone-compiler.log": "36a1b48838489183c608df55a70d0049eb93e8484b3d913a9cb70d9ba217822c",
+    "same-value-local-edit-em-3d/inlineMath-generated.tex": "52a00a0185d3e092b8b6dc8d09c54f4ddf95e70add53a0c433c9ecdc38716326",
+    "same-value-local-edit-em-3d/inlineMath-wrapped.tex": "19198fdb725ee4fafc0aff0c443aff7ebe772e7668803cc432ddc97576ed2173",
+    "same-value-local-edit-em-3d/inlineMath-domain.txt": "38155a0e4f9ea32004abfc0596373c8c78ef4968924bbec1fad388c0b03ee32f",
+    "same-value-local-edit-em-3d/inlineMath-compilation.txt": "424f7afd1eb5d385436a42afa0d662f2ac3abcbcce1ccaa418563f1e48190071",
+    "same-value-local-edit-em-3d/inlineMath-compiler.log": "ee2d7cc3b1b4d9f3e6fa01086412158a24809f2676fa6dac9f7d7cc90b0a79f1",
+    "inferred-numeric-change-em-2d/model.json": "51f1b4c85621c592341b798ff5e0e1ca5fd4492834a84e9c34255402f6e80cbf",
+    "inferred-numeric-change-em-2d/tiny-cylinder.sty": "12d7d927950f55996ca3eb7dea4aa985d8026a852f1576892208e73467810475",
+    "inferred-numeric-change-em-2d/standalone-generated.tex": "0b6881f4417afcd17b9df6296ce6f5aa5be725aa72688c883f78d08aa7e7b2da",
+    "inferred-numeric-change-em-2d/standalone-wrapped.tex": "01ff6d4e405b4c7e7266c8d9146b1d64346ec3a7a9071c9c53222d39892ca52d",
+    "inferred-numeric-change-em-2d/standalone-domain.txt": "4d5b52e18d3fa8f67b14aa0a83b1c045cdd45e903ae22165b7e8ecdafa1183e1",
+    "inferred-numeric-change-em-2d/standalone-compilation.txt": "28f1d47b873dcc7a849eb18e2ae07c025a19cb9901a266dd1f5d1750df2b8d2d",
+    "inferred-numeric-change-em-2d/standalone-compiler.log": "14eb8ed52450131e2a9b4f8a18cfd6a49a14373db4c3dfaecef4cc8fbadfe4c5",
+    "inferred-numeric-change-em-2d/inlineMath-generated.tex": "8286c8fa19d807ca7952705f89b71efd46303db18f8c43348dc3294c61ae4880",
+    "inferred-numeric-change-em-2d/inlineMath-wrapped.tex": "53746430f18ea07294b53a9ac70adb47845f33574962ee3794298df98aa44078",
+    "inferred-numeric-change-em-2d/inlineMath-domain.txt": "4d5b52e18d3fa8f67b14aa0a83b1c045cdd45e903ae22165b7e8ecdafa1183e1",
+    "inferred-numeric-change-em-2d/inlineMath-compilation.txt": "1e4e989f621af7f84271be0426d4ffca85e96fc9667f401ce0127ad524703d96",
+    "inferred-numeric-change-em-2d/inlineMath-compiler.log": "bf6bcbf818c6b47fee80a2ac751142cc2ff63177329d325c06603e59fcb02a45",
+    "inferred-numeric-change-em-3d/model.json": "cda0ddaef7c010f0f6186aec73d9e9a3f6b4d40563f8e4ffc9223ca8638b2354",
+    "inferred-numeric-change-em-3d/tiny-cylinder.sty": "12d7d927950f55996ca3eb7dea4aa985d8026a852f1576892208e73467810475",
+    "inferred-numeric-change-em-3d/standalone-generated.tex": "948547f5cbc4481324f63d5811d32d48be9c1f5f5583c7c8a88896ba7a5f6709",
+    "inferred-numeric-change-em-3d/standalone-wrapped.tex": "974913f54a6bbb727a926be3f21bb728ff64e99b7b3c444d82a974eb1c72c122",
+    "inferred-numeric-change-em-3d/standalone-domain.txt": "4d5b52e18d3fa8f67b14aa0a83b1c045cdd45e903ae22165b7e8ecdafa1183e1",
+    "inferred-numeric-change-em-3d/standalone-compilation.txt": "28f1d47b873dcc7a849eb18e2ae07c025a19cb9901a266dd1f5d1750df2b8d2d",
+    "inferred-numeric-change-em-3d/standalone-compiler.log": "5a4691d1bfa09eec7439938dd3271d1911e9fabb18678495d2b7b9e0e5bba924",
+    "inferred-numeric-change-em-3d/inlineMath-generated.tex": "5af49f68fb97217b6ff091b419e74ab6e84b08493a8be5b6769c9cf00a0c172c",
+    "inferred-numeric-change-em-3d/inlineMath-wrapped.tex": "a4fd156af8c151c2821e986bf39a860c111aee0478bb80c4a0dc0c512e5bc927",
+    "inferred-numeric-change-em-3d/inlineMath-domain.txt": "4d5b52e18d3fa8f67b14aa0a83b1c045cdd45e903ae22165b7e8ecdafa1183e1",
+    "inferred-numeric-change-em-3d/inlineMath-compilation.txt": "83c4e5a90b3c35ce6c085c49f90fb1a6a6e8a629d778c86946c9e1efba15c245",
+    "inferred-numeric-change-em-3d/inlineMath-compiler.log": "b3b6ebd65218ddc834e90522886cbf9a3ff5bba5b535769d708bf1344e7b49f4",
+    "local-pt-roundup-2d/model.json": "915f195578f0a311f8858f8559c3de34096cc3648fb08e511d173f636d95dcab",
+    "local-pt-roundup-2d/standalone-generated.tex": "89a7d33c2d9fad55ddc4031cf8a1529b77379e70e22e9503223e05823fd9cdd7",
+    "local-pt-roundup-2d/standalone-wrapped.tex": "e9552c59e4795620cf1db75bd751186d34a35a2c1616315adf2df4c963a9cfdf",
+    "local-pt-roundup-2d/standalone-domain.txt": "af60f3e83334a9a4e672e45dbc66320f7bb49c6428ea97f0f7ae285e2c0d360b",
+    "local-pt-roundup-2d/standalone-compilation.txt": "a1cbb4d1e4ad9cf71b425de6aeb115ba10493ee54e5b5a60be1f92b37a5dd4c4",
+    "local-pt-roundup-2d/standalone-compiler.log": "b9b6da113f0938fd0048d10e9bea8129e6c5bc418a748deb3f06d00c8dadf080",
+    "local-pt-roundup-2d/inlineMath-generated.tex": "a86dd7a3320a93fa060e950434988784d82e1cc9f9a048ca1b8f34f5d86124b9",
+    "local-pt-roundup-2d/inlineMath-wrapped.tex": "703c5847d761578e93c5146eb3e24341c2ac7847555a93b3581e8f34bfacb3cf",
+    "local-pt-roundup-2d/inlineMath-domain.txt": "af60f3e83334a9a4e672e45dbc66320f7bb49c6428ea97f0f7ae285e2c0d360b",
+    "local-pt-roundup-2d/inlineMath-compilation.txt": "a1cbb4d1e4ad9cf71b425de6aeb115ba10493ee54e5b5a60be1f92b37a5dd4c4",
+    "local-pt-roundup-2d/inlineMath-compiler.log": "680cdb7aa7cff21a60e83b9b3053ccc006553e916b26007ea641baed1982a402",
+    "local-pt-roundup-3d/model.json": "5214d408eef18e4e31c765ce77337cf57f866518765e77ca8f082ecc40e1fa92",
+    "local-pt-roundup-3d/standalone-generated.tex": "01693abb334cf688fbd2bdaab888eb177d9a3fb957bdbb1d3b1f92c6d6cafb81",
+    "local-pt-roundup-3d/standalone-wrapped.tex": "88f01e88de667d2933071054366ac8cadd9803cb09c3dcae2c5b4c660f7e29f7",
+    "local-pt-roundup-3d/standalone-domain.txt": "af60f3e83334a9a4e672e45dbc66320f7bb49c6428ea97f0f7ae285e2c0d360b",
+    "local-pt-roundup-3d/standalone-compilation.txt": "ad60af81cedaa1645c8b3aca025c48a2d652d033535b7817a8fbc4415a1db08b",
+    "local-pt-roundup-3d/standalone-compiler.log": "a0e56ff1d2d8238a63b5de8341eafa831ef43d67cf6018b65db6bdfed5da0a34",
+    "local-pt-roundup-3d/inlineMath-generated.tex": "7f69f42dc466a631d8f698e98f50df1a6392b439cbd482b06feb65065c294457",
+    "local-pt-roundup-3d/inlineMath-wrapped.tex": "745e146895fe17b541f645a64f0f94acaf4b485deeda3995c9ba139dcd91ec3c",
+    "local-pt-roundup-3d/inlineMath-domain.txt": "af60f3e83334a9a4e672e45dbc66320f7bb49c6428ea97f0f7ae285e2c0d360b",
+    "local-pt-roundup-3d/inlineMath-compilation.txt": "a8ad0088e8c54c53666127b864416a9263e8bf81ab5975d861fc2e8871ece66e",
+    "local-pt-roundup-3d/inlineMath-compiler.log": "5d73bd77d27c6a8eca336baec4bd14923fe9a4b25ac78d40af1d68f298fa83f6",
+    "local-pt-rounddown-2d/model.json": "5f50911bef7f1e96a39e18a8be4608dba26dcaf6d963bffe1dc801ee6256a6f2",
+    "local-pt-rounddown-2d/standalone-generated.tex": "1191caff4fec78d08b2e01bc2b49bce0450a0c049a94db5f78c89e161eacb6b5",
+    "local-pt-rounddown-2d/standalone-wrapped.tex": "a6d5cd44859bc18dd5b94d213a7a8f6d292692da5f2921389859f0f538c6ed32",
+    "local-pt-rounddown-2d/standalone-domain.txt": "5dfa246c4b275f5536a1ea90330893bd63d505a7d9fdfe6a85370d7131d93eac",
+    "local-pt-rounddown-2d/standalone-compilation.txt": "dffd99cd78c6c5398f2f60d011a8b6242ae69c2ef814e584e5b3673edb99ad6f",
+    "local-pt-rounddown-2d/standalone-compiler.log": "7f7339e687a6dffd558dd7817b563be10f81ab5878401afca40d24491c095f72",
+    "local-pt-rounddown-2d/inlineMath-generated.tex": "93c72d71a521f2a241ae340dbce7d51146a5e07212231991068e7c9e434a936d",
+    "local-pt-rounddown-2d/inlineMath-wrapped.tex": "0586d4edcd3dd50f804d802e783a3d9b8e11b49a3b5e2d871ffeabf0cbd9162e",
+    "local-pt-rounddown-2d/inlineMath-domain.txt": "5dfa246c4b275f5536a1ea90330893bd63d505a7d9fdfe6a85370d7131d93eac",
+    "local-pt-rounddown-2d/inlineMath-compilation.txt": "dffd99cd78c6c5398f2f60d011a8b6242ae69c2ef814e584e5b3673edb99ad6f",
+    "local-pt-rounddown-2d/inlineMath-compiler.log": "a98af35c5dfcf015d54ac5753410e4116608d8a77eb8cecccf804237d1674e92",
+    "local-pt-rounddown-3d/model.json": "477d0f25809a7d63c5fe86e496ec55ac866e33d21bb4a23f44f88d0282107a02",
+    "local-pt-rounddown-3d/standalone-generated.tex": "ff14c01a4d707f89001ecdf664ee551d09433ef02a9be564a95bdab62d22508a",
+    "local-pt-rounddown-3d/standalone-wrapped.tex": "d2dd1a7234ace76d53a85e4a702745477dc97de1abbd371b96af594ee1bfde2f",
+    "local-pt-rounddown-3d/standalone-domain.txt": "5dfa246c4b275f5536a1ea90330893bd63d505a7d9fdfe6a85370d7131d93eac",
+    "local-pt-rounddown-3d/standalone-compilation.txt": "de35213eb82833927a26a46361d1dd87250dd5b47c8f6f4a442db7a7da0b6d28",
+    "local-pt-rounddown-3d/standalone-compiler.log": "c3a2caaff400724770eef4bae13213915aa44793170ed8165c5a891ba904fe80",
+    "local-pt-rounddown-3d/inlineMath-generated.tex": "09037c1d0424a501086d18de95d859a8c27dae349d783a228eddd54596a38b11",
+    "local-pt-rounddown-3d/inlineMath-wrapped.tex": "98b5e5166defb841c1b2ab5b308839477d939505b135fe0e56d67d49567da6ee",
+    "local-pt-rounddown-3d/inlineMath-domain.txt": "5dfa246c4b275f5536a1ea90330893bd63d505a7d9fdfe6a85370d7131d93eac",
+    "local-pt-rounddown-3d/inlineMath-compilation.txt": "b1e2ee64642189ef72c128eba94b669b6490a29b864a730cba172cb6cd4ccd22",
+    "local-pt-rounddown-3d/inlineMath-compiler.log": "923d2c479126239b9395526a6afd230afc64bbb304dc999b245d8b10b318011e",
+    "local-negative-em-2d/model.json": "0e7c3a21a198cf5e576cb8c39f5987bcee65e2f2990e599700511348b7b6bc93",
+    "local-negative-em-2d/standalone-generated.tex": "6ad2a0b4c7ea3ec64489065c690f3107c7c2598feaaa1a11ac649598fb2b6248",
+    "local-negative-em-2d/standalone-wrapped.tex": "4de7f227fc40bbcead04cce0ec8eff1300348d41b7e29f3a99c489f667bddf6e",
+    "local-negative-em-2d/standalone-domain.txt": "a083a97d9e6ba367a3dea988fb117c20f5f4b3d42d11a542a35eb577110f2cc6",
+    "local-negative-em-2d/standalone-compilation.txt": "5229d217eb74e1e05a6b02cf22d7379b3b7a57d951546aaa2e289e94d283cbad",
+    "local-negative-em-2d/standalone-compiler.log": "4219901be6cb06125ea9dce1c8df8e244af773efae67b20c8a988e6def9dba22",
+    "local-negative-em-2d/inlineMath-generated.tex": "bff800ac736d0091f452eaddbeaf0cd9e6a5e4ef31085d363000bfc161f5ecf5",
+    "local-negative-em-2d/inlineMath-wrapped.tex": "c626040f40754d47b7a6b742c183f33d7c539d2c4b6726d5434321b58d17a78c",
+    "local-negative-em-2d/inlineMath-domain.txt": "a083a97d9e6ba367a3dea988fb117c20f5f4b3d42d11a542a35eb577110f2cc6",
+    "local-negative-em-2d/inlineMath-compilation.txt": "9c836df17c7d3ceec223dd8cb6f84f56cea61f12bd271b451b6d662bc8820c65",
+    "local-negative-em-2d/inlineMath-compiler.log": "74c72d4ff9920408c68b6a656a9f8ef57d05aeaceb40a6a39a1ea8b464e965d1",
+    "local-negative-em-3d/model.json": "f765290fc77cca090e52670fa887bcf2212589c3c874b28e7b7228424e40663f",
+    "local-negative-em-3d/standalone-generated.tex": "bdab52f440add06395f4095f213a5374d79e40d3e5d30b5e7befe1f6ba254f69",
+    "local-negative-em-3d/standalone-wrapped.tex": "7cd271e63f79082acf3dfdb84940e5742467081210027f2c3468b29f4e3e0a91",
+    "local-negative-em-3d/standalone-domain.txt": "a083a97d9e6ba367a3dea988fb117c20f5f4b3d42d11a542a35eb577110f2cc6",
+    "local-negative-em-3d/standalone-compilation.txt": "5229d217eb74e1e05a6b02cf22d7379b3b7a57d951546aaa2e289e94d283cbad",
+    "local-negative-em-3d/standalone-compiler.log": "69ea32a1f7cc2875d604b28d37e2c09a986855dd140a9a96de285b7d70253c83",
+    "local-negative-em-3d/inlineMath-generated.tex": "30d559295f8bfc9ea78f09440beac8bda52a3205208f0af1fd025659120fe785",
+    "local-negative-em-3d/inlineMath-wrapped.tex": "18d99f45679136c741252fef17b1cd78e1de02f9c8894663962a6e55cb97bda4",
+    "local-negative-em-3d/inlineMath-domain.txt": "a083a97d9e6ba367a3dea988fb117c20f5f4b3d42d11a542a35eb577110f2cc6",
+    "local-negative-em-3d/inlineMath-compilation.txt": "6065dc48137070420fb419158e3dba9cbbdd3f42ad1fdd08892eb133c673beb5",
+    "local-negative-em-3d/inlineMath-compiler.log": "d6a4110b94fee873c1360664c84f0187cb61d13cdf91eb23d7d84d4a2cb15594",
+    "local-ex-recorded-context-2d/model.json": "b97b71478da2b09f17186ac578c21ff4c94325982cd7ab66d92491f40d6030b3",
+    "local-ex-recorded-context-2d/standalone-generated.tex": "1a2932e1040a0a4fc3239a60d858e08c9b386e0e0c9996719d9dc37de2054e80",
+    "local-ex-recorded-context-2d/standalone-wrapped.tex": "2ba293caec6a1359ab0e98a285098d99f73febab093502bfa1fe4040a717f6e3",
+    "local-ex-recorded-context-2d/standalone-domain.txt": "d5ad092cdff5a7245a2194af4b725a08b2f895c4661433c47fc34439229a8560",
+    "local-ex-recorded-context-2d/standalone-compilation.txt": "4251cc64de16e51b0270a20afd3707a3d14955cf8b199f69ff040288d2e711b6",
+    "local-ex-recorded-context-2d/standalone-compiler.log": "507d6b2310d9153e6f6a05198aae615e05949d9d9d36885d90407088cb120484",
+    "local-ex-recorded-context-2d/inlineMath-generated.tex": "357b7627cd1ff269ffc96eb980e0d5d8cad8a31c4b99bd9ae395c784c27f016c",
+    "local-ex-recorded-context-2d/inlineMath-wrapped.tex": "23140968142f1459275b010c22268dded9e1c29aeb4170adcd5c6f9307266d15",
+    "local-ex-recorded-context-2d/inlineMath-domain.txt": "d5ad092cdff5a7245a2194af4b725a08b2f895c4661433c47fc34439229a8560",
+    "local-ex-recorded-context-2d/inlineMath-compilation.txt": "7ccb813e262f1171c4d4beceb1fdf596beee2d1f184e8c0ecac967326b34a12f",
+    "local-ex-recorded-context-2d/inlineMath-compiler.log": "5843e27f4245e5919a789e7b68724ffea262bf6d09c77915dc67d7ac3a06f05b",
+    "local-ex-recorded-context-3d/model.json": "37589c76dc15298b4e7d764323f003e398d0ed516f8a41532177449969afedd1",
+    "local-ex-recorded-context-3d/standalone-generated.tex": "2e62c6274e1ccf054cf03390ae8f712f6c035e029f3fdb62839b5a77529a4192",
+    "local-ex-recorded-context-3d/standalone-wrapped.tex": "3f2a8f35284470bc171c9c90695aa402fa2bd349d79adaa13b9b11e2d0382efd",
+    "local-ex-recorded-context-3d/standalone-domain.txt": "d5ad092cdff5a7245a2194af4b725a08b2f895c4661433c47fc34439229a8560",
+    "local-ex-recorded-context-3d/standalone-compilation.txt": "4251cc64de16e51b0270a20afd3707a3d14955cf8b199f69ff040288d2e711b6",
+    "local-ex-recorded-context-3d/standalone-compiler.log": "9b67b23a2e67995498c30fa184cea025219a4891b50873df749fd8aa05842bb6",
+    "local-ex-recorded-context-3d/inlineMath-generated.tex": "bc6dbbe0b8384e0ba1e49acc6449f4faaf081afead1e8ffbd16a5821fad5be3d",
+    "local-ex-recorded-context-3d/inlineMath-wrapped.tex": "7911627c680f2d4b8f3501c5b3dd3e25b984fe88307b0f90e881555590b38821",
+    "local-ex-recorded-context-3d/inlineMath-domain.txt": "d5ad092cdff5a7245a2194af4b725a08b2f895c4661433c47fc34439229a8560",
+    "local-ex-recorded-context-3d/inlineMath-compilation.txt": "a02fb22def504a9508ab8446b633abe28ef6028004d8c0abe593ce5ce22fdd2c",
+    "local-ex-recorded-context-3d/inlineMath-compiler.log": "9e4a11cd95ee8402f91055edbd0cc282b93875fcbfa90b2f26ec385c4858d7d6",
+    "inherited-ex-2d/model.json": "5772f026cedb7d8e9ee20f754487ee7e339f41d3f28d4d765e0344c2bc7dde07",
+    "inherited-ex-2d/tiny-cylinder.sty": "4d43c4fa5bd4071161ba9cf3f798acbeca42a95c7167f0a36bcdf9dd1a2049ff",
+    "inherited-ex-2d/standalone-generated.tex": "a59c671eb322b1fbb28c897fc724de07da45b3deb9ca2993229340de4c9f4001",
+    "inherited-ex-2d/standalone-wrapped.tex": "45af5d9bd29c7a397b1b301b91fdd2fbf911822bae25440589fb8417628699c5",
+    "inherited-ex-2d/standalone-domain.txt": "5dfa246c4b275f5536a1ea90330893bd63d505a7d9fdfe6a85370d7131d93eac",
+    "inherited-ex-2d/standalone-compilation.txt": "75c6ceffbe233d1cc10d171b3204517f66a96d0bbb2011ab208d7dc5be1178a2",
+    "inherited-ex-2d/standalone-compiler.log": "3343c10bea0bd254bc040ba84e8ea2258e6b72fa72680810195c18e81958ddcc",
+    "inherited-ex-2d/inlineMath-generated.tex": "70b7b7cc19f20116c6ccb22095634655d0cfc056a6a3c3f375d8dd221628f1fc",
+    "inherited-ex-2d/inlineMath-wrapped.tex": "550778a4790015a0dbe4a81109033198a6337020c87db00a043ba29bc6ce6be2",
+    "inherited-ex-2d/inlineMath-domain.txt": "5dfa246c4b275f5536a1ea90330893bd63d505a7d9fdfe6a85370d7131d93eac",
+    "inherited-ex-2d/inlineMath-compilation.txt": "5c42b9b3a957062c84033b8ba77060cdb9286e78f4a136eb140c33c1c6a10775",
+    "inherited-ex-2d/inlineMath-compiler.log": "15aeb6cf8eb906bec896ef5694efc06ec5058a06b80a641c30d5e95736fba484",
+    "inherited-ex-3d/model.json": "355bb81edfefa1bbf02b9214f492cc8db5c710940ca85d6a3ca0d7f91bb29725",
+    "inherited-ex-3d/tiny-cylinder.sty": "4d43c4fa5bd4071161ba9cf3f798acbeca42a95c7167f0a36bcdf9dd1a2049ff",
+    "inherited-ex-3d/standalone-generated.tex": "10d5f644641530385f166cf4ae77cad8e703717836df85a8d90a7f71f5e47188",
+    "inherited-ex-3d/standalone-wrapped.tex": "3c43cd5bd34a69c3cc6f2ba5a5653953fbc3ca83a55f2e331ba1c141b18f74e5",
+    "inherited-ex-3d/standalone-domain.txt": "5dfa246c4b275f5536a1ea90330893bd63d505a7d9fdfe6a85370d7131d93eac",
+    "inherited-ex-3d/standalone-compilation.txt": "0eedf9dcb87e5734616fc9f0d3c3067ec1d8b4089042f6ab2b7dbf42c5ed2bdb",
+    "inherited-ex-3d/standalone-compiler.log": "7887f3d5d69dd669ec57083e0d0f24e3fa3f6342c661d5d1cab623025904d66b",
+    "inherited-ex-3d/inlineMath-generated.tex": "a259a3c2c385a144790c1f1f12653b33386367932dbbd1bae3180f3893e10bf0",
+    "inherited-ex-3d/inlineMath-wrapped.tex": "670de1953c0a55dbcbd0e87858b85aa9a496e4e55a7c5876c7f9a2b28fcb59d4",
+    "inherited-ex-3d/inlineMath-domain.txt": "5dfa246c4b275f5536a1ea90330893bd63d505a7d9fdfe6a85370d7131d93eac",
+    "inherited-ex-3d/inlineMath-compilation.txt": "162fef6bcfb42601e9382ada6e7cd9a8471cd674c1fc1defa723f19d28b2b89a",
+    "inherited-ex-3d/inlineMath-compiler.log": "ab1d2f6b918c40b55d7f936b486fba570ecce16e8cffd0666ab6a6da99c85a96"
+  },
+  "records": [
+    {
+      "id": "local-em-2d",
+      "source": "0.0000074em",
+      "expectedDivisorSp": 5,
+      "expectedExit": 0,
+      "ambientDimension": 2,
+      "artifacts": {
+        "model": "local-em-2d/model.json"
+      },
+      "runs": [
+        {
+          "exportMode": "standalone",
+          "exitCode": 0,
+          "command": [
+            "/Library/TeX/texbin/pdflatex",
+            "-no-shell-escape",
+            "-interaction=nonstopmode",
+            "-halt-on-error",
+            "actual-generated-wrapped.tex"
+          ],
+          "observedDivisorSp": 5,
+          "firstDivide": {
+            "numerator": "0.0",
+            "divisor": "0.00008"
+          },
+          "artifacts": {
+            "source": "local-em-2d/standalone-generated.tex",
+            "wrapper": "local-em-2d/standalone-wrapped.tex",
+            "domain": "local-em-2d/standalone-domain.txt",
+            "compilation": "local-em-2d/standalone-compilation.txt",
+            "compilerLog": "local-em-2d/standalone-compiler.log"
+          }
+        },
+        {
+          "exportMode": "inlineMath",
+          "exitCode": 0,
+          "command": [
+            "/Library/TeX/texbin/pdflatex",
+            "-no-shell-escape",
+            "-interaction=nonstopmode",
+            "-halt-on-error",
+            "actual-generated-wrapped.tex"
+          ],
+          "observedDivisorSp": 5,
+          "firstDivide": {
+            "numerator": "0.0",
+            "divisor": "0.00008"
+          },
+          "artifacts": {
+            "source": "local-em-2d/inlineMath-generated.tex",
+            "wrapper": "local-em-2d/inlineMath-wrapped.tex",
+            "domain": "local-em-2d/inlineMath-domain.txt",
+            "compilation": "local-em-2d/inlineMath-compilation.txt",
+            "compilerLog": "local-em-2d/inlineMath-compiler.log"
+          }
+        }
+      ]
+    },
+    {
+      "id": "local-em-3d",
+      "source": "0.0000074em",
+      "expectedDivisorSp": 5,
+      "expectedExit": 0,
+      "ambientDimension": 3,
+      "artifacts": {
+        "model": "local-em-3d/model.json"
+      },
+      "runs": [
+        {
+          "exportMode": "standalone",
+          "exitCode": 0,
+          "command": [
+            "/Library/TeX/texbin/pdflatex",
+            "-no-shell-escape",
+            "-interaction=nonstopmode",
+            "-halt-on-error",
+            "actual-generated-wrapped.tex"
+          ],
+          "observedDivisorSp": 5,
+          "firstDivide": {
+            "numerator": "0.0",
+            "divisor": "0.00008"
+          },
+          "artifacts": {
+            "source": "local-em-3d/standalone-generated.tex",
+            "wrapper": "local-em-3d/standalone-wrapped.tex",
+            "domain": "local-em-3d/standalone-domain.txt",
+            "compilation": "local-em-3d/standalone-compilation.txt",
+            "compilerLog": "local-em-3d/standalone-compiler.log"
+          }
+        },
+        {
+          "exportMode": "inlineMath",
+          "exitCode": 0,
+          "command": [
+            "/Library/TeX/texbin/pdflatex",
+            "-no-shell-escape",
+            "-interaction=nonstopmode",
+            "-halt-on-error",
+            "actual-generated-wrapped.tex"
+          ],
+          "observedDivisorSp": 5,
+          "firstDivide": {
+            "numerator": "0.0",
+            "divisor": "0.00008"
+          },
+          "artifacts": {
+            "source": "local-em-3d/inlineMath-generated.tex",
+            "wrapper": "local-em-3d/inlineMath-wrapped.tex",
+            "domain": "local-em-3d/inlineMath-domain.txt",
+            "compilation": "local-em-3d/inlineMath-compilation.txt",
+            "compilerLog": "local-em-3d/inlineMath-compiler.log"
+          }
+        }
+      ]
+    },
+    {
+      "id": "inherited-legacy-em-2d",
+      "source": "0.0000074em",
+      "imported": true,
+      "removeLayoutIntent": true,
+      "expectedDivisorSp": 0,
+      "expectedExit": 1,
+      "expectedError": "You've asked me to divide",
+      "ambientDimension": 2,
+      "artifacts": {
+        "model": "inherited-legacy-em-2d/model.json",
+        "externalSource": "inherited-legacy-em-2d/tiny-cylinder.sty"
+      },
+      "runs": [
+        {
+          "exportMode": "standalone",
+          "exitCode": 1,
+          "command": [
+            "/Library/TeX/texbin/pdflatex",
+            "-no-shell-escape",
+            "-interaction=nonstopmode",
+            "-halt-on-error",
+            "actual-generated-wrapped.tex"
+          ],
+          "observedDivisorSp": 0,
+          "firstDivide": {
+            "numerator": "0.0",
+            "divisor": "0.0"
+          },
+          "artifacts": {
+            "source": "inherited-legacy-em-2d/standalone-generated.tex",
+            "wrapper": "inherited-legacy-em-2d/standalone-wrapped.tex",
+            "domain": "inherited-legacy-em-2d/standalone-domain.txt",
+            "compilation": "inherited-legacy-em-2d/standalone-compilation.txt",
+            "compilerLog": "inherited-legacy-em-2d/standalone-compiler.log"
+          }
+        },
+        {
+          "exportMode": "inlineMath",
+          "exitCode": 1,
+          "command": [
+            "/Library/TeX/texbin/pdflatex",
+            "-no-shell-escape",
+            "-interaction=nonstopmode",
+            "-halt-on-error",
+            "actual-generated-wrapped.tex"
+          ],
+          "observedDivisorSp": 0,
+          "firstDivide": {
+            "numerator": "0.0",
+            "divisor": "0.0"
+          },
+          "artifacts": {
+            "source": "inherited-legacy-em-2d/inlineMath-generated.tex",
+            "wrapper": "inherited-legacy-em-2d/inlineMath-wrapped.tex",
+            "domain": "inherited-legacy-em-2d/inlineMath-domain.txt",
+            "compilation": "inherited-legacy-em-2d/inlineMath-compilation.txt",
+            "compilerLog": "inherited-legacy-em-2d/inlineMath-compiler.log"
+          }
+        }
+      ]
+    },
+    {
+      "id": "inherited-legacy-em-3d",
+      "source": "0.0000074em",
+      "imported": true,
+      "removeLayoutIntent": true,
+      "expectedDivisorSp": 0,
+      "expectedExit": 1,
+      "expectedError": "You've asked me to divide",
+      "ambientDimension": 3,
+      "artifacts": {
+        "model": "inherited-legacy-em-3d/model.json",
+        "externalSource": "inherited-legacy-em-3d/tiny-cylinder.sty"
+      },
+      "runs": [
+        {
+          "exportMode": "standalone",
+          "exitCode": 1,
+          "command": [
+            "/Library/TeX/texbin/pdflatex",
+            "-no-shell-escape",
+            "-interaction=nonstopmode",
+            "-halt-on-error",
+            "actual-generated-wrapped.tex"
+          ],
+          "observedDivisorSp": 0,
+          "firstDivide": {
+            "numerator": "0.0",
+            "divisor": "0.0"
+          },
+          "artifacts": {
+            "source": "inherited-legacy-em-3d/standalone-generated.tex",
+            "wrapper": "inherited-legacy-em-3d/standalone-wrapped.tex",
+            "domain": "inherited-legacy-em-3d/standalone-domain.txt",
+            "compilation": "inherited-legacy-em-3d/standalone-compilation.txt",
+            "compilerLog": "inherited-legacy-em-3d/standalone-compiler.log"
+          }
+        },
+        {
+          "exportMode": "inlineMath",
+          "exitCode": 1,
+          "command": [
+            "/Library/TeX/texbin/pdflatex",
+            "-no-shell-escape",
+            "-interaction=nonstopmode",
+            "-halt-on-error",
+            "actual-generated-wrapped.tex"
+          ],
+          "observedDivisorSp": 0,
+          "firstDivide": {
+            "numerator": "0.0",
+            "divisor": "0.0"
+          },
+          "artifacts": {
+            "source": "inherited-legacy-em-3d/inlineMath-generated.tex",
+            "wrapper": "inherited-legacy-em-3d/inlineMath-wrapped.tex",
+            "domain": "inherited-legacy-em-3d/inlineMath-domain.txt",
+            "compilation": "inherited-legacy-em-3d/inlineMath-compilation.txt",
+            "compilerLog": "inherited-legacy-em-3d/inlineMath-compiler.log"
+          }
+        }
+      ]
+    },
+    {
+      "id": "inherited-current-source-2d",
+      "source": "0.0000074em",
+      "imported": true,
+      "rawCurrent": "\\tikzset{tinyCylinder/.style={cylinder,inner xsep=0pt,inner ysep=1pt,outer sep=0pt,minimum width=0pt,minimum height=80pt}}",
+      "expectedDivisorSp": 65536,
+      "expectedExit": 0,
+      "ambientDimension": 2,
+      "artifacts": {
+        "model": "inherited-current-source-2d/model.json",
+        "externalSource": "inherited-current-source-2d/tiny-cylinder.sty"
+      },
+      "runs": [
+        {
+          "exportMode": "standalone",
+          "exitCode": 0,
+          "command": [
+            "/Library/TeX/texbin/pdflatex",
+            "-no-shell-escape",
+            "-interaction=nonstopmode",
+            "-halt-on-error",
+            "actual-generated-wrapped.tex"
+          ],
+          "observedDivisorSp": 65536,
+          "firstDivide": {
+            "numerator": "0.0",
+            "divisor": "1.0"
+          },
+          "artifacts": {
+            "source": "inherited-current-source-2d/standalone-generated.tex",
+            "wrapper": "inherited-current-source-2d/standalone-wrapped.tex",
+            "domain": "inherited-current-source-2d/standalone-domain.txt",
+            "compilation": "inherited-current-source-2d/standalone-compilation.txt",
+            "compilerLog": "inherited-current-source-2d/standalone-compiler.log"
+          }
+        },
+        {
+          "exportMode": "inlineMath",
+          "exitCode": 0,
+          "command": [
+            "/Library/TeX/texbin/pdflatex",
+            "-no-shell-escape",
+            "-interaction=nonstopmode",
+            "-halt-on-error",
+            "actual-generated-wrapped.tex"
+          ],
+          "observedDivisorSp": 65536,
+          "firstDivide": {
+            "numerator": "0.0",
+            "divisor": "1.0"
+          },
+          "artifacts": {
+            "source": "inherited-current-source-2d/inlineMath-generated.tex",
+            "wrapper": "inherited-current-source-2d/inlineMath-wrapped.tex",
+            "domain": "inherited-current-source-2d/inlineMath-domain.txt",
+            "compilation": "inherited-current-source-2d/inlineMath-compilation.txt",
+            "compilerLog": "inherited-current-source-2d/inlineMath-compiler.log"
+          }
+        }
+      ]
+    },
+    {
+      "id": "inherited-current-source-3d",
+      "source": "0.0000074em",
+      "imported": true,
+      "rawCurrent": "\\tikzset{tinyCylinder/.style={cylinder,inner xsep=0pt,inner ysep=1pt,outer sep=0pt,minimum width=0pt,minimum height=80pt}}",
+      "expectedDivisorSp": 65536,
+      "expectedExit": 0,
+      "ambientDimension": 3,
+      "artifacts": {
+        "model": "inherited-current-source-3d/model.json",
+        "externalSource": "inherited-current-source-3d/tiny-cylinder.sty"
+      },
+      "runs": [
+        {
+          "exportMode": "standalone",
+          "exitCode": 0,
+          "command": [
+            "/Library/TeX/texbin/pdflatex",
+            "-no-shell-escape",
+            "-interaction=nonstopmode",
+            "-halt-on-error",
+            "actual-generated-wrapped.tex"
+          ],
+          "observedDivisorSp": 65536,
+          "firstDivide": {
+            "numerator": "0.0",
+            "divisor": "1.0"
+          },
+          "artifacts": {
+            "source": "inherited-current-source-3d/standalone-generated.tex",
+            "wrapper": "inherited-current-source-3d/standalone-wrapped.tex",
+            "domain": "inherited-current-source-3d/standalone-domain.txt",
+            "compilation": "inherited-current-source-3d/standalone-compilation.txt",
+            "compilerLog": "inherited-current-source-3d/standalone-compiler.log"
+          }
+        },
+        {
+          "exportMode": "inlineMath",
+          "exitCode": 0,
+          "command": [
+            "/Library/TeX/texbin/pdflatex",
+            "-no-shell-escape",
+            "-interaction=nonstopmode",
+            "-halt-on-error",
+            "actual-generated-wrapped.tex"
+          ],
+          "observedDivisorSp": 65536,
+          "firstDivide": {
+            "numerator": "0.0",
+            "divisor": "1.0"
+          },
+          "artifacts": {
+            "source": "inherited-current-source-3d/inlineMath-generated.tex",
+            "wrapper": "inherited-current-source-3d/inlineMath-wrapped.tex",
+            "domain": "inherited-current-source-3d/inlineMath-domain.txt",
+            "compilation": "inherited-current-source-3d/inlineMath-compilation.txt",
+            "compilerLog": "inherited-current-source-3d/inlineMath-compiler.log"
+          }
+        }
+      ]
+    },
+    {
+      "id": "inherited-preset-fallback-2d",
+      "source": "0.0000074em",
+      "imported": true,
+      "presetOnly": true,
+      "expectedDivisorSp": 0,
+      "expectedExit": 1,
+      "expectedError": "You've asked me to divide",
+      "ambientDimension": 2,
+      "artifacts": {
+        "model": "inherited-preset-fallback-2d/model.json",
+        "externalSource": "inherited-preset-fallback-2d/tiny-cylinder.sty"
+      },
+      "runs": [
+        {
+          "exportMode": "standalone",
+          "exitCode": 1,
+          "command": [
+            "/Library/TeX/texbin/pdflatex",
+            "-no-shell-escape",
+            "-interaction=nonstopmode",
+            "-halt-on-error",
+            "actual-generated-wrapped.tex"
+          ],
+          "observedDivisorSp": 0,
+          "firstDivide": {
+            "numerator": "0.0",
+            "divisor": "0.0"
+          },
+          "artifacts": {
+            "source": "inherited-preset-fallback-2d/standalone-generated.tex",
+            "wrapper": "inherited-preset-fallback-2d/standalone-wrapped.tex",
+            "domain": "inherited-preset-fallback-2d/standalone-domain.txt",
+            "compilation": "inherited-preset-fallback-2d/standalone-compilation.txt",
+            "compilerLog": "inherited-preset-fallback-2d/standalone-compiler.log"
+          }
+        },
+        {
+          "exportMode": "inlineMath",
+          "exitCode": 1,
+          "command": [
+            "/Library/TeX/texbin/pdflatex",
+            "-no-shell-escape",
+            "-interaction=nonstopmode",
+            "-halt-on-error",
+            "actual-generated-wrapped.tex"
+          ],
+          "observedDivisorSp": 0,
+          "firstDivide": {
+            "numerator": "0.0",
+            "divisor": "0.0"
+          },
+          "artifacts": {
+            "source": "inherited-preset-fallback-2d/inlineMath-generated.tex",
+            "wrapper": "inherited-preset-fallback-2d/inlineMath-wrapped.tex",
+            "domain": "inherited-preset-fallback-2d/inlineMath-domain.txt",
+            "compilation": "inherited-preset-fallback-2d/inlineMath-compilation.txt",
+            "compilerLog": "inherited-preset-fallback-2d/inlineMath-compiler.log"
+          }
+        }
+      ]
+    },
+    {
+      "id": "inherited-preset-fallback-3d",
+      "source": "0.0000074em",
+      "imported": true,
+      "presetOnly": true,
+      "expectedDivisorSp": 0,
+      "expectedExit": 1,
+      "expectedError": "You've asked me to divide",
+      "ambientDimension": 3,
+      "artifacts": {
+        "model": "inherited-preset-fallback-3d/model.json",
+        "externalSource": "inherited-preset-fallback-3d/tiny-cylinder.sty"
+      },
+      "runs": [
+        {
+          "exportMode": "standalone",
+          "exitCode": 1,
+          "command": [
+            "/Library/TeX/texbin/pdflatex",
+            "-no-shell-escape",
+            "-interaction=nonstopmode",
+            "-halt-on-error",
+            "actual-generated-wrapped.tex"
+          ],
+          "observedDivisorSp": 0,
+          "firstDivide": {
+            "numerator": "0.0",
+            "divisor": "0.0"
+          },
+          "artifacts": {
+            "source": "inherited-preset-fallback-3d/standalone-generated.tex",
+            "wrapper": "inherited-preset-fallback-3d/standalone-wrapped.tex",
+            "domain": "inherited-preset-fallback-3d/standalone-domain.txt",
+            "compilation": "inherited-preset-fallback-3d/standalone-compilation.txt",
+            "compilerLog": "inherited-preset-fallback-3d/standalone-compiler.log"
+          }
+        },
+        {
+          "exportMode": "inlineMath",
+          "exitCode": 1,
+          "command": [
+            "/Library/TeX/texbin/pdflatex",
+            "-no-shell-escape",
+            "-interaction=nonstopmode",
+            "-halt-on-error",
+            "actual-generated-wrapped.tex"
+          ],
+          "observedDivisorSp": 0,
+          "firstDivide": {
+            "numerator": "0.0",
+            "divisor": "0.0"
+          },
+          "artifacts": {
+            "source": "inherited-preset-fallback-3d/inlineMath-generated.tex",
+            "wrapper": "inherited-preset-fallback-3d/inlineMath-wrapped.tex",
+            "domain": "inherited-preset-fallback-3d/inlineMath-domain.txt",
+            "compilation": "inherited-preset-fallback-3d/inlineMath-compilation.txt",
+            "compilerLog": "inherited-preset-fallback-3d/inlineMath-compiler.log"
+          }
+        }
+      ]
+    },
+    {
+      "id": "source-rotate90-2d",
+      "source": "1pt",
+      "imported": true,
+      "rawInitial": "\\tikzset{tinyCylinder/.style={cylinder,inner xsep=0pt,inner ysep=1pt,outer sep=0pt,minimum width=0pt,minimum height=80pt}}",
+      "rawCurrent": "\\tikzset{tinyCylinder/.style={cylinder,shape border rotate=90,inner xsep=0pt,inner ysep=1pt,outer sep=0pt,minimum width=0pt,minimum height=80pt}}",
+      "domainRotate": 90,
+      "expectedDivisorSp": 0,
+      "expectedExit": 1,
+      "expectedError": "You've asked me to divide",
+      "ambientDimension": 2,
+      "artifacts": {
+        "model": "source-rotate90-2d/model.json",
+        "externalSource": "source-rotate90-2d/tiny-cylinder.sty"
+      },
+      "runs": [
+        {
+          "exportMode": "standalone",
+          "exitCode": 1,
+          "command": [
+            "/Library/TeX/texbin/pdflatex",
+            "-no-shell-escape",
+            "-interaction=nonstopmode",
+            "-halt-on-error",
+            "actual-generated-wrapped.tex"
+          ],
+          "observedDivisorSp": 0,
+          "firstDivide": {
+            "numerator": "0.0",
+            "divisor": "0.0"
+          },
+          "artifacts": {
+            "source": "source-rotate90-2d/standalone-generated.tex",
+            "wrapper": "source-rotate90-2d/standalone-wrapped.tex",
+            "domain": "source-rotate90-2d/standalone-domain.txt",
+            "compilation": "source-rotate90-2d/standalone-compilation.txt",
+            "compilerLog": "source-rotate90-2d/standalone-compiler.log"
+          }
+        },
+        {
+          "exportMode": "inlineMath",
+          "exitCode": 1,
+          "command": [
+            "/Library/TeX/texbin/pdflatex",
+            "-no-shell-escape",
+            "-interaction=nonstopmode",
+            "-halt-on-error",
+            "actual-generated-wrapped.tex"
+          ],
+          "observedDivisorSp": 0,
+          "firstDivide": {
+            "numerator": "0.0",
+            "divisor": "0.0"
+          },
+          "artifacts": {
+            "source": "source-rotate90-2d/inlineMath-generated.tex",
+            "wrapper": "source-rotate90-2d/inlineMath-wrapped.tex",
+            "domain": "source-rotate90-2d/inlineMath-domain.txt",
+            "compilation": "source-rotate90-2d/inlineMath-compilation.txt",
+            "compilerLog": "source-rotate90-2d/inlineMath-compiler.log"
+          }
+        }
+      ]
+    },
+    {
+      "id": "source-rotate90-3d",
+      "source": "1pt",
+      "imported": true,
+      "rawInitial": "\\tikzset{tinyCylinder/.style={cylinder,inner xsep=0pt,inner ysep=1pt,outer sep=0pt,minimum width=0pt,minimum height=80pt}}",
+      "rawCurrent": "\\tikzset{tinyCylinder/.style={cylinder,shape border rotate=90,inner xsep=0pt,inner ysep=1pt,outer sep=0pt,minimum width=0pt,minimum height=80pt}}",
+      "domainRotate": 90,
+      "expectedDivisorSp": 0,
+      "expectedExit": 1,
+      "expectedError": "You've asked me to divide",
+      "ambientDimension": 3,
+      "artifacts": {
+        "model": "source-rotate90-3d/model.json",
+        "externalSource": "source-rotate90-3d/tiny-cylinder.sty"
+      },
+      "runs": [
+        {
+          "exportMode": "standalone",
+          "exitCode": 1,
+          "command": [
+            "/Library/TeX/texbin/pdflatex",
+            "-no-shell-escape",
+            "-interaction=nonstopmode",
+            "-halt-on-error",
+            "actual-generated-wrapped.tex"
+          ],
+          "observedDivisorSp": 0,
+          "firstDivide": {
+            "numerator": "0.0",
+            "divisor": "0.0"
+          },
+          "artifacts": {
+            "source": "source-rotate90-3d/standalone-generated.tex",
+            "wrapper": "source-rotate90-3d/standalone-wrapped.tex",
+            "domain": "source-rotate90-3d/standalone-domain.txt",
+            "compilation": "source-rotate90-3d/standalone-compilation.txt",
+            "compilerLog": "source-rotate90-3d/standalone-compiler.log"
+          }
+        },
+        {
+          "exportMode": "inlineMath",
+          "exitCode": 1,
+          "command": [
+            "/Library/TeX/texbin/pdflatex",
+            "-no-shell-escape",
+            "-interaction=nonstopmode",
+            "-halt-on-error",
+            "actual-generated-wrapped.tex"
+          ],
+          "observedDivisorSp": 0,
+          "firstDivide": {
+            "numerator": "0.0",
+            "divisor": "0.0"
+          },
+          "artifacts": {
+            "source": "source-rotate90-3d/inlineMath-generated.tex",
+            "wrapper": "source-rotate90-3d/inlineMath-wrapped.tex",
+            "domain": "source-rotate90-3d/inlineMath-domain.txt",
+            "compilation": "source-rotate90-3d/inlineMath-compilation.txt",
+            "compilerLog": "source-rotate90-3d/inlineMath-compiler.log"
+          }
+        }
+      ]
+    },
+    {
+      "id": "source-rotate270-2d",
+      "source": "1pt",
+      "imported": true,
+      "rawInitial": "\\tikzset{tinyCylinder/.style={cylinder,inner xsep=0pt,inner ysep=1pt,outer sep=0pt,minimum width=0pt,minimum height=80pt}}",
+      "rawCurrent": "\\tikzset{tinyCylinder/.style={cylinder,shape border rotate=270,inner xsep=0pt,inner ysep=1pt,outer sep=0pt,minimum width=0pt,minimum height=80pt}}",
+      "domainRotate": 270,
+      "expectedDivisorSp": 0,
+      "expectedExit": 1,
+      "expectedError": "You've asked me to divide",
+      "ambientDimension": 2,
+      "artifacts": {
+        "model": "source-rotate270-2d/model.json",
+        "externalSource": "source-rotate270-2d/tiny-cylinder.sty"
+      },
+      "runs": [
+        {
+          "exportMode": "standalone",
+          "exitCode": 1,
+          "command": [
+            "/Library/TeX/texbin/pdflatex",
+            "-no-shell-escape",
+            "-interaction=nonstopmode",
+            "-halt-on-error",
+            "actual-generated-wrapped.tex"
+          ],
+          "observedDivisorSp": 0,
+          "firstDivide": {
+            "numerator": "0.0",
+            "divisor": "0.0"
+          },
+          "artifacts": {
+            "source": "source-rotate270-2d/standalone-generated.tex",
+            "wrapper": "source-rotate270-2d/standalone-wrapped.tex",
+            "domain": "source-rotate270-2d/standalone-domain.txt",
+            "compilation": "source-rotate270-2d/standalone-compilation.txt",
+            "compilerLog": "source-rotate270-2d/standalone-compiler.log"
+          }
+        },
+        {
+          "exportMode": "inlineMath",
+          "exitCode": 1,
+          "command": [
+            "/Library/TeX/texbin/pdflatex",
+            "-no-shell-escape",
+            "-interaction=nonstopmode",
+            "-halt-on-error",
+            "actual-generated-wrapped.tex"
+          ],
+          "observedDivisorSp": 0,
+          "firstDivide": {
+            "numerator": "0.0",
+            "divisor": "0.0"
+          },
+          "artifacts": {
+            "source": "source-rotate270-2d/inlineMath-generated.tex",
+            "wrapper": "source-rotate270-2d/inlineMath-wrapped.tex",
+            "domain": "source-rotate270-2d/inlineMath-domain.txt",
+            "compilation": "source-rotate270-2d/inlineMath-compilation.txt",
+            "compilerLog": "source-rotate270-2d/inlineMath-compiler.log"
+          }
+        }
+      ]
+    },
+    {
+      "id": "source-rotate270-3d",
+      "source": "1pt",
+      "imported": true,
+      "rawInitial": "\\tikzset{tinyCylinder/.style={cylinder,inner xsep=0pt,inner ysep=1pt,outer sep=0pt,minimum width=0pt,minimum height=80pt}}",
+      "rawCurrent": "\\tikzset{tinyCylinder/.style={cylinder,shape border rotate=270,inner xsep=0pt,inner ysep=1pt,outer sep=0pt,minimum width=0pt,minimum height=80pt}}",
+      "domainRotate": 270,
+      "expectedDivisorSp": 0,
+      "expectedExit": 1,
+      "expectedError": "You've asked me to divide",
+      "ambientDimension": 3,
+      "artifacts": {
+        "model": "source-rotate270-3d/model.json",
+        "externalSource": "source-rotate270-3d/tiny-cylinder.sty"
+      },
+      "runs": [
+        {
+          "exportMode": "standalone",
+          "exitCode": 1,
+          "command": [
+            "/Library/TeX/texbin/pdflatex",
+            "-no-shell-escape",
+            "-interaction=nonstopmode",
+            "-halt-on-error",
+            "actual-generated-wrapped.tex"
+          ],
+          "observedDivisorSp": 0,
+          "firstDivide": {
+            "numerator": "0.0",
+            "divisor": "0.0"
+          },
+          "artifacts": {
+            "source": "source-rotate270-3d/standalone-generated.tex",
+            "wrapper": "source-rotate270-3d/standalone-wrapped.tex",
+            "domain": "source-rotate270-3d/standalone-domain.txt",
+            "compilation": "source-rotate270-3d/standalone-compilation.txt",
+            "compilerLog": "source-rotate270-3d/standalone-compiler.log"
+          }
+        },
+        {
+          "exportMode": "inlineMath",
+          "exitCode": 1,
+          "command": [
+            "/Library/TeX/texbin/pdflatex",
+            "-no-shell-escape",
+            "-interaction=nonstopmode",
+            "-halt-on-error",
+            "actual-generated-wrapped.tex"
+          ],
+          "observedDivisorSp": 0,
+          "firstDivide": {
+            "numerator": "0.0",
+            "divisor": "0.0"
+          },
+          "artifacts": {
+            "source": "source-rotate270-3d/inlineMath-generated.tex",
+            "wrapper": "source-rotate270-3d/inlineMath-wrapped.tex",
+            "domain": "source-rotate270-3d/inlineMath-domain.txt",
+            "compilation": "source-rotate270-3d/inlineMath-compilation.txt",
+            "compilerLog": "source-rotate270-3d/inlineMath-compiler.log"
+          }
+        }
+      ]
+    },
+    {
+      "id": "source-incircle-disabled-2d",
+      "source": "0pt",
+      "imported": true,
+      "rawInitial": "\\tikzset{tinyCylinder/.style={cylinder,shape border uses incircle=true,inner xsep=5pt,inner ysep=0pt,outer sep=0pt,minimum width=0pt,minimum height=80pt}}",
+      "rawCurrent": "\\tikzset{tinyCylinder/.style={cylinder,shape border uses incircle=false,inner xsep=5pt,inner ysep=0pt,outer sep=0pt,minimum width=0pt,minimum height=80pt}}",
+      "domainIncircle": false,
+      "expectedDivisorSp": 0,
+      "expectedExit": 1,
+      "expectedError": "You've asked me to divide",
+      "ambientDimension": 2,
+      "artifacts": {
+        "model": "source-incircle-disabled-2d/model.json",
+        "externalSource": "source-incircle-disabled-2d/tiny-cylinder.sty"
+      },
+      "runs": [
+        {
+          "exportMode": "standalone",
+          "exitCode": 1,
+          "command": [
+            "/Library/TeX/texbin/pdflatex",
+            "-no-shell-escape",
+            "-interaction=nonstopmode",
+            "-halt-on-error",
+            "actual-generated-wrapped.tex"
+          ],
+          "observedDivisorSp": 0,
+          "firstDivide": {
+            "numerator": "0.0",
+            "divisor": "0.0"
+          },
+          "artifacts": {
+            "source": "source-incircle-disabled-2d/standalone-generated.tex",
+            "wrapper": "source-incircle-disabled-2d/standalone-wrapped.tex",
+            "domain": "source-incircle-disabled-2d/standalone-domain.txt",
+            "compilation": "source-incircle-disabled-2d/standalone-compilation.txt",
+            "compilerLog": "source-incircle-disabled-2d/standalone-compiler.log"
+          }
+        },
+        {
+          "exportMode": "inlineMath",
+          "exitCode": 1,
+          "command": [
+            "/Library/TeX/texbin/pdflatex",
+            "-no-shell-escape",
+            "-interaction=nonstopmode",
+            "-halt-on-error",
+            "actual-generated-wrapped.tex"
+          ],
+          "observedDivisorSp": 0,
+          "firstDivide": {
+            "numerator": "0.0",
+            "divisor": "0.0"
+          },
+          "artifacts": {
+            "source": "source-incircle-disabled-2d/inlineMath-generated.tex",
+            "wrapper": "source-incircle-disabled-2d/inlineMath-wrapped.tex",
+            "domain": "source-incircle-disabled-2d/inlineMath-domain.txt",
+            "compilation": "source-incircle-disabled-2d/inlineMath-compilation.txt",
+            "compilerLog": "source-incircle-disabled-2d/inlineMath-compiler.log"
+          }
+        }
+      ]
+    },
+    {
+      "id": "source-incircle-disabled-3d",
+      "source": "0pt",
+      "imported": true,
+      "rawInitial": "\\tikzset{tinyCylinder/.style={cylinder,shape border uses incircle=true,inner xsep=5pt,inner ysep=0pt,outer sep=0pt,minimum width=0pt,minimum height=80pt}}",
+      "rawCurrent": "\\tikzset{tinyCylinder/.style={cylinder,shape border uses incircle=false,inner xsep=5pt,inner ysep=0pt,outer sep=0pt,minimum width=0pt,minimum height=80pt}}",
+      "domainIncircle": false,
+      "expectedDivisorSp": 0,
+      "expectedExit": 1,
+      "expectedError": "You've asked me to divide",
+      "ambientDimension": 3,
+      "artifacts": {
+        "model": "source-incircle-disabled-3d/model.json",
+        "externalSource": "source-incircle-disabled-3d/tiny-cylinder.sty"
+      },
+      "runs": [
+        {
+          "exportMode": "standalone",
+          "exitCode": 1,
+          "command": [
+            "/Library/TeX/texbin/pdflatex",
+            "-no-shell-escape",
+            "-interaction=nonstopmode",
+            "-halt-on-error",
+            "actual-generated-wrapped.tex"
+          ],
+          "observedDivisorSp": 0,
+          "firstDivide": {
+            "numerator": "0.0",
+            "divisor": "0.0"
+          },
+          "artifacts": {
+            "source": "source-incircle-disabled-3d/standalone-generated.tex",
+            "wrapper": "source-incircle-disabled-3d/standalone-wrapped.tex",
+            "domain": "source-incircle-disabled-3d/standalone-domain.txt",
+            "compilation": "source-incircle-disabled-3d/standalone-compilation.txt",
+            "compilerLog": "source-incircle-disabled-3d/standalone-compiler.log"
+          }
+        },
+        {
+          "exportMode": "inlineMath",
+          "exitCode": 1,
+          "command": [
+            "/Library/TeX/texbin/pdflatex",
+            "-no-shell-escape",
+            "-interaction=nonstopmode",
+            "-halt-on-error",
+            "actual-generated-wrapped.tex"
+          ],
+          "observedDivisorSp": 0,
+          "firstDivide": {
+            "numerator": "0.0",
+            "divisor": "0.0"
+          },
+          "artifacts": {
+            "source": "source-incircle-disabled-3d/inlineMath-generated.tex",
+            "wrapper": "source-incircle-disabled-3d/inlineMath-wrapped.tex",
+            "domain": "source-incircle-disabled-3d/inlineMath-domain.txt",
+            "compilation": "source-incircle-disabled-3d/inlineMath-compilation.txt",
+            "compilerLog": "source-incircle-disabled-3d/inlineMath-compiler.log"
+          }
+        }
+      ]
+    },
+    {
+      "id": "dimmed-preset-only-3d",
+      "source": "0.0000074em",
+      "imported": true,
+      "presetOnly": true,
+      "dimPreset": true,
+      "ambientDimensions": [
+        3
+      ],
+      "expectedDivisorSp": 5,
+      "expectedExit": 0,
+      "ambientDimension": 3,
+      "artifacts": {
+        "model": "dimmed-preset-only-3d/model.json",
+        "externalSource": "dimmed-preset-only-3d/tiny-cylinder.sty"
+      },
+      "runs": [
+        {
+          "exportMode": "standalone",
+          "exitCode": 0,
+          "command": [
+            "/Library/TeX/texbin/pdflatex",
+            "-no-shell-escape",
+            "-interaction=nonstopmode",
+            "-halt-on-error",
+            "actual-generated-wrapped.tex"
+          ],
+          "observedDivisorSp": 5,
+          "firstDivide": {
+            "numerator": "0.0",
+            "divisor": "0.00008"
+          },
+          "artifacts": {
+            "source": "dimmed-preset-only-3d/standalone-generated.tex",
+            "wrapper": "dimmed-preset-only-3d/standalone-wrapped.tex",
+            "domain": "dimmed-preset-only-3d/standalone-domain.txt",
+            "compilation": "dimmed-preset-only-3d/standalone-compilation.txt",
+            "compilerLog": "dimmed-preset-only-3d/standalone-compiler.log"
+          }
+        },
+        {
+          "exportMode": "inlineMath",
+          "exitCode": 0,
+          "command": [
+            "/Library/TeX/texbin/pdflatex",
+            "-no-shell-escape",
+            "-interaction=nonstopmode",
+            "-halt-on-error",
+            "actual-generated-wrapped.tex"
+          ],
+          "observedDivisorSp": 5,
+          "firstDivide": {
+            "numerator": "0.0",
+            "divisor": "0.00008"
+          },
+          "artifacts": {
+            "source": "dimmed-preset-only-3d/inlineMath-generated.tex",
+            "wrapper": "dimmed-preset-only-3d/inlineMath-wrapped.tex",
+            "domain": "dimmed-preset-only-3d/inlineMath-domain.txt",
+            "compilation": "dimmed-preset-only-3d/inlineMath-compilation.txt",
+            "compilerLog": "dimmed-preset-only-3d/inlineMath-compiler.log"
+          }
+        }
+      ]
+    },
+    {
+      "id": "inherited-em-2d",
+      "source": "0.0000074em",
+      "imported": true,
+      "expectedDivisorSp": 0,
+      "expectedExit": 1,
+      "expectedError": "You've asked me to divide",
+      "ambientDimension": 2,
+      "artifacts": {
+        "model": "inherited-em-2d/model.json",
+        "externalSource": "inherited-em-2d/tiny-cylinder.sty"
+      },
+      "runs": [
+        {
+          "exportMode": "standalone",
+          "exitCode": 1,
+          "command": [
+            "/Library/TeX/texbin/pdflatex",
+            "-no-shell-escape",
+            "-interaction=nonstopmode",
+            "-halt-on-error",
+            "actual-generated-wrapped.tex"
+          ],
+          "observedDivisorSp": 0,
+          "firstDivide": {
+            "numerator": "0.0",
+            "divisor": "0.0"
+          },
+          "artifacts": {
+            "source": "inherited-em-2d/standalone-generated.tex",
+            "wrapper": "inherited-em-2d/standalone-wrapped.tex",
+            "domain": "inherited-em-2d/standalone-domain.txt",
+            "compilation": "inherited-em-2d/standalone-compilation.txt",
+            "compilerLog": "inherited-em-2d/standalone-compiler.log"
+          }
+        },
+        {
+          "exportMode": "inlineMath",
+          "exitCode": 1,
+          "command": [
+            "/Library/TeX/texbin/pdflatex",
+            "-no-shell-escape",
+            "-interaction=nonstopmode",
+            "-halt-on-error",
+            "actual-generated-wrapped.tex"
+          ],
+          "observedDivisorSp": 0,
+          "firstDivide": {
+            "numerator": "0.0",
+            "divisor": "0.0"
+          },
+          "artifacts": {
+            "source": "inherited-em-2d/inlineMath-generated.tex",
+            "wrapper": "inherited-em-2d/inlineMath-wrapped.tex",
+            "domain": "inherited-em-2d/inlineMath-domain.txt",
+            "compilation": "inherited-em-2d/inlineMath-compilation.txt",
+            "compilerLog": "inherited-em-2d/inlineMath-compiler.log"
+          }
+        }
+      ]
+    },
+    {
+      "id": "inherited-em-3d",
+      "source": "0.0000074em",
+      "imported": true,
+      "expectedDivisorSp": 0,
+      "expectedExit": 1,
+      "expectedError": "You've asked me to divide",
+      "ambientDimension": 3,
+      "artifacts": {
+        "model": "inherited-em-3d/model.json",
+        "externalSource": "inherited-em-3d/tiny-cylinder.sty"
+      },
+      "runs": [
+        {
+          "exportMode": "standalone",
+          "exitCode": 1,
+          "command": [
+            "/Library/TeX/texbin/pdflatex",
+            "-no-shell-escape",
+            "-interaction=nonstopmode",
+            "-halt-on-error",
+            "actual-generated-wrapped.tex"
+          ],
+          "observedDivisorSp": 0,
+          "firstDivide": {
+            "numerator": "0.0",
+            "divisor": "0.0"
+          },
+          "artifacts": {
+            "source": "inherited-em-3d/standalone-generated.tex",
+            "wrapper": "inherited-em-3d/standalone-wrapped.tex",
+            "domain": "inherited-em-3d/standalone-domain.txt",
+            "compilation": "inherited-em-3d/standalone-compilation.txt",
+            "compilerLog": "inherited-em-3d/standalone-compiler.log"
+          }
+        },
+        {
+          "exportMode": "inlineMath",
+          "exitCode": 1,
+          "command": [
+            "/Library/TeX/texbin/pdflatex",
+            "-no-shell-escape",
+            "-interaction=nonstopmode",
+            "-halt-on-error",
+            "actual-generated-wrapped.tex"
+          ],
+          "observedDivisorSp": 0,
+          "firstDivide": {
+            "numerator": "0.0",
+            "divisor": "0.0"
+          },
+          "artifacts": {
+            "source": "inherited-em-3d/inlineMath-generated.tex",
+            "wrapper": "inherited-em-3d/inlineMath-wrapped.tex",
+            "domain": "inherited-em-3d/inlineMath-domain.txt",
+            "compilation": "inherited-em-3d/inlineMath-compilation.txt",
+            "compilerLog": "inherited-em-3d/inlineMath-compiler.log"
+          }
+        }
+      ]
+    },
+    {
+      "id": "detached-em-2d",
+      "source": "0.0000074em",
+      "imported": true,
+      "detach": true,
+      "expectedDivisorSp": 5,
+      "expectedExit": 0,
+      "ambientDimension": 2,
+      "artifacts": {
+        "model": "detached-em-2d/model.json",
+        "externalSource": "detached-em-2d/tiny-cylinder.sty"
+      },
+      "runs": [
+        {
+          "exportMode": "standalone",
+          "exitCode": 0,
+          "command": [
+            "/Library/TeX/texbin/pdflatex",
+            "-no-shell-escape",
+            "-interaction=nonstopmode",
+            "-halt-on-error",
+            "actual-generated-wrapped.tex"
+          ],
+          "observedDivisorSp": 5,
+          "firstDivide": {
+            "numerator": "0.0",
+            "divisor": "0.00008"
+          },
+          "artifacts": {
+            "source": "detached-em-2d/standalone-generated.tex",
+            "wrapper": "detached-em-2d/standalone-wrapped.tex",
+            "domain": "detached-em-2d/standalone-domain.txt",
+            "compilation": "detached-em-2d/standalone-compilation.txt",
+            "compilerLog": "detached-em-2d/standalone-compiler.log"
+          }
+        },
+        {
+          "exportMode": "inlineMath",
+          "exitCode": 0,
+          "command": [
+            "/Library/TeX/texbin/pdflatex",
+            "-no-shell-escape",
+            "-interaction=nonstopmode",
+            "-halt-on-error",
+            "actual-generated-wrapped.tex"
+          ],
+          "observedDivisorSp": 5,
+          "firstDivide": {
+            "numerator": "0.0",
+            "divisor": "0.00008"
+          },
+          "artifacts": {
+            "source": "detached-em-2d/inlineMath-generated.tex",
+            "wrapper": "detached-em-2d/inlineMath-wrapped.tex",
+            "domain": "detached-em-2d/inlineMath-domain.txt",
+            "compilation": "detached-em-2d/inlineMath-compilation.txt",
+            "compilerLog": "detached-em-2d/inlineMath-compiler.log"
+          }
+        }
+      ]
+    },
+    {
+      "id": "detached-em-3d",
+      "source": "0.0000074em",
+      "imported": true,
+      "detach": true,
+      "expectedDivisorSp": 5,
+      "expectedExit": 0,
+      "ambientDimension": 3,
+      "artifacts": {
+        "model": "detached-em-3d/model.json",
+        "externalSource": "detached-em-3d/tiny-cylinder.sty"
+      },
+      "runs": [
+        {
+          "exportMode": "standalone",
+          "exitCode": 0,
+          "command": [
+            "/Library/TeX/texbin/pdflatex",
+            "-no-shell-escape",
+            "-interaction=nonstopmode",
+            "-halt-on-error",
+            "actual-generated-wrapped.tex"
+          ],
+          "observedDivisorSp": 5,
+          "firstDivide": {
+            "numerator": "0.0",
+            "divisor": "0.00008"
+          },
+          "artifacts": {
+            "source": "detached-em-3d/standalone-generated.tex",
+            "wrapper": "detached-em-3d/standalone-wrapped.tex",
+            "domain": "detached-em-3d/standalone-domain.txt",
+            "compilation": "detached-em-3d/standalone-compilation.txt",
+            "compilerLog": "detached-em-3d/standalone-compiler.log"
+          }
+        },
+        {
+          "exportMode": "inlineMath",
+          "exitCode": 0,
+          "command": [
+            "/Library/TeX/texbin/pdflatex",
+            "-no-shell-escape",
+            "-interaction=nonstopmode",
+            "-halt-on-error",
+            "actual-generated-wrapped.tex"
+          ],
+          "observedDivisorSp": 5,
+          "firstDivide": {
+            "numerator": "0.0",
+            "divisor": "0.00008"
+          },
+          "artifacts": {
+            "source": "detached-em-3d/inlineMath-generated.tex",
+            "wrapper": "detached-em-3d/inlineMath-wrapped.tex",
+            "domain": "detached-em-3d/inlineMath-domain.txt",
+            "compilation": "detached-em-3d/inlineMath-compilation.txt",
+            "compilerLog": "detached-em-3d/inlineMath-compiler.log"
+          }
+        }
+      ]
+    },
+    {
+      "id": "same-value-local-edit-em-2d",
+      "source": "0.0000074em",
+      "imported": true,
+      "edit": "0.0000074em",
+      "expectedDivisorSp": 5,
+      "expectedExit": 0,
+      "ambientDimension": 2,
+      "artifacts": {
+        "model": "same-value-local-edit-em-2d/model.json",
+        "externalSource": "same-value-local-edit-em-2d/tiny-cylinder.sty"
+      },
+      "runs": [
+        {
+          "exportMode": "standalone",
+          "exitCode": 0,
+          "command": [
+            "/Library/TeX/texbin/pdflatex",
+            "-no-shell-escape",
+            "-interaction=nonstopmode",
+            "-halt-on-error",
+            "actual-generated-wrapped.tex"
+          ],
+          "observedDivisorSp": 5,
+          "firstDivide": {
+            "numerator": "0.0",
+            "divisor": "0.00008"
+          },
+          "artifacts": {
+            "source": "same-value-local-edit-em-2d/standalone-generated.tex",
+            "wrapper": "same-value-local-edit-em-2d/standalone-wrapped.tex",
+            "domain": "same-value-local-edit-em-2d/standalone-domain.txt",
+            "compilation": "same-value-local-edit-em-2d/standalone-compilation.txt",
+            "compilerLog": "same-value-local-edit-em-2d/standalone-compiler.log"
+          }
+        },
+        {
+          "exportMode": "inlineMath",
+          "exitCode": 0,
+          "command": [
+            "/Library/TeX/texbin/pdflatex",
+            "-no-shell-escape",
+            "-interaction=nonstopmode",
+            "-halt-on-error",
+            "actual-generated-wrapped.tex"
+          ],
+          "observedDivisorSp": 5,
+          "firstDivide": {
+            "numerator": "0.0",
+            "divisor": "0.00008"
+          },
+          "artifacts": {
+            "source": "same-value-local-edit-em-2d/inlineMath-generated.tex",
+            "wrapper": "same-value-local-edit-em-2d/inlineMath-wrapped.tex",
+            "domain": "same-value-local-edit-em-2d/inlineMath-domain.txt",
+            "compilation": "same-value-local-edit-em-2d/inlineMath-compilation.txt",
+            "compilerLog": "same-value-local-edit-em-2d/inlineMath-compiler.log"
+          }
+        }
+      ]
+    },
+    {
+      "id": "same-value-local-edit-em-3d",
+      "source": "0.0000074em",
+      "imported": true,
+      "edit": "0.0000074em",
+      "expectedDivisorSp": 5,
+      "expectedExit": 0,
+      "ambientDimension": 3,
+      "artifacts": {
+        "model": "same-value-local-edit-em-3d/model.json",
+        "externalSource": "same-value-local-edit-em-3d/tiny-cylinder.sty"
+      },
+      "runs": [
+        {
+          "exportMode": "standalone",
+          "exitCode": 0,
+          "command": [
+            "/Library/TeX/texbin/pdflatex",
+            "-no-shell-escape",
+            "-interaction=nonstopmode",
+            "-halt-on-error",
+            "actual-generated-wrapped.tex"
+          ],
+          "observedDivisorSp": 5,
+          "firstDivide": {
+            "numerator": "0.0",
+            "divisor": "0.00008"
+          },
+          "artifacts": {
+            "source": "same-value-local-edit-em-3d/standalone-generated.tex",
+            "wrapper": "same-value-local-edit-em-3d/standalone-wrapped.tex",
+            "domain": "same-value-local-edit-em-3d/standalone-domain.txt",
+            "compilation": "same-value-local-edit-em-3d/standalone-compilation.txt",
+            "compilerLog": "same-value-local-edit-em-3d/standalone-compiler.log"
+          }
+        },
+        {
+          "exportMode": "inlineMath",
+          "exitCode": 0,
+          "command": [
+            "/Library/TeX/texbin/pdflatex",
+            "-no-shell-escape",
+            "-interaction=nonstopmode",
+            "-halt-on-error",
+            "actual-generated-wrapped.tex"
+          ],
+          "observedDivisorSp": 5,
+          "firstDivide": {
+            "numerator": "0.0",
+            "divisor": "0.00008"
+          },
+          "artifacts": {
+            "source": "same-value-local-edit-em-3d/inlineMath-generated.tex",
+            "wrapper": "same-value-local-edit-em-3d/inlineMath-wrapped.tex",
+            "domain": "same-value-local-edit-em-3d/inlineMath-domain.txt",
+            "compilation": "same-value-local-edit-em-3d/inlineMath-compilation.txt",
+            "compilerLog": "same-value-local-edit-em-3d/inlineMath-compiler.log"
+          }
+        }
+      ]
+    },
+    {
+      "id": "inferred-numeric-change-em-2d",
+      "source": "0.0000074em",
+      "imported": true,
+      "edit": "0.000009em",
+      "removeRecordedOverride": true,
+      "expectedDivisorSp": 6,
+      "expectedExit": 0,
+      "ambientDimension": 2,
+      "artifacts": {
+        "model": "inferred-numeric-change-em-2d/model.json",
+        "externalSource": "inferred-numeric-change-em-2d/tiny-cylinder.sty"
+      },
+      "runs": [
+        {
+          "exportMode": "standalone",
+          "exitCode": 0,
+          "command": [
+            "/Library/TeX/texbin/pdflatex",
+            "-no-shell-escape",
+            "-interaction=nonstopmode",
+            "-halt-on-error",
+            "actual-generated-wrapped.tex"
+          ],
+          "observedDivisorSp": 6,
+          "firstDivide": {
+            "numerator": "0.0",
+            "divisor": "0.00009"
+          },
+          "artifacts": {
+            "source": "inferred-numeric-change-em-2d/standalone-generated.tex",
+            "wrapper": "inferred-numeric-change-em-2d/standalone-wrapped.tex",
+            "domain": "inferred-numeric-change-em-2d/standalone-domain.txt",
+            "compilation": "inferred-numeric-change-em-2d/standalone-compilation.txt",
+            "compilerLog": "inferred-numeric-change-em-2d/standalone-compiler.log"
+          }
+        },
+        {
+          "exportMode": "inlineMath",
+          "exitCode": 0,
+          "command": [
+            "/Library/TeX/texbin/pdflatex",
+            "-no-shell-escape",
+            "-interaction=nonstopmode",
+            "-halt-on-error",
+            "actual-generated-wrapped.tex"
+          ],
+          "observedDivisorSp": 6,
+          "firstDivide": {
+            "numerator": "0.0",
+            "divisor": "0.00009"
+          },
+          "artifacts": {
+            "source": "inferred-numeric-change-em-2d/inlineMath-generated.tex",
+            "wrapper": "inferred-numeric-change-em-2d/inlineMath-wrapped.tex",
+            "domain": "inferred-numeric-change-em-2d/inlineMath-domain.txt",
+            "compilation": "inferred-numeric-change-em-2d/inlineMath-compilation.txt",
+            "compilerLog": "inferred-numeric-change-em-2d/inlineMath-compiler.log"
+          }
+        }
+      ]
+    },
+    {
+      "id": "inferred-numeric-change-em-3d",
+      "source": "0.0000074em",
+      "imported": true,
+      "edit": "0.000009em",
+      "removeRecordedOverride": true,
+      "expectedDivisorSp": 6,
+      "expectedExit": 0,
+      "ambientDimension": 3,
+      "artifacts": {
+        "model": "inferred-numeric-change-em-3d/model.json",
+        "externalSource": "inferred-numeric-change-em-3d/tiny-cylinder.sty"
+      },
+      "runs": [
+        {
+          "exportMode": "standalone",
+          "exitCode": 0,
+          "command": [
+            "/Library/TeX/texbin/pdflatex",
+            "-no-shell-escape",
+            "-interaction=nonstopmode",
+            "-halt-on-error",
+            "actual-generated-wrapped.tex"
+          ],
+          "observedDivisorSp": 6,
+          "firstDivide": {
+            "numerator": "0.0",
+            "divisor": "0.00009"
+          },
+          "artifacts": {
+            "source": "inferred-numeric-change-em-3d/standalone-generated.tex",
+            "wrapper": "inferred-numeric-change-em-3d/standalone-wrapped.tex",
+            "domain": "inferred-numeric-change-em-3d/standalone-domain.txt",
+            "compilation": "inferred-numeric-change-em-3d/standalone-compilation.txt",
+            "compilerLog": "inferred-numeric-change-em-3d/standalone-compiler.log"
+          }
+        },
+        {
+          "exportMode": "inlineMath",
+          "exitCode": 0,
+          "command": [
+            "/Library/TeX/texbin/pdflatex",
+            "-no-shell-escape",
+            "-interaction=nonstopmode",
+            "-halt-on-error",
+            "actual-generated-wrapped.tex"
+          ],
+          "observedDivisorSp": 6,
+          "firstDivide": {
+            "numerator": "0.0",
+            "divisor": "0.00009"
+          },
+          "artifacts": {
+            "source": "inferred-numeric-change-em-3d/inlineMath-generated.tex",
+            "wrapper": "inferred-numeric-change-em-3d/inlineMath-wrapped.tex",
+            "domain": "inferred-numeric-change-em-3d/inlineMath-domain.txt",
+            "compilation": "inferred-numeric-change-em-3d/inlineMath-compilation.txt",
+            "compilerLog": "inferred-numeric-change-em-3d/inlineMath-compiler.log"
+          }
+        }
+      ]
+    },
+    {
+      "id": "local-pt-roundup-2d",
+      "source": "0.0000076pt",
+      "expectedDivisorSp": 1,
+      "expectedExit": 1,
+      "expectedError": "Dimension too large",
+      "ambientDimension": 2,
+      "artifacts": {
+        "model": "local-pt-roundup-2d/model.json"
+      },
+      "runs": [
+        {
+          "exportMode": "standalone",
+          "exitCode": 1,
+          "command": [
+            "/Library/TeX/texbin/pdflatex",
+            "-no-shell-escape",
+            "-interaction=nonstopmode",
+            "-halt-on-error",
+            "actual-generated-wrapped.tex"
+          ],
+          "observedDivisorSp": 1,
+          "firstDivide": {
+            "numerator": "0.0",
+            "divisor": "0.00002"
+          },
+          "artifacts": {
+            "source": "local-pt-roundup-2d/standalone-generated.tex",
+            "wrapper": "local-pt-roundup-2d/standalone-wrapped.tex",
+            "domain": "local-pt-roundup-2d/standalone-domain.txt",
+            "compilation": "local-pt-roundup-2d/standalone-compilation.txt",
+            "compilerLog": "local-pt-roundup-2d/standalone-compiler.log"
+          }
+        },
+        {
+          "exportMode": "inlineMath",
+          "exitCode": 1,
+          "command": [
+            "/Library/TeX/texbin/pdflatex",
+            "-no-shell-escape",
+            "-interaction=nonstopmode",
+            "-halt-on-error",
+            "actual-generated-wrapped.tex"
+          ],
+          "observedDivisorSp": 1,
+          "firstDivide": {
+            "numerator": "0.0",
+            "divisor": "0.00002"
+          },
+          "artifacts": {
+            "source": "local-pt-roundup-2d/inlineMath-generated.tex",
+            "wrapper": "local-pt-roundup-2d/inlineMath-wrapped.tex",
+            "domain": "local-pt-roundup-2d/inlineMath-domain.txt",
+            "compilation": "local-pt-roundup-2d/inlineMath-compilation.txt",
+            "compilerLog": "local-pt-roundup-2d/inlineMath-compiler.log"
+          }
+        }
+      ]
+    },
+    {
+      "id": "local-pt-roundup-3d",
+      "source": "0.0000076pt",
+      "expectedDivisorSp": 1,
+      "expectedExit": 1,
+      "expectedError": "Dimension too large",
+      "ambientDimension": 3,
+      "artifacts": {
+        "model": "local-pt-roundup-3d/model.json"
+      },
+      "runs": [
+        {
+          "exportMode": "standalone",
+          "exitCode": 1,
+          "command": [
+            "/Library/TeX/texbin/pdflatex",
+            "-no-shell-escape",
+            "-interaction=nonstopmode",
+            "-halt-on-error",
+            "actual-generated-wrapped.tex"
+          ],
+          "observedDivisorSp": 1,
+          "firstDivide": {
+            "numerator": "0.0",
+            "divisor": "0.00002"
+          },
+          "artifacts": {
+            "source": "local-pt-roundup-3d/standalone-generated.tex",
+            "wrapper": "local-pt-roundup-3d/standalone-wrapped.tex",
+            "domain": "local-pt-roundup-3d/standalone-domain.txt",
+            "compilation": "local-pt-roundup-3d/standalone-compilation.txt",
+            "compilerLog": "local-pt-roundup-3d/standalone-compiler.log"
+          }
+        },
+        {
+          "exportMode": "inlineMath",
+          "exitCode": 1,
+          "command": [
+            "/Library/TeX/texbin/pdflatex",
+            "-no-shell-escape",
+            "-interaction=nonstopmode",
+            "-halt-on-error",
+            "actual-generated-wrapped.tex"
+          ],
+          "observedDivisorSp": 1,
+          "firstDivide": {
+            "numerator": "0.0",
+            "divisor": "0.00002"
+          },
+          "artifacts": {
+            "source": "local-pt-roundup-3d/inlineMath-generated.tex",
+            "wrapper": "local-pt-roundup-3d/inlineMath-wrapped.tex",
+            "domain": "local-pt-roundup-3d/inlineMath-domain.txt",
+            "compilation": "local-pt-roundup-3d/inlineMath-compilation.txt",
+            "compilerLog": "local-pt-roundup-3d/inlineMath-compiler.log"
+          }
+        }
+      ]
+    },
+    {
+      "id": "local-pt-rounddown-2d",
+      "source": "0.0000074pt",
+      "expectedDivisorSp": 0,
+      "expectedExit": 1,
+      "expectedError": "You've asked me to divide",
+      "ambientDimension": 2,
+      "artifacts": {
+        "model": "local-pt-rounddown-2d/model.json"
+      },
+      "runs": [
+        {
+          "exportMode": "standalone",
+          "exitCode": 1,
+          "command": [
+            "/Library/TeX/texbin/pdflatex",
+            "-no-shell-escape",
+            "-interaction=nonstopmode",
+            "-halt-on-error",
+            "actual-generated-wrapped.tex"
+          ],
+          "observedDivisorSp": 0,
+          "firstDivide": {
+            "numerator": "0.0",
+            "divisor": "0.0"
+          },
+          "artifacts": {
+            "source": "local-pt-rounddown-2d/standalone-generated.tex",
+            "wrapper": "local-pt-rounddown-2d/standalone-wrapped.tex",
+            "domain": "local-pt-rounddown-2d/standalone-domain.txt",
+            "compilation": "local-pt-rounddown-2d/standalone-compilation.txt",
+            "compilerLog": "local-pt-rounddown-2d/standalone-compiler.log"
+          }
+        },
+        {
+          "exportMode": "inlineMath",
+          "exitCode": 1,
+          "command": [
+            "/Library/TeX/texbin/pdflatex",
+            "-no-shell-escape",
+            "-interaction=nonstopmode",
+            "-halt-on-error",
+            "actual-generated-wrapped.tex"
+          ],
+          "observedDivisorSp": 0,
+          "firstDivide": {
+            "numerator": "0.0",
+            "divisor": "0.0"
+          },
+          "artifacts": {
+            "source": "local-pt-rounddown-2d/inlineMath-generated.tex",
+            "wrapper": "local-pt-rounddown-2d/inlineMath-wrapped.tex",
+            "domain": "local-pt-rounddown-2d/inlineMath-domain.txt",
+            "compilation": "local-pt-rounddown-2d/inlineMath-compilation.txt",
+            "compilerLog": "local-pt-rounddown-2d/inlineMath-compiler.log"
+          }
+        }
+      ]
+    },
+    {
+      "id": "local-pt-rounddown-3d",
+      "source": "0.0000074pt",
+      "expectedDivisorSp": 0,
+      "expectedExit": 1,
+      "expectedError": "You've asked me to divide",
+      "ambientDimension": 3,
+      "artifacts": {
+        "model": "local-pt-rounddown-3d/model.json"
+      },
+      "runs": [
+        {
+          "exportMode": "standalone",
+          "exitCode": 1,
+          "command": [
+            "/Library/TeX/texbin/pdflatex",
+            "-no-shell-escape",
+            "-interaction=nonstopmode",
+            "-halt-on-error",
+            "actual-generated-wrapped.tex"
+          ],
+          "observedDivisorSp": 0,
+          "firstDivide": {
+            "numerator": "0.0",
+            "divisor": "0.0"
+          },
+          "artifacts": {
+            "source": "local-pt-rounddown-3d/standalone-generated.tex",
+            "wrapper": "local-pt-rounddown-3d/standalone-wrapped.tex",
+            "domain": "local-pt-rounddown-3d/standalone-domain.txt",
+            "compilation": "local-pt-rounddown-3d/standalone-compilation.txt",
+            "compilerLog": "local-pt-rounddown-3d/standalone-compiler.log"
+          }
+        },
+        {
+          "exportMode": "inlineMath",
+          "exitCode": 1,
+          "command": [
+            "/Library/TeX/texbin/pdflatex",
+            "-no-shell-escape",
+            "-interaction=nonstopmode",
+            "-halt-on-error",
+            "actual-generated-wrapped.tex"
+          ],
+          "observedDivisorSp": 0,
+          "firstDivide": {
+            "numerator": "0.0",
+            "divisor": "0.0"
+          },
+          "artifacts": {
+            "source": "local-pt-rounddown-3d/inlineMath-generated.tex",
+            "wrapper": "local-pt-rounddown-3d/inlineMath-wrapped.tex",
+            "domain": "local-pt-rounddown-3d/inlineMath-domain.txt",
+            "compilation": "local-pt-rounddown-3d/inlineMath-compilation.txt",
+            "compilerLog": "local-pt-rounddown-3d/inlineMath-compiler.log"
+          }
+        }
+      ]
+    },
+    {
+      "id": "local-negative-em-2d",
+      "source": "-0.0000074em",
+      "signed": true,
+      "expectedDivisorSp": -5,
+      "expectedExit": 0,
+      "ambientDimension": 2,
+      "artifacts": {
+        "model": "local-negative-em-2d/model.json"
+      },
+      "runs": [
+        {
+          "exportMode": "standalone",
+          "exitCode": 0,
+          "command": [
+            "/Library/TeX/texbin/pdflatex",
+            "-no-shell-escape",
+            "-interaction=nonstopmode",
+            "-halt-on-error",
+            "actual-generated-wrapped.tex"
+          ],
+          "observedDivisorSp": -5,
+          "firstDivide": {
+            "numerator": "0.0",
+            "divisor": "-0.00008"
+          },
+          "artifacts": {
+            "source": "local-negative-em-2d/standalone-generated.tex",
+            "wrapper": "local-negative-em-2d/standalone-wrapped.tex",
+            "domain": "local-negative-em-2d/standalone-domain.txt",
+            "compilation": "local-negative-em-2d/standalone-compilation.txt",
+            "compilerLog": "local-negative-em-2d/standalone-compiler.log"
+          }
+        },
+        {
+          "exportMode": "inlineMath",
+          "exitCode": 0,
+          "command": [
+            "/Library/TeX/texbin/pdflatex",
+            "-no-shell-escape",
+            "-interaction=nonstopmode",
+            "-halt-on-error",
+            "actual-generated-wrapped.tex"
+          ],
+          "observedDivisorSp": -5,
+          "firstDivide": {
+            "numerator": "0.0",
+            "divisor": "-0.00008"
+          },
+          "artifacts": {
+            "source": "local-negative-em-2d/inlineMath-generated.tex",
+            "wrapper": "local-negative-em-2d/inlineMath-wrapped.tex",
+            "domain": "local-negative-em-2d/inlineMath-domain.txt",
+            "compilation": "local-negative-em-2d/inlineMath-compilation.txt",
+            "compilerLog": "local-negative-em-2d/inlineMath-compiler.log"
+          }
+        }
+      ]
+    },
+    {
+      "id": "local-negative-em-3d",
+      "source": "-0.0000074em",
+      "signed": true,
+      "expectedDivisorSp": -5,
+      "expectedExit": 0,
+      "ambientDimension": 3,
+      "artifacts": {
+        "model": "local-negative-em-3d/model.json"
+      },
+      "runs": [
+        {
+          "exportMode": "standalone",
+          "exitCode": 0,
+          "command": [
+            "/Library/TeX/texbin/pdflatex",
+            "-no-shell-escape",
+            "-interaction=nonstopmode",
+            "-halt-on-error",
+            "actual-generated-wrapped.tex"
+          ],
+          "observedDivisorSp": -5,
+          "firstDivide": {
+            "numerator": "0.0",
+            "divisor": "-0.00008"
+          },
+          "artifacts": {
+            "source": "local-negative-em-3d/standalone-generated.tex",
+            "wrapper": "local-negative-em-3d/standalone-wrapped.tex",
+            "domain": "local-negative-em-3d/standalone-domain.txt",
+            "compilation": "local-negative-em-3d/standalone-compilation.txt",
+            "compilerLog": "local-negative-em-3d/standalone-compiler.log"
+          }
+        },
+        {
+          "exportMode": "inlineMath",
+          "exitCode": 0,
+          "command": [
+            "/Library/TeX/texbin/pdflatex",
+            "-no-shell-escape",
+            "-interaction=nonstopmode",
+            "-halt-on-error",
+            "actual-generated-wrapped.tex"
+          ],
+          "observedDivisorSp": -5,
+          "firstDivide": {
+            "numerator": "0.0",
+            "divisor": "-0.00008"
+          },
+          "artifacts": {
+            "source": "local-negative-em-3d/inlineMath-generated.tex",
+            "wrapper": "local-negative-em-3d/inlineMath-wrapped.tex",
+            "domain": "local-negative-em-3d/inlineMath-domain.txt",
+            "compilation": "local-negative-em-3d/inlineMath-compilation.txt",
+            "compilerLog": "local-negative-em-3d/inlineMath-compiler.log"
+          }
+        }
+      ]
+    },
+    {
+      "id": "local-ex-recorded-context-2d",
+      "source": "0.0000074ex",
+      "fontContext": {
+        "fontSizePt": 30,
+        "xHeightPt": 20
+      },
+      "expectedDivisorSp": 10,
+      "expectedExit": 0,
+      "ambientDimension": 2,
+      "artifacts": {
+        "model": "local-ex-recorded-context-2d/model.json"
+      },
+      "runs": [
+        {
+          "exportMode": "standalone",
+          "exitCode": 0,
+          "command": [
+            "/Library/TeX/texbin/pdflatex",
+            "-no-shell-escape",
+            "-interaction=nonstopmode",
+            "-halt-on-error",
+            "actual-generated-wrapped.tex"
+          ],
+          "observedDivisorSp": 10,
+          "firstDivide": {
+            "numerator": "0.0",
+            "divisor": "0.00015"
+          },
+          "artifacts": {
+            "source": "local-ex-recorded-context-2d/standalone-generated.tex",
+            "wrapper": "local-ex-recorded-context-2d/standalone-wrapped.tex",
+            "domain": "local-ex-recorded-context-2d/standalone-domain.txt",
+            "compilation": "local-ex-recorded-context-2d/standalone-compilation.txt",
+            "compilerLog": "local-ex-recorded-context-2d/standalone-compiler.log"
+          }
+        },
+        {
+          "exportMode": "inlineMath",
+          "exitCode": 0,
+          "command": [
+            "/Library/TeX/texbin/pdflatex",
+            "-no-shell-escape",
+            "-interaction=nonstopmode",
+            "-halt-on-error",
+            "actual-generated-wrapped.tex"
+          ],
+          "observedDivisorSp": 10,
+          "firstDivide": {
+            "numerator": "0.0",
+            "divisor": "0.00015"
+          },
+          "artifacts": {
+            "source": "local-ex-recorded-context-2d/inlineMath-generated.tex",
+            "wrapper": "local-ex-recorded-context-2d/inlineMath-wrapped.tex",
+            "domain": "local-ex-recorded-context-2d/inlineMath-domain.txt",
+            "compilation": "local-ex-recorded-context-2d/inlineMath-compilation.txt",
+            "compilerLog": "local-ex-recorded-context-2d/inlineMath-compiler.log"
+          }
+        }
+      ]
+    },
+    {
+      "id": "local-ex-recorded-context-3d",
+      "source": "0.0000074ex",
+      "fontContext": {
+        "fontSizePt": 30,
+        "xHeightPt": 20
+      },
+      "expectedDivisorSp": 10,
+      "expectedExit": 0,
+      "ambientDimension": 3,
+      "artifacts": {
+        "model": "local-ex-recorded-context-3d/model.json"
+      },
+      "runs": [
+        {
+          "exportMode": "standalone",
+          "exitCode": 0,
+          "command": [
+            "/Library/TeX/texbin/pdflatex",
+            "-no-shell-escape",
+            "-interaction=nonstopmode",
+            "-halt-on-error",
+            "actual-generated-wrapped.tex"
+          ],
+          "observedDivisorSp": 10,
+          "firstDivide": {
+            "numerator": "0.0",
+            "divisor": "0.00015"
+          },
+          "artifacts": {
+            "source": "local-ex-recorded-context-3d/standalone-generated.tex",
+            "wrapper": "local-ex-recorded-context-3d/standalone-wrapped.tex",
+            "domain": "local-ex-recorded-context-3d/standalone-domain.txt",
+            "compilation": "local-ex-recorded-context-3d/standalone-compilation.txt",
+            "compilerLog": "local-ex-recorded-context-3d/standalone-compiler.log"
+          }
+        },
+        {
+          "exportMode": "inlineMath",
+          "exitCode": 0,
+          "command": [
+            "/Library/TeX/texbin/pdflatex",
+            "-no-shell-escape",
+            "-interaction=nonstopmode",
+            "-halt-on-error",
+            "actual-generated-wrapped.tex"
+          ],
+          "observedDivisorSp": 10,
+          "firstDivide": {
+            "numerator": "0.0",
+            "divisor": "0.00015"
+          },
+          "artifacts": {
+            "source": "local-ex-recorded-context-3d/inlineMath-generated.tex",
+            "wrapper": "local-ex-recorded-context-3d/inlineMath-wrapped.tex",
+            "domain": "local-ex-recorded-context-3d/inlineMath-domain.txt",
+            "compilation": "local-ex-recorded-context-3d/inlineMath-compilation.txt",
+            "compilerLog": "local-ex-recorded-context-3d/inlineMath-compiler.log"
+          }
+        }
+      ]
+    },
+    {
+      "id": "inherited-ex-2d",
+      "source": "0.0000074ex",
+      "imported": true,
+      "expectedDivisorSp": 0,
+      "expectedExit": 1,
+      "expectedError": "You've asked me to divide",
+      "ambientDimension": 2,
+      "artifacts": {
+        "model": "inherited-ex-2d/model.json",
+        "externalSource": "inherited-ex-2d/tiny-cylinder.sty"
+      },
+      "runs": [
+        {
+          "exportMode": "standalone",
+          "exitCode": 1,
+          "command": [
+            "/Library/TeX/texbin/pdflatex",
+            "-no-shell-escape",
+            "-interaction=nonstopmode",
+            "-halt-on-error",
+            "actual-generated-wrapped.tex"
+          ],
+          "observedDivisorSp": 0,
+          "firstDivide": {
+            "numerator": "0.0",
+            "divisor": "0.0"
+          },
+          "artifacts": {
+            "source": "inherited-ex-2d/standalone-generated.tex",
+            "wrapper": "inherited-ex-2d/standalone-wrapped.tex",
+            "domain": "inherited-ex-2d/standalone-domain.txt",
+            "compilation": "inherited-ex-2d/standalone-compilation.txt",
+            "compilerLog": "inherited-ex-2d/standalone-compiler.log"
+          }
+        },
+        {
+          "exportMode": "inlineMath",
+          "exitCode": 1,
+          "command": [
+            "/Library/TeX/texbin/pdflatex",
+            "-no-shell-escape",
+            "-interaction=nonstopmode",
+            "-halt-on-error",
+            "actual-generated-wrapped.tex"
+          ],
+          "observedDivisorSp": 0,
+          "firstDivide": {
+            "numerator": "0.0",
+            "divisor": "0.0"
+          },
+          "artifacts": {
+            "source": "inherited-ex-2d/inlineMath-generated.tex",
+            "wrapper": "inherited-ex-2d/inlineMath-wrapped.tex",
+            "domain": "inherited-ex-2d/inlineMath-domain.txt",
+            "compilation": "inherited-ex-2d/inlineMath-compilation.txt",
+            "compilerLog": "inherited-ex-2d/inlineMath-compiler.log"
+          }
+        }
+      ]
+    },
+    {
+      "id": "inherited-ex-3d",
+      "source": "0.0000074ex",
+      "imported": true,
+      "expectedDivisorSp": 0,
+      "expectedExit": 1,
+      "expectedError": "You've asked me to divide",
+      "ambientDimension": 3,
+      "artifacts": {
+        "model": "inherited-ex-3d/model.json",
+        "externalSource": "inherited-ex-3d/tiny-cylinder.sty"
+      },
+      "runs": [
+        {
+          "exportMode": "standalone",
+          "exitCode": 1,
+          "command": [
+            "/Library/TeX/texbin/pdflatex",
+            "-no-shell-escape",
+            "-interaction=nonstopmode",
+            "-halt-on-error",
+            "actual-generated-wrapped.tex"
+          ],
+          "observedDivisorSp": 0,
+          "firstDivide": {
+            "numerator": "0.0",
+            "divisor": "0.0"
+          },
+          "artifacts": {
+            "source": "inherited-ex-3d/standalone-generated.tex",
+            "wrapper": "inherited-ex-3d/standalone-wrapped.tex",
+            "domain": "inherited-ex-3d/standalone-domain.txt",
+            "compilation": "inherited-ex-3d/standalone-compilation.txt",
+            "compilerLog": "inherited-ex-3d/standalone-compiler.log"
+          }
+        },
+        {
+          "exportMode": "inlineMath",
+          "exitCode": 1,
+          "command": [
+            "/Library/TeX/texbin/pdflatex",
+            "-no-shell-escape",
+            "-interaction=nonstopmode",
+            "-halt-on-error",
+            "actual-generated-wrapped.tex"
+          ],
+          "observedDivisorSp": 0,
+          "firstDivide": {
+            "numerator": "0.0",
+            "divisor": "0.0"
+          },
+          "artifacts": {
+            "source": "inherited-ex-3d/inlineMath-generated.tex",
+            "wrapper": "inherited-ex-3d/inlineMath-wrapped.tex",
+            "domain": "inherited-ex-3d/inlineMath-domain.txt",
+            "compilation": "inherited-ex-3d/inlineMath-compilation.txt",
+            "compilerLog": "inherited-ex-3d/inlineMath-compiler.log"
+          }
+        }
+      ]
+    }
+  ]
+}

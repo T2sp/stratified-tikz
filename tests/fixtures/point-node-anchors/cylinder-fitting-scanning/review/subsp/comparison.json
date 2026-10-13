@@ -1,0 +1,40 @@
+{
+  "work": "/private/tmp/stz-review-cylinder-subsp-y0liua",
+  "input": {
+    "shape": "cylinder",
+    "body": {
+      "width": 0,
+      "height": 0,
+      "depth": 0
+    },
+    "innerXSep": 0,
+    "innerYSep": 0.000001,
+    "outerXSep": 0,
+    "outerYSep": 0,
+    "minimumWidth": 0,
+    "minimumHeight": 80,
+    "lineWidth": 0.4,
+    "anchor": "center"
+  },
+  "pgfExit": 1,
+  "pgfDivisionFailure": true,
+  "production": {
+    "shapeBounds": {
+      "minX": -47.8799988,
+      "minY": -0.0000012,
+      "maxX": 48.120001200000004,
+      "maxY": 0.0000012
+    },
+    "contours": [
+      "M -47.8799976 -0.0000012 A 0.0000012 0.0000012 0 0 0 -47.8799976 0.0000012 L 48.12 0.0000012 A 0.0000012 0.0000012 0 0 0 48.12 -0.0000012 Z",
+      "M 48.12 -0.0000012 A 0.0000012 0.0000012 0 0 0 48.12 0.0000012"
+    ],
+    "selectionRadius": 48.45941245494303
+  },
+  "solutionBounds": {
+    "minX": -39.899999,
+    "minY": -0.000001,
+    "maxX": 40.100001,
+    "maxY": 0.000001
+  }
+}

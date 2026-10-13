@@ -183,7 +183,7 @@ export function extractSettledSvgLabel(
     root.replaceChildren(body)
     try {
       extractSettledSvgLabel(document, { ...capture, pointStyle: undefined,
-        position: svgPointNodeLayout(capture.pointStyle, state).placementOffset }, state)
+        position: svgPointNodeLayout(capture.pointStyle, state, capture.pointCylinderDomainContext).placementOffset }, state)
     } finally {
       point.appendChild(body)
       root.replaceChildren(point)

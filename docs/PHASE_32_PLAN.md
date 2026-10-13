@@ -1,5 +1,82 @@
 # Phase 32 Plan: Point-node math, paint, geometric shapes, and layout
 
+Cylinder construction / scanned dimensions / verifier progress follow-up
+(2026-10-13): actual clean entry HEAD is
+`afe1bd642f8bf5a97671c0ade2b3a2c5565ffcbf`, fingerprint
+`e830af22f561da5256d21788d907ca2e954213286c348f5d2da4bb093f22a4c7`.
+The predecessor work is now tracked and preserved. Latest independent review
+is **needs_changes**, Critical 0 / Medium 3 / Low 0, `ready_to_commit:false`:
+folded-cylinder anchors lose fitted signs/declared end-base roles; tiny authored
+dimensions can scan to zero before PGF division; queued freezing and verifier
+promise progress do not have complete repeatable reviewer acceptance.
+
+Matching historical `dTPBzJ` passed all five checks and 7,094/7,094 tests. Its
+authenticated report resolves to eighteen groups, ten layout scenarios, 203
+records / 4,625 diagnostics with no page errors. The reviewer run observed
+7,053 passed / one failed / one cancelled out of 7,055 before interruption;
+it is incomplete. Individual diagnostic retries cannot replace that run.
+Existing raw-zero cylinder references (110 files) match their recorded hashes.
+
+The [current implementation audit](PHASE_32D_IMPLEMENTATION.md) records the
+three findings and this invocation's scoped corrections, additive evidence and
+actual outcomes. Phase 32 remains **incomplete**. Fresh exact-byte strict
+verification precedes independent read-only review; failed/incomplete checks or
+`needs_changes` block completion/commit. Retain the post-review matching-tree
+guard and leave commit/push with the parent. Earlier entries follow as history.
+
+The scoped implementation retains signed cylinder construction metadata in the
+PGF Y-up frame and resolves anchors from actual declared end/base roles. A
+cylinder-only staged dimensional classifier uses actual emitted local `pt`
+literals or current inherited named-style sources/context and TeX-point scaling
+before PGF division; raw model/options/text and painted geometry remain intact.
+Runtime source identity guards same-valued overrides and is frozen separately
+in click capture. Legacy imported intent absence and changed active references
+use the current associated resolution, including the rotation/incircle flags
+needed only for classification; paint parameters and saved models remain intact. Additive full-anchor/scanner evidence is separate from
+all 654 preceding reference files. The cumulative workflow preserves eighteen
+groups and the ten existing scenarios, adding mandatory folded/full-anchor and
+subsp diagnostic cases in both dimensions (twelve layout scenarios total).
+
+Freezing uses deterministic entered/release gates with scoped deadline scheduling,
+immediate rejection ownership and finally draining. Real verifier subtest/
+publication stages and restoration/cleanup counts are retained before assertions;
+complete-fixture failing/stalled writes prove bounded error propagation and
+terminal failure authority. The interrupted reviewer log still does not establish
+a unique cancellation cause. Completed checks and pending parent/review gates
+are recorded in the current audit and external handoff, without promoting an
+isolated diagnostic or cancelled run to acceptance.
+
+Completed checks: final cylinder/reference/shared 114/114, expanded preserved
+geometry/render/model/TikZ 720/720, native/artifact policy 74/74 initially and
+25/25 after strengthening, full 32D policy file 741/741, full affected verifier/
+publication files 679/679, and the first registered suite 7,195/7,195. Every
+completed run has zero failures/cancellations/skips. First oracle/test API/CLI
+corrections are retained separately. The intermediate strict runner also passed
+7,195/7,195, build and diff, then stopped on localhost EPERM before browser
+acceptance. Subsequent authenticated local/inherited/override-source and placed
+DOM-frame audits required further changes: the new source file initially observed
+22 passed / one failed out of 23 due to stale same-owner commit reuse, and the
+corrected folded contract completes 27/27. The five final cylinder files
+complete 154/154, and the final extended preserved sweep completes 909/909.
+Separate export-domain evidence contains 389 files / 33 models /
+66 actual compiler runs, including current inherited fitting flags and the real
+3D dimmed preset-only case, alongside the unchanged first 173-file bundle.
+The final-source file's first 39/40 outcome was a fixture-vs-parser JSON key-order
+comparison; same-loaded-model before/after serialization now preserves the
+intended immutability proof without altering evidence. Fresh final-tree runner
+outcomes/identities belong to the external handoff; the
+intermediate strict report cannot verify those later bytes. Build,
+strict TypeScript, scoped new-code lint and seventeen script syntax checks pass;
+four original inherited lint errors are reproduced separately. Final propagation
+also reaches a fifth inherited refs lint finding in `SvgDiagram`, reproduced
+unchanged at HEAD. Sixteen final TypeScript files pass scoped new-code lint with
+that single inherited rule excluded only for `SvgDiagram`; eighteen scripts pass
+syntax/scoped lint with only the original exact `_role` exclusion. Full-file
+`SvgDiagram` lint is recorded as inherited failure, not a pass. Configured browser checks
+fail at fresh localhost `listen EPERM` before Chrome; eighteen groups remain
+unexecuted, with no new native/download acceptance. Full final-tree runner logs,
+identity and remaining parent/review gates are retained in the external handoff.
+
 Singular-cylinder / deterministic writer follow-up (2026-10-12): actual clean
 entry HEAD is `f4dbfd7c7930515f6cd1d57db17ad32a96fc4d47`, fingerprint
 `21796531870c52a3af2508226f45a92b96667a45fad4c777a75d486a18e11444`.

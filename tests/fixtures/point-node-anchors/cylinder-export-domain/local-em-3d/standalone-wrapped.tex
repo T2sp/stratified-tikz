@@ -1,0 +1,80 @@
+\documentclass{article}
+\usepackage{tikz}
+\usepackage{tikz-3dplot}
+\usetikzlibrary{shapes.geometric,shapes.symbols}
+\typeout{STZ PGF VERSION \pgfversion}
+\begin{document}
+\makeatletter
+\newwrite\domainout\immediate\openout\domainout=domain.txt
+\let\originaldivide\pgfmathdivide@
+\def\pgfmathdivide@#1#2{\immediate\write\domainout{DIVIDE #1; #2}\originaldivide{#1}{#2}}
+\makeatother
+% ----------------------------------------------------------------------------
+% Styles and colors
+% ----------------------------------------------------------------------------
+
+% Requires \usepackage{tikz-3dplot}
+
+% Required TikZ libraries for non-circular point shapes:
+% \usetikzlibrary{shapes.geometric,shapes.symbols}
+
+\definecolor{stzPointpFill}{HTML}{000000}
+\definecolor{stzPointpStroke}{HTML}{000000}
+\definecolor{stzPointpText}{HTML}{000000}
+\pgfdeclarelayer{stratifiedLayer0}
+\pgfsetlayers{stratifiedLayer0,main}
+
+\tdplotsetmaincoords{13}{-23}
+
+\begin{tikzpicture}[
+    tdplot_main_coords,
+    line cap=round,
+    line join=round
+]
+
+    % ----------------------------------------------------------------------------
+    % Coordinates
+    % ----------------------------------------------------------------------------
+
+    \coordinate (pointPoint0p0) at (0,0,0);
+
+    % ----------------------------------------------------------------------------
+    % Layered drawing commands
+    % ----------------------------------------------------------------------------
+
+    % Layer 0: stratifiedLayer0
+    \begin{pgfonlayer}{stratifiedLayer0}
+        %----------------------------------------
+        % Codimension 3 strata: points
+        %----------------------------------------
+        \node[
+            cylinder,
+            fill=stzPointpFill,
+            draw=stzPointpStroke,
+            text=stzPointpText,
+            fill opacity=1,
+            draw opacity=1,
+            text opacity=1,
+            line width=0.4pt,
+            solid,
+            dash phase=0pt,
+            line cap=butt,
+            line join=miter,
+            inner sep=1.5pt,
+            inner xsep=0pt,
+            inner ysep=0.000074pt,
+            outer xsep=0pt,
+            outer ysep=0pt,
+            minimum width=0pt,
+            minimum height=80pt
+        ] at (pointPoint0p0) {};
+
+    \end{pgfonlayer}
+
+    % Codimension 1 strata: sheets
+    % Codimension 2 strata: curves
+    % Labels
+
+\end{tikzpicture}
+
+\end{document}

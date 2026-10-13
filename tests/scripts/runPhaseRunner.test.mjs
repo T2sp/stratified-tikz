@@ -83,6 +83,10 @@ function fixture(t, phase = '31B', options = {}) {
   // placement through pure helpers. Copy its literal dependency closure for
   // every isolated runner, including failure-before-browser controls.
   copyRelativeFixtureModules(cwd, ['scripts/singularCylinderDiagnosticContract.mjs'])
+  copyRelativeFixtureModules(cwd, ['scripts/foldedCylinderContract.mjs'])
+  const cylinderReference = 'tests/fixtures/point-node-anchors/cylinder-fitting-scanning/references.json'
+  mkdirSync(join(cwd, 'tests/fixtures/point-node-anchors/cylinder-fitting-scanning'), { recursive: true })
+  cpSync(join(automationDir, '../..', cylinderReference), join(cwd, cylinderReference))
   if (options.faithful32d) {
     // The full controlled runner records use the same pure model/projection/TikZ
     // fixture builders as the parent-dispatch suite. Keep their dependencies in

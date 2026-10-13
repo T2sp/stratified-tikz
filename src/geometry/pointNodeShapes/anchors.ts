@@ -584,13 +584,10 @@ function anchorBoundary(input: PointNodeShapeInput, solution: UnanchoredSolution
         { kind: 'line', a: sectorCenter, b: startCorner }, { kind: 'line', a: startCorner, b: start }]; break
     }
     case 'cylinder': {
-      const end = solution.paintRegions.find((region) => region.role === 'end')!
-      const endBounds = boundsOfPoints(end.vertices.map((point) => unrotate(point, rotation)))
-      const rx = (endBounds.maxX - endBounds.minX) / 2, ry = (endBounds.maxY - endBounds.minY) / 2
-      const endCenter = { x: (endBounds.minX + endBounds.maxX) / 2, y: 0 }
-      const baseCenter = { x: bounds.minX + rx, y: 0 }
+      const fitting = solution.cylinderFitting!
+      const { rx, ry, endCenter, baseCenter } = fitting
       const endArc = arc(endCenter, rx + sep, ry + sep, -90, 90), baseArc = arc(baseCenter, rx + sep, ry + sep, 90, 270)
-      const top = { x: endCenter.x, y: ry + input.outerYSep }, bottom = { x: baseCenter.x, y: ry + input.outerYSep }
+      const top = add(fitting.beforeTop, { x: 0, y: input.outerYSep }), bottom = add(fitting.afterBottom, { x: 0, y: input.outerYSep })
       Object.assign(names, { 'before top': top, top: { x: endCenter.x + rx + sep, y: 0 }, 'after top': { x: top.x, y: -top.y },
         'before bottom': { x: bottom.x, y: -bottom.y }, bottom: { x: baseCenter.x - rx - sep, y: 0 }, 'after bottom': bottom,
         'shape center': midpoint(baseCenter, endCenter) })
