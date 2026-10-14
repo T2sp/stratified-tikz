@@ -1,4 +1,5 @@
 import assert from 'node:assert/strict'
+import { createHash } from 'node:crypto'
 import { spawnSync } from 'node:child_process'
 import { chmodSync, cpSync, existsSync, mkdirSync, mkdtempSync, readFileSync, writeFileSync } from 'node:fs'
 import { tmpdir } from 'node:os'
@@ -467,8 +468,14 @@ test('fresh isolated runner resolves an authenticated cumulative report from its
   const report = reportFromOutput(result), check = report.checks.find(check => check.name === 'check:free-labels')
   assert.equal(report.status, 'passed')
   const document = JSON.parse(readFileSync(join(check.artifactDir, 'free-labels-evidence.json'), 'utf8'))
-  assert.equal(document.schema, 'stz-evidence-document-v1')
-  assert.equal(document.identity.checkout.fingerprint, report.checkout.fingerprint)
+  assert.equal(document.schema, 'stz-evidence-document-v2')
+  const checkoutBytes = readFileSync(join(check.artifactDir, document.identity.checkout.path))
+  assert.equal(checkoutBytes.length, document.identity.checkout.bytes)
+  assert.equal(createHash('sha256').update(checkoutBytes).digest('hex'), document.identity.checkout.sha256)
+  const canonical = JSON.parse(checkoutBytes)
+  assert.equal(canonical.schema, 'stz-evidence-checkout-v2')
+  assert.equal(canonical.owner, document.identity.owner)
+  assert.deepEqual(canonical.checkout, report.checkout)
   assert.equal(document.identity.disposition, 'passed')
   assert.ok(readFileSync(join(check.artifactDir, document.artifact.path)).length > 0)
   assert.equal(setup.git('rev-parse', 'HEAD'), setup.initialHead)

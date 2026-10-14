@@ -1586,12 +1586,16 @@ function controlledPublicationGate() {
 // encoding/writes, but the writer's actual entered signal arms its countdown.
 function controlledWriterDeadline() {
   let clockMs = 0, scheduled, armedAt, expirations = 0, cancellations = 0
+  const scheduleDeadline = (expire, timeoutMs) => {
+    assert.equal(scheduled, undefined, 'One selected evidence boundary owns the controlled deadline')
+    scheduled = { expire, timeoutMs }
+    return () => { scheduled = undefined; cancellations++ }
+  }
+  // The selected writer's monotonic clock begins at its actual admission.
+  // Ordinary PNG work and separately gated preparation keep normal deadlines.
+  scheduleDeadline.monotonicNow = () => armedAt === undefined ? 0 : clockMs - armedAt
   return {
-    scheduleDeadline(expire, timeoutMs) {
-      assert.equal(scheduled, undefined, 'One selected evidence boundary owns the controlled deadline')
-      scheduled = { expire, timeoutMs }
-      return () => { scheduled = undefined; cancellations++ }
-    },
+    scheduleDeadline,
     arm() {
       assert.ok(scheduled, 'Selected deadline is registered before its real writer enters')
       assert.equal(armedAt, undefined, 'Only the first stalled writer arms this deadline')
@@ -1669,8 +1673,8 @@ async function releaseControlledPngIo(control, outcome) {
 
 function liveWorkflowPublication(t, options = {}) {
   const fixture = syntheticLiveWorkflow(t, options), artifactDir = join(fixture.args.pngPath, '..')
-  const checkout = { fingerprint: 'publication-controlled-tree', revision: 'publication-controlled-head',
-    trackedDiffSha256: 'controlled-tracked', untrackedSha256: { 'evidencePublication.mjs': 'controlled-untracked' } }
+  const checkout = { fingerprint: 'a'.repeat(64), revision: 'b'.repeat(40),
+    trackedDiffSha256: 'c'.repeat(64), untrackedSha256: { 'evidencePublication.mjs': 'd'.repeat(64) } }
   const gate = controlledPublicationGate(), entered = controlledPublicationGate(), finished = controlledPublicationGate()
   const pngGate = controlledPublicationGate(), pngEntered = controlledPublicationGate(), deadline = controlledWriterDeadline()
   const preparationGate = controlledPublicationGate(), preparationEntered = controlledPublicationGate()

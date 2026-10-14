@@ -60,15 +60,16 @@ let stage = 'playwright-import'
 let checkpoint = null
 let primaryFailure
 const reportStorage = createEvidenceReportStorage({ artifactDir, checkout })
-async function save(result, error) {
-  if (error) reportStorage.publisher.fail(error)
+async function save(result, error, options = {}) {
+  options.operation?.assertActive('report checkpoint start')
+  if (error) reportStorage.publisher.fail(error, options)
   await reportStorage.save({ result, stage, environment, checkout, profile,
     deferredScenarios: profile === phase32cProfile ? [mechanismNotRun()] : [],
     checkpoint, started, checkpoints, completed, incompleteGroups: scenarios.filter((name) => !completed.includes(name)),
     unexecuted: scenarios.filter((name) => !started.includes(name)),
     coverageNote: 'Started/checkpoints and diagnostics describe execution, not passing assertions. Evidence records passed scenarios; groups complete only after all their assertions return.',
     diagnostics, evidence, pageErrors,
-    error: error ? { message: error.message, stack: error.stack, code: error.code } : undefined })
+    error: error ? { message: error.message, stack: error.stack, code: error.code } : undefined }, options)
 }
 async function startGroup(group, name = group) {
   assert.ok(scenarios.includes(group), `Known scenario group: ${group}`)
@@ -87,11 +88,15 @@ async function completeGroup(group) {
   completed.push(group)
   await save('running')
 }
-async function observe(name, details) {
+async function observe(name, details, options = {}) {
+  options.operation?.assertActive('observation checkpoint start')
+  const observation = reportStorage.capture({ name, ...details }, options)
+  options.operation?.assertActive('observation checkpoint mutation')
   checkpoint = { group: details.group ?? checkpoint?.group, name }
   checkpoints.push(checkpoint)
-  diagnostics.push(reportStorage.capture({ name, ...details }))
-  await save('running')
+  diagnostics.push(observation)
+  await save(options.disposition === 'failed' ? 'failed' : 'running',
+    options.disposition === 'failed' ? options.primary ?? primaryFailure ?? reportStorage.publisher.primary : undefined, options)
 }
 function secondaryFailure(name, error) {
   diagnostics.push({ name, error: { message: error.message, stack: error.stack } })
@@ -155,10 +160,13 @@ try {
     assert.ok(found, `Rendered label ${id} exists`)
     await page.mouse.click(found.rect.x + found.rect.width / 2, found.rect.y + found.rect.height / 2)
   }
-  async function record(name, details = {}) {
-    evidence.push(reportStorage.capture({ name, ...details }))
+  async function record(name, details = {}, options = {}) {
+    options.operation?.assertActive('accepted scenario checkpoint start')
+    const observation = reportStorage.capture({ name, ...details }, options)
+    options.operation?.assertActive('accepted scenario checkpoint mutation')
+    evidence.push(observation)
     console.log(JSON.stringify({ result: 'passed', name }))
-    await save('running')
+    await save('running', undefined, options)
   }
 
   const fallbackSource = '  "<>&"  \\textbf{bad}\t keep \\slash\r\n tail  '

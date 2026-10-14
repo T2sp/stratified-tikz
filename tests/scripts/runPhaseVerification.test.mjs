@@ -1191,8 +1191,8 @@ for (const target of ['named-full-closed-limitation', 'unrelated-App-failure']) 
 function referencedParentFixture(t) {
   const artifactDir = realpathSync(mkdtempSync(join(tmpdir(), 'stz-parent-publication-')))
   t.after(() => rmSync(artifactDir, { recursive: true, force: true }))
-  const checkout = { revision: 'current-revision', trackedDiffSha256: 'current-tracked-bytes',
-    untrackedSha256: { 'current-observation.mjs': 'current-untracked-bytes' }, fingerprint: 'current-tree' }
+  const checkout = { revision: '1'.repeat(40), trackedDiffSha256: '2'.repeat(64),
+    untrackedSha256: { 'current-observation.mjs': '3'.repeat(64) }, fingerprint: '4'.repeat(64) }
   const publisher = createEvidencePublisher({ artifactDir, checkout: { ...checkout, status: ' M current-observation.mjs\n' } })
   const report = { result: 'passed', stage: 'complete', environment: { browserVersion: 'controlled parent-policy fixture' },
     checkout: { ...checkout, status: ' M current-observation.mjs\n' },
@@ -1359,6 +1359,28 @@ function replaceParentBoundary(artifactDir, document, boundary) {
   document.artifact.bytes = bytes.length
   document.artifact.sha256 = createHash('sha256').update(bytes).digest('hex')
   replaceParentPointer(artifactDir, document)
+  const indexPath = join(artifactDir, 'evidence-publication-index.json')
+  const index = JSON.parse(readFileSync(indexPath, 'utf8'))
+  index.history.find(entry => entry.sequence === document.identity.sequence).artifact = document.artifact
+  writeFileSync(indexPath, JSON.stringify(index) + '\n')
+}
+
+function parentPackReferences(artifactDir, boundary) {
+  assert.equal(boundary.schema, 'stz-evidence-boundary-v2')
+  const chunks = []
+  for (let ref = boundary.packReferences; ref; ) {
+    const chunk = JSON.parse(readFileSync(join(artifactDir, ref.path), 'utf8'))
+    chunks.push({ ref, chunk }); ref = chunk.previous
+  }
+  return { chunks, packs: chunks.toReversed().flatMap(({ chunk }) => chunk.packs) }
+}
+
+function replaceParentChunk(artifactDir, document, boundary, chunk) {
+  const bytes = Buffer.from(JSON.stringify(chunk) + '\n')
+  writeFileSync(join(artifactDir, boundary.packReferences.path), bytes)
+  boundary.packReferences.bytes = bytes.length
+  boundary.packReferences.sha256 = createHash('sha256').update(bytes).digest('hex')
+  replaceParentBoundary(artifactDir, document, boundary)
 }
 
 test('32D parent resolves current-tree report references without accepting a complete group count alone', async t => {
@@ -1398,23 +1420,49 @@ for (const fault of ['running-document', 'running-index', 'wrong-terminal-stage'
 }
 
 for (const fault of ['missing-boundary', 'missing-pack', 'truncated-pack', 'wrong-hash', 'wrong-length',
-  'wrong-owner', 'wrong-stage', 'wrong-pack-order', 'untracked-tree', 'stale-current-pointer']) {
+  'wrong-owner', 'wrong-stage', 'wrong-pack-order', 'untracked-tree', 'stale-current-pointer',
+  'missing-identity', 'wrong-identity-owner', 'substituted-identity', 'missing-reference-chunk',
+  'wrong-reference-hash', 'wrong-reference-owner', 'wrong-reference-sequence']) {
   test(`32D parent rejects unauthenticated referenced report: ${fault}`, async t => {
     const fixture = referencedParentFixture(t), { artifactDir, checkout, publisher, report } = fixture
     const document = await publishParentReport(fixture, fault === 'stale-current-pointer' ? 'running' : 'passed')
     const boundary = JSON.parse(readFileSync(join(artifactDir, document.artifact.path), 'utf8'))
-    assert.ok(boundary.packs.length >= 2, 'The control includes retained shared data and current report data')
+    const { chunks, packs } = parentPackReferences(artifactDir, boundary)
+    assert.ok(packs.length >= 2, 'The control includes retained shared data and current report data')
     if (fault === 'missing-boundary') unlinkSync(join(artifactDir, document.artifact.path))
-    if (fault === 'missing-pack') unlinkSync(join(artifactDir, boundary.packs[0].path))
+    if (fault === 'missing-pack') unlinkSync(join(artifactDir, packs[0].path))
     if (fault === 'truncated-pack') {
-      const path = join(artifactDir, boundary.packs[0].path), bytes = readFileSync(path)
+      const path = join(artifactDir, packs[0].path), bytes = readFileSync(path)
       writeFileSync(path, bytes.subarray(0, bytes.length - 1))
     }
     if (fault === 'wrong-hash') { document.artifact.sha256 = '0'.repeat(64); replaceParentPointer(artifactDir, document) }
     if (fault === 'wrong-length') { document.artifact.bytes++; replaceParentPointer(artifactDir, document) }
     if (fault === 'wrong-owner') { document.identity.owner = 'foreign-publisher'; replaceParentPointer(artifactDir, document) }
     if (fault === 'wrong-stage') { boundary.identity.stage = 'unexecuted-stage'; replaceParentBoundary(artifactDir, document, boundary) }
-    if (fault === 'wrong-pack-order') { boundary.packs.reverse(); replaceParentBoundary(artifactDir, document, boundary) }
+    if (fault === 'wrong-pack-order') {
+      const chunk = chunks[0].chunk
+      chunk.packs[0] = packs[0]
+      replaceParentChunk(artifactDir, document, boundary, chunk)
+    }
+    if (fault === 'missing-identity') unlinkSync(join(artifactDir, document.identity.checkout.path))
+    if (fault === 'wrong-identity-owner' || fault === 'substituted-identity') {
+      const path = join(artifactDir, document.identity.checkout.path)
+      const identity = JSON.parse(readFileSync(path, 'utf8'))
+      if (fault === 'wrong-identity-owner') identity.owner = 'foreign-canonical-owner'
+      else identity.checkout.untrackedSha256['current-observation.mjs'] = 'substituted-bytes'
+      writeFileSync(path, JSON.stringify(identity) + '\n')
+    }
+    if (fault === 'missing-reference-chunk') unlinkSync(join(artifactDir, boundary.packReferences.path))
+    if (fault === 'wrong-reference-hash') {
+      boundary.packReferences.sha256 = '0'.repeat(64)
+      replaceParentBoundary(artifactDir, document, boundary)
+    }
+    if (fault === 'wrong-reference-owner' || fault === 'wrong-reference-sequence') {
+      const chunk = chunks[0].chunk
+      if (fault === 'wrong-reference-owner') chunk.identity.owner = 'foreign-reference-owner'
+      else chunk.identity.sequence++
+      replaceParentChunk(artifactDir, document, boundary, chunk)
+    }
     if (fault === 'untracked-tree') checkout.untrackedSha256['current-observation.mjs'] = 'stale-untracked-bytes'
     if (fault === 'stale-current-pointer') {
       report.diagnostics.push({ name: 'new-terminal-observation', group: layoutAnchorGroup, result: 'observed' })
@@ -1491,7 +1539,7 @@ test('32D real complete parent dispatch accepts explicitly closed empty titles a
     ...fixture.signed.flatMap(({ download }) => ['native', 'live-capture', 'standalone'].map(suffix => `${download.scenario}-${suffix}.json`)),
   ]) await publisher.publish(name, fixture.readJson(name), { stage: 'observed-exact-artifact' })
   await publisher.publish('free-labels-evidence.json', fixture.report, { stage: 'complete', disposition: 'passed' })
-  assert.equal(JSON.parse(readFileSync(join(fixture.artifactDir, 'free-labels-evidence.json'), 'utf8')).schema, 'stz-evidence-document-v1')
+  assert.equal(JSON.parse(readFileSync(join(fixture.artifactDir, 'free-labels-evidence.json'), 'utf8')).schema, 'stz-evidence-document-v2')
   assert.deepEqual(readEvidenceDocumentSync(fixture.artifactDir, 'free-labels-evidence.json', { checkout: fixture.checkout }), fixture.report)
   validateBrowserEvidence('check:free-labels', fixture.artifactDir, '32D', fixture.checkout)
 })

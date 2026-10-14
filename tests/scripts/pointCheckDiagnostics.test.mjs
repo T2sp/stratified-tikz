@@ -4,7 +4,7 @@ import { EventEmitter } from 'node:events'
 import { mkdtemp, readFile, rm, writeFile } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
-import { createPointDiagnostics, cleanupPointCheck, capturePointCheck, captureObservedPointCheck } from '../../scripts/pointCheckDiagnostics.mjs'
+import { createPointDiagnostics, cleanupPointCheck, capturePointCheck, captureObservedPointCheck, boundedPointDiagnostic, createPointDiagnosticOperation } from '../../scripts/pointCheckDiagnostics.mjs'
 import { runPointThenAppChecks } from '../../scripts/checkPointNodes.mjs'
 import { runPointNodeGeometricShapeChecks } from '../../scripts/checkPointNodeGeometricShapes.mjs'
 import { assertGeometricShapeEvidence } from '../../scripts/pointGeometricShapesContract.mjs'
@@ -311,4 +311,141 @@ test('native capture clears its owned deadline when evaluation finishes', async 
   const setup = { formCount: 0 }
   assert.equal(await captureNativePointSetup({ evaluate: async () => setup }), setup)
   assert.equal(timers.size, 0)
+})
+
+// The scoped owner clock exercises an absolute deadline without a global timer
+// mock or charging ordinary file I/O to a short fixture-construction timer.
+test('owned diagnostic checks its absolute deadline when timer delivery is delayed', async () => {
+  let clockMs = 100, scheduled, cancelled = 0, release
+  const gate = new Promise((resolve) => { release = resolve })
+  const schedule = (expire, timeoutMs, operation) => {
+    scheduled = { expire, timeoutMs, operation }
+    return () => { cancelled++ }
+  }
+  schedule.monotonicNow = () => clockMs
+  const writes = []
+  const outcome = boundedPointDiagnostic(async (operation) => {
+    operation.mark('ordinary-producer-entered')
+    await gate
+    operation.assertActive('next-report-checkpoint')
+    writes.push('running')
+  }, 'Geometric selection final evidence', 2000, schedule).then(
+    (value) => ({ value }), (error) => ({ error }))
+  await new Promise((resolve) => setImmediate(resolve))
+  assert.equal(scheduled.timeoutMs, 2000)
+  assert.equal(scheduled.operation.startMs, 100)
+  assert.equal(scheduled.operation.deadlineMs, 2100)
+  clockMs = 2100; release()
+  const { error } = await outcome
+  assert.match(error.message, /Timed out after 2000ms during Geometric selection final evidence/)
+  assert.equal(scheduled.operation.error, error)
+  assert.equal(scheduled.operation.state, 'expired')
+  assert.equal(scheduled.operation.generation, 1)
+  assert.deepEqual(writes, [])
+  assert.equal(cancelled, 1)
+  assert.ok(scheduled.operation.progress.some(({ stage }) => stage === 'operation-expired'))
+})
+
+for (const late of ['fulfillment', 'rejection']) test(`owned diagnostic consumes controlled late ${late} and forbids subsequent work`, async () => {
+  let expire, owned, release, reject, entered
+  const entry = new Promise((resolve) => { entered = resolve })
+  const gate = new Promise((resolve, fail) => { release = resolve; reject = fail })
+  const schedule = (trigger, timeoutMs, operation) => {
+    assert.equal(timeoutMs, 2000); expire = trigger; owned = operation
+    return () => {}
+  }
+  schedule.monotonicNow = () => 0
+  const order = [], unhandled = [], onUnhandled = (error) => unhandled.push(error)
+  process.on('unhandledRejection', onUnhandled)
+  try {
+    const outcome = boundedPointDiagnostic(async (operation) => {
+      entered(); await gate
+      operation.assertActive('pending-retain-after-caller')
+      order.push('late running report')
+    }, 'Geometric selection final evidence', 2000, schedule).then(
+      () => ({ ok: true }), (error) => ({ ok: false, error }))
+    await entry
+    expire()
+    const result = await outcome
+    assert.equal(result.ok, false)
+    assert.equal(owned.error, result.error)
+    if (late === 'fulfillment') release(); else reject(new Error('late ordinary writer rejection'))
+    await new Promise((resolve) => setImmediate(resolve))
+    assert.deepEqual(order, [])
+    assert.deepEqual(unhandled, [])
+    assert.equal(owned.error, result.error, 'Late settlement cannot replace the timeout Error')
+    assert.equal(owned.state, 'expired')
+    assert.ok(owned.progress.some(({ stage }) => stage === 'late-rejection-consumed'))
+  } finally {
+    release(); process.off('unhandledRejection', onUnhandled)
+  }
+})
+
+test('owned point diagnostics freeze the raw capture and await both publication and report checkpoints', async () => {
+  const operation = createPointDiagnosticOperation('complete composed evidence', 2000)
+  const source = { observation: { secondaryErrors: [], native: { source: '  $F$\t\n' } } }
+  const expected = structuredClone(source), order = []
+  const diagnose = createPointDiagnostics({ artifactPrefix: 'owned-point', publish: async (name, raw, options) => {
+    assert.equal(options.operation, operation)
+    assert.equal(name, 'owned-point-0001.json')
+    source.observation.secondaryErrors.push('later failure')
+    assert.deepEqual(raw.observation, expected.observation)
+    order.push('raw authority')
+  }, observe: async (_name, _details, options) => {
+    assert.equal(options.operation, operation); order.push('report checkpoint')
+  } })
+  const observed = await diagnose('group', 'scenario', source, { operation })
+  assert.deepEqual(observed.observation, expected.observation)
+  assert.equal(observed.result, 'observed')
+  assert.deepEqual(order, ['raw authority', 'report checkpoint'])
+  assert.ok(operation.progress.some(({ stage }) => stage === 'diagnostic-report-checkpoint-completed'))
+})
+
+test('owned point diagnostics cannot begin a report checkpoint after its raw publication expires', async () => {
+  let clockMs = 0
+  const operation = createPointDiagnosticOperation('composed publication', 2000, () => clockMs)
+  let reports = 0
+  const diagnose = createPointDiagnostics({ publish: async () => { clockMs = 2000 }, observe: async () => { reports++ } })
+  await assert.rejects(diagnose('group', 'scenario', { native: { errors: [] } }, { operation }),
+    (error) => error === operation.error && /Timed out after 2000ms/.test(error.message))
+  assert.equal(reports, 0)
+})
+
+for (const expired of [false, true]) test(`owned callback rejection ${expired ? 'after absolute expiry consumes its late error' : 'before deadline preserves the native Error'} without timer delivery`, async () => {
+  let clockMs = 0, owned, reject, entered, cancellations = 0
+  const entry = new Promise((resolve) => { entered = resolve })
+  const gate = new Promise((_resolve, fail) => { reject = fail })
+  const schedule = (_expire, timeoutMs, operation) => {
+    assert.equal(timeoutMs, 2000); owned = operation
+    // Deliberately leave timer delivery pending; the owner must enforce its
+    // registered absolute deadline when the gated callback rejects.
+    return () => { cancellations++ }
+  }
+  schedule.monotonicNow = () => clockMs
+  const native = new Error(expired ? 'late ordinary writer rejection' : 'original native assertion')
+  const outcome = boundedPointDiagnostic(async () => {
+    entered(); await gate
+  }, 'Geometric selection final evidence', 2000, schedule).then(
+    (value) => ({ value }), (error) => ({ error }))
+  try {
+    await Promise.race([entry, outcome.then(({ error }) => {
+      throw error ?? new Error('Diagnostic completed before its controlled callback entered')
+    })])
+    assert.equal(owned.deadlineMs, 2000)
+    clockMs = expired ? 2000 : 1999
+    reject(native)
+    const { error } = await outcome
+    assert.equal(owned.error, error)
+    if (expired) {
+      assert.notEqual(error, native)
+      assert.equal(error.message, 'Timed out after 2000ms during Geometric selection final evidence')
+      assert.equal(owned.state, 'expired')
+      assert.ok(owned.progress.some(({ stage }) => stage === 'late-rejection-consumed'))
+    } else {
+      assert.equal(error, native)
+      assert.equal(owned.state, 'rejected')
+    }
+    assert.equal(cancellations, 1)
+    assert.equal(Object.keys(native).length, 0, 'Ownership never mutates the original Error')
+  } finally { reject(native); await outcome }
 })

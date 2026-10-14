@@ -146,7 +146,7 @@ export async function capturePointLayoutStandalone({ standalone, artifactDir, de
 
 export async function runPointLayoutAnchorChecks({ browser, origin, artifactDir, record, observe, startGroup, completeGroup, setStage, evidencePublisher }) {
   const context = await browser.newContext({ viewport: { width: 1700, height: 1300 }, acceptDownloads: true })
-  const pageErrors = [], waits = [], held = new Set()
+  const pageErrors = [], selectionSecondaryErrors = [], waits = [], held = new Set()
   context.on('page', (page) => { page.on('pageerror', (error) => pageErrors.push(error.message)); page.on('crash', () => pageErrors.push('Owned layout page crashed')) })
   const page = await context.newPage(), url = `${origin}/stratified-tikz/scripts/fixtures/freeLabelsApp.html`
   const publish = (name, value, options = {}) => evidencePublisher.publish(name, value, options)
@@ -156,7 +156,7 @@ export async function runPointLayoutAnchorChecks({ browser, origin, artifactDir,
   let scenario = 'point-layout-per-shape-spacing-minima', primary, selectionSequence = 0, currentLiveCapture
   async function retainFailure(name, details) {
     try { await publish(name, details, { stage: name, disposition: 'failed' }) }
-    catch (error) { pageErrors.push(`Failure evidence ${name}: ${error.message}`); console.error(`Layout failure evidence ${name}: ${error.message}`) }
+    catch (error) { selectionSecondaryErrors.push(`Failure evidence ${name}: ${error.message}`); console.error(`Layout failure evidence ${name}: ${error.message}`) }
   }
   const inspector = page.locator('#preview-inspector-drawer')
   const state = () => app.readState()
@@ -184,12 +184,14 @@ export async function runPointLayoutAnchorChecks({ browser, origin, artifactDir,
     return input
   }
   async function select(id = 'app-point', observePoint = observeLayoutPoint, pendingFixture) {
-    const selection = { page, readState: state, observePoint, diagnose: async (details) => {
-      await diagnostic(group, scenario, details)
+    const selection = { page, readState: state, observePoint, diagnose: async (details, options = {}) => {
+      options.operation?.assertActive('selection-primary-authority')
+      if (options.primary) evidencePublisher.fail(options.primary, options)
+      await diagnostic(group, scenario, details, options)
       if (details.pendingPreparation) await publish(`${scenario}-preparation.json`,
-        { scenario, group, result: 'observed', pendingPreparation: details.pendingPreparation })
+        { scenario, group, result: 'observed', pendingPreparation: details.pendingPreparation }, options)
     },
-      secondaryErrors: pageErrors, scenario, sequence: ++selectionSequence, id, boundary: true }
+      secondaryErrors: selectionSecondaryErrors, scenario, sequence: ++selectionSequence, id, boundary: true }
     const rendered = pendingFixture
       ? await preparePendingLayoutPoint({ ...selection, fixture: pendingFixture, source: pendingFixture.diagram.strata[0].text })
       : await selectGeometricPoint(selection)
@@ -1129,14 +1131,15 @@ export async function runPointLayoutAnchorChecks({ browser, origin, artifactDir,
         pendingPreparation, beforeExportClick, capturedRelease, ...(postClickView ? { postClickView } : {}),
         capture: standaloneEvidence.capture })
     }
-    assert.deepEqual(pageErrors, []); await completeGroup(group)
+    assert.deepEqual(pageErrors, []); assert.deepEqual(selectionSecondaryErrors, []); await completeGroup(group)
   } catch (error) {
     primary = error
     evidencePublisher.fail(error)
     if (currentLiveCapture) markZeroAxisLiveCaptureFailure(error)
     const liveCapture = isZeroAxisLiveCaptureFailure(error) ? currentLiveCapture : undefined
-    await retainFailure('point-layout-failure.json', { scenario, group, result: 'failed', pageErrors, liveCapture, error: { message: error.message, stack: error.stack } })
-    try { await app.failure(error, { scenario, pageErrors, liveCapture }, { captureScreenshot: !scenario.startsWith('point-layout-pending-')
+    await retainFailure('point-layout-failure.json', { scenario, group, result: 'failed', pageErrors,
+      secondaryErrors: selectionSecondaryErrors, liveCapture, error: { message: error.message, stack: error.stack } })
+    try { await app.failure(error, { scenario, pageErrors, secondaryErrors: selectionSecondaryErrors, liveCapture }, { captureScreenshot: !scenario.startsWith('point-layout-pending-')
       && !isZeroAxisLiveCaptureFailure(error) }) } catch (diagnosticError) {
       await retainFailure('point-layout-secondary-failure.json', { primary: error.message, diagnostic: diagnosticError.message })
     }
@@ -1150,7 +1153,7 @@ export async function runPointLayoutAnchorChecks({ browser, origin, artifactDir,
         pendingCleanup.exportListenerReleased = true
       } catch (error) {
         primary ??= error; pendingCleanup.errors.push({ operation: 'export listener cleanup', message: error.message })
-        pageErrors.push(`Pending export listener cleanup: ${error.message}`)
+        selectionSecondaryErrors.push(`Pending export listener cleanup: ${error.message}`)
       }
     }
     for (const source of held) {
@@ -1161,7 +1164,7 @@ export async function runPointLayoutAnchorChecks({ browser, origin, artifactDir,
         release.result = await page.evaluate((source) => window.stzAppLabels.release(source), source)
         release.after = await page.evaluate((source) => window.stzAppLabels.pending(source), source)
       } catch (error) {
-        primary ??= error; release.error = error.message; pageErrors.push(`Held layout conversion cleanup: ${error.message}`)
+        primary ??= error; release.error = error.message; selectionSecondaryErrors.push(`Held layout conversion cleanup: ${error.message}`)
       }
     }
     if (scenario.startsWith('point-layout-pending-')) await retainFailure('point-layout-pending-cleanup.json', pendingCleanup)

@@ -1,5 +1,62 @@
 # Phase 32 Plan: Point-node math, paint, geometric shapes, and layout
 
+Pending-selection publication and deadline ownership follow-up (2026-10-14):
+the actual clean entry is `6a4f5ab577a7d7d4fb28ff35dde059dc212550cc`,
+fingerprint `630cf6ca15ebb6398ff799b0d3274b7c5b169a4af67ca028d7c825c97c0eea64`.
+The parent has tracked the previous 26 modified files and 571 additive files;
+all 571 retained handoff hashes match, including the 562 cylinder evidence files.
+The authenticated `u4oMpK` parent passed tests/build/diff/label-assets, then failed
+transparent pending preparation at the 2,000ms final selection diagnostic.
+Its raw report has 16/18 completed groups, 17 started, 193 evidence records and
+4,761 diagnostics. Ten of twelve layout scenarios passed. Neither pending
+download nor final standalone completed. This partial native evidence does not
+accept the new checkout, and the local diagnostic error is not a page error.
+
+One final callback includes native cloning/modifier reads and five ordered raw,
+report and preparation publications. The previous index was 86,163,405 bytes:
+859 documents repeated a 98,708-byte checkout; 2,812 index writes totaled
+125,417,437,237 bytes. These are authenticated metadata measurements, not proof
+of an exclusive serialization, I/O, queue or page-read timeout cause. Previously
+recorded index I/O omitted serialization. The frozen final observation precedes
+expiry and has no error; subsequent failure and cleanup records retain the
+AggregateError. Cleanup release does not establish pending acceptance.
+
+The scoped v2 publisher retains one complete authenticated checkout and immutable
+ordered pack-reference links, preserving exact historical raw replay and the
+strict declared-v1 reader. Compact monotonic progress records cover the producer
+and authority boundaries. The composed operation propagates its absolute deadline
+through diagnostics, reports and preparation retention; queued and synchronous
+authority checks reject expiry. Independent bounded failure cleanup retains the
+original primary Error or diagnostic AggregateError. Late completion/rejection
+cannot create success checkpoints or rewrite failed authority. The diagnostic
+2,000ms and publisher 5,000ms production limits remain unchanged.
+
+Current implementation/test results and exact-byte handoff are recorded in
+[the implementation audit](PHASE_32D_IMPLEMENTATION.md). Phase 32 remains
+**incomplete**. Fresh complete full-suite and browser-capable parent verification
+must precede independent read-only completion review and the matching-tree guard.
+All eighteen groups and twelve named layout scenarios, both pending workflows
+and final standalone remain mandatory. No commit or push is authorized here.
+The previous cylinder and freezing corrections below remain historical records.
+
+Completed follow-up checks: affected helper/policy/capture sweep 1,336/1,336;
+preserved cylinder sweep 154/154; final owned composition files 389/389 and final
+publication/composition files 78/78. All completed sweeps have zero failures,
+cancellations/skips; counts overlap. The first parent/runner files finished
+688/692 with four failures in the initial status/schema adaptation, since fixed.
+The first registered suite passed 7,285/7,285 with zero failures/cancellations/
+skips/todos, but source changed during its last ownership controls, so its
+before/after guard rejects final-tree acceptance. The full fresh strict frozen-tree
+outcome is recorded in the external handoff. The large composed fixture's hot
+index is 851,926 bytes for 890 documents / 935 boundaries, with one exact identity
+and 54,609 reference bytes; its complete five-publication callback takes 44.309ms.
+These are offline measurements. Build/strict TypeScript/new-code recommended lint/
+syntax/diff pass separately from the four original lint findings and the inherited
+`SvgDiagram` finding. Both fresh direct browsers stop at localhost EPERM before
+Chrome. Final current-tree strict/browser/review disposition remains in
+`/private/tmp/stz-32d-pending-evidence-fix-20261014/HANDOFF.json`; partial prior native
+evidence cannot replace eighteen complete groups and all twelve layout scenarios.
+
 Cylinder construction / scanned dimensions / verifier progress follow-up
 (2026-10-13): actual clean entry HEAD is
 `afe1bd642f8bf5a97671c0ade2b3a2c5565ffcbf`, fingerprint

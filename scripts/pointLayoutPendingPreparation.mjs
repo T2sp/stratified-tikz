@@ -251,12 +251,22 @@ export async function inputPendingLayoutContour({ stage, fixture, source, id = '
 }
 
 export async function preparePendingLayoutPoint({ page, readState, diagnose, secondaryErrors, scenario, sequence,
-  fixture, source, id = 'layout-circle', observePoint }) {
+  fixture, source, id = 'layout-circle', observePoint, scheduleDiagnosticDeadline }) {
   const token = `${scenario}:pending-preparation:${sequence}:${id}`
   const record = { scenario, sequence, id, source, fixture: structuredClone(fixture), result: 'observed', stages: [],
     cleanup: { observerRemoved: false }, secondaryErrors: [] }
-  let primary, rendered, installed = false, inputCount = 0
-  const retain = () => boundedPointDiagnostic(() => diagnose({ boundary: 'pending-layout-preparation', pendingPreparation: record }), 'Pending layout preparation evidence')
+  let primary, rendered, finalSelectionOperation, installed = false, inputCount = 0
+  const retain = (options = {}) => {
+    const persist = async (operation) => {
+      operation.assertActive('pending-retain-start')
+      await diagnose({ boundary: 'pending-layout-preparation', pendingPreparation: record }, { ...options, operation })
+      operation.assertActive('pending-retain-completed')
+    }
+    // Nested retain belongs to the selection diagnostic's one absolute budget.
+    // Cleanup/failure retain instead gets a fresh separately bounded owner.
+    return options.operation ? persist(options.operation)
+      : boundedPointDiagnostic(persist, 'Pending layout preparation evidence')
+  }
   const capture = async (boundary, click = null) => {
     const stage = { boundary, ...await capturePendingLayoutPreparation({ page, readState, fixture, source, id, click }) }
     record.stages.push(stage); await retain(); return stage
@@ -285,24 +295,45 @@ export async function preparePendingLayoutPoint({ page, readState, diagnose, sec
         const stage = await capture('current-contour-measurement', point?.boundary)
         assertPendingLayoutMeasurement(stage, fixture, source, id, false)
         return point
-      }, secondaryErrors, diagnose: async (details) => {
-        if (details.observation) record.nativeSelection = structuredClone(details.observation)
-        if (installed) record.modifiers = await page.evaluate(readPendingModifiers, token)
-        await diagnose(details); await retain()
+      }, secondaryErrors, scheduleDiagnosticDeadline, diagnose: async (details, options = {}) => {
+        const { operation } = options
+        if (details.boundary === 'selection-finished') finalSelectionOperation = operation
+        operation?.assertActive('pending-native-clone-start')
+        if (details.observation) {
+          const snapshot = structuredClone(details.observation)
+          operation?.mark('pending-native-clone-completed')
+          operation?.assertActive('pending-native-clone-assign')
+          record.nativeSelection = snapshot
+        }
+        if (installed) {
+          operation?.assertActive('pending-modifiers-read-start')
+          const modifiers = await page.evaluate(readPendingModifiers, token)
+          operation?.assertActive('pending-modifiers-read-completed')
+          record.modifiers = modifiers
+        }
+        operation?.assertActive('pending-selection-diagnostic-start')
+        await diagnose(details, options)
+        operation?.assertActive('pending-selection-diagnostic-completed')
+        await retain(options)
       } })
+    if (finalSelectionOperation) record.finalSelectionOperation = finalSelectionOperation.snapshot()
     record.nativeSelection = rendered.nativeSelection
     record.modifiers = await page.evaluate(readPendingModifiers, token)
     record.stateAfter = await readState()
     await capture('after-native-selection', rendered.boundary)
     assert.equal(inputCount, 1, 'Pending preparation made exactly one native contour gesture')
-  } catch (error) { primary = error; record.error = { message: error.message, stack: error.stack } }
+  } catch (error) {
+    primary = error; record.error = { message: error.message, stack: error.stack }
+    if (finalSelectionOperation) record.finalSelectionOperation = finalSelectionOperation.snapshot()
+    if (error instanceof AggregateError) record.selectionDiagnosticErrors = error.errors.map((cause) => ({ message: cause.message, stack: cause.stack }))
+  }
   finally {
     if (installed) {
       try { record.cleanup.observerRemoved = await boundedPointDiagnostic(() => page.evaluate(removePendingModifiers, token), 'Pending modifier observer cleanup') }
       catch (error) { primary ??= error; record.secondaryErrors.push({ operation: 'modifier observer cleanup', message: error.message }); secondaryErrors.push(error.message) }
     } else record.cleanup.observerRemoved = true
     if (primary) record.error = { message: primary.message, stack: primary.stack }
-    try { await retain() } catch (error) { primary ??= error; record.secondaryErrors.push({ operation: 'final pending evidence', message: error.message }); secondaryErrors.push(error.message) }
+    try { await retain(primary ? { disposition: 'failed', primary } : {}) } catch (error) { primary ??= error; record.secondaryErrors.push({ operation: 'final pending evidence', message: error.message }); secondaryErrors.push(error.message) }
   }
   if (primary) throw primary
   try {
@@ -310,7 +341,7 @@ export async function preparePendingLayoutPoint({ page, readState, diagnose, sec
     record.result = 'passed'; await retain()
   } catch (error) {
     record.result = 'observed'; record.error = { message: error.message, stack: error.stack }
-    try { await retain() } catch (secondary) {
+    try { await retain({ disposition: 'failed', primary: error }) } catch (secondary) {
       record.secondaryErrors.push({ operation: 'validation failure evidence', message: secondary.message }); secondaryErrors.push(secondary.message)
     }
     throw error

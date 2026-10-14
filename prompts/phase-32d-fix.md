@@ -1,250 +1,251 @@
-# Phase 32D Fix for pending-selection evidence publication and deadline ownership
+# Phase 32D Fix for the real-App stable-frame deadline failure
 
 ## Objective and scope
 
-The cylinder fitting/anchor, staged TeX-domain and deterministic freezing/owned
-verifier-progress fixes are implemented. The fresh matching parent passed tests,
-build, diff and label-assets, but free-labels failed during transparent pending
-layout preparation:
+Authenticated metadata sharing and absolute deadline ownership are implemented
+across the complete pending-selection publication path. The fresh matching tree
+passed 7,291/7,291 tests, build, strict TypeScript, scoped new-code lint, syntax
+and diff. Do not repeat those fixes or the completed cylinder/freezing fixes.
+
+The latest browser-capable parent passed tests/build/diff/label-assets, then
+free-labels failed earlier in `real-App-workflows`:
 
 ~~~text
-AggregateError: Geometric selection diagnostics failed
-Error: Timed out after 2000ms during Geometric selection final evidence
+Error: Timed out after 2100ms during App stable frame wait
+    at Object.expire (scripts/pointCheckDiagnostics.mjs:31:17)
+    at Timeout.<anonymous> (scripts/pointCheckDiagnostics.mjs:77:85)
 ~~~
 
-Fix the bounded final-evidence path, its publication metadata amplification and
-deadline ownership. Diagnose the complete nested operation before assigning the
-timeout to a particular serialization, writer, queue or page read.
-Keep the production2,000ms diagnostic and5,000ms publication limits unchanged.
+Diagnose this owned App geometry/frame wait and fix an established defect,
+preserving its existing acceptance and deadlines. An established execution
+discontinuity may instead require a valid fresh run; do not invent a code defect
+or relax absolute deadlines to accept a suspended run.
+The historical pending-selection timeout's exclusive bottleneck remains unproven.
+The new App failure does not establish that the
+publication fix regressed, nor that production geometry, scrolling, renderer
+frames, transport, timer delivery or host event-loop blocking caused the timeout.
+Distinguish the actual wait failure from those hypotheses before changing code.
 
-Scope edits to evidence publication/strict resolution, the owned diagnostic/
-report/pending-preparation composition needed at this boundary, meaningful
-regressions, necessary runner copies and Phase32 status documentation.
+Scope edits to the real-App stability wait, its diagnostic/ownership/cancellation
+composition, compact evidence needed to establish this boundary, meaningful
+regressions, necessary runner dependency copies and Phase 32 status documentation.
 No production geometry, model/schema, PGF reference, rendering, input, capture
-or TikZ change is justified by this failure.
-Do not repeat the completed cylinder or freezing fixes.
+or TikZ change is justified by the current evidence. Any additional scope must
+follow a reproduced, authenticated cause, not this host timeout alone.
 Preserve every required observation, exact checkout/raw/file authentication,
 current native gesture and pending-download acceptance contract.
 
-Read `AGENTS.md`, implementation/review prompts and both Phase32 docs.
-Resolve the authenticated latest artifacts with `readEvidenceDocumentSync` and
-their exact checkout. Do not treat pointer JSON as the raw observation.
-Phase32 is incomplete; fresh verification before independent review/commit and
-matching-tree guards remain mandatory.
+Read `AGENTS.md`, implementation/review prompts and both Phase 32 docs.
+Resolve latest published artifacts with `readEvidenceDocumentSync` and their
+complete exact checkout. Ordinary App diagnostic/lifecycle JSON is separate from
+published pointer JSON; do not treat a pointer as the raw observation.
+Phase 32 is incomplete; fresh verification before independent review and the
+post-review matching-tree guard remain mandatory. No commit or push.
 
 ## Latest implementation, parent and exact identity
 
-Implementation handoff:
-`/private/tmp/stz-32d-fitting-progress-fix-20261013/HANDOFF.json`.
-Handoff SHA256:
-`97250ff4d45f8ce0951f74165d8f83f0d39b5587262bc4753cdc4c339bdebb09`.
+Latest authenticated implementation handoff:
+`/private/tmp/stz-32d-pending-evidence-fix-20261014/HANDOFF.json`.
+Bytes: 910,802. SHA256:
+`c1173a218d922d0ee46aae2f1b372eff61b922b2d98c78c3ae18af3f6957b9ac`.
+Use its exact 16-file inventory and hashes, final registered-suite result,
+strict child report, preserved reference manifests and recorded first outcomes.
 
 Current parent verifier handoff:
-`/var/folders/vk/7kf940pd4bx8f6cg3rzlmtc80000gn/T/stz-phase-verifier-QBA9vY/response.json`.
+`/var/folders/vk/7kf940pd4bx8f6cg3rzlmtc80000gn/T/stz-phase-verifier-P19JEq/response.json`.
+SHA256: `3f376bc169a671f9c98f7af1b5ace321cd4421ed4bacba7c8d4792468ae97722`.
 Current parent report:
-`/var/folders/vk/7kf940pd4bx8f6cg3rzlmtc80000gn/T/stz-phase32d-before-review-u4oMpK/verification.json`.
+`/var/folders/vk/7kf940pd4bx8f6cg3rzlmtc80000gn/T/stz-phase32d-before-review-yWdc9n/verification.json`.
+SHA256: `52f413b7abf43c6f151062f21cee05ad770ff6e3d1d9b7ed0d94df052a959f86`.
 Current free-labels artifact directory:
-`/var/folders/vk/7kf940pd4bx8f6cg3rzlmtc80000gn/T/stz-phase32d-before-review-u4oMpK/05-check-free-labels/artifacts/`.
-Child strict report:
-`/var/folders/vk/7kf940pd4bx8f6cg3rzlmtc80000gn/T/stz-phase32d-manual-3ByfEC/verification.json`.
+`/var/folders/vk/7kf940pd4bx8f6cg3rzlmtc80000gn/T/stz-phase32d-before-review-yWdc9n/05-check-free-labels/artifacts/`.
+Strict child report:
+`/var/folders/vk/7kf940pd4bx8f6cg3rzlmtc80000gn/T/stz-phase32d-manual-hT0kf0/verification.json`.
 
 Branch: `phase/32d-margin-minsize-anchor`.
-HEAD: `afe1bd642f8bf5a97671c0ade2b3a2c5565ffcbf`.
-Before this prompt edit, the checkout matches parent before/after:
+HEAD: `6a4f5ab577a7d7d4fb28ff35dde059dc212550cc`.
+Before this prompt edit, the checkout matches both latest handoff and current
+parent before/after:
 
 ~~~text
-a31f594e86c088453c16d9904b6b99cc034837dd2ae91a4f17a989227362029c
+4f2a45e43929b82c25f558a38909dc2b5aaef658d1f94a6a61dfa9a175b17fe7
 ~~~
 
 Tracked-diff SHA256:
-`4b9008cf404157a89eb7c69279f653b9472ec24df3980ca674c87d69522a7250`.
-Preserve26 modified tracked files and571 untracked files:562 separate additive
-evidence files and nine code/test files. Use the handoff's35-file source/test/docs
-inventory and all exact reference hashes; do not reset/drop inherited work.
-The original110 cylinder-domain files are retained predecessors.
+`3659da351d555965a63d83b72e4cecb63781fda57fc2c0e3b3b56257cee4e609`.
+The one untracked file is `tests/scripts/pendingSelectionPublication.test.mjs`,
+SHA256 `043b88328beb7dd8f842d99d140d34da81230a2f570b2837c8ea00dd8819becd`.
+Preserve all 15 modified tracked files plus that untracked file. The handoff's
+`finalSourceInventory.inventorySha256` is
+`e079701bf4deb8d331c1ee29ad9255cd291ae513594435787c9ea572b0d428f2`.
+All 16 current source bytes match that inventory before this prompt edit.
+
+The parent tracked the earlier 26 modified and 571 untracked files at HEAD.
+Those inherited files are no longer 571 current untracked files. All 571 retained
+filename/hash associations, 562 additive evidence hashes and 654 original
+reference hashes still match; do not reset/drop/replace inherited work.
+The original 110 cylinder-domain files remain retained predecessors.
 Prompt edits change identity; all new gates must capture actual tracked and
 untracked bytes rather than reuse this fingerprint.
 
 | Evidence | Actual result |
 | --- | --- |
-| Implementation checks | 7,237/7,237 full tests passed, zero failures/cancellations/skips. Focused cylinder154/154; broader909/909. Build, strict TypeScript, scoped new-code lint, syntax and diff passed. Counts overlap; do not add them. |
-| Inherited debt | Four original lint findings plus one inherited `SvgDiagram` finding reproduced separately. Repository-wide lint was not rerun. |
-| Child browsers | Both commands failed at localhost startup with `listen EPERM` before Chrome. No new child native acceptance. |
-| Matching parent | npm test/build/diff/label-assets passed. Free-labels failed at the final selection diagnostic; unchanged exact checkout. |
-| Cumulative browser evidence | 16/18 groups completed,17 started,193 evidence records/4,761 diagnostics; no top-level page errors. Ten of12 layout scenarios passed before the failure. |
-| Remaining acceptance | Both pending layout scenarios incomplete; transparent stopped in preparation before export. White pending and final standalone were not executed. Combined layout is incomplete. |
-| Review/status | Fresh independent completion review has not started. Phase32 incomplete; no commit or push. |
+| Matching implementation checks | 7,291/7,291 full tests, zero failures/cancellations/skips/todos; build, strict TypeScript, scoped new-code lint, syntax and diff passed. Earlier focused counts overlap; do not add them. |
+| Offline large composition regression | 571 checkout entries, 859 prior documents, 4,761 diagnostic rows; 851,936-byte index. All five required publications completed in 59.331917ms with 2,000ms/5,000ms limits. This is helper evidence, not native acceptance or a proved historical cause. |
+| Inherited debt | Four original lint findings plus one inherited `SvgDiagram` finding remain separately recorded. Repository-wide lint was not claimed. |
+| Child browsers | Both commands hit localhost `listen EPERM` before Chrome; no current child native acceptance. |
+| Matching current parent | npm test 7,291/7,291, build, diff and label-assets passed. Free-labels failed at real-App-workflows; checkout unchanged before/after. |
+| Current cumulative browser evidence | 13/18 groups completed, 14 started; 123 evidence records, 348 diagnostics, 377 checkpoints; zero top-level page errors. App initial-valid, invalid-pending and invalid-fallback observations passed before the failure. |
+| Current acceptance gaps | real-App-workflows is incomplete. Settled standalone export, point paint/import/persistence, geometric shapes and combined layout groups were unexecuted. Neither layout pending workflow nor final standalone has current acceptance. |
+| Review/status | Fresh independent completion review has not started. Phase 32 remains incomplete; no commit or push. |
 
-The passed layout scenarios include all prior spacing/anchor/controls/import/
-isolation/native cases, signed-polygonal/zero-axis coverage and the singular,
-subsp and folded cylinder cases. Keep all12 registered named scenarios.
-Do not report the local diagnostic timeout as a production browser page error;
-retain its actual outer failure and secondary-error record.
+Historical parent `u4oMpK` and verifier `QBA9vY` belong to the previous checkout:
+16/18 groups completed, ten of twelve layout scenarios passed, then transparent
+pending preparation failed at geometric selection final evidence (2,000ms).
+Retain its immutable pre-expiry observation and later failure/cleanup records.
+Its native success does not accept the new tree. Do not describe its layout
+failure or ten passed scenarios as the current parent's results.
 
-## Proven failure boundary and pending state
+## Establish the current App failure boundary
 
-Current stack:
-`pointGeometricSelection.mjs:595` →
-`pointLayoutPendingPreparation.mjs:282` →
-`checkPointLayoutAnchors.mjs:194/1053` →
-`checkFreeLabels.mjs:487`.
-The nested cause is the final-evidence2,000ms timeout, not a failed contour hit
-or initial-render timeout.
+Authenticate and resolve `free-labels-evidence.json`, then inspect
+`app-failure.json`, `app-lifecycle.json`, `app-geometry-index.json`, the retained
+`app-geometry-*.json`, persistence artifacts and owned-server records.
+`app-workflows.json` is absent: failure occurred before the full App workflow
+returned. Preserve that absence as an incomplete gate, not inferred success.
+The stage is `valid-again-pending` for source `$\mathord{\mathrm{i}}$`.
+`app-geometry-0068.json` proves the wrapped `geometry()` stable boundary already
+passed in 54.877292ms. `app-geometry-0069.json` retains primary failure afterward.
+The failing wait is an unwrapped later `waitForStableAppGeometry`: either the
+pointer helper at `checkFreeLabelsApp.mjs:211` or the final stage wait at `:269`.
+The records do not identify which probe/wait. Trace both actual call sites and
+retain stage/probe identity for every wait without removing native assertions.
 
-Resolve `point-layout-selection-0819.json`, `point-layout-selection-0821.json`
-and `point-layout-selection-0823.json`, plus their pending-preparation and outer
-failure/cleanup records.
-The retained native proof shows unselected→`layout-circle`, fresh fraction`.23`
-click at approximately(593.5371704101562,1134.83984375), exactly three trusted
-primary down/up/click events, pointer1, revision461, all modifiers false,
-dropped0 and actual circle/owner targeting.
-Model/runtime/history/revision/UI, held source, request and current point-node
-owner remain unchanged. Inspector closed natively and inherited expanded toolbar
-was restored. Native snapshots have no observation errors.
+These snapshots retain exact pending source/request/bounds and owner
+`["free-label",1,"app-label"]`, original URL/document generation/API identity,
+visible/focused document, live frame observer, no Inspector or animations.
+App errors/dropped errors are zero; last recorded edit advances past history
+from two to three entries. Do not infer full current model state or held-request
+counts at failure: those were not captured. The earlier pending predicate passed.
+All 69 App geometry captures have zero dropped events/samples and diagnostic
+errors. Disposed diagnostics record `pendingEvaluation=false`; lifecycle records
+page close and no secondary capture/cleanup errors were logged. Cancellation's
+actual outcome remains unrecorded, so these facts do not prove wait-token cleanup.
 
-After toolbar restoration/assertion, `selection-finished` persistence times out.
-Its immutable raw snapshot was taken BEFORE expiry and has no primary/secondary
-errors; the later outer failure records the diagnostic timeout.
-Keep both temporal truths. Do not rewrite the frozen observation to imply a
-later failure was present at capture.
+The current v2 publication index has failed disposition, sequence zero and no
+documents/history/boundaries, with this App timeout as primary. The latest browser
+run never reached layout publication. Earlier native point transparent/white
+checks passed; they are distinct from unexecuted combined-layout pending cases.
 
-`preparePendingLayoutPoint` did not reach after-native-selection capture,
-terminal preparation validation or SVG export. Its raw result stays observed,
-with the AggregateError. Modifier-observer cleanup completed; held-source
-release→null and export-listener release were failure cleanup with no errors.
-Cleanup release does not prove pending acceptance, download or intended release.
+The App stable helper is in `scripts/appGeometryDiagnostics.mjs` and its callers
+are in `scripts/checkFreeLabelsApp.mjs`. The browser timer is 2,000ms; the host
+`boundedPointDiagnostic` budget is 2,100ms; token-specific cancellation is bounded
+at 250ms. The shared diagnostic's absolute monotonic completion/rejection guards
+now reject expiry even when the timer callback is delayed. Preserve that correct
+ownership behavior; do not make delayed timer delivery authorize late success.
+The supplied stack reports the host timer expiry. Determine browser evaluation,
+inner timer/frame outcome, host completion and cancellation timing separately.
 
-The helper's final diagnostic wraps a pending callback that clones the native
-observation, reads modifiers and awaits the caller diagnostic, then `retain()`.
-The caller publishes the raw observation and running report; pending retain
-publishes its raw observation/report and named preparation artifact.
-Five ordered publications, plus cloning/page work, can occur under the same
-outer2,000ms diagnostic. Inspect the real call path and shared publisher queue.
-Do not remove required preparation/report stages to shorten it.
+Measure host monotonic start/deadline/callback entry/settlement/timer delivery,
+browser wait entry/frame samples/inner deadline/settlement, document generation,
+URL/API/current source/request/status, and cancellation/drain. Correlate clocks
+explicitly; do not subtract browser and host performance.now values as one clock.
+The retained `0068` completed -> `0069` failure deltas are:
 
-## Measure and remove authenticated metadata amplification
+| Clock/observation | Actual delta |
+| --- | --- |
+| Host wall | 1,448,062ms |
+| Host monotonic | 1,448,119.216834ms |
+| Browser snapshot wall | 1,448,068ms |
+| Browser performance.now | 1,863.5ms |
+| Browser observer frames / last-frame timestamp | +101 / +1,866.6ms |
 
-The current authority index is about86.16MB for859 documents/2,810 boundaries.
-The compact serialized checkout is98,708 bytes; each document identity repeats
-it. Documents metadata alone is about85.18MB.
-Recorded index writes:2,812, totaling125,417,437,237 bytes.
-This is measured metadata amplification, not proof of the timeout's direct cause.
+These endpoints bracket the remaining `inspectStage` work; they do not timestamp
+the failing wait's entry or identify which native probes ran.
+They do not establish continuous unstable frames or prove
+device suspension, clock behavior, event-loop blocking or transport delay.
+Establish the actual wait intervals and execution continuity before assigning
+cause to geometry, instrumentation, serialization/I/O, renderer inactivity or
+host work. Record missing observations honestly. Preserve absolute expiry when
+host execution resumes; an inner/browser clock cannot silently extend ownership.
 
-Failure-adjacent diagnostic/report/preparation publications2797→2798→2799 all
-committed as running. Individual retained pack/boundary timings are small;
-recorded index I/O is roughly18–25ms.
-`atomic(..., jsonBytes(index()))` starts timing AFTER index serialization.
-Current metrics omit that serialization and do not isolate end-to-end callback,
-clone, hash, queue wait or deadline/authority timing.
-Do not equate I/O-only timing with total persistence time or assert a late commit
-occurred after expiry without a timestamp proving it.
+Add compact bounded progress only at the real wait/producer boundaries as needed.
+Retain pre-assertion/failure evidence independently of an unresponsive renderer.
+Instrumentation must not repeatedly clone or publish the whole accumulated
+report under the stable-frame deadline, recursively capture itself or introduce
+unbounded work. Use token/generation/sequence associations and explicit caps.
+A host deadline failure is not a top-level browser `pageerror`.
 
-Add small owned monotonic timing/progress records at the actual producer and
-authority boundaries: operation start/deadline, snapshot/clone, encode/hash,
-queue wait, pack/boundary/index serialization and writes, authentication,
-document authority commit, report checkpoint, preparation retain and operation
-completion/expiry. Associate them with owner/token/generation/sequence.
-Capture timing before/after the expensive work; metrics must not recursively
-publish large snapshots or introduce new unbounded diagnostics.
+## Preserve App stability and owned cleanup
 
-Remove repeated complete checkout metadata from the frequently rewritten index.
-A canonical authenticated checkout with compact exact identity references is
-a supported approach. Preserve its revision, tracked diff, fingerprint and all
-571 filename→hash entries, including every evidence file.
-Resolve/reconstruct the complete logical identity and compare it strictly before
-accepting a document. A fingerprint alone or a stripped metadata envelope is
-insufficient. Reject wrong owner/tree/ref/hash/sequence, missing or substituted
-identity, cross-checkout documents and stale/nonlatest authority.
+Stable acceptance requires three consecutive exactly equal comparison snapshots.
+Preserve generation/URL/API continuity, original source/request/state/bounds,
+connected finite node rects and CTMs, node identity, layout/scroll, ancestors,
+Inspector, camera, viewBox and viewport. Keep the existing frame/sample/wait-map
+budgets. Do not loosen comparison fields/tolerances, return an earlier snapshot,
+force a native action, add sleeps/retries or focus/reload/reacquire a replacement
+page to manufacture acceptance. Native scroll and pointer/history/source checks
+must retain their normal production paths and deadlines.
 
-Inspect ordered pack/reference metadata too: current boundaries repeat the
-accumulated pack list (about729KB near this failure). Share immutable authenticated
-ordered references/chunks if needed, preserving all historical reachable packs,
-bytes, paths, lengths, hashes and traversal order.
-Keep per-document pointer, index and history consistency, frozen observations
-and complete raw values/order. Reduce the hot repeated work instead of deferring
-mandatory validation outside the diagnostic deadline.
+Preserve the browser's inner 2,000ms wait, host 2,100ms bound, 250ms cancellation,
+2,000ms ordinary diagnostics, 5,000ms publication and existing normal App action,
+page/I/O/image/cleanup limits. No larger timeout, global clock mock or new heap/
+concurrency flag may hide the failure. If a defect is established, fix the
+unnecessary work or ownership defect at its actual boundary while retaining
+strict stable acceptance. Otherwise retain unresolved causes or an established
+execution discontinuity explicitly and obtain valid fresh acceptance.
 
-Update the strict reader/parent replay and necessary copied dependencies with
-any representation change. Version it narrowly if required; retained old reports
-must still resolve and authenticate under their declared schema.
-Do not add permissive legacy fallback, filename exemptions, skipped historical
-references, broad field stripping or inferred raw success.
-Preserve pre-assertion evidence, immutable packs, chunked report arrays, exact
-raw resolution, atomic authority, primary-error disposition and complete replay.
+Own initial browser evaluation and both late outcomes immediately. Expiry must
+close the success generation, consume late fulfillment/rejection and prevent a
+late running/pass checkpoint, App-group completion or replacement primary error.
+Cancel only the exact token in the original owned document; prove frame/timer/
+map/listener cleanup when responsive, and separately bounded host cleanup when
+unresponsive. Do not revive a stopped observer or restart its ownership lease.
+Retain the first native/assertion/timeout Error through diagnostic, cancellation,
+write and cleanup failures. Finish owned listener/event/page/browser/server
+cleanup without allowing it to stand in for successful workflow acceptance.
 
-## Own outer diagnostic expiry through the composed operation
+## Meaningful regressions and preserved publication fixes
 
-`boundedPointDiagnostic` owns late promise rejection but does not cancel the
-underlying callback. Publisher5,000ms ownership is separate from outer2,000ms.
-A timed-out final diagnostic can leave its nested publication/report/retain
-work running unless the producer's expiry is propagated and authority is guarded.
-The existing record does not timestamp all late commits; establish the behavior.
+Exercise the actual host helper -> browser frame wait -> snapshot/comparison ->
+App caller -> failure/cancellation/cleanup composition. Existing successful frame
+or standalone diagnostic stubs do not reproduce this composed boundary.
+Use controlled entered/release gates and an operation-scoped clock/scheduler
+seam; ordinary setup, file I/O, image and native work keep their normal budgets.
+Register new tests in the explicit `package.json` test list if needed.
 
-Give the composed operation explicit ownership/expiry at the actual boundary.
-Check it before every subsequent observation/checkpoint/preparation publication
-and authority transition, including queued work.
-Use the absolute monotonic deadline at these checks; synchronous serialization
-can delay the timer callback, so timer delivery alone cannot authorize a commit.
-After expiry, late fulfillment/rejection must be consumed and cannot create
-a running/pass checkpoint, resurrect successful selection/preparation, mutate
-the primary error or overwrite failed/terminal authority.
-Already committed before-expiry raw records remain valid historical evidence.
+Cover exact stable success before return; changing geometry/node identity/source/
+request resetting the three-frame count, followed by genuinely stable snapshots;
+no frames; missing/nonfinite targets; original URL/API/generation loss;
+stopped observer; bounded sample/frame/map limits; host expiry with
+responsive cancellation and stalled cancellation; late fulfillment/rejection;
+inner failure versus host backstop; earlier native/assertion Error identity;
+cleanup failure; cancellation before browser wait registration; late registration
+after host expiry; and withheld host/browser timer delivery crossing absolute
+deadlines. Exercise clock discontinuity/late callback entry with deterministic
+owned seams, and distinguish the two clocks without changing production budgets.
+Control delivery/clock entry deterministically rather than charging expensive
+fixture work to a tiny real timer. Release/drain all gates; prove no orphan or
+unhandled rejection, no stale checkpoint/pass and exact cleanup/primary retention.
+Node helper controls cannot replace current native App acceptance.
 
-Keep cleanup/failure persistence separately owned and bounded so it can save
-the actual failure and release modifiers, inherited UI, conversion hold and
-export listener without reviving the expired success operation.
-Retain original native/assertion Error identity when one already exists.
-For this no-earlier-primary case, preserve the diagnostic timeout in the thrown
-AggregateError and secondary evidence. Further cleanup/write failures cannot
-replace or hide it. Do not return a rendered/passed preparation until its required
-final evidence and validation have fully completed.
+Keep the implemented v2 canonical immutable authenticated complete checkout,
+compact document references and ordered immutable pack-reference links.
+Preserve every logical identity field/hash, historical pack/path/length/hash/order,
+pointer/index/history agreement, raw values/order and strict declared-v1 replay.
+Wrong/missing owner/tree/ref/hash/order/sequence and stale authority remain rejected;
+no legacy exemption, fingerprint-only comparison or broad field stripping.
 
-Keep immediate rejection ownership, generation guards, pending gate settlement
-and owned cleanup for all callers. Maintain diagnostic result`observed` versus
-accepted scenario result`passed`.
-No fire-and-forget persistence, promise-ignore/fake success, swallowed final
-diagnostic, extra click, retry or moved unbounded final writer.
-Preserve production2,000ms/5,000ms deadlines, normal page/I/O/capture/cleanup
-limits and the existing deterministic deadline seams; no global timer mock,
-new sleep, increased deadline or heap/concurrency flag may hide the problem.
-
-## Meaningful integration and deterministic regressions
-
-Exercise the actual `selectGeometricPoint` → pending wrapper →
-`createPointDiagnostics` → observe/report → pending retain/publication composition,
-using faithful measurement/state fixtures and ordinary asynchronous file writers.
-Tiny-checkout publisher tests, nine-boundary retainers or an immediate diagnose
-stub do not exercise the observed metadata size/nested queue path.
-
-Use a realistically large checkout with hundreds of separately hashed evidence
-entries, accumulated document/pack history and the same raw final/preparation
-shape. Share expensive immutable setup where appropriate; keep independent
-negative controls. Prove exact lossless raw/report/history replay and bounded
-metadata growth, including index/identity reference bytes, without duplicating
-the present125GB write pattern in a regression.
-
-Add controlled entered/release gates at the intended final diagnostic boundary,
-using its existing scoped scheduler seam or a narrowly owned seam at the real
-operation. Ordinary file I/O, measurements and image work retain normal deadlines.
-Assert deadline values and gate entry deterministically; do not charge expensive
-fixture construction to an arbitrary short real timer.
-Test success, queued freezing before mutation, controlled expiry, late fulfillment,
-late rejection, earlier native/assertion failure and cleanup failure.
-A metadata/identity corruption must fail strict parent replay, not get normalized
-away. Cover missing/wrong owner/identity/chunk/hash/order/sequence and both old/new
-authenticated representation paths if a schema is changed.
-
-After controlled expiry, release/drain every owned operation and assert no late
-running/pass/primary mutation, no orphan/unhandled rejection, stable failed/
-terminal authority and exact listener/modifier/UI/held-source cleanup.
-After success, final selection/preparation artifacts must be completely published
-and resolve before the helper returns. Keep the one trusted native gesture,
-state/history/source/request/current-owner invariants and real acceptance gates.
-
-Complete affected files and the registered full suite under normal settings.
-Record first outcomes, zero failures/cancellations/skips and complete counts.
-Diagnostic retries or isolated passes cannot replace repeatable full-suite or
-fresh browser verification.
+Keep compact producer/authority timing, absolute composed diagnostic guards,
+queued freezing, independent bounded failure-publication queue, immediate producer
+rejection ownership and immutable failed authority. Preserve all five ordered
+final selection/report/preparation publications and successful return only after
+complete validation/retention. Late work cannot rewrite failed authority or
+replace an earlier native Error/the actual timeout AggregateError.
+Retain the faithful large-checkout composition, expiry/late/error/corruption
+controls and recorded first failures/outcomes. The 851,936-byte/59.33ms regression
+establishes reduced authenticated metadata work, not an exclusive historical
+bottleneck or a fresh pending-download pass.
 
 ## Preserve completed cylinder fixes and independent references
 
@@ -295,7 +296,7 @@ The global20ms live-writer race was corrected with scoped scheduler control;
 preserve that fix. Deterministic freezing and owned verifier progress are now
 implemented and the first affected/full suites completed. The historical reviewer
 cancellation was not uniquely established or reproduced; do not claim a proved
-historical cause. The current native final-evidence timeout is a distinct blocker.
+historical cause. The current real-App stable-frame timeout is a distinct blocker.
 
 Keep explicit resolved preview schema (six dimensions, anchor, effective font
 context) separate from exact authored units/source/context.
@@ -352,14 +353,16 @@ byte validation, artifact inventories, raw-policy checks and runner copies.
 ## Fresh verification, review and handoff
 
 Use strict TypeScript without `any`, small separated helpers and no new dependency.
-Update both Phase32 docs to the observed final-evidence failure, measured
-metadata amplification, established ownership/optimization fixes and actual
-completed checks. Separate child EPERM, parent partial native success, new
+Update both Phase 32 docs to the current real-App stable-frame failure,
+established wait/ownership fixes and actual completed checks. Preserve the
+completed publication optimization and its authenticated offline measurements.
+Separate child EPERM, parent partial native success, new
 verification and independent review. Do not claim the historical verifier
 cancellation cause was proven or that the current operation already passed.
 
-Run focused publication/authentication/reader/report/deadline/pending-selection
-composition and strict parent-corruption/runner tests, plus preserved cylinder/
+Run focused App geometry/frame-wait/ownership/cancellation/full-workflow tests,
+publication/authentication/reader/report/deadline/pending-selection composition
+and strict parent-corruption/runner tests, plus preserved cylinder/
 scanning/placement/native/capture/association/pending/standalone regressions.
 Use Homebrew Node>=22.12.0 and normal project settings:
 
@@ -387,8 +390,10 @@ folded/subsp/singular cylinder and signed-polygonal/zero-axis cases; both ambien
 dimensions/native/live/standalone; both pending transparent/white workflows,
 full15-entry immutable click envelopes, actual downloads, external reopening,
 complete SVG/PNG/TikZ/source/reference/authority replay and no page errors.
-Final standalone must execute and pass. Do not reuse u4oMpK acceptance after edits
-or substitute its ten passed layout cases for a complete current run.
+Real-App-workflows and its native geometry controls must finish before that
+group completes. Final standalone must execute and pass. Do not reuse yWdc9n
+or historical u4oMpK partial acceptance after edits, or substitute either run
+for a complete current run.
 
 Preserve clean-tree rules; do not reset/stash/discard inherited work or commit.
 If child startup hits EPERM, record the exact failure/tree and continue through
@@ -400,9 +405,11 @@ Require complete reviewer/full-suite success and all current native/file gates.
 An incomplete/cancelled reviewer run or needs_changes blocks completion/commit.
 Keep the post-review matching-tree guard.
 
-Report the established cause and scoped publication/composition/ownership fix,
-meaningful regressions, authenticated metadata/timing results, exact changed
-files, first completed focused/full/browser outcomes, baseline failures and
-tree/report hashes. Show preserved source/reference identities separately.
+Report established findings, any proved App cause and any justified scoped fix,
+or a documented execution discontinuity and valid fresh run. State unresolved
+causes explicitly. Include meaningful regressions, authenticated wait/timing
+results, preserved publication measurements, exact changed files, first completed
+focused/full/browser outcomes, baseline failures and tree/report hashes.
+Show preserved source/reference identities separately.
 Phase32 remains incomplete until every required gate passes.
-Leave commit/push to the parent after verification and review.
+Do not commit or push; leave that decision to the parent after verification and review.

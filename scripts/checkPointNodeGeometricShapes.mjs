@@ -189,7 +189,7 @@ export async function runPointNodeGeometricShapeChecks({ browser, origin, artifa
   }
   async function select(id = 'app-point', boundary = false) {
     const rendered = await selectGeometricPoint({ page, readState: state, observePoint: observeGeometricPoint,
-      diagnose: (details) => selectionDiagnostic(group, scenario, details), secondaryErrors: pageErrors,
+      diagnose: (details, options) => selectionDiagnostic(group, scenario, details, options), secondaryErrors: pageErrors,
       scenario, sequence: ++selectionSequence, id, boundary, requireUnselected: !boundary })
     const beforeInspector = await state()
     const open = page.getByRole('button', { name: 'Open inspector drawer', exact: true })

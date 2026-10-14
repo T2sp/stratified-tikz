@@ -453,20 +453,23 @@ export async function prepareGeometricCanvasClick({ page, readState, observePoin
 /** Close an inherited Inspector through its real control before measuring.
  * Preserve primary native/assertion errors through bounded diagnostics/cleanup. */
 export async function selectGeometricPoint({ page, readState, observePoint, diagnose, secondaryErrors,
-  scenario, sequence, id = 'app-point', boundary = false, requireUnselected = false }) {
+  scenario, sequence, id = 'app-point', boundary = false, requireUnselected = false, scheduleDiagnosticDeadline }) {
   const token = `${scenario}:${sequence}:${id}`
   const observation = { scenario, sequence, id, clickKind: boundary ? 'boundary' : 'center', requireUnselected,
     preparation: { closeActions: 0 }, toolbarPreparation: { actions: [] }, toolbarRestoration: {}, secondaryErrors: [] }
   const failures = []
-  let primary, rendered, installed = false
+  let primary, diagnosticPrimary, rendered, installed = false
   const diagnostic = async (name, operation) => {
-    try { return await boundedPointDiagnostic(operation, `Geometric selection ${name}`) }
+    try { return await boundedPointDiagnostic(operation, `Geometric selection ${name}`, 2000,
+      name === 'final evidence' ? scheduleDiagnosticDeadline : undefined) }
     catch (error) {
       failures.push(error)
       observation.secondaryErrors.push({ name, message: error.message })
       secondaryErrors.push(`Geometric selection ${name}: ${error.message}`)
     }
   }
+  const evidence = (details) => (operation) => diagnose(details, { operation,
+    disposition: primary ? 'failed' : 'running', primary })
   try {
     const preparation = observation.preparation
     preparation.stateBefore = await diagnostic('state before preparation', readState)
@@ -493,7 +496,7 @@ export async function selectGeometricPoint({ page, readState, observePoint, diag
     }
     preparation.closed = await diagnostic('closed drawer', () => page.evaluate(observeGeometricSelection, { id, click: null, token: null }))
     preparation.stateAfter = await diagnostic('state after preparation', readState)
-    await diagnostic('preparation evidence', () => diagnose({ boundary: 'selection-prepared', observation }))
+    await diagnostic('preparation evidence', evidence({ boundary: 'selection-prepared', observation }))
     if (preparationPrimary) throw preparationPrimary
     assert.equal(preparation.closedDrawerCount, 0, 'Inspector drawer is detached before selection')
     assert.equal(preparation.openerCount, 1, 'Closed Inspector has one native open control')
@@ -507,7 +510,7 @@ export async function selectGeometricPoint({ page, readState, observePoint, diag
     }
     rendered = await prepareGeometricCanvasClick({ page, readState, observePoint, id, boundary, requireUnselected,
       preparation: observation.toolbarPreparation, diagnostic,
-      evidence: (stage) => diagnostic(`${stage} evidence`, () => diagnose({ boundary: stage, observation })) })
+      evidence: (stage) => diagnostic(`${stage} evidence`, evidence({ boundary: stage, observation })) })
     observation.rendered = rendered
     if (rendered.bodyOverflow) observation.clickKind = 'body'
     const click = boundary ? rendered.boundary : rendered.center
@@ -515,7 +518,7 @@ export async function selectGeometricPoint({ page, readState, observePoint, diag
     await page.evaluate(installGeometricSelectionObserver, { token, id }); installed = true
     observation.stateBefore = await diagnostic('state before canvas click', readState)
     observation.before = await diagnostic('before click', () => page.evaluate(observeGeometricSelection, { id, click, token }))
-    await diagnostic('before evidence', () => diagnose({ boundary: 'before-native-click', observation }))
+    await diagnostic('before evidence', evidence({ boundary: 'before-native-click', observation }))
     assertFreshGeometricClick(observation.before, rendered, click, boundary)
     assertUiPreserved(observation.toolbarPreparation.statePrepared, observation.stateBefore,
       observation.toolbarPreparation.prepared, observation.before, 'Fresh canvas click measurement')
@@ -526,10 +529,10 @@ export async function selectGeometricPoint({ page, readState, observePoint, diag
     try { await page.mouse.click(click.x, click.y) } catch (error) { primary = error }
     try { observation.stateAfter = await readState(); observation.selected = observation.stateAfter.selection } catch (error) { primary ??= error }
     observation.after = await diagnostic('after click', () => page.evaluate(observeGeometricSelection, { id, click, token }))
-    await diagnostic('after evidence', () => diagnose({ boundary: 'after-native-click-before-assertion', observation }))
+    await diagnostic('after evidence', evidence({ boundary: 'after-native-click-before-assertion', observation }))
     if (primary) throw primary
     assert.equal(observation.selected?.id, id, 'Native contour click selects its point')
-    if (failures.length) throw new AggregateError(failures, 'Geometric selection diagnostics failed')
+    if (failures.length) throw (diagnosticPrimary ??= new AggregateError(failures, 'Geometric selection diagnostics failed'))
     for (const snapshot of [preparation.inherited, preparation.closed, observation.before, observation.after]) {
       assert.deepEqual(snapshot?.errors, [], 'Selection snapshot completed without observation errors')
     }
@@ -576,7 +579,7 @@ export async function selectGeometricPoint({ page, readState, observePoint, diag
     try {
       await restoreGeometricCanvasToolbar({ page, readState, id, preparation: observation.toolbarPreparation,
         restoration: observation.toolbarRestoration, diagnostic,
-        evidence: (stage) => diagnostic(`${stage} evidence`, () => diagnose({ boundary: stage, observation })) })
+        evidence: (stage) => diagnostic(`${stage} evidence`, evidence({ boundary: stage, observation })) })
     } catch (error) {
       if (!primary) primary = error
       else {
@@ -588,11 +591,12 @@ export async function selectGeometricPoint({ page, readState, observePoint, diag
       try { assertGeometricToolbarPreparation(observation.toolbarPreparation, observation.toolbarRestoration) }
       catch (error) { primary = error }
     }
-    await diagnostic('final evidence', () => diagnose({ boundary: 'selection-finished', observation,
+    if (!primary && failures.length) primary = diagnosticPrimary ??= new AggregateError(failures, 'Geometric selection diagnostics failed')
+    await diagnostic('final evidence', evidence({ boundary: 'selection-finished', observation,
       ...(primary ? { primary: { message: primary.message, stack: primary.stack } } : {}) }))
   }
   if (primary) throw primary
-  if (failures.length) throw new AggregateError(failures, 'Geometric selection diagnostics failed')
+  if (failures.length) throw (diagnosticPrimary ?? new AggregateError(failures, 'Geometric selection diagnostics failed'))
   observation.events = observation.after.events
   rendered.nativeSelection = structuredClone(observation)
   return rendered

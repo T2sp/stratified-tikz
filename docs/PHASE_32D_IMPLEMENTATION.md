@@ -1,5 +1,171 @@
 # Phase 32D spacing, minima, anchors, and combined audit
 
+## Pending-selection publication and deadline ownership (2026-10-14)
+
+Actual clean entry is `6a4f5ab577a7d7d4fb28ff35dde059dc212550cc`, fingerprint
+`630cf6ca15ebb6398ff799b0d3274b7c5b169a4af67ca028d7c825c97c0eea64`.
+The parent prompt commit preserves the inherited work as tracked files. The
+implementation handoff SHA256 is
+`97250ff4d45f8ce0951f74165d8f83f0d39b5587262bc4753cdc4c339bdebb09`;
+all 571 filename/hash associations match current bytes before these scoped
+publication changes. Both additive evidence bundles and every production
+geometry/model/rendering/input/capture/TikZ/reference file are retained.
+
+The matching retained parent report `u4oMpK` (SHA256
+`2a983d1eed1dd7c20e665b37b87ae0379d65ad45ebff737e5a692c8a46dc187a`)
+matches before/after checkout `a31f594e…` and the handoff's exact 571-entry identity.
+`readEvidenceDocumentSync` authenticates its raw failed report: 16/18 completed
+groups, 17 started, 193 evidence records / 4,761 diagnostics, ten of twelve
+layout scenarios passed. Tests/build/diff/label-assets passed; free-labels failed
+in transparent pending preparation before export. White pending and final
+standalone were unexecuted. The child EPERM results remain separate from this
+partial parent native success and from any new verification.
+
+Resolved `point-layout-selection-0819`, `0821` and `0823` preserve the one trusted
+ordinary contour gesture at `(593.5371704101562,1134.83984375)`, fixed fraction
+`.23`, pointer 1, revision 461, no modifiers/dropped events, circle/current-owner
+targeting and unselected-to-`layout-circle` selection. Exact authoritative state,
+history, request and held source remain unchanged; Inspector closes natively
+and inherited expanded toolbar restores. The frozen `selection-finished` raw
+snapshot has no primary/secondary failure because capture preceded expiry.
+The outer failure subsequently records `AggregateError: Geometric selection
+diagnostics failed`, containing the 2,000ms final-evidence timeout and its
+secondary evidence. No failed contour hit or initial-render timeout is inferred.
+Preparation stays `observed`; after-native capture, terminal validation and SVG
+export did not execute. Modifier cleanup, held-source release to null and export
+listener release complete without errors as failure cleanup, not acceptance.
+
+The complete nested callback clones native observations, reads pending modifiers,
+publishes selection raw/report, then retains preparation raw/report/named artifact.
+Five ordered publications share one outer diagnostic and publisher queue. The
+retained index is 86,163,405 bytes for 859 documents and 2,810 boundaries.
+Checkout JSON alone is 98,708 bytes; document metadata is 85,180,407 bytes.
+Recorded 2,812 index writes total 125,417,437,237 bytes. Failure-adjacent
+2797/2798/2799 remain committed running records. Recorded 18–25ms index I/O
+excludes index serialization and does not establish an exclusive timeout cause
+or timestamp a commit after expiry. The fix measures producer start/deadline,
+clone/page stages and queue/encoding/hash/serialization/write/authentication/
+authority/report/retain completion or expiry before and after actual work.
+Progress is compact and bounded, associated with owner/token/generation/sequence.
+
+V2 retains one immutable complete checkout file authenticated by exact path,
+length and SHA256. All revision/diff/fingerprint and filename-to-hash entries
+remain; optional browser status is authenticated provenance and the complete
+four-field logical tree is compared strictly to the parent. Document identities
+reference that file. Immutable authenticated reference links retain the complete
+ordered historical pack prefix without copying it into every boundary. The
+reader authenticates every historical boundary, current pointer, linked chunk,
+pack and graph node before cumulative replay; declared v1 reports continue
+through their strict representation path. Unknown/missing/substituted identity,
+owner/tree/ref/hash/order/sequence and stale authority remain rejected. Raw
+values/order, immutable packs and chunked report arrays are unchanged.
+
+An owned absolute monotonic diagnostic deadline travels through the selection,
+pending wrapper, diagnostic factory, observe/report and preparation publications.
+Guards run before subsequent observation/checkpoint mutation, queued work,
+serialization-dependent authority transitions and atomic rename. A delayed timer
+cannot authorize an expired operation. Frozen queued values remain immutable.
+Failure publication has its own ordered queue, independent of a stalled success
+writer. Expired producer rejections are consumed without installing a premature
+publisher primary; separately bounded cleanup retains the actual thrown
+AggregateError. An earlier native/assertion Error retains object identity, and
+later cleanup/write errors cannot replace it. Repeated failure notification and
+late writer outcomes cannot rewrite existing failed authority. Success returns
+only after final evidence, validation and preparation retention finish. Production
+diagnostic 2,000ms / publication 5,000ms limits, ordinary page/I/O/image/cleanup
+limits and the one-gesture/download/capture contracts remain.
+
+The registered large composition regression uses 571 separately hashed evidence
+entries, 859 prior documents and 4,761 report rows, faithful fifteen-point native/
+measurement fixtures and ordinary asynchronous writers. It exercises the actual
+selection → pending wrapper → diagnostics → observe/report → retain path,
+success, enqueue freezing, controlled expiry/late fulfillment/rejection, earlier
+native/assertion failure, cleanup failure and strict identity corruption. The
+only controlled diagnostic clock owns the intended final boundary; expensive
+fixture construction and normal file work retain their normal budgets. All
+entered/release operations drain. Required publication ordering, raw/history
+replay, failed authority stability and listener/modifier/UI/source cleanup are
+asserted. These are deterministic helper checks, not new native acceptance.
+
+Initial integration outcomes are retained rather than replaced by retries:
+7 tests initially had one pass/six failures (fixture equality/current-artifact
+assumptions and a real failure-publication reference-chain race); the corrected
+7-test run had six passes/one failure exposing late rejection rewriting failed
+authority. A subsequent expanded eight-test run passed 8/8 with zero failures,
+cancellations or skips. First publisher checks passed 38/38; first ownership/
+pending/geometric checks passed 372/372, then expanded checks passed 377/377.
+Final affected/full/static/browser outcomes belong to the external handoff at
+`/private/tmp/stz-32d-pending-evidence-fix-20261014/`; these initial focused runs
+do not establish final-tree acceptance. Original four inherited lint findings
+and the separately reproduced `SvgDiagram` refs finding remain distinct from
+new-code checks; repository-wide lint is not claimed.
+
+The first complete parent/runner files finished **688 passed / four failed out
+of 692**, zero cancellations/skips. Three failures exposed v2's initial rejection
+of the authenticated browser-status field; the fourth retained a v1-only schema
+assertion. The canonical envelope now explicitly authenticates optional string
+status while comparing every logical identity field and all hashes; arbitrary
+additional identity fields remain rejected. The parent assertion checks v2.
+These failures and their first log remain in the handoff.
+
+The affected selection/publication/reader/native/capture/pending/standalone sweep
+completed **1,336/1,336**, zero failures/cancellations/skips. Preserved cylinder
+checks completed **154/154**. The final ownership/pending/geometric/composition
+files then completed **389/389**, and final publication/composition files
+**78/78**, including ten actual composition controls. Counts overlap. Final
+controls also cover rejection with timer delivery withheld, an ordinary writer
+failure just before expiry, and failed-index serialization crossing the deadline.
+Producer rejection immediately closes its generation and queued siblings; the
+composed caller installs its Aggregate/native primary under a new failure owner.
+Direct failure authority has a separately owned absolute 5,000ms budget, with
+guards before primary installation and the index rename. Pointer restoration
+and temporary cleanup errors retain the original error as primary. Selection
+diagnostic secondary records are separate from actual browser page errors.
+
+The first registered full suite completed **7,285/7,285**, zero failures,
+cancellations/skips/todos, in 818,096.090875ms. Its source changed while the
+last absolute-rejection controls were added: before fingerprint `4b7c936d…`,
+after `721981b1…`. The matching guard correctly rejects it as final-tree
+acceptance. A fresh strict runner must replay the entire expanded registered
+suite on the final frozen bytes; its exact outcomes/report and before/after
+identity are retained in `HANDOFF.json`, not inferred from this prior pass.
+
+The registered-suite composition measurement at that checkpoint uses a
+122,386-byte complete 571-entry checkout, 859 prior documents and 4,761 diagnostic
+rows. It retains 890 current documents / 935 boundaries in an **851,926-byte**
+index, one 122,482-byte authenticated identity and 54,609 bytes of immutable
+ordered reference metadata. Total index writes are 421,994,496 bytes, rather
+than reproducing the historical 125GB pattern. Index serialization is measured
+separately (1,157.653ms over that whole fixture); hash time is 21.399ms and queue
+wait 45.283ms. All five required final publications complete under one owner in
+44.309ms, with the original 2,000ms / 5,000ms deadlines. These are actual offline
+composition timings, not browser acceptance or an exclusive historical cause.
+
+Build, strict application TypeScript, thirteen script syntax checks and scoped
+recommended JavaScript new-code lint pass. Raw changed-file lint still reports
+the two exact inherited geometric-caller `no-unsafe-finally` findings; no rule
+is suppressed. The four original frozen-HEAD findings (those two, verifier
+`_role`, and `layers.test`'s unused import) and the separately reproduced
+`SvgDiagram` refs finding remain distinct. The first lint run's three new
+findings were corrected and retained as first outcomes. The current v2 reader
+also strictly resolves the actual retained v1 parent report with all 571 old
+identity entries, 193 records / 4,761 diagnostics and no top-level page errors.
+
+Both fresh configured direct browser commands fail at `listen EPERM 127.0.0.1`
+before Chrome on unchanged fingerprint `af12d57b…`. Those startup records precede
+the last ownership changes and do not verify the final tree. They establish no
+new native/download acceptance. Final strict child and browser-capable parent
+results, exact source inventory, preserved reference identities and all log/report
+hashes belong to `/private/tmp/stz-32d-pending-evidence-fix-20261014/HANDOFF.json`.
+
+Phase 32 remains **incomplete**. All eighteen groups, twelve named scenarios,
+both ambient dimensions, both immutable fifteen-entry pending downloads and
+final standalone must pass fresh strict parent verification on actual changed
+bytes. Only then may fresh independent read-only completion review run, followed
+by a matching-tree guard. Missing/cancelled/failed checks or `needs_changes`
+block completion/commit. The historical reviewer cancellation cause remains
+unproven. No completion review, commit or push is claimed here.
+
 ## Cylinder construction, scanned dimensions, and verifier progress (2026-10-13)
 
 This fix starts at clean HEAD `afe1bd642f8bf5a97671c0ade2b3a2c5565ffcbf`,
