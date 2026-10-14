@@ -1,251 +1,220 @@
-# Phase 32D Fix for the real-App stable-frame deadline failure
+# Phase 32D Fix for PGF diamond aspect arithmetic and signed ellipse traversal
 
 ## Objective and scope
 
-Authenticated metadata sharing and absolute deadline ownership are implemented
-across the complete pending-selection publication path. The fresh matching tree
-passed 7,291/7,291 tests, build, strict TypeScript, scoped new-code lint, syntax
-and diff. Do not repeat those fixes or the completed cylinder/freezing fixes.
+The App wait follow-up fixed two reproduced helper defects: browser frames could
+be accepted after the inner deadline, and cancellation could miss late wait
+registration. Precise stage/probe timing, immutable entry evidence and bounded
+original-document cleanup are implemented. Authenticated pending-selection
+publication and absolute deadline ownership are also implemented. Preserve these
+fixes; neither historical native timeout's exclusive cause is established.
 
-The latest browser-capable parent passed tests/build/diff/label-assets, then
-free-labels failed earlier in `real-App-workflows`:
+The latest matching browser-capable parent now passes all required checks,
+including all 18 cumulative groups, all 12 layout scenarios and both actual
+pending downloaded/reopened exports. Independent completion review then returned
+`needs_changes`: Critical 0 / Medium 2 / Low 0, `ready_to_commit: false`.
+The two production conformance defects are the active blockers:
 
-~~~text
-Error: Timed out after 2100ms during App stable frame wait
-    at Object.expire (scripts/pointCheckDiagnostics.mjs:31:17)
-    at Timeout.<anonymous> (scripts/pointCheckDiagnostics.mjs:77:85)
-~~~
+1. Diamond fitting uses ordinary division instead of PGF's scanned aspect inverse,
+   changing contour height and north-anchored placement for supported small aspects.
+2. Mixed-sign ellipse radii reverse SVG traversal, changing direction-sensitive
+   dashed paint relative to PGF and the sampled contour.
 
-Diagnose this owned App geometry/frame wait and fix an established defect,
-preserving its existing acceptance and deadlines. An established execution
-discontinuity may instead require a valid fresh run; do not invent a code defect
-or relax absolute deadlines to accept a suspended run.
-The historical pending-selection timeout's exclusive bottleneck remains unproven.
-The new App failure does not establish that the
-publication fix regressed, nor that production geometry, scrolling, renderer
-frames, transport, timer delivery or host event-loop blocking caused the timeout.
-Distinguish the actual wait failure from those hypotheses before changing code.
+Fix these two reproduced defects in small shared pure geometry helpers, plus
+meaningful independent references, rendering/export regressions, necessary runner
+copies and Phase 32 status documentation. Do not repeat the completed App wait,
+publication, freezing, signed-axis or cylinder fixes. No model/saved schema,
+parameter-range, authored-option, UI/input, style, dependency or broad capture/
+TikZ-generation rewrite is justified. Keep the existing aspect range 0.01–100.
 
-Scope edits to the real-App stability wait, its diagnostic/ownership/cancellation
-composition, compact evidence needed to establish this boundary, meaningful
-regressions, necessary runner dependency copies and Phase 32 status documentation.
-No production geometry, model/schema, PGF reference, rendering, input, capture
-or TikZ change is justified by the current evidence. Any additional scope must
-follow a reproduced, authenticated cause, not this host timeout alone.
-Preserve every required observation, exact checkout/raw/file authentication,
-current native gesture and pending-download acceptance contract.
+Read `AGENTS.md`, the paired implementation/review prompts and both Phase 32 docs.
+Authenticate the latest handoff, review manifest and source/artifact hashes.
+Resolve published parent evidence with `readEvidenceDocumentSync` and its complete
+exact checkout; do not treat a pointer as the raw observation.
+Phase 32 remains incomplete because of `needs_changes`, despite complete parent
+browser acceptance. All checks and independent review must be fresh after source
+edits, followed by a matching-tree guard. No commit or push.
 
-Read `AGENTS.md`, implementation/review prompts and both Phase 32 docs.
-Resolve latest published artifacts with `readEvidenceDocumentSync` and their
-complete exact checkout. Ordinary App diagnostic/lifecycle JSON is separate from
-published pointer JSON; do not treat a pointer as the raw observation.
-Phase 32 is incomplete; fresh verification before independent review and the
-post-review matching-tree guard remain mandatory. No commit or push.
+## Latest handoff, accepted parent and rejected review
 
-## Latest implementation, parent and exact identity
+Latest App implementation handoff:
+`/private/tmp/stz-32d-app-wait-fix-20261014/HANDOFF.json`.
+Bytes: 33,191. SHA256:
+`a525e18e9cbeb5058d7b4369a5e02705af2da08db9e00be1dc3421556cfde378`.
+Its native-pending status predates the subsequent complete parent execution;
+retain that immutable handoff and record the newer result separately.
 
-Latest authenticated implementation handoff:
-`/private/tmp/stz-32d-pending-evidence-fix-20261014/HANDOFF.json`.
-Bytes: 910,802. SHA256:
-`c1173a218d922d0ee46aae2f1b372eff61b922b2d98c78c3ae18af3f6957b9ac`.
-Use its exact 16-file inventory and hashes, final registered-suite result,
-strict child report, preserved reference manifests and recorded first outcomes.
+Latest parent verifier response:
+`/var/folders/vk/7kf940pd4bx8f6cg3rzlmtc80000gn/T/stz-phase-verifier-DOqrfo/response.json`.
+SHA256: `af5bed781225c8536725e3aca302236db1a1e8d948d4d843721d411866bee881`.
+Latest parent verification report:
+`/var/folders/vk/7kf940pd4bx8f6cg3rzlmtc80000gn/T/stz-phase32d-before-review-KZ5KP9/verification.json`.
+SHA256: `8369c139f29dd306724dda5e37f1303d2768ecb8cdedd6a59cc26262e8c46bf1`.
+Parent free-labels artifact directory:
+`/var/folders/vk/7kf940pd4bx8f6cg3rzlmtc80000gn/T/stz-phase32d-before-review-KZ5KP9/05-check-free-labels/artifacts/`.
 
-Current parent verifier handoff:
-`/var/folders/vk/7kf940pd4bx8f6cg3rzlmtc80000gn/T/stz-phase-verifier-P19JEq/response.json`.
-SHA256: `3f376bc169a671f9c98f7af1b5ace321cd4421ed4bacba7c8d4792468ae97722`.
-Current parent report:
-`/var/folders/vk/7kf940pd4bx8f6cg3rzlmtc80000gn/T/stz-phase32d-before-review-yWdc9n/verification.json`.
-SHA256: `52f413b7abf43c6f151062f21cee05ad770ff6e3d1d9b7ed0d94df052a959f86`.
-Current free-labels artifact directory:
-`/var/folders/vk/7kf940pd4bx8f6cg3rzlmtc80000gn/T/stz-phase32d-before-review-yWdc9n/05-check-free-labels/artifacts/`.
-Strict child report:
-`/var/folders/vk/7kf940pd4bx8f6cg3rzlmtc80000gn/T/stz-phase32d-manual-hT0kf0/verification.json`.
+Latest independent review summary: `logs/codex/32D-review-summary.json`.
+SHA256: `a29a114135cfc4b2ec8d6302db2e7d1fceb4e25497275c6f9413f57c26faf212`.
+Full review: `logs/codex/32D-review.log`.
+SHA256: `1def5ecd9293e6d8df0b11956ea3b359b1e396a2e415666a76dd3721bb5f2731`.
+Independent reproduction manifest:
+`/private/tmp/stz-32d-review-pgf/manifest.json`.
+Bytes: 4,985. SHA256:
+`8cd2592e5084d3d38f71fd568659951575ea19d08eab1dd7550401f267151a48`.
+All 18 declared artifact/source hashes match current bytes. Retain the original
+PGF input/log/raw geometry, solver observations, SVGs/PNGs, renderer probes,
+commands, engine/version and hashes unchanged as pre-fix evidence.
+Before source edits, retain authenticated copies of the reviewed source bytes,
+with original-path to retained-path/byte/hash associations. Keep new source and
+reference identities separate from that immutable reproduction manifest.
 
 Branch: `phase/32d-margin-minsize-anchor`.
-HEAD: `6a4f5ab577a7d7d4fb28ff35dde059dc212550cc`.
-Before this prompt edit, the checkout matches both latest handoff and current
-parent before/after:
+HEAD: `129bccd8119f313b6902fa9ae948f3b216aa4dda`.
+Before this prompt edit, handoff, parent before/after and review manifest all match:
 
 ~~~text
-4f2a45e43929b82c25f558a38909dc2b5aaef658d1f94a6a61dfa9a175b17fe7
+8443f980f600cd365fd8f93b8af2946542012f486a201fae67bd83adae362396
 ~~~
 
 Tracked-diff SHA256:
-`3659da351d555965a63d83b72e4cecb63781fda57fc2c0e3b3b56257cee4e609`.
-The one untracked file is `tests/scripts/pendingSelectionPublication.test.mjs`,
-SHA256 `043b88328beb7dd8f842d99d140d34da81230a2f570b2837c8ea00dd8819becd`.
-Preserve all 15 modified tracked files plus that untracked file. The handoff's
-`finalSourceInventory.inventorySha256` is
-`e079701bf4deb8d331c1ee29ad9255cd291ae513594435787c9ea572b0d428f2`.
-All 16 current source bytes match that inventory before this prompt edit.
+`f21606a0fabebfba237d6f1df3143ce4d44db27954a9fd4eeb62e95854d6ca6c`.
+The handoff's nine-file source inventory has six modified tracked files and three
+untracked files, inventory SHA256:
+`50dd2b247566b81fa7599f8a94e0fe00bf973344d28a6b1cd92bf5c7e2f9b0e2`.
+Retain its exact path/byte/hash entries as the authenticated baseline. Preserve
+the inherited implementation; record necessary documentation/test-registration
+updates and new source identities separately. Untracked identities are:
 
-The parent tracked the earlier 26 modified and 571 untracked files at HEAD.
-Those inherited files are no longer 571 current untracked files. All 571 retained
-filename/hash associations, 562 additive evidence hashes and 654 original
-reference hashes still match; do not reset/drop/replace inherited work.
-The original 110 cylinder-domain files remain retained predecessors.
-Prompt edits change identity; all new gates must capture actual tracked and
-untracked bytes rather than reuse this fingerprint.
+~~~text
+tests/scripts/appGeometryAppCaller.test.mjs
+  215e5c36298a47a033865ad8e54200b8e7207dcb943452ffca50e569c0c58300
+tests/scripts/appGeometryWaitFixture.mjs
+  865ef3662b38519fccf496aa88157d0d894713e4359ef2a42609305dc9bf7414
+tests/scripts/appGeometryWaitOwnership.test.mjs
+  acdc2482eb3d436e20d13b25cb7589e33484327ab647d22378f182a55e95ba99
+~~~
 
-| Evidence | Actual result |
+All nine handoff files match before this prompt edit. The earlier 16-file
+publication inventory is inherited at HEAD; those are not current untracked
+files. All 571 inherited associations, 562 additive evidence files and 654
+original references remain preserved. Do not reset/stash/drop inherited work.
+Prompt/source edits change identity: every new gate must capture actual tracked
+and untracked bytes, not reuse the preceding fingerprint.
+
+| Evidence | Actual result on the preceding tree |
 | --- | --- |
-| Matching implementation checks | 7,291/7,291 full tests, zero failures/cancellations/skips/todos; build, strict TypeScript, scoped new-code lint, syntax and diff passed. Earlier focused counts overlap; do not add them. |
-| Offline large composition regression | 571 checkout entries, 859 prior documents, 4,761 diagnostic rows; 851,936-byte index. All five required publications completed in 59.331917ms with 2,000ms/5,000ms limits. This is helper evidence, not native acceptance or a proved historical cause. |
-| Inherited debt | Four original lint findings plus one inherited `SvgDiagram` finding remain separately recorded. Repository-wide lint was not claimed. |
-| Child browsers | Both commands hit localhost `listen EPERM` before Chrome; no current child native acceptance. |
-| Matching current parent | npm test 7,291/7,291, build, diff and label-assets passed. Free-labels failed at real-App-workflows; checkout unchanged before/after. |
-| Current cumulative browser evidence | 13/18 groups completed, 14 started; 123 evidence records, 348 diagnostics, 377 checkpoints; zero top-level page errors. App initial-valid, invalid-pending and invalid-fallback observations passed before the failure. |
-| Current acceptance gaps | real-App-workflows is incomplete. Settled standalone export, point paint/import/persistence, geometric shapes and combined layout groups were unexecuted. Neither layout pending workflow nor final standalone has current acceptance. |
-| Review/status | Fresh independent completion review has not started. Phase 32 remains incomplete; no commit or push. |
+| Frozen implementation | 7,344/7,344 tests; build, strict TypeScript, scoped lint, syntax and diff passed. Focused App 102/102, publication/policy/runner 1,550/1,550 and preservation 868/868; counts overlap. |
+| Child browsers | Both configured commands hit localhost `listen EPERM` before Chrome. Child startup did not establish native acceptance. |
+| Matching parent KZ5KP9 | npm test 7,344/7,344, build, diff, label-assets and free-labels all passed; exact checkout unchanged. |
+| Authenticated parent browser replay | 18/18 groups started and completed, 205 evidence records, 4,907 diagnostics, zero page errors. All 12 named layout scenarios and final standalone passed. Both pending exports retain 15-entry immutable envelopes, actual downloads and clean external reopening. |
+| Independent review | `needs_changes`, Critical 0 / Medium 2 / Low 0. Reviewer full tests 7,344/7,344; focused geometry 401/401 and diagnostics 72/72; build/strict TypeScript/scoped lint/syntax/diff passed. Matching parent artifacts were inspected and accepted. No checkout files changed. |
+| Lint debt/status | Five inherited findings reproduced separately; repository-wide lint was not run. The two production findings still block completion/commit. No commit or push. |
 
-Historical parent `u4oMpK` and verifier `QBA9vY` belong to the previous checkout:
-16/18 groups completed, ten of twelve layout scenarios passed, then transparent
-pending preparation failed at geometric selection final evidence (2,000ms).
-Retain its immutable pre-expiry observation and later failure/cleanup records.
-Its native success does not accept the new tree. Do not describe its layout
-failure or ten passed scenarios as the current parent's results.
+Historical `yWdc9n`/`P19JEq` failed in App stability, and older `u4oMpK`/`QBA9vY`
+failed during pending selection evidence. Preserve their partial outcomes and
+unresolved causes as history, not current missing-browser gates. The complete
+App evidence is in the raw cumulative report; `app-workflows.json` is absent even
+in the successful parent and its absence is not an acceptance gap by itself.
+KZ5KP9's complete prior-tree acceptance cannot accept upcoming geometry changes.
 
-## Establish the current App failure boundary
+## Diamond: reproduce PGF's scanned aspect inverse
 
-Authenticate and resolve `free-labels-evidence.json`, then inspect
-`app-failure.json`, `app-lifecycle.json`, `app-geometry-index.json`, the retained
-`app-geometry-*.json`, persistence artifacts and owned-server records.
-`app-workflows.json` is absent: failure occurred before the full App workflow
-returned. Preserve that absence as an incomplete gate, not inferred success.
-The stage is `valid-again-pending` for source `$\mathord{\mathrm{i}}$`.
-`app-geometry-0068.json` proves the wrapped `geometry()` stable boundary already
-passed in 54.877292ms. `app-geometry-0069.json` retains primary failure afterward.
-The failing wait is an unwrapped later `waitForStableAppGeometry`: either the
-pointer helper at `checkFreeLabelsApp.mjs:211` or the final stage wait at `:269`.
-The records do not identify which probe/wait. Trace both actual call sites and
-retain stage/probe identity for every wait without removing native assertions.
+The independent PGF 3.1.11a reproduction uses fixed body width/height/depth
+20/8/3pt, inner x/y separation 1.5pt, outer separation 0, minima 1pt and supported
+`aspect=0.01`, anchor `north`. PGF north distance is 1170.06155pt; production gives
+1157pt, a 13.06155pt error. The manifest and raw files also retain neighboring
+aspects. Inspect the actual source rather than fitting a constant to this case.
 
-These snapshots retain exact pending source/request/bounds and owner
-`["free-label",1,"app-label"]`, original URL/document generation/API identity,
-visible/focused document, live frame observer, no Inspector or animations.
-App errors/dropped errors are zero; last recorded edit advances past history
-from two to three entries. Do not infer full current model state or held-request
-counts at failure: those were not captured. The earlier pending predicate passed.
-All 69 App geometry captures have zero dropped events/samples and diagnostic
-errors. Disposed diagnostics record `pendingEvaluation=false`; lifecycle records
-page close and no secondary capture/cleanup errors were logged. Cancellation's
-actual outcome remains unrecorded, so these facts do not prove wait-token cleanup.
+Current duplicate formulas are in `src/geometry/pointNodeShapes/solve.ts:92–93`
+and `anchors.ts:458–459`. The north axis uses `x / aspect` in both paths.
+PGF's `\pgfsetshapeaspect` in `pgflibraryshapes.geometric.code.tex` instead scans
+`aspect pt`, performs the `.125` dimensional multiplication, converts scaled
+points to an integer count, divides `8192pt` by that count and prints the saved
+inverse. Subsequent dimensional products/additions have their own TeX scanning
+and truncation order. Plain JavaScript reciprocal/division and the existing
+`pgfReciprocal` helper are different algorithms; do not substitute one without
+independent stage equivalence.
 
-The current v2 publication index has failed disposition, sequence zero and no
-documents/history/boundaries, with this App timeout as primary. The latest browser
-run never reached layout publication. Earlier native point transparent/white
-checks passed; they are distinct from unexecuted combined-layout pending cases.
+Implement one narrowly shared pure diamond-fitting helper used by paint and
+anchor construction. Reproduce the supported PGF sequence, scalar/dimensional
+quantization and `unitScale` behavior. Preserve independently applied width and
+height minima after aspect fitting. Keep outer-clearance anchor axes separate
+from the documented diamond background subtraction of `1.414213 * outerSep`.
+The accepted outer-separation exception is not this aspect defect; do not remove
+it, apply it to other shapes or recover signed axes from sorted paint bounds.
+Keep currently supported named/numeric anchors and text/base/mid placement
+consistent with the same fitted geometry, including attached/free/inline labels,
+both ambient dimensions and settled SVG. Preserve unsupported text-side anchor
+diagnostics; do not expand the support map as part of this arithmetic fix.
+TikZ must retain the user's authored aspect/options instead of compensating for
+preview arithmetic in generated source.
 
-The App stable helper is in `scripts/appGeometryDiagnostics.mjs` and its callers
-are in `scripts/checkFreeLabelsApp.mjs`. The browser timer is 2,000ms; the host
-`boundedPointDiagnostic` budget is 2,100ms; token-specific cancellation is bounded
-at 250ms. The shared diagnostic's absolute monotonic completion/rejection guards
-now reject expiry even when the timer callback is delayed. Preserve that correct
-ownership behavior; do not make delayed timer delivery authorize late success.
-The supplied stack reports the host timer expiry. Determine browser evaluation,
-inner timer/frame outcome, host completion and cancellation timing separately.
+Add additive authenticated independent PGF stage/path/anchor references for
+small and neighboring aspects, including .01, .03, .1, .2, .6, 1.1 and 100.
+Cover independent minima, asymmetric/signed separation, zero/empty bodies and
+scaled units with exact inputs, PGF source/engine/command/units and artifact hashes.
+The reference generator must not import the production solver or use production
+values as its oracle. Verify both fitted axes/paint and every supported anchor
+category/placement. A control restoring the old analytic division must fail.
+Use the existing 0.025pt anchor and 0.03pt contour tolerances; no widening or
+rewriting inherited expected data to hide the mismatch.
 
-Measure host monotonic start/deadline/callback entry/settlement/timer delivery,
-browser wait entry/frame samples/inner deadline/settlement, document generation,
-URL/API/current source/request/status, and cancellation/drain. Correlate clocks
-explicitly; do not subtract browser and host performance.now values as one clock.
-The retained `0068` completed -> `0069` failure deltas are:
+## Ellipse: retain signed traversal when encoding SVG arcs
 
-| Clock/observation | Actual delta |
-| --- | --- |
-| Host wall | 1,448,062ms |
-| Host monotonic | 1,448,119.216834ms |
-| Browser snapshot wall | 1,448,068ms |
-| Browser performance.now | 1,863.5ms |
-| Browser observer frames / last-frame timestamp | +101 / +1,866.6ms |
+The independent reviewed `ellipse-mixed-axes` case has body 20/8/3pt, inner
+separation -30/+2pt, minima -2/-5pt and outer separation 0. Its signed fitted
+axes are (-1, 10.6066017). With stroke width .4pt, dash array `2 5`, SVG dash offset
+-2.7, 800×800 rendering of viewBox `-40 -40 80 80` and dark threshold 128,
+production and PGF each have 480 dark pixels but differ at 298 positions.
+Changing only the two SVG sweep flags gives zero mismatches; corrected PNG bytes
+have exactly the independent PGF PNG hash. Preserve those original/control files.
 
-These endpoints bracket the remaining `inspectStage` work; they do not timestamp
-the failing wait's entry or identify which native probes ran.
-They do not establish continuous unstable frames or prove
-device suspension, clock behavior, event-loop blocking or transport delay.
-Establish the actual wait intervals and execution continuity before assigning
-cause to geometry, instrumentation, serialization/I/O, renderer inactivity or
-host work. Record missing observations honestly. Preserve absolute expiry when
-host execution resumes; an inner/browser clock cannot silently extend ownership.
+`ShapeContourBuilder.arc` in `src/geometry/pointNodeShapes/contours.ts:91–92`
+currently chooses sweep from parameter direction alone. One negative radius
+reverses orientation; account for axis signs and forward/reverse parameter
+traversal under the existing PGF-to-SVG coordinate transform and border rotation.
+Retain signed analytic axes, start point/endpoints, ordered vertices, bounds,
+anchors and sampled picking contours. Absolute magnitudes, if used, belong only
+in SVG arc radius operands. Do not globally abs axes, reverse sampled vertices,
+change the start angle, dash pattern/offset, source style or anchor placement.
 
-Add compact bounded progress only at the real wait/producer boundaries as needed.
-Retain pre-assertion/failure evidence independently of an unresponsive renderer.
-Instrumentation must not repeatedly clone or publish the whole accumulated
-report under the stable-frame deadline, recursively capture itself or introduce
-unbounded work. Use token/generation/sequence associations and explicit caps.
-A host deadline failure is not a top-level browser `pageerror`.
+Test all four nonzero radius sign combinations, positive/reversed partial sweeps,
+full split arcs, rotation/translated centers, multiple dash phases and appropriate
+caps/joins/solid/fill controls. Compare ordered quarter endpoints/tangents or
+cumulative traversal, plus actual independent PGF-token SVG/PNG paint.
+Equal bounds, orderless contour distance and dark-pixel counts miss this defect.
+Keep an explicit old-sweep negative control and a global-abs-axis control.
+The existing mixed-sign test's blanket sweep-zero invariant must be replaced
+with independently justified direction cases, not wholesale expected-path edits.
 
-## Preserve App stability and owned cleanup
+Exercise the shared contour.path through actual live and detached settled SVG
+rendering/export in 2D and 3D, with authored styles/dashes and unchanged model,
+history, coordinates, projection and TikZ. Preserve zero-axis ordered retracing,
+quarter extrema, stroke length/closure/no-fill behavior, signed rectangle/ellipse
+anchors and picking, magnitude-only sample density, 0.005 precision and the
+2048 finite-work budget. Check folded/signed cylinder arcs, seams/end/body order
+and custom fill because they share the path builder. No broad shape rewrite.
 
-Stable acceptance requires three consecutive exactly equal comparison snapshots.
-Preserve generation/URL/API continuity, original source/request/state/bounds,
-connected finite node rects and CTMs, node identity, layout/scroll, ancestors,
-Inspector, camera, viewBox and viewport. Keep the existing frame/sample/wait-map
-budgets. Do not loosen comparison fields/tolerances, return an earlier snapshot,
-force a native action, add sleeps/retries or focus/reload/reacquire a replacement
-page to manufacture acceptance. Native scroll and pointer/history/source checks
-must retain their normal production paths and deadlines.
+## Preserve completed wait and publication fixes
 
-Preserve the browser's inner 2,000ms wait, host 2,100ms bound, 250ms cancellation,
-2,000ms ordinary diagnostics, 5,000ms publication and existing normal App action,
-page/I/O/image/cleanup limits. No larger timeout, global clock mock or new heap/
-concurrency flag may hide the failure. If a defect is established, fix the
-unnecessary work or ownership defect at its actual boundary while retaining
-strict stable acceptance. Otherwise retain unresolved causes or an established
-execution discontinuity explicitly and obtain valid fresh acceptance.
+Retain three exactly equal App comparison snapshots, original generation/URL/API,
+source/request/bounds/node/CTM/layout/scroll/camera/viewBox/viewport invariants,
+absolute browser deadline checks and exact-token cancellation fences for late
+registration. Keep immediate initial/late evaluation ownership, immutable entry/
+terminal stage/probe evidence, bounded original-document drain and first Error
+retention through failure/cancellation/cleanup. Preserve scoped entered/release
+regressions and all original native controls. No sleeps, retries, force actions,
+observer restart, global clock mock or relaxed readiness may mask a regression.
 
-Own initial browser evaluation and both late outcomes immediately. Expiry must
-close the success generation, consume late fulfillment/rejection and prevent a
-late running/pass checkpoint, App-group completion or replacement primary error.
-Cancel only the exact token in the original owned document; prove frame/timer/
-map/listener cleanup when responsive, and separately bounded host cleanup when
-unresponsive. Do not revive a stopped observer or restart its ownership lease.
-Retain the first native/assertion/timeout Error through diagnostic, cancellation,
-write and cleanup failures. Finish owned listener/event/page/browser/server
-cleanup without allowing it to stand in for successful workflow acceptance.
-
-## Meaningful regressions and preserved publication fixes
-
-Exercise the actual host helper -> browser frame wait -> snapshot/comparison ->
-App caller -> failure/cancellation/cleanup composition. Existing successful frame
-or standalone diagnostic stubs do not reproduce this composed boundary.
-Use controlled entered/release gates and an operation-scoped clock/scheduler
-seam; ordinary setup, file I/O, image and native work keep their normal budgets.
-Register new tests in the explicit `package.json` test list if needed.
-
-Cover exact stable success before return; changing geometry/node identity/source/
-request resetting the three-frame count, followed by genuinely stable snapshots;
-no frames; missing/nonfinite targets; original URL/API/generation loss;
-stopped observer; bounded sample/frame/map limits; host expiry with
-responsive cancellation and stalled cancellation; late fulfillment/rejection;
-inner failure versus host backstop; earlier native/assertion Error identity;
-cleanup failure; cancellation before browser wait registration; late registration
-after host expiry; and withheld host/browser timer delivery crossing absolute
-deadlines. Exercise clock discontinuity/late callback entry with deterministic
-owned seams, and distinguish the two clocks without changing production budgets.
-Control delivery/clock entry deterministically rather than charging expensive
-fixture work to a tiny real timer. Release/drain all gates; prove no orphan or
-unhandled rejection, no stale checkpoint/pass and exact cleanup/primary retention.
-Node helper controls cannot replace current native App acceptance.
-
-Keep the implemented v2 canonical immutable authenticated complete checkout,
-compact document references and ordered immutable pack-reference links.
-Preserve every logical identity field/hash, historical pack/path/length/hash/order,
-pointer/index/history agreement, raw values/order and strict declared-v1 replay.
-Wrong/missing owner/tree/ref/hash/order/sequence and stale authority remain rejected;
-no legacy exemption, fingerprint-only comparison or broad field stripping.
-
-Keep compact producer/authority timing, absolute composed diagnostic guards,
-queued freezing, independent bounded failure-publication queue, immediate producer
-rejection ownership and immutable failed authority. Preserve all five ordered
-final selection/report/preparation publications and successful return only after
-complete validation/retention. Late work cannot rewrite failed authority or
-replace an earlier native Error/the actual timeout AggregateError.
-Retain the faithful large-checkout composition, expiry/late/error/corruption
-controls and recorded first failures/outcomes. The 851,936-byte/59.33ms regression
-establishes reduced authenticated metadata work, not an exclusive historical
-bottleneck or a fresh pending-download pass.
+Keep browser 2,000ms / host 2,100ms / cancellation 250ms, ordinary diagnostics
+2,000ms / publication 5,000ms and normal App action/page/I/O/image/cleanup limits.
+Retain v2 complete-checkout authentication, immutable ordered pack references,
+strict declared-v1 replay, raw/history/pointer/index agreement, queued freezing,
+absolute producer/authority guards and independent bounded failed publication.
+Late outcomes cannot produce pass checkpoints or rewrite failed authority.
+All five ordered selection/report/preparation publications and complete retention
+before success return remain required. The offline 851,936-byte / 59.331917ms
+composition is preserved helper evidence, not exclusive historical-cause proof.
 
 ## Preserve completed cylinder fixes and independent references
 
@@ -281,7 +250,9 @@ Retain earlier67 empty-body,72 publication,61 correspondence,65 live-capture and
 Preserve actual DOM order/derived owner association, file-local contour/body/root/
 placement/paint proof, owner-bound CTM, full-stroke pixels, exact model/click/
 history and SVG/PNG/TikZ/file identities, owned capture and UI restoration.
-No production dependency, saved schema or reference change is needed.
+No production dependency or saved-schema change is needed. New independent
+references for the two conformance defects must be additive; preserve all
+inherited reference bytes and their original meaning.
 
 ## Preserve completed corrections and contracts
 
@@ -296,7 +267,8 @@ The global20ms live-writer race was corrected with scoped scheduler control;
 preserve that fix. Deterministic freezing and owned verifier progress are now
 implemented and the first affected/full suites completed. The historical reviewer
 cancellation was not uniquely established or reproduced; do not claim a proved
-historical cause. The current real-App stable-frame timeout is a distinct blocker.
+historical cause. The App wait fixes and complete matching parent native
+acceptance are retained; the two current conformance findings block completion.
 
 Keep explicit resolved preview schema (six dimensions, anchor, effective font
 context) separate from exact authored units/source/context.
@@ -352,19 +324,23 @@ byte validation, artifact inventories, raw-policy checks and runner copies.
 
 ## Fresh verification, review and handoff
 
-Use strict TypeScript without `any`, small separated helpers and no new dependency.
-Update both Phase 32 docs to the current real-App stable-frame failure,
-established wait/ownership fixes and actual completed checks. Preserve the
-completed publication optimization and its authenticated offline measurements.
-Separate child EPERM, parent partial native success, new
-verification and independent review. Do not claim the historical verifier
-cancellation cause was proven or that the current operation already passed.
+Use strict TypeScript without `any`, small separated helpers and no new dependency
+without explaining why. Register new tests in the explicit `package.json` list.
+Retain first completed outcomes, complete counts and any initial failures rather
+than replacing them with isolated retries. Do not add tests that only echo the
+new implementation; use independent PGF values and direction-sensitive paint.
 
-Run focused App geometry/frame-wait/ownership/cancellation/full-workflow tests,
-publication/authentication/reader/report/deadline/pending-selection composition
-and strict parent-corruption/runner tests, plus preserved cylinder/
-scanning/placement/native/capture/association/pending/standalone regressions.
-Use Homebrew Node>=22.12.0 and normal project settings:
+Update both Phase 32 docs for the latest complete KZ5KP9 parent, rejected review,
+two reproduced conformance defects, scoped fixes and actual new results.
+Keep child EPERM, historical timeout causes, implementation helper controls,
+complete prior native acceptance and new matching acceptance distinct.
+Do not claim either historical timeout's exclusive cause is established.
+
+Run focused diamond arithmetic/reference/anchor/placement and signed-ellipse
+contour/dashed-paint/live/settled-export tests, plus preserved signed/zero-axis/
+cylinder/scanning/domain, App ownership, publication/reader/authority,
+pending/standalone/native/capture/association and strict parent/runner controls.
+Use Homebrew Node >=22.12.0 and normal project settings:
 
 ~~~bash
 PATH=/opt/homebrew/bin:$PATH npm test
@@ -374,10 +350,11 @@ PATH=/opt/homebrew/bin:$PATH npm run check:label-assets
 PATH=/opt/homebrew/bin:$PATH npm run check:free-labels
 ~~~
 
-Run focused strict TypeScript, changed-code lint and script syntax/diff.
-Keep four original inherited lint findings and the separately reproduced
-inherited `SvgDiagram` finding distinct from new-code checks.
-Do not fix unrelated debt or claim unperformed repository-wide checks.
+Run strict TypeScript, changed-code lint and script syntax/diff. Keep four
+original inherited lint findings plus the separately reproduced `SvgDiagram`
+finding distinct from new-code checks. Do not fix unrelated debt or claim
+unperformed repository-wide checks. Preserve all original reference hashes and
+add a separate exact inventory for new independent artifacts.
 
 Run fresh browser-capable strict parent verification on actual changed bytes:
 
@@ -385,31 +362,31 @@ Run fresh browser-capable strict parent verification on actual changed bytes:
 PATH=/opt/homebrew/bin:$PATH node scripts/automation/run-phase.mjs 32D verify
 ~~~
 
-Require all18 cumulative groups and all12 named layout scenarios, including
-folded/subsp/singular cylinder and signed-polygonal/zero-axis cases; both ambient
-dimensions/native/live/standalone; both pending transparent/white workflows,
-full15-entry immutable click envelopes, actual downloads, external reopening,
-complete SVG/PNG/TikZ/source/reference/authority replay and no page errors.
-Real-App-workflows and its native geometry controls must finish before that
-group completes. Final standalone must execute and pass. Do not reuse yWdc9n
-or historical u4oMpK partial acceptance after edits, or substitute either run
-for a complete current run.
+Require all 18 cumulative groups and all 12 named layout scenarios, both ambient
+dimensions/native/live/standalone, folded/subsp/singular cylinder and signed/
+zero-axis cases; both transparent/white pending workflows with full 15-entry
+immutable click envelopes, actual downloads, external reopening, complete-root
+SVG/PNG/TikZ/source/reference/authority replay and no page errors.
+Real-App-workflows and its native geometry controls must return before group
+completion; final standalone must execute and pass. Include meaningful native/
+export coverage for the corrected diamond placement and dashed signed ellipse.
+Enforce added native evidence in parent policy or an existing required scenario's
+terminal inventory, with missing/mismatched controls; an exit-zero incomplete
+report must not accept the new conformance coverage.
+KZ5KP9 is complete preceding-tree evidence and must not be reused after edits.
 
 Preserve clean-tree rules; do not reset/stash/discard inherited work or commit.
-If child startup hits EPERM, record the exact failure/tree and continue through
-approved browser-capable parent execution without relaxing coverage.
-After every required check completely passes, obtain fresh independent read-only
-completion review using `prompts/phase-32d-review.md` on exact matching tracked/
-untracked bytes and inspect actual resolved reports/artifacts.
-Require complete reviewer/full-suite success and all current native/file gates.
-An incomplete/cancelled reviewer run or needs_changes blocks completion/commit.
-Keep the post-review matching-tree guard.
+If child browser startup hits EPERM, record the exact failure/tree and retain a
+handoff for the browser-capable parent without relaxing coverage. After all
+required checks pass completely, obtain fresh independent read-only completion
+review using `prompts/phase-32d-review.md` on matching tracked/untracked bytes and
+actual resolved reports/artifacts. The old `needs_changes` review is not a pass.
+Missing/incomplete/cancelled checks or review and new `needs_changes` block
+completion/commit. Keep the post-review complete matching-tree guard.
 
-Report established findings, any proved App cause and any justified scoped fix,
-or a documented execution discontinuity and valid fresh run. State unresolved
-causes explicitly. Include meaningful regressions, authenticated wait/timing
-results, preserved publication measurements, exact changed files, first completed
-focused/full/browser outcomes, baseline failures and tree/report hashes.
-Show preserved source/reference identities separately.
-Phase32 remains incomplete until every required gate passes.
+Report each reproduced cause, shared arithmetic/traversal correction, meaningful
+negative controls, independently authenticated references and actual renderer/
+native/file results. Include exact changed-file/artifact inventories, first
+focused/full/browser outcomes, baseline lint debt, preserved identities and
+new tree/report/review hashes. Phase 32 remains incomplete until all gates pass.
 Do not commit or push; leave that decision to the parent after verification and review.

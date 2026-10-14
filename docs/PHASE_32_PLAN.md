@@ -1,5 +1,83 @@
 # Phase 32 Plan: Point-node math, paint, geometric shapes, and layout
 
+Real-App stable-frame boundary and ownership follow-up (2026-10-14): actual
+clean entry is `129bccd8119f313b6902fa9ae948f3b216aa4dda`, fingerprint
+`10e1de4a37e885f5beffe73574ef313290bef87677f1b08512069c6cbd736145`.
+All sixteen inherited pending-publication handoff source files match that HEAD;
+all 571 retained filename/hash associations, 562 additive evidence hashes and
+654 original reference hashes match. These are preserved file inventories,
+not geometry-case counts. The actual entry differs from the prompt's earlier
+dirty identity; every new gate must capture current tracked/untracked bytes.
+
+The authenticated current parent `yWdc9n` passed 7,291 tests/build/diff and
+label-assets, then failed at `real-App-workflows` with the host's **2,100ms App
+stable-frame deadline**. Its raw report, resolved with `readEvidenceDocumentSync`
+and the complete exact checkout, has **13/18 completed groups, fourteen started**,
+123 evidence records, 348 diagnostics, 377 checkpoints and zero page errors.
+Initial-valid, invalid-pending and invalid-fallback App observations passed;
+`app-workflows.json` is absent. Settled standalone, point paint, geometric shapes
+and combined layout were unexecuted. Neither layout pending workflow nor final
+standalone has current acceptance. Historical `u4oMpK`/`QBA9vY` instead completed
+16/18 groups and ten layout scenarios before transparent pending publication
+failed on an earlier tree; those outcomes remain separate.
+
+At `valid-again-pending` for `$\mathord{\mathrm{i}}$`, geometry record `0068`
+proves the wrapped stable boundary passed in 54.877292ms; `0069` retains a later
+unwrapped stable-wait failure. The records cannot distinguish the pointer helper
+from the final-stage wait. Their comparison fields match at the endpoints, while
+host wall/monotonic advance 1,448,062ms/1,448,119.216834ms and browser wall/
+performance advance 1,448,068ms/1,863.5ms; frames advance 101. These are separate
+clocks and incomplete interval evidence. No production geometry, scrolling,
+renderer, transport, timer, host blocking, suspension or clock cause is proved.
+The first host expiry remains primary. Zero diagnostics drops/errors, disposed
+`pendingEvaluation=false` and owned page/server cleanup do not prove unrecorded
+exact-token cancellation. The latest failed v2 index has sequence zero and no
+committed documents/history; ordinary App raw JSON is separate from pointers.
+
+The scoped helper/caller changes retain three exactly equal snapshots and every
+original acceptance field, with browser **2,000ms**, host **2,100ms** and exact-token
+cancellation **250ms** limits. Compact bounded stage/probe/token records distinguish
+host entry/deadline/raw completion/timer/settlement from browser entry/frames/
+deadline/settlement and cancellation. Original-document cancellation fences a
+late registration; browser absolute checks reject late frames even when its
+timer delivery is withheld. Late outcomes remain owned and cannot create a pass
+or replace the first Error. Controlled composed regressions cover these actual
+ownership gaps without claiming they caused the historical timeout. No production
+or reference change is justified or included. Deterministic baseline controls
+reproduce the old helper accepting at 2,048ms with its 2,000ms timer withheld
+and cancellation-before-registration leaving an active wait; all control work
+is drained. These are helper defects, not the historical native cause.
+
+Current composed checks pass 102/102 (47 new ownership, six actual App caller
+controls plus preserved controls), and preservation checks pass 868/868; these
+counts overlap full tests. Build/strict TypeScript and scoped changed-code lint/
+syntax/diff pass. A fixed readiness poll initially outran ordinary fixture I/O;
+exact entered gates corrected that test defect without production budget changes.
+Entry and terminal wait artifacts are separate, and bounded late-record drain
+retains available/missing/unavailable timing from only the original document.
+The configured direct browser attempts hit localhost EPERM before Chrome after
+initial default imports lacked optional Playwright. Static label assets pass;
+native acceptance does not. Fresh frozen full/policy/runner/strict-verifier results
+remain pending here and will be retained in the handoff artifact directory.
+
+The preserved final publication measurement is **851,936 bytes / 59.331917ms**
+for all five ordered publications, with 571 checkout entries, 859 prior documents
+and 4,761 diagnostic rows under unchanged 2,000ms/5,000ms limits. It is authenticated
+offline composition evidence, not native acceptance or an exclusive historical
+bottleneck. The inherited matching child full suite passed **7,291/7,291** with
+zero failures/cancellations/skips/todos; its strict browser startup hit localhost
+EPERM before Chrome. Earlier inherited lint debt remains separately recorded.
+
+The [implementation audit](PHASE_32D_IMPLEMENTATION.md) and
+`/private/tmp/stz-32d-app-wait-fix-20261014/historical-boundary-audit.json` retain
+raw paths/lengths/hashes, complete exact identities, missing observations and
+preserved inventories. **Phase 32 remains incomplete**. Fresh full/static/browser
+verification of changed bytes, all eighteen groups/twelve named scenarios, both
+pending downloads and final standalone must precede independent completion review
+and the post-review matching-tree guard. Child EPERM cannot substitute for parent
+native acceptance; incomplete/cancelled review or `needs_changes` blocks completion.
+No commit or push occurred. Prior entries below remain historical records.
+
 Pending-selection publication and deadline ownership follow-up (2026-10-14):
 the actual clean entry is `6a4f5ab577a7d7d4fb28ff35dde059dc212550cc`,
 fingerprint `630cf6ca15ebb6398ff799b0d3274b7c5b169a4af67ca028d7c825c97c0eea64`.

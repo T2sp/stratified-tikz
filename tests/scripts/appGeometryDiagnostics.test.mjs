@@ -61,7 +61,7 @@ test('native pointer releases Alt within a host bound without replacing the fail
 function frameDocument(measure = snapshot, stalled = false) {
   const pending = new Map(), cancelled = [], window = { __stzAppGeometryDiagnostics: { snapshot: measure } }
   let next = 0, calls = 0
-  const globals = { window, Map, Number, JSON, Error, setTimeout, clearTimeout,
+  const globals = { window, Map, Number, JSON, Error, performance, Date, setTimeout, clearTimeout,
     requestAnimationFrame(callback) {
       calls++; const id = ++next
       if (!stalled) pending.set(id, setTimeout(() => { pending.delete(id); callback(calls * 16) }, 0))
