@@ -72,6 +72,12 @@ function candidates(input: ReturnType<typeof fixture>, local: Vec2, entry?: SvgP
 function picked(input: ReturnType<typeof fixture>, local: Vec2, entry?: SvgPointNodeCommit, displayScale = 1) {
   return candidates(input, local, entry, displayScale).some(({ id }) => id === input.point.id)
 }
+function anchorClearanceWithoutDashPaint(point: PointStratum) {
+  const paint = getPointPaint(point.style)
+  return pendingSvgPointNodeLayout({ ...point, style: { ...point.style, paint: { ...paint, stroke: {
+    ...paint.stroke, lineStyle: 'solid', dashPattern: undefined, dashPhase: 0, lineCap: 'butt', lineJoin: 'miter',
+  } } } }).anchorClearanceBounds
+}
 
 test('reported dashed square triangle cap paint survives pending, committed, responsive and selection geometry', async () => {
   const input = fixture()
@@ -85,7 +91,8 @@ test('reported dashed square triangle cap paint survives pending, committed, res
   // measurements, not values obtained from the production stroke helper.
   close(pending.paintedBounds.minY, -29.65625, 1 / 16)
   close(pending.selectionRadius, 30.3804328989, 2 / 16)
-  assert.deepEqual(pending.anchorClearanceBounds, pending.paintedBounds)
+  assert.deepEqual(pending.anchorClearanceBounds, anchorClearanceWithoutDashPaint(input.point),
+    'PGF anchor clearance does not follow square dash cap paint')
   for (const state of [undefined, entry]) for (const scale of [.5, 1, 2]) {
     for (const local of [{ x: 0, y: -24 }, { x: -6, y: -28 }]) assert.equal(picked(input, local, state, scale), true)
     for (const local of [{ x: 0, y: -45 }, { x: 45, y: 0 }, { x: -45, y: 0 }, { x: 0, y: 45 }]) {
@@ -470,7 +477,8 @@ for (const observation of productionObservations) {
     const entry = await committed(input.point)
     const layout = pendingSvgPointNodeLayout(input.point)
     boundsClose(layout.paintedBounds, entry.layout.paintedBounds)
-    assert.deepEqual(layout.anchorClearanceBounds, layout.paintedBounds)
+    assert.deepEqual(layout.anchorClearanceBounds, anchorClearanceWithoutDashPaint(input.point),
+      'PGF anchor clearance is independent of dash, cap and join paint')
     if (zeroDotPolicyCases.has(observation.id)) {
       const policy = literalZeroDotPolicy(observation)
       boundsClose(layout.paintedBounds, policy.bounds)

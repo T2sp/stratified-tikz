@@ -1,0 +1,15 @@
+CASE rotation270-subsp
+FONT 10.00002pt,4.30554pt
+STAGE innerXSp; 0
+STAGE innerYSp; 327680
+STAGE initialXSp; 0
+STAGE initialYSp; 327680
+STAGE fittedXSp; 327680
+STAGE fittedYSp; 0
+STAGE transverseInnerSepSp; 0
+STAGE minimumWidthSp; 0
+STAGE divisorSp; 0
+STAGE bodyWidthHalfSp; 0
+STAGE bodyHeightHalfSp; 0
+STAGE bodyDepthHalfSp; 0
+STAGE minimumWidthHalfSp; 0

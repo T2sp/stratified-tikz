@@ -1,0 +1,1233 @@
+import assert from 'node:assert/strict'
+import { readFile, writeFile } from 'node:fs/promises'
+import { createLiveEvidenceRetainer } from './evidencePublication.mjs'
+import { resolve } from 'node:path'
+import { pathToFileURL } from 'node:url'
+import { layoutAnchorGroup as group, layoutShapes, layoutRegimes, layoutForShapeRegime, pointAnchorsForShape,
+  layoutShapeParameters, layoutAnchorArtifacts, assertLayoutAnchorEvidence, assertPointTikzSourceByMode,
+  signedAnchorCases, signedPickingCases, signedPolygonalScenario, signedPolygonalCases, zeroAxisLayout, zeroAxisHalfExtent,
+  assertZeroAxisTraversal, observeZeroAxisPixels, assertZeroAxisPixelEvidence, assertFreshZeroAxisAction, assertZeroAxisNativeAction } from './pointLayoutAnchorsContract.mjs'
+import { layoutImportCases as importCases } from './pointLayoutAnchorsContract.mjs'
+import { createOwnedAppPage } from './ownedAppPage.mjs'
+import { ownPageEvent } from './ownedPageEvent.mjs'
+import { resolvePointInspectorField } from './pointInspectorFields.mjs'
+import { observeGeometricSelection, selectGeometricPoint, prepareGeometricCanvasClick,
+  restoreGeometricCanvasToolbar, assertFreshGeometricClick } from './pointGeometricSelection.mjs'
+import { dragSelectedPoint, prepareSelectedPointCanvas } from './pointNativeDrag.mjs'
+import { boundedPointDiagnostic, createPointDiagnostics } from './pointCheckDiagnostics.mjs'
+import { saveAppJson } from './appJsonPersistence.mjs'
+import { observePointLiteral, assertPositionedLiteral } from './pointLiteralOracle.mjs'
+import { withOwnedFontFace, observeOwnedFontFace } from './ownedFontFace.mjs'
+import { captureStandaloneSvg } from './standaloneSvgCapture.mjs'
+import { runUnsupportedDiagnosticCase } from './pointUnsupportedDiagnostic.mjs'
+import { buildPendingLayoutFixture, assertPendingLayoutFixture, resolvePendingLayoutInlineNodes } from './pointLayoutPendingFixture.mjs'
+import { preparePendingLayoutPoint, capturePendingLayoutPreparation,
+  assertPendingLayoutClickContinuation } from './pointLayoutPendingPreparation.mjs'
+import { changePendingLayoutView } from './pointLayoutPendingView.mjs'
+import { observeZeroAxisCapture } from './zeroAxisLiveCapture.mjs'
+import { captureZeroAxisLive, isZeroAxisLiveCaptureFailure, markZeroAxisLiveCaptureFailure } from './zeroAxisLiveCaptureWorkflow.mjs'
+import { cylinderDiagnosticScenarios, cylinderDiagnosticLayout, singularCylinderOwner, singularCylinderParameters,
+  assertSingularCylinderSvg, assertSingularCylinderObservation, observeSingularCylinderPixels, assertSingularCylinderPixels } from './singularCylinderDiagnosticContract.mjs'
+import { observeSingularCylinderPoint, observeSingularCylinderPreExport, observeSingularCylinderReopening,
+  runSingularCylinderNative } from './singularCylinderDiagnostic.mjs'
+import { foldedCylinderScenario, foldedCylinderOwner, foldedCylinderLayout, foldedCylinderReference,
+  assertFoldedCylinderPlacement, assertFoldedCylinderSvg, observeFoldedCylinderReopening,
+  observeFoldedCylinderPixels, assertFoldedCylinderPixels } from './foldedCylinderContract.mjs'
+import { observeSignedPointPreExport, observeSignedPointReopening, signedPointRenderOrderProof,
+  createSignedPointAssociationCandidate, assertSignedPointStandaloneAssociation,
+  assertSignedPointStandaloneGeometry } from './signedPointStandaloneAssociation.mjs'
+import { conformanceCases, conformanceStem, conformanceReference, conformanceSpec, conformancePaint,
+  assertConformancePlacement, assertConformanceEvidence } from './pointConformanceContract.mjs'
+import { captureConformancePaint } from './pointConformanceBrowser.mjs'
+import { createHash } from 'node:crypto'
+
+const paint = { text: { color: '#203040', opacity: 1 }, fill: { enabled: true, color: '#d8ecff', opacity: .7 },
+  stroke: { enabled: true, color: '#203040', opacity: 1, width: .4, lineStyle: 'solid', dashPhase: 0, lineCap: 'butt', lineJoin: 'miter' } }
+const source = ' body $\\frac{x_1}{y^2}$ gyp '
+const captions = { innerXSep: 'Inner xsep', innerYSep: 'Inner ysep', outerXSep: 'Outer xsep', outerYSep: 'Outer ysep',
+  minimumWidth: 'Minimum width', minimumHeight: 'Minimum height', anchor: 'Anchor' }
+const importedSource = String.raw`% Phase 32D literal dimensions; no TeX execution.
+\tikzset{` + importCases.map(({ key, options }) => `${key}/.style={rectangle,${options}}`).join(',\n') + String.raw`,
+layout unsupported text metrics/.style={rectangle,text height=8pt,text depth=3pt,text width=2cm,align=center}}
+`
+
+// Production DOM observations use native SVG matrices. The expected placement
+// is the outer model-coordinate transform; selected-anchor translation is read
+// from the actual painted contour, never recomputed with the solver under test.
+export async function observeLayoutPoint(page, id = 'app-point') {
+  return page.evaluate((id) => {
+    const node = document.querySelector(`[data-point-id="${CSS.escape(id)}"] [data-point-node]`)
+    if (!node) return null
+    const contour = node.querySelector('[data-point-contour]'), body = node.querySelector('[data-label-state]')
+    if (!contour || !body) return { limitation: node.getAttribute('data-point-shape-limitation'), anchor: node.getAttribute('data-point-anchor') }
+    const pair = (name) => { const values = node.getAttribute(name)?.trim().split(/\s+/).map(Number); return values?.length === 2 ? { x: values[0], y: values[1] } : null }
+    const coordinate = (point) => ({ x: point.x, y: point.y })
+    const anchorOffset = pair('data-point-anchor-offset'), matrix = contour.getScreenCTM(), inkMatrix = body.getScreenCTM()
+    const local = node.getCTM().inverse().multiply(body.getCTM()), contourLocal = node.getCTM().inverse().multiply(contour.getCTM()), bounds = contour.getBBox()
+    const screenBounds = contour.getBoundingClientRect()
+    const at = contour.getPointAtLength(contour.getTotalLength() * .23).matrixTransform(matrix)
+    const clean = (element) => ({ tag: element.localName, attributes: Object.fromEntries([...element.attributes]
+      .filter(({ name }) => !name.startsWith('data-') && name !== 'pointer-events').map(({ name, value }) => [name, value])) })
+    return { source: body.getAttribute('data-label-source'), state: body.getAttribute('data-label-state'),
+      shape: node.getAttribute('data-point-shape'), anchor: node.getAttribute('data-point-anchor'),
+      pointOwner: node.getAttribute('data-point-node'), layout: JSON.parse(node.getAttribute('data-point-layout')), pointRequest: node.getAttribute('data-point-request'), bodyRequest: body.getAttribute('data-label-request'),
+      anchorOffset, placementOffset: { x: contourLocal.e, y: contourLocal.f }, bodyOrigin: pair('data-point-body-origin'), baseline: Number(node.getAttribute('data-point-body-baseline')),
+      placement: coordinate(new DOMPoint().matrixTransform(node.getScreenCTM())),
+      placedAnchor: anchorOffset && coordinate(new DOMPoint(anchorOffset.x, anchorOffset.y).matrixTransform(matrix)),
+      boundary: coordinate(at), center: coordinate(at), contour: clean(contour),
+      seams: [...node.querySelectorAll('[data-point-internal-border]')].map(clean), warningCount: node.querySelectorAll('[data-point-shape-warning]').length,
+      paintRegionCount: node.querySelectorAll('[data-point-paint-region]').length,
+      nodeTransform: node.getAttribute('transform'), bodyTransform: body.getAttribute('transform'),
+      bounds: { x: bounds.x, y: bounds.y, width: bounds.width, height: bounds.height },
+      contourScreenBounds: { x: screenBounds.x, y: screenBounds.y, width: screenBounds.width, height: screenBounds.height },
+      shapeBounds: node.getAttribute('data-point-shape-bounds'), paintedBounds: node.getAttribute('data-point-painted-bounds'),
+      bodyBounds: node.getAttribute('data-point-body-bounds'), anchorBounds: node.getAttribute('data-point-anchor-bounds'),
+      screenCTM: Object.fromEntries(['a', 'b', 'c', 'd', 'e', 'f'].map((key) => [key, matrix[key]])),
+      nativeTraversal: [0, .25, .5, .75, 1].map((fraction) => coordinate(contour.getPointAtLength(contour.getTotalLength() * fraction))),
+      contourLength: contour.getTotalLength(), math: body.querySelectorAll('[data-label-math]').length,
+      bodyUpright: Math.abs(local.b) < 1e-10 && Math.abs(local.c) < 1e-10,
+      inkMatrix: Object.fromEntries(['a', 'b', 'c', 'd', 'e', 'f'].map((key) => [key, inkMatrix[key]])),
+      literal: [...body.querySelectorAll('[data-label-literal]')].map((text) => text.textContent).join('') }
+  }, id)
+}
+
+/** Own the reopened file page and retain its raw candidate before validation or
+ * image work. A saved capture is still observed evidence until the caller has
+ * completed the immutable download/layout assertions and terminal save. */
+export async function capturePointLayoutStandalone({ standalone, artifactDir, details, reopen, assertReopened, observe, evidencePublisher }) {
+  const requests = [], standaloneErrors = [], cleanupErrors = []
+  const candidate = { ...details, result: 'observed', requests, standaloneErrors, cleanupErrors }
+  const request = (request) => requests.push(request.url())
+  const pageerror = (error) => standaloneErrors.push(error.message)
+  const crash = () => standaloneErrors.push('Owned standalone layout page crashed')
+  const listeners = [['request', request], ['pageerror', pageerror], ['crash', crash]]
+  const persist = async (capture) => {
+    if (capture) candidate.capture = capture
+    try {
+      await boundedPointDiagnostic(() => evidencePublisher
+        ? evidencePublisher.publish(`${details.scenario}-standalone.json`, candidate,
+          { stage: `${details.scenario}-standalone`, disposition: primary ? 'failed' : 'running' })
+        : writeFile(resolve(artifactDir, `${details.scenario}-standalone.json`), JSON.stringify(candidate, null, 2) + '\n'), 'Standalone layout evidence', 5000)
+    } catch (error) { evidencePublisher?.fail(error); throw error }
+  }
+  let primary
+  const retainFailure = async () => {
+    evidencePublisher?.fail(primary)
+    candidate.error = { message: primary.message, stack: primary.stack }
+    try { await persist() } catch (error) {
+      details.pageErrors.push(`Standalone layout failure evidence: ${error.message}`)
+    }
+  }
+  try {
+    for (const [type, listener] of listeners) standalone.on(type, listener)
+    await persist()
+    await standalone.goto(details.fileUrl)
+    Object.assign(candidate, await boundedPointDiagnostic(() => reopen(standalone), 'Standalone layout reopening observations', 5000))
+    await persist()
+    await boundedPointDiagnostic(() => observe(candidate), 'Standalone layout observed candidate', 5000)
+    await assertReopened(candidate)
+    assert.deepEqual(standaloneErrors, [], 'Standalone file has no page errors')
+    await captureStandaloneSvg(standalone, resolve(artifactDir, `${details.scenario}.png`), persist)
+    assert.deepEqual(standaloneErrors, [], 'Standalone capture has no page errors')
+  } catch (error) {
+    primary = error
+    await retainFailure()
+  } finally {
+    for (const [type, listener] of listeners) {
+      try { standalone.off(type, listener) } catch (error) {
+        primary ??= error; cleanupErrors.push({ operation: `${type} listener cleanup`, message: error.message })
+      }
+    }
+    try { await boundedPointDiagnostic(() => standalone.close(), 'Standalone layout page cleanup', 5000) }
+    catch (error) {
+      primary ??= error; cleanupErrors.push({ operation: 'page close', message: error.message })
+    }
+    if (primary) await retainFailure()
+  }
+  if (primary) throw primary
+  return candidate
+}
+
+export async function runPointLayoutAnchorChecks({ browser, origin, artifactDir, record, observe, startGroup, completeGroup, setStage, evidencePublisher }) {
+  const context = await browser.newContext({ viewport: { width: 1700, height: 1300 }, acceptDownloads: true })
+  const pageErrors = [], selectionSecondaryErrors = [], waits = [], held = new Set()
+  context.on('page', (page) => { page.on('pageerror', (error) => pageErrors.push(error.message)); page.on('crash', () => pageErrors.push('Owned layout page crashed')) })
+  const page = await context.newPage(), url = `${origin}/stratified-tikz/scripts/fixtures/freeLabelsApp.html`
+  const publish = (name, value, options = {}) => evidencePublisher.publish(name, value, options)
+  const app = createOwnedAppPage({ page, expectedUrl: url, artifactDir, prefix: 'point-layout-app',
+    writeEvidence: (name, value, phase) => publish(name, value, { stage: phase, disposition: primary ? 'failed' : 'running' }) })
+  const diagnostic = createPointDiagnostics({ artifactDir, observe, artifactPrefix: 'point-layout-selection', publish })
+  let scenario = 'point-layout-per-shape-spacing-minima', primary, selectionSequence = 0, currentLiveCapture, conformanceImageAttempt = false
+  async function retainFailure(name, details) {
+    try { await publish(name, details, { stage: name, disposition: 'failed' }) }
+    catch (error) { selectionSecondaryErrors.push(`Failure evidence ${name}: ${error.message}`); console.error(`Layout failure evidence ${name}: ${error.message}`) }
+  }
+  const inspector = page.locator('#preview-inspector-drawer')
+  const state = () => app.readState()
+  const model = async () => JSON.parse((await state()).json).diagram
+  const settle = () => page.waitForFunction(() => !document.querySelector('[data-label-state="pending"]'), undefined, { timeout: 30_000 })
+  async function event(name, kind, action) { const wait = ownPageEvent(page, kind, { name, timeoutMs: 30_000 }); waits.push(wait); return wait.run(action) }
+  async function load(input) {
+    const before = await state(), json = typeof input === 'string' ? input : JSON.stringify(input)
+    const { event: chooser } = await event(scenario + '-load', 'filechooser', () => page.getByRole('button', { name: 'Load JSON', exact: true }).click())
+    await chooser.setFiles({ name: 'point-layout.json', mimeType: 'application/json', buffer: Buffer.from(json) })
+    await page.waitForFunction((revision) => window.stzAppLabels.state().labelDocumentRevision > revision, before.labelDocumentRevision)
+  }
+  async function document(shape = 'rectangle', layout = { anchor: 'base east' }, text = source, ambientDimension = 2, combined = false) {
+    const input = JSON.parse(await page.evaluate(({ ambientDimension, text }) => window.stzAppLabels.pointDocumentJson(ambientDimension, text), { ambientDimension, text }))
+    const point = input.diagram.strata[0]
+    point.position = { x: 3, y: 3, z: ambientDimension === 3 ? .5 : 0 }
+    point.style = { ...point.style, shape, size: 8, opacity: 1, paint: structuredClone(paint), layout: structuredClone(layout),
+      shapeParameters: structuredClone(layoutShapeParameters[shape] ?? {}) }
+    if (combined) {
+      const siblings = await page.evaluate(() => window.stzAppLabels.exportDocumentJson(2))
+      const siblingModel = JSON.parse(siblings.json).diagram
+      input.diagram.labels = siblingModel.labels.filter(({ layer }) => layer === 0).slice(0, 2)
+      input.diagram.strata.push(siblingModel.strata[0])
+    }
+    return input
+  }
+  async function select(id = 'app-point', observePoint = observeLayoutPoint, pendingFixture) {
+    const selection = { page, readState: state, observePoint, diagnose: async (details, options = {}) => {
+      options.operation?.assertActive('selection-primary-authority')
+      if (options.primary) evidencePublisher.fail(options.primary, options)
+      await diagnostic(group, scenario, details, options)
+      if (details.pendingPreparation) await publish(`${scenario}-preparation.json`,
+        { scenario, group, result: 'observed', pendingPreparation: details.pendingPreparation }, options)
+    },
+      secondaryErrors: selectionSecondaryErrors, scenario, sequence: ++selectionSequence, id, boundary: true }
+    const rendered = pendingFixture
+      ? await preparePendingLayoutPoint({ ...selection, fixture: pendingFixture, source: pendingFixture.diagram.strata[0].text })
+      : await selectGeometricPoint(selection)
+    const beforeInspector = await state()
+    const open = page.getByRole('button', { name: 'Open inspector drawer', exact: true })
+    if (await open.count()) await open.click()
+    const expand = inspector.getByRole('button', { name: 'Expand', exact: true })
+    if (await expand.count()) await expand.click()
+    const afterInspector = await state()
+    await boundedPointDiagnostic(() => diagnostic(group, scenario, { boundary: 'inspector-reopened',
+      sequence: selectionSequence, beforeInspector, afterInspector }), 'Layout Inspector reopening evidence')
+    for (const field of ['json', 'runtimeDiagramJson', 'history', 'labelDocumentRevision']) {
+      assert.equal(afterInspector[field], beforeInspector[field], `Native Inspector reopening preserves ${field}`)
+    }
+    return rendered
+  }
+  async function cycleOwner(selectedId, expectedId, observePoint = observeLayoutPoint) {
+    const sequence = ++selectionSequence, token = `${scenario}:owner-cycle:${sequence}:${selectedId}`
+    const entry = { selectedId, expectedId, sequence, toolbarPreparation: { actions: [] }, toolbarRestoration: {}, secondaryErrors: [] }
+    let cyclePrimary, installed = false
+    const retain = async (name, operation) => {
+      try { return await boundedPointDiagnostic(operation, `Layout owner cycling ${name}`) }
+      catch (error) {
+        entry.secondaryErrors.push({ name, message: error.message })
+        pageErrors.push(`Layout owner cycling ${name}: ${error.message}`)
+      }
+    }
+    try {
+      entry.preparation = await prepareSelectedPointCanvas({ page, readState: state,
+        diagnose: (details) => diagnostic(group, scenario, details), secondaryErrors: pageErrors,
+        scenario, sequence, id: selectedId })
+      entry.rendered = await prepareGeometricCanvasClick({ page, readState: state, observePoint, id: selectedId, boundary: true,
+        preparation: entry.toolbarPreparation, diagnostic: retain,
+        evidence: (boundary) => retain(`${boundary} evidence`, () => diagnostic(group, scenario, { boundary, ownerCycle: entry })) })
+      entry.requestedClick = entry.rendered.boundary
+      await page.evaluate(({ token, selectedId }) => {
+        const registry = window.__stzLayoutOwnerCycles ??= new Map()
+        if (registry.has(token)) throw new Error(`Owner-cycle observer already owned: ${token}`)
+        const describe = (element) => element instanceof Element ? {
+          tag: element.localName, pointId: element.closest('[data-point-id]')?.getAttribute('data-point-id') ?? null,
+          drawer: !!element.closest('#preview-inspector-drawer'), svg: element instanceof SVGElement,
+          canvas: !!element.closest('svg.svg-diagram'), canvasRoot: element.matches('svg.svg-diagram'),
+          pointHandle: element.matches('circle.svg-geometry-handle') && !!element.closest('[aria-label="Selected point drag handles"]'),
+        } : null
+        const owned = { events: [], droppedEvents: 0 }
+        owned.listener = (event) => {
+          if (owned.events.length === 16) { owned.droppedEvents++; return }
+          const state = window.stzAppLabels.state()
+          owned.events.push({ phase: 'owner-cycle', selectedId, type: event.type, trusted: event.isTrusted,
+            altKey: event.altKey, pointerId: event.pointerId ?? null, button: event.button, buttons: event.buttons,
+            client: { x: event.clientX, y: event.clientY }, target: describe(event.target),
+            path: event.composedPath().slice(0, 16).map(describe), selection: state.selection,
+            labelDocumentRevision: state.labelDocumentRevision })
+        }
+        registry.set(token, owned)
+        for (const type of ['pointerdown', 'pointerup', 'click']) document.addEventListener(type, owned.listener, true)
+      }, { token, selectedId })
+      installed = true
+      entry.stateBefore = await state()
+      entry.before = await page.evaluate(observeGeometricSelection, { id: selectedId, click: entry.requestedClick, token: null })
+      await retain('before evidence', () => diagnostic(group, scenario, { boundary: 'before-native-owner-cycle', ownerCycle: entry }))
+      assert.deepEqual(entry.before.errors, [], 'Owner-cycle geometry observation is complete')
+      assertFreshGeometricClick(entry.before, entry.rendered, entry.requestedClick, true)
+      assert.equal(entry.before.inspector.open, false, 'Owner cycling starts with a closed Inspector')
+      assert.equal(entry.stateBefore.selection?.id, selectedId, 'Owner cycling begins with the selected owner')
+      const intended = (target) => target?.pointId === selectedId && target.svg === true && target.canvas === true && target.drawer === false
+      assert.ok(intended(entry.before.elementFromPoint), 'Fresh owner-cycle click reaches the intended SVG point')
+      assert.ok(intended(entry.before.elementsFromPoint[0]), 'Fresh owner-cycle hit stack starts with the intended SVG point')
+      try {
+        await page.keyboard.down('Alt')
+        await page.mouse.click(entry.requestedClick.x, entry.requestedClick.y)
+      } catch (error) { cyclePrimary = error }
+      entry.stateAfter = await retain('after state', state)
+      entry.after = await retain('after geometry', () => page.evaluate(observeGeometricSelection, { id: selectedId, click: entry.requestedClick, token: null }))
+      const retained = await retain('after events', () => page.evaluate((token) => {
+        const owned = window.__stzLayoutOwnerCycles?.get(token)
+        return owned ? { events: [...owned.events], droppedEvents: owned.droppedEvents } : null
+      }, token))
+      if (retained) Object.assign(entry, retained)
+      await retain('after evidence', () => diagnostic(group, scenario, { boundary: 'after-native-owner-cycle-before-assertion', ownerCycle: entry }))
+      if (cyclePrimary) throw cyclePrimary
+      assert.equal(entry.stateAfter?.selection?.id, expectedId, 'Alt cycles to the actual next owner')
+      for (const field of ['json', 'runtimeDiagramJson', 'history', 'labelDocumentRevision', 'uiSettings']) {
+        assert.deepEqual(entry.stateAfter[field], entry.stateBefore[field], `Owner cycling preserves ${field}`)
+      }
+      assert.equal(entry.droppedEvents, 0, 'All native owner-cycle events were retained')
+      for (const event of entry.events) assert.equal(event.labelDocumentRevision, entry.stateBefore.labelDocumentRevision, 'Owner-cycle events preserve the document epoch')
+      let previous = -1, pointerId
+      for (const type of ['pointerdown', 'pointerup', 'click']) {
+        const index = entry.events.findIndex((event, index) => index > previous && event.type === type && event.phase === 'owner-cycle'
+          && event.trusted === true && event.altKey === true && intended(event.target)
+          && event.path.some((element) => element?.pointId === selectedId) && event.path.some((element) => element?.canvasRoot === true)
+          && Math.abs(event.client.x - entry.requestedClick.x) < 1 && Math.abs(event.client.y - entry.requestedClick.y) < 1
+          && (pointerId === undefined || event.pointerId === pointerId || (type === 'click' && event.pointerId === null)))
+        assert.ok(index >= 0, `Native owner-cycle ${type} reached the intended point path`)
+        if (type === 'pointerdown') pointerId = entry.events[index].pointerId
+        previous = index
+      }
+      assert.ok(Number.isInteger(pointerId), 'Native owner cycling retains its pointer identity')
+      assert.deepEqual(entry.secondaryErrors, [], 'Owner-cycle observations completed')
+    } catch (error) { cyclePrimary ??= error }
+    finally {
+      await retain('Alt release', () => page.keyboard.up('Alt'))
+      if (installed) await retain('observer cleanup', () => page.evaluate((token) => {
+        const registry = window.__stzLayoutOwnerCycles, owned = registry?.get(token)
+        if (owned) for (const type of ['pointerdown', 'pointerup', 'click']) document.removeEventListener(type, owned.listener, true)
+        registry?.delete(token)
+        if (registry?.size === 0) delete window.__stzLayoutOwnerCycles
+      }, token))
+      try {
+        await restoreGeometricCanvasToolbar({ page, readState: state, id: selectedId, preparation: entry.toolbarPreparation,
+          restoration: entry.toolbarRestoration, diagnostic: retain,
+          evidence: (boundary) => retain(`${boundary} evidence`, () => diagnostic(group, scenario, { boundary, ownerCycle: entry })) })
+      } catch (error) {
+        if (!cyclePrimary) cyclePrimary = error
+        else {
+          entry.secondaryErrors.push({ name: 'toolbar restoration', message: error.message })
+          pageErrors.push(`Layout owner cycling toolbar restoration: ${error.message}`)
+        }
+      }
+      await retain('final evidence', () => diagnostic(group, scenario, { boundary: 'native-owner-cycle-finished', ownerCycle: entry,
+        ...(cyclePrimary ? { primary: { message: cyclePrimary.message, stack: cyclePrimary.stack } } : {}) }))
+    }
+    if (cyclePrimary) throw cyclePrimary
+    assert.deepEqual(entry.secondaryErrors, [], 'Owner-cycle observation and cleanup completed')
+    return entry
+  }
+  async function zeroAxisInput() {
+    const id = 'zero-overlap', workflow = { result: 'observed', actions: [], secondaryErrors: [], cleanup: {}, toolbarPreparation: { actions: [] }, toolbarRestoration: {} }
+    const retain = async (boundary) => {
+      try { await boundedPointDiagnostic(() => observe(`${scenario}-zero-axis-${boundary}`, { group, result: 'observed', axisInteraction: structuredClone(workflow) }), `Zero-axis ${boundary} evidence`, 5000) }
+      catch (error) {
+        primary ??= error
+        workflow.secondaryErrors.push({ operation: `${boundary} evidence`, message: error.message })
+        pageErrors.push(`Zero-axis ${boundary} evidence: ${error.message}`)
+      }
+    }
+    let primary, installed = false
+    const token = `${scenario}:zero-axis:${++selectionSequence}`
+    try {
+      workflow.preparation = await prepareSelectedPointCanvas({ page, readState: state,
+        diagnose: (details) => diagnostic(group, scenario, details), secondaryErrors: pageErrors,
+        scenario, sequence: selectionSequence, id })
+      await prepareGeometricCanvasClick({ page, readState: state, observePoint: observeLayoutPoint, id, boundary: true,
+        preparation: workflow.toolbarPreparation,
+        diagnostic: async (name, operation) => boundedPointDiagnostic(operation, `Zero-axis ${name}`, 5000), evidence: retain })
+      await page.evaluate(({ token, id }) => {
+        const registry = window.__stzZeroAxisInputs ??= new Map()
+        const currentCanvas = () => {
+          const roots = [...document.querySelectorAll('svg.svg-diagram')], root = roots[0] ?? null
+          const backgrounds = root ? [...root.children].filter((element) => element instanceof SVGElement
+            && element.localName === 'rect' && element.getAttribute('data-svg-background') === 'true') : []
+          return { roots, root, backgrounds }
+        }
+        const describe = (element) => {
+          if (!(element instanceof Element)) return null
+          const { roots, root, backgrounds } = currentCanvas()
+          const current = roots.length === 1 && root.isConnected
+          return { tag: element.localName, id: element.id, class: element.getAttribute('class'),
+            pointId: element.closest('[data-point-id]')?.getAttribute('data-point-id') ?? null,
+            drawer: !!element.closest('#preview-inspector-drawer'), ariaLabel: element.getAttribute('aria-label'),
+            svg: element instanceof SVGElement, canvas: !!element.closest('svg.svg-diagram'),
+            canvasRoot: element.matches('svg.svg-diagram'), connected: element.isConnected,
+            svgBackgroundAttribute: element.getAttribute('data-svg-background'),
+            currentCanvas: current && element.closest('svg.svg-diagram') === root,
+            currentCanvasRoot: current && element.isConnected && element === root,
+            canvasDirectChild: root !== null && element.parentElement === root,
+            svgBackground: current && element instanceof SVGElement && element.isConnected && element.localName === 'rect'
+              && element.getAttribute('data-svg-background') === 'true' && element.parentElement === root
+              && backgrounds.length === 1 && element === backgrounds[0],
+            pointHandle: element.matches('circle.svg-geometry-handle') && !!element.closest('[aria-label="Selected point drag handles"]'),
+            creationToolbar: !!element.closest('.preview-floating-toolbar'), toolbarOverlay: !!element.closest('.preview-toolbar-overlay-stack'),
+            quickStyle: !!element.closest('.context-quick-style-bar'), history: !!element.closest('.preview-history-overlay') }
+        }
+        const canvasObservation = () => {
+          const { roots, root, backgrounds } = currentCanvas()
+          return { rootCount: roots.length, backgroundCount: backgrounds.length,
+            root: describe(root), background: describe(backgrounds[0]) }
+        }
+        const owned = { events: [], droppedEvents: 0 }
+        owned.listener = (event) => {
+          if (owned.events.length >= 16) { owned.droppedEvents++; return }
+          const current = window.stzAppLabels.state(), node = document.querySelector(`[data-point-id="${CSS.escape(id)}"] [data-point-node]`)
+          owned.events.push({ type: event.type, trusted: event.isTrusted, altKey: event.altKey,
+            pointerId: event.pointerId ?? null, button: event.button, buttons: event.buttons,
+            canvasObservation: canvasObservation(),
+            canvasHasPointerCapture: typeof event.pointerId === 'number'
+              && (document.querySelector('svg.svg-diagram')?.hasPointerCapture(event.pointerId) ?? false),
+            client: { x: event.clientX, y: event.clientY }, target: describe(event.target),
+            path: event.composedPath().slice(0, 16).map(describe), selection: current.selection,
+            labelDocumentRevision: current.labelDocumentRevision,
+            layout: { owner: node.getAttribute('data-point-node'), request: node.getAttribute('data-point-request'),
+              bodyRequest: node.querySelector('[data-label-source]').getAttribute('data-label-request'),
+              shape: node.getAttribute('data-point-shape'), state: node.querySelector('[data-label-source]').getAttribute('data-label-state'),
+              source: node.querySelector('[data-label-source]').getAttribute('data-label-source') } })
+        }
+        registry.set(token, owned)
+        for (const type of ['pointerdown', 'pointerup', 'click']) document.addEventListener(type, owned.listener, true)
+      }, { token, id })
+      installed = true
+      for (const [index, key] of ['outside-clear', 'ordinary-axis', 'alt-start', 'alt-next', 'outside-final'].entries()) {
+        const action = { key, local: { x: index > 0 && index < 4 ? 0 : 12, y: 20 }, altKey: index === 2 || index === 3 }
+        workflow.actions.push(action)
+        action.stateBefore = await state()
+        action.click = await page.evaluate(({ id, local }) => {
+          const contour = document.querySelector(`[data-point-id="${CSS.escape(id)}"] [data-point-contour]`)
+          const projected = new DOMPoint(local.x, local.y).matrixTransform(contour.getScreenCTM())
+          return { x: projected.x, y: projected.y }
+        }, { id, local: action.local })
+        action.before = await page.evaluate(observeGeometricSelection, { id, click: action.click, token: null, coincidentIds: ['app-point', id] })
+        await retain(`${key}-before-native-input`)
+        if (primary) throw primary
+        assertFreshZeroAxisAction(action)
+        if (action.altKey) await page.keyboard.down('Alt')
+        await page.mouse.click(action.click.x, action.click.y)
+        if (action.altKey) await page.keyboard.up('Alt')
+        action.stateAfter = await state()
+        action.after = await page.evaluate(observeGeometricSelection, { id, click: action.click, token: null, coincidentIds: ['app-point', id] })
+        Object.assign(action, await page.evaluate((token) => {
+          const owned = window.__stzZeroAxisInputs.get(token)
+          const result = { events: [...owned.events], droppedEvents: owned.droppedEvents }
+          owned.events.length = 0; owned.droppedEvents = 0
+          return result
+        }, token))
+        await retain(`${key}-after-native-input-before-assertion`)
+        if (primary) throw primary
+        assertZeroAxisNativeAction(action)
+      }
+    } catch (error) { primary ??= error }
+    finally {
+      try {
+        await boundedPointDiagnostic(() => page.keyboard.up('Alt'), 'Zero-axis Alt cleanup', 5000)
+        workflow.cleanup.altKeyUp = 'completed'
+      } catch (error) { primary ??= error; workflow.secondaryErrors.push({ operation: 'Alt cleanup', message: error.message }) }
+      if (installed) try {
+        workflow.cleanup.observer = await boundedPointDiagnostic(() => page.evaluate((token) => {
+          const registry = window.__stzZeroAxisInputs, owned = registry?.get(token)
+          if (owned) for (const type of ['pointerdown', 'pointerup', 'click']) document.removeEventListener(type, owned.listener, true)
+          registry?.delete(token); if (registry?.size === 0) delete window.__stzZeroAxisInputs
+          return { tokenPresent: window.__stzZeroAxisInputs?.has(token) ?? false,
+            registryPresent: window.__stzZeroAxisInputs !== undefined, remaining: window.__stzZeroAxisInputs?.size ?? 0 }
+        }, token), 'Zero-axis observer cleanup', 5000)
+      } catch (error) { primary ??= error; workflow.secondaryErrors.push({ operation: 'observer cleanup', message: error.message }) }
+      try {
+        await restoreGeometricCanvasToolbar({ page, readState: state, id, preparation: workflow.toolbarPreparation,
+          restoration: workflow.toolbarRestoration, diagnostic: async (name, operation) => boundedPointDiagnostic(operation, `Zero-axis ${name}`, 5000), evidence: retain })
+      } catch (error) { primary ??= error; workflow.secondaryErrors.push({ operation: 'toolbar cleanup', message: error.message }) }
+      if (primary) workflow.primary = { message: primary.message, stack: primary.stack }
+      await retain('finished')
+    }
+    if (primary) throw primary
+    return workflow
+  }
+  async function observeEntry(input, extra = {}, id = 'app-point') {
+    const point = input.diagram.strata.find((point) => point.id === id), rendered = await observeLayoutPoint(page, id)
+    const current = (await model()).strata.find((point) => point.id === id)
+    const entry = { result: 'passed', shape: point.style.shape, source: point.text ?? '', anchor: point.style.layout?.anchor ?? 'center',
+      layout: point.style.layout, rendered, modelPositionUnchanged: JSON.stringify(current.position) === JSON.stringify(point.position), ...extra }
+    await observe(`${scenario}-${extra.regime ?? extra.key ?? entry.shape}-${entry.anchor}`, { group, entry })
+    return entry
+  }
+  async function save(details) {
+    const evidence = { scenario, group, result: 'passed', pageErrors: [...pageErrors], ...details }
+    assertLayoutAnchorEvidence(evidence, scenario)
+    await publish(`${scenario}.json`, evidence)
+    await record(scenario, { group, result: 'passed', artifacts: layoutAnchorArtifacts(scenario) })
+  }
+  async function tikzArtifacts(stem = scenario) {
+    const outputs = {}
+    for (const mode of ['standalone', 'inlineMath']) {
+      await page.getByLabel(/^TikZ export mode:/).selectOption(mode)
+      outputs[mode] = await page.getByRole('textbox', { name: 'Generated TikZ source', exact: true }).inputValue()
+      await writeFile(resolve(artifactDir, `${stem}-${mode}.tex`), outputs[mode])
+    }
+    return outputs
+  }
+  async function siblingSnapshot() {
+    return page.evaluate(() => {
+      const model = JSON.parse(window.stzAppLabels.state().json).diagram
+      return { labels: model.labels, paths: model.strata.filter(({ geometricKind }) => geometricKind === 'curve'),
+        rendered: [...document.querySelectorAll('[data-label-id], [data-path-inline-node-path-id]')].map((node) => ({
+          source: node.querySelector('[data-label-source]')?.getAttribute('data-label-source'),
+          state: node.querySelector('[data-label-state]')?.getAttribute('data-label-state'),
+          paths: [...node.querySelectorAll('path')].map((path) => path.getAttribute('d')),
+          text: [...node.querySelectorAll('text')].map((text) => text.textContent) })) }
+    })
+  }
+  async function nativeField(key, value, expectedModel = value) {
+    const control = await resolvePointInspectorField(page, captions[key], 'input[type="text"]'), token = `${scenario}:${key}`
+    const requestCountBefore = (await state()).requests
+    await control.evaluate((element, token) => {
+      const registry = window.__stzLayoutInputs ??= new Map(), owned = { element, events: [] }
+      owned.listener = (event) => owned.events.push({ type: event.type, trusted: event.isTrusted, value: element.value })
+      registry.set(token, owned); element.addEventListener('input', owned.listener)
+    }, token)
+    let fieldPrimary, completedField
+    try {
+      await control.fill(String(value))
+      const field = await page.evaluate((token) => {
+        const owned = window.__stzLayoutInputs.get(token)
+        return { value: owned.element.value, events: [...owned.events] }
+      }, token)
+      const selectedId = (await state()).selection?.id
+      field.modelValue = (await model()).strata.find(({ id }) => id === selectedId).style.layout[key]
+      Object.assign(field, { key, expected: String(value), expectedModel })
+      field.requestsUnchanged = (await state()).requests === requestCountBefore
+      await observe(`${scenario}-${key}-native-input`, { group, field })
+      assert.equal(field.value, field.expected); assert.equal(field.modelValue, expectedModel)
+      assert.ok(field.events.length > 0 && field.events.every(({ trusted }) => trusted === true))
+      assert.equal(field.requestsUnchanged, true, 'Layout/anchor edits reuse the existing body conversion')
+      completedField = field
+    } catch (error) { fieldPrimary = error }
+    finally {
+      try { await page.evaluate((token) => { const registry = window.__stzLayoutInputs, owned = registry?.get(token); if (owned) owned.element.removeEventListener('input', owned.listener); registry?.delete(token) }, token) }
+      catch (error) { fieldPrimary ??= error; pageErrors.push(`Layout input cleanup: ${error.message}`) }
+    }
+    if (fieldPrimary) throw fieldPrimary
+    return completedField
+  }
+  try {
+    setStage?.(group); await startGroup(group); await app.install(); await page.goto(url); await app.start()
+    const sizing = [], outerSepPaintInvariant = []
+    for (const shape of layoutShapes) {
+      const observed = new Map()
+      for (const regime of layoutRegimes) {
+        const input = await document(shape, layoutForShapeRegime(shape, regime))
+        await load(input); await settle()
+        const entry = await observeEntry(input, { regime: regime.key }); sizing.push(entry); observed.set(regime.key, entry.rendered)
+      }
+      const small = observed.get('unequal-padding'), large = observed.get('outer-clearance')
+      outerSepPaintInvariant.push({ shape, sameContour: JSON.stringify(small.contour) === JSON.stringify(large.contour),
+        samePaintedBounds: small.paintedBounds === large.paintedBounds, differentAnchorBounds: small.anchorBounds !== large.anchorBounds,
+        ...(shape === 'diamond' ? { paintShrink: { width: small.bounds.width - large.bounds.width, height: small.bounds.height - large.bounds.height } } : {}) })
+    }
+    await save({ cases: sizing, outerSepPaintInvariant })
+
+    scenario = 'point-layout-anchor-support-rotation'
+    const anchorCases = []
+    for (const shape of layoutShapes) for (const anchor of pointAnchorsForShape(shape)) {
+      const input = await document(shape, { innerXSep: 3, innerYSep: 1, outerXSep: 2, outerYSep: 4, anchor })
+      await load(input); await settle(); anchorCases.push(await observeEntry(input))
+    }
+    const unsupported = await document('rectangle', { anchor: 'not a PGF anchor' })
+    await load(unsupported); await settle()
+    const unsupportedAnchor = { savedAnchor: (await model()).strata[0].style.layout.anchor,
+      diagnostic: await page.locator('[data-point-shape-warning]').getAttribute('aria-label') ?? '', nativeCases: [] }
+    for (const ambientDimension of [2, 3]) for (const shape of ['ellipse', 'circle', 'cylinder']) {
+      const input = await document(shape, { anchor: unsupportedAnchor.savedAnchor, minimumWidth: 1000, minimumHeight: 1000 }, 'WWWW diagnostic', ambientDimension)
+      await load(input); await settle()
+      const entry = await runUnsupportedDiagnosticCase({ page, readState: state,
+        expected: { id: 'app-point', ambientDimension, shape, source: 'WWWW diagnostic', anchor: unsupportedAnchor.savedAnchor },
+        token: `${scenario}:unsupported:${ambientDimension}:${shape}:${++selectionSequence}`, secondaryErrors: pageErrors,
+        diagnose: (details) => diagnostic(group, scenario, details) })
+      unsupportedAnchor.nativeCases.push(entry); await observe(`${scenario}-unsupported-${shape}-${ambientDimension}d`, { group, entry })
+    }
+    await save({ cases: anchorCases, unsupportedAnchor })
+
+    scenario = 'point-layout-native-controls-persistence'
+    const raw = '  native $x_i$\t\\keep\n tail  ', input = await document('rectangle', {}, raw)
+    input.diagram.strata.push({ ...structuredClone(input.diagram.strata[0]), id: 'copy-point', position: { x: -1, y: 3, z: 0 } })
+    await load(input); await settle(); await select()
+    const fields = []
+    for (const [key, value] of Object.entries({ innerXSep: -1, innerYSep: 0, outerXSep: 3, outerYSep: 5, minimumWidth: 64, minimumHeight: 38, anchor: 'base east' })) fields.push(await nativeField(key, value))
+    const configured = structuredClone((await model()).strata.find(({ id }) => id === 'app-point').style.layout)
+    const beforePaintRequests = (await state()).requests
+    await (await resolvePointInspectorField(page, 'Fill opacity', 'input[type="text"]')).fill('.45')
+    assert.equal((await state()).requests, beforePaintRequests, 'Paint changes reuse existing conversion')
+    await page.getByRole('button', { name: 'Undo last diagram change', exact: true }).click()
+    await page.getByRole('button', { name: 'Undo last diagram change', exact: true }).click()
+    assert.notEqual((await model()).strata[0].style.layout.anchor, 'base east')
+    await page.getByRole('button', { name: 'Redo last undone diagram change', exact: true }).click()
+    assert.deepEqual((await model()).strata[0].style.layout, configured)
+    await inspector.getByRole('button', { name: 'Copy style', exact: true }).click()
+    await select('copy-point'); await inspector.getByRole('button', { name: 'Paste style', exact: true }).click()
+    assert.deepEqual((await model()).strata.find(({ id }) => id === 'copy-point').style.layout, configured)
+    await select()
+    const dialog = ownPageEvent(page, 'dialog', { name: scenario + '-preset', timeoutMs: 30_000 }); waits.push(dialog)
+    const accepted = dialog.outcome.then(async (outcome) => {
+      if (!outcome.ok) return { error: outcome.error }
+      try { await outcome.event.accept('Layout acceptance preset'); return { accepted: true } }
+      catch (error) { return { error } }
+    })
+    await dialog.run(() => inspector.getByRole('button', { name: 'Save current', exact: true }).click())
+    const promptResult = await accepted; if (promptResult.error) throw promptResult.error
+    await page.waitForFunction(() => JSON.parse(window.stzAppLabels.state().json).diagram.userStylePresets?.some(({ name }) => name === 'Layout acceptance preset'))
+    const preset = (await model()).userStylePresets.find(({ name }) => name === 'Layout acceptance preset')
+    assert.deepEqual(preset.style.layout, configured)
+    await nativeField('minimumWidth', 80)
+    await inspector.locator('.style-preset-list-item').filter({ hasText: 'Layout acceptance preset' }).click()
+    await inspector.getByRole('button', { name: 'Apply', exact: true }).click()
+    assert.deepEqual((await model()).strata[0].style.layout, configured)
+    const saved = await saveAppJson({ page, artifactDir, name: `${scenario}-saved`, owned: waits, diagnose: (details) => observe(scenario + '-save', { group, details }) })
+    await nativeField('anchor', 'north'); await load(saved.json); await settle()
+    assert.deepEqual((await model()).strata[0].style.layout, configured); assert.equal((await model()).strata[0].text, raw)
+    const outputs = await tikzArtifacts()
+    for (const code of Object.values(outputs)) { assert.ok(code.includes('anchor=base east')); assert.ok(code.includes('inner xsep=-1pt')) }
+    assertPointTikzSourceByMode(outputs, raw)
+    await save({ fields, configured, preset, nativeInputs: true, historyRestored: true, clipboardRestored: true, presetRestored: true,
+      saveReloadRestored: true, rawSourcePreserved: true, standaloneTikz: true, inlineTikz: true })
+
+    scenario = 'point-layout-import-order-units'
+    await load(await document('rectangle', {})); await settle(); await select()
+    await writeFile(resolve(artifactDir, `${scenario}.sty`), importedSource)
+    const { event: chooser } = await event(scenario + '-import', 'filechooser', () => page.getByRole('button', { name: 'Choose .sty/.tex', exact: true }).click())
+    await chooser.setFiles({ name: 'point-layout-import.sty', mimeType: 'text/plain', buffer: Buffer.from(importedSource) })
+    await page.waitForFunction(() => JSON.parse(window.stzAppLabels.state().json).diagram.importedTikzStyleReferences?.some(({ key }) => key === 'layout signed zero'))
+    const imports = []
+    for (const spec of importCases) {
+      await inspector.locator('.style-preset-list-item').filter({ hasText: spec.key }).click(); await inspector.getByRole('button', { name: 'Apply', exact: true }).click(); await settle()
+      const rendered = await observeLayoutPoint(page), current = await model(), point = current.strata[0]
+      const actual = Object.fromEntries(Object.keys(spec.expected).map((key) => [key, key === 'anchor' ? rendered.anchor : rendered.layout[key]]))
+      for (const [key, expected] of Object.entries(spec.expected)) {
+        if (typeof expected === 'number') assert.ok(Math.abs(actual[key] - expected) < .00001, `${spec.key}/${key}`)
+        else assert.equal(actual[key], expected)
+      }
+      const reference = current.importedTikzStyleReferences.find(({ id }) => id === point.importedTikzStyleReferenceId)
+      assert.ok(reference.options.includes(spec.options.split(',')[0]))
+      const entry = { key: spec.key, result: 'passed', expected: spec.expected, actual, rendered, reference, sourcePreserved: true }
+      imports.push(entry); await observe(scenario + '-' + spec.key, { group, entry })
+    }
+    await inspector.locator('.style-preset-list-item').filter({ hasText: 'layout unsupported text metrics' }).click(); await inspector.getByRole('button', { name: 'Apply', exact: true }).click()
+    const diagnostics = (await model()).importedTikzStyleReferences.find(({ key }) => key === 'layout unsupported text metrics').previewDiagnostics
+    assert.ok(diagnostics?.some((entry) => /text height|text depth/.test(JSON.stringify(entry))))
+    const savedImport = await saveAppJson({ page, artifactDir, name: `${scenario}-saved`, owned: waits, diagnose: (details) => observe(scenario + '-save', { group, details }) })
+    await load(savedImport.json); await settle()
+    const outputsImport = await tikzArtifacts()
+    for (const code of Object.values(outputsImport)) assert.ok(code.includes('layout unsupported text metrics'))
+    await save({ cases: imports, nativeImport: true, saveReloadRestored: true, standaloneTikz: true, inlineTikz: true, unsupportedTextMetricsDiagnosed: true, diagnostics })
+
+    scenario = 'point-layout-async-combined-isolation'
+    const wide = '$\\frac{wide_{32D}}{1+\\frac{x}{y}}$', tall = '$\\sum_{j=1}^{n}\\frac{x_j}{y_j}$', invalid = '  $\\unknownLayoutMacro$\t\\slash\n tail  '
+    const asyncInput = await document('circular sector', { anchor: 'arc start', outerXSep: 4, outerYSep: 7 }, '$initial$', 2, true)
+    await load(asyncInput); await settle(); await select()
+    const siblings = await siblingSnapshot(), transitions = []
+    async function transition(key, text, expectedState) {
+      const input = structuredClone(asyncInput); input.diagram.strata[0].text = text
+      const current = await observeEntry(input, { key, siblingsUnchanged: JSON.stringify(await siblingSnapshot()) === JSON.stringify(siblings) })
+      assert.equal(current.rendered.state, expectedState)
+      if (expectedState !== 'ready') {
+        current.literalObservation = await observePointLiteral(page, { id: 'app-point' })
+        assertPositionedLiteral(current.literalObservation, text)
+      }
+      transitions.push(current)
+    }
+    await page.evaluate((source) => window.stzAppLabels.hold(source), wide); held.add(wide)
+    await (await resolvePointInspectorField(page, 'Node text', 'textarea')).fill(wide)
+    await page.waitForFunction((source) => window.stzAppLabels.pending(source)?.started > 0, wide)
+    await transition('pending-wide', wide, 'pending')
+    const pendingHistory = (await state()).history
+    await page.evaluate((source) => window.stzAppLabels.release(source), wide); held.delete(wide); await settle(); await transition('ready-wide', wide, 'ready')
+    assert.equal((await state()).history, pendingHistory)
+    await (await resolvePointInspectorField(page, 'Node text', 'textarea')).fill(invalid); await settle(); await transition('fallback', invalid, 'fallback')
+    await (await resolvePointInspectorField(page, 'Node text', 'textarea')).fill(tall); await settle(); await transition('ready-tall', tall, 'ready')
+    const stale = '$stale_{layout32D}$'
+    await page.evaluate((source) => window.stzAppLabels.hold(source), stale); held.add(stale)
+    await (await resolvePointInspectorField(page, 'Node text', 'textarea')).fill(stale)
+    await page.waitForFunction((source) => window.stzAppLabels.pending(source)?.started > 0, stale)
+    const replacement = structuredClone(asyncInput); replacement.diagram.strata[0].text = tall
+    await load(replacement); await settle(); await page.evaluate((source) => window.stzAppLabels.release(source), stale); held.delete(stale)
+    await transition('stale-load', tall, 'ready'); await select()
+    await (await resolvePointInspectorField(page, 'Node text', 'textarea')).fill(wide); await settle()
+    await page.getByRole('button', { name: 'Undo last diagram change', exact: true }).click(); await settle(); await transition('undo', tall, 'ready')
+    await page.getByRole('button', { name: 'Redo last undone diagram change', exact: true }).click(); await settle(); await transition('redo', wide, 'ready')
+    const undoLate = '$undoLate_{layout32D}$'
+    await page.evaluate((source) => window.stzAppLabels.hold(source), undoLate); held.add(undoLate)
+    await (await resolvePointInspectorField(page, 'Node text', 'textarea')).fill(undoLate)
+    await page.waitForFunction((source) => window.stzAppLabels.pending(source)?.started > 0, undoLate)
+    await page.getByRole('button', { name: 'Undo last diagram change', exact: true }).click(); await settle()
+    await page.evaluate((source) => window.stzAppLabels.release(source), undoLate); held.delete(undoLate); await transition('stale-undo', wide, 'ready')
+    const fontSource = 'mmmm WWWW $unclosed'
+    await (await resolvePointInspectorField(page, 'Node text', 'textarea')).fill(fontSource); await settle(); await transition('font-before', fontSource, 'fallback')
+    const fontBefore = transitions.at(-1), fontModelBefore = await state()
+    const settleFont = async () => {
+      await page.evaluate(async () => { await document.fonts.ready; await new Promise((resolve) => requestAnimationFrame(() => requestAnimationFrame(resolve))) })
+      await page.waitForFunction(() => {
+        const node = document.querySelector('[data-point-id="app-point"] [data-point-node]'), request = node?.getAttribute('data-point-request')
+        return document.fonts.status === 'loaded' && node?.querySelector('[data-label-state]')?.getAttribute('data-label-state') !== 'pending'
+          && request && JSON.parse(request)[5] === window.stzAppLabels.state().fontGeneration
+      }, undefined, { timeout: 30_000 })
+    }
+    let fontLoaded, fontRestored, ownedFace
+    const fontLifecycle = await withOwnedFontFace(page, { family: 'Times New Roman', source: 'local("Courier New")',
+      use: async (handle) => {
+        await settleFont(); await transition('font-loaded', fontSource, 'fallback'); fontLoaded = transitions.at(-1)
+        ownedFace = await observeOwnedFontFace(handle)
+        assert.equal(ownedFace.ownedFacePresent, true)
+        assert.notEqual(fontLoaded.literalObservation.lines[0].width, fontBefore.literalObservation.lines[0].width, 'Actual native font width changes')
+        assert.equal((await state()).history, fontModelBefore.history)
+      },
+      restore: async (removal, handle) => {
+        await settleFont(); await transition('font-restored', fontSource, 'fallback'); fontRestored = transitions.at(-1)
+        const restored = await observeOwnedFontFace(handle)
+        assert.equal(restored.ownedFacePresent, false); assert.ok(restored.previousFaces.every(({ present }) => present))
+        assert.equal(fontRestored.literalObservation.lines[0].width, fontBefore.literalObservation.lines[0].width)
+        assert.deepEqual(fontRestored.rendered.bounds, fontBefore.rendered.bounds)
+        assert.equal((await state()).history, fontModelBefore.history)
+        return { removal, restored }
+      },
+      diagnoseFailure: (details) => observe(scenario + '-font-failure', { group, details }) })
+    assert.ok(transitions.filter(({ rendered }) => rendered.state === 'ready').every(({ rendered }) => rendered.math > 0))
+    await save({ transitions, actualMathJax: true, historyUnchangedOnSettle: true, fontLifecycle, ownedFace, nativeFontChanged: true, nativeFontRestored: true })
+
+    scenario = 'point-layout-native-interaction-2d-3d'
+    const interactions = [], bodyOverflowCases = []
+    for (const ambientDimension of [2, 3]) for (const shape of ['rectangle', 'circular sector']) {
+      const interactionInput = await document(shape, { anchor: shape === 'rectangle' ? 'base east' : 'arc start', outerXSep: 4, outerYSep: 7 }, source, ambientDimension)
+      const refPosition = structuredClone(interactionInput.diagram.strata[0].position)
+      const components = Object.fromEntries(['x', 'y', 'z'].map((key) => [key, { kind: 'numeric', value: refPosition[key] }]))
+      interactionInput.diagram.coordinateAnchors = [{ id: 'layout-reference', name: 'Layout reference', tikzName: 'LayoutReference', position: { kind: 'global', value: components } }]
+      interactionInput.diagram.strata[0].position.symbolic = { ...components, source: { kind: 'coordinateRef', coordinateId: 'layout-reference', preview: refPosition } }
+      interactionInput.diagram.strata.push({ ...structuredClone(interactionInput.diagram.strata[0]), id: 'overlap-point' })
+      delete interactionInput.diagram.strata[1].position.symbolic
+      await load(interactionInput); await settle()
+      const observed = await select('overlap-point'), before = (await model()).strata.find(({ id }) => id === 'overlap-point')
+      // compareSvgPreviewSelectionCandidates breaks this position tie by
+      // stableId, putting app-point first. A null cycle state uses
+      // initialCycleIndex(count) = 1; the observed continuation reaches
+      // app-point. Both actions prepare/measure anew; an initial failure aborts.
+      const ownerCycleStart = await cycleOwner('overlap-point', 'overlap-point')
+      const ownerCycle = await cycleOwner('overlap-point', 'app-point')
+      await select('overlap-point')
+      const nativeDrag = await dragSelectedPoint({ page, readState: state,
+        diagnose: (details) => diagnostic(group, scenario, details), secondaryErrors: pageErrors,
+        scenario, sequence: ++selectionSequence, id: 'overlap-point', displacement: { x: 22, y: -14 }, steps: 4 })
+      const after = JSON.parse(nativeDrag.afterAction.state.runtimeDiagramJson).strata.find(({ id }) => id === 'overlap-point')
+      const events = nativeDrag.afterAction.observation.events.filter(({ phase }) => phase === 'drag')
+      assert.notDeepEqual(after.position, before.position)
+      const dragged = await observeLayoutPoint(page, 'overlap-point')
+      assert.ok(Math.hypot(dragged.placedAnchor.x - dragged.placement.x, dragged.placedAnchor.y - dragged.placement.y) < .001)
+      const lockedInput = structuredClone(interactionInput); lockedInput.diagram.layers = [{ value: 0, name: 'Locked', visible: true, locked: true }]
+      await load(lockedInput); await settle(); const lockedBefore = await state()
+      await page.getByRole('button', { name: 'Select', exact: true }).click(); await page.locator('svg.svg-diagram').scrollIntoViewIfNeeded()
+      const locked = await observeLayoutPoint(page)
+      await page.mouse.click(locked.boundary.x, locked.boundary.y)
+      assert.equal((await state()).json, lockedBefore.json); assert.notEqual((await state()).selection?.id, 'app-point')
+      const hidden = structuredClone(lockedInput); hidden.diagram.layers[0] = { value: 0, name: 'Hidden', visible: false }
+      await load(hidden); await settle(); assert.equal(await observeLayoutPoint(page), null)
+      await load(interactionInput); await settle(); const cameraBefore = await observeLayoutPoint(page)
+      const zoom = page.getByRole('spinbutton', { name: 'zoom value', exact: true })
+      if (!await zoom.count()) await page.locator('.camera-summary-toggle').click()
+      const beforeCameraRequests = (await state()).requests
+      if (ambientDimension === 3) {
+        const theta = page.getByRole('spinbutton', { name: 'theta value', exact: true })
+        await theta.fill('63')
+      }
+      await zoom.fill('1.4')
+      await page.getByRole('spinbutton', { name: 'pan x value', exact: true }).fill('12')
+      await page.getByRole('spinbutton', { name: 'pan y value', exact: true }).fill('-9')
+      const cameraAfter = await observeLayoutPoint(page)
+      assert.ok(Math.hypot(cameraAfter.placedAnchor.x - cameraAfter.placement.x, cameraAfter.placedAnchor.y - cameraAfter.placement.y) < .001)
+      assert.notDeepEqual(cameraAfter.placement, cameraBefore.placement)
+      assert.equal((await state()).requests, beforeCameraRequests)
+      assert.deepEqual((await model()).strata[0].position, interactionInput.diagram.strata[0].position)
+      const referenceCode = await page.getByRole('textbox', { name: 'Generated TikZ source', exact: true }).inputValue()
+      assert.ok(referenceCode.includes('at (LayoutReference)'))
+      interactions.push({ ambientDimension, shape, codim: before.codim, observed, dragged, before, after, events, nativeDrag, ownerCycleStart, ownerCycle,
+        trustedBoundaryClick: true, trustedDrag: events.some(({ type, trusted }) => type === 'pointerdown' && trusted) && events.some(({ type, trusted }) => type === 'pointermove' && trusted),
+        anchorStayedAtModel: true, undoRestored: true, redoRestored: true, altCycling: true, lockedUnchanged: true, hiddenAbsent: true, cameraPlacement: true,
+        referenceUnchanged: JSON.stringify((await model()).strata[0].position) === JSON.stringify(interactionInput.diagram.strata[0].position), referenceCode, cameraBefore, cameraAfter })
+      if (shape === 'rectangle') {
+        const overflowInput = await document('rectangle', { innerXSep: -15, innerYSep: 0, outerXSep: 0, outerYSep: 0, anchor: 'base east' }, 'WWWWWWWWWWWWWWWWWWWW', ambientDimension)
+        overflowInput.diagram.strata.push({ ...structuredClone(overflowInput.diagram.strata[0]), id: 'overflow-overlap' })
+        await load(overflowInput); await settle()
+        const observeOverflow = async (page, id) => {
+          const rendered = await observeLayoutPoint(page, id)
+          const ink = await page.evaluate((id) => {
+            const node = document.querySelector(`[data-point-id="${CSS.escape(id)}"] [data-point-node]`)
+            const text = node.querySelector('[data-label-state] text'), contour = node.querySelector('[data-point-contour]')
+            const character = text.getExtentOfChar(0), localBodyClick = { x: character.x + character.width / 2, y: character.y + character.height * .55 }
+            const screen = new DOMPoint(localBodyClick.x, localBodyClick.y).matrixTransform(text.getScreenCTM())
+            const local = screen.matrixTransform(contour.getScreenCTM().inverse()), box = contour.getBBox()
+            const contourBounds = { x: box.x, y: box.y, width: box.width, height: box.height }
+            const distance = Math.max(box.x - local.x, local.x - box.x - box.width, box.y - local.y, local.y - box.y - box.height, 0)
+            return { click: { x: screen.x, y: screen.y }, localBodyClick, clickInContour: { x: local.x, y: local.y }, contourBounds,
+              characterBounds: { x: character.x, y: character.y, width: character.width, height: character.height }, distance }
+          }, id)
+          assert.ok(ink.distance > 6, 'Native text click is beyond the contour picking tolerance')
+          return { ...rendered, boundary: ink.click, bodyOverflow: ink }
+        }
+        const overflowObserved = await select('overflow-overlap', observeOverflow)
+        overflowObserved.bodyOverflow.selectionRing = await page.evaluate(() => {
+          const node = document.querySelector('[data-point-id="overflow-overlap"] [data-point-node]'), text = node.querySelector('[data-label-state] text')
+          const ring = node.querySelector(':scope > circle[data-svg-export-exclude]'), box = text.getBBox(), inverse = ring.getScreenCTM().inverse()
+          const cx = Number(ring.getAttribute('cx')), cy = Number(ring.getAttribute('cy')), radius = Number(ring.getAttribute('r'))
+          const inkRadius = Math.max(...[[box.x, box.y], [box.x + box.width, box.y], [box.x, box.y + box.height], [box.x + box.width, box.y + box.height]].map(([x, y]) => {
+            const local = new DOMPoint(x, y).matrixTransform(text.getScreenCTM()).matrixTransform(inverse)
+            return Math.hypot(local.x - cx, local.y - cy)
+          }))
+          return { radius, inkRadius }
+        })
+        assert.ok(overflowObserved.bodyOverflow.selectionRing.radius >= overflowObserved.bodyOverflow.selectionRing.inkRadius, 'Selection ring encloses the actual overflowing text ink')
+        // The same stableId ordering and initial index 1 apply to the two
+        // overlapping body owners; retain both planned native cycle actions.
+        const ownerCycleStart = await cycleOwner('overflow-overlap', 'overflow-overlap', observeOverflow)
+        const ownerCycle = await cycleOwner('overflow-overlap', 'app-point', observeOverflow)
+        assert.deepEqual((await model()).strata[0].position, overflowInput.diagram.strata[0].position)
+        const entry = { result: 'passed', ambientDimension, shape: 'rectangle', anchor: 'base east', source: overflowInput.diagram.strata[0].text,
+          layout: overflowInput.diagram.strata[0].style.layout, rendered: overflowObserved, modelPositionUnchanged: true,
+          altSelection: { id: ownerCycle.stateAfter.selection.id, events: ownerCycle.events }, ownerCycleStart, ownerCycle, diagramUnchanged: true }
+        bodyOverflowCases.push(entry); await observe(scenario + `-body-overflow-${ambientDimension}d`, { group, entry })
+      }
+    }
+    const signedAnchors = [], signedPicking = []
+    for (const spec of signedAnchorCases) {
+      const input = await document(spec.shape, spec.layout, spec.source, spec.ambientDimension)
+      await load(input); await settle()
+      signedAnchors.push(await observeEntry(input, { key: spec.key, ambientDimension: spec.ambientDimension, state: await state() }))
+    }
+    for (const spec of signedPickingCases) {
+      const input = await document(spec.shape, spec.layout, spec.source, spec.ambientDimension)
+      input.diagram.strata.push({ ...structuredClone(input.diagram.strata[0]), id: 'signed-overlap' })
+      await load(input); await settle()
+      const rendered = await select('signed-overlap')
+      // Both exact owners have distance zero on the native SVG .23 boundary.
+      // A sparse four-cardinal contour misses this oblique paint by >6 units;
+      // native selection and both planned cycles must therefore reach the
+      // corrected production contour before this evidence can be accepted.
+      const ownerCycleStart = await cycleOwner('signed-overlap', 'signed-overlap')
+      const ownerCycle = await cycleOwner('signed-overlap', 'app-point')
+      signedPicking.push(await observeEntry(input, { key: spec.key, ambientDimension: spec.ambientDimension,
+        state: await state(), rendered, ownerCycleStart, ownerCycle }, 'signed-overlap'))
+    }
+    await save({ cases: interactions, bodyOverflowCases, signedAnchorCases: signedAnchors, signedPickingCases: signedPicking })
+
+    scenario = signedPolygonalScenario
+    const polygonalCases = [], zeroAxisCases = [], downloads = []
+    for (const ambientDimension of [2, 3]) {
+      const stem = `${scenario}-${ambientDimension}d`, inDimension = []
+      for (const spec of signedPolygonalCases) {
+        const input = await document(spec.shape, spec.layout, '', ambientDimension)
+        input.diagram.strata[0].style.shapeParameters = {}
+        await load(input); await settle()
+        const rendered = await select()
+        const entry = await observeEntry(input, { key: spec.key, ambientDimension, state: await state(), rendered })
+        polygonalCases.push(entry); inDimension.push(entry)
+      }
+      const zeroInput = await document('ellipse', zeroAxisLayout, '', ambientDimension)
+      zeroInput.diagram.strata[0].style.shapeParameters = {}
+      zeroInput.diagram.strata[0].style.paint = { ...structuredClone(paint), fill: { enabled: false, color: '#FFFFFF', opacity: 1 },
+        stroke: { ...structuredClone(paint.stroke), color: '#B000C0' } }
+      zeroInput.diagram.strata.push({ ...structuredClone(zeroInput.diagram.strata[0]), id: 'zero-overlap' })
+      await load(zeroInput); await settle()
+      const rendered = await select('zero-overlap')
+      const zeroAxisCase = { ambientDimension, layout: structuredClone(zeroAxisLayout), rendered, state: await state() }
+      zeroAxisCase.axisInteraction = await zeroAxisInput()
+      await publish(`${stem}-native.json`, { scenario, group, result: 'observed', polygonalCases: inDimension, zeroAxisCase })
+      await observe(`${scenario}-${ambientDimension}d-zero-axis-traversal`, { group, result: 'observed', artifact: `${stem}-native.json` })
+      assertZeroAxisTraversal(rendered)
+      zeroAxisCase.liveObservation = {}
+      currentLiveCapture = zeroAxisCase
+      const retainLive = createLiveEvidenceRetainer({ publisher: evidencePublisher, stem, scenario, group,
+        zeroAxisCase, polygonalCases: inDimension, observe })
+      await captureZeroAxisLive({ page, pngPath: resolve(artifactDir, `${stem}-live.png`),
+        live: zeroAxisCase.liveObservation, interaction: zeroAxisCase.axisInteraction,
+        measure: async () => {
+          const current = await state()
+          const snapshot = await page.evaluate(observeGeometricSelection, { id: 'zero-overlap', click: null,
+            token: null, coincidentIds: ['app-point', 'zero-overlap'] })
+          return { state: current, snapshot: await page.evaluate(observeZeroAxisCapture, { snapshot, halfExtent: zeroAxisHalfExtent }) }
+        }, retain: retainLive, inspect: observeZeroAxisPixels, assertPixels: assertZeroAxisPixelEvidence })
+      zeroAxisCase.livePaint = zeroAxisCase.liveObservation.pixels
+      zeroAxisCases.push(zeroAxisCase)
+      await publish(`${stem}-native.json`, { scenario, group, result: 'observed', polygonalCases: inDimension, zeroAxisCase })
+      await observe(`${stem}-native-before-assertion`, { group, result: 'observed',
+        artifact: `${stem}-native.json`, captureArtifact: `${stem}-live-capture.json` })
+      assertZeroAxisPixelEvidence(zeroAxisCase.livePaint)
+      currentLiveCapture = undefined
+
+      // Additive standalone fixture: six default-parameter signed polygons and
+      // one visibly retraced empty ellipse. The pending fifteen-point fixture
+      // and both immutable download sequences retain their exact old inputs.
+      const fixture = structuredClone(zeroInput)
+      fixture.diagram.strata = signedPolygonalCases.map((spec, index) => {
+        const point = structuredClone(zeroInput.diagram.strata[0])
+        point.id = `signed-${spec.key}`; point.position = { x: 1 + index % 3 * 2, y: 1 + Math.floor(index / 3) * 2, z: ambientDimension === 3 ? .5 : 0 }
+        point.style.shape = spec.shape; point.style.layout = structuredClone(spec.layout)
+        point.style.paint = structuredClone(paint)
+        return point
+      })
+      const zero = structuredClone(zeroInput.diagram.strata[0]); zero.id = 'signed-zero-axis'
+      zero.position = { x: 7, y: 3, z: ambientDimension === 3 ? .5 : 0 }; fixture.diagram.strata.push(zero)
+      await load(fixture); await settle()
+      const expected = []
+      for (const [index, point] of fixture.diagram.strata.entries()) expected.push(await observeEntry(fixture, {
+        id: point.id, modelPoint: structuredClone(point), key: index < signedPolygonalCases.length ? signedPolygonalCases[index].key : 'zero-axis', ambientDimension }, point.id))
+      const saved = await saveAppJson({ page, artifactDir, name: `${stem}-saved`, owned: waits,
+        diagnose: (details) => observe(`${stem}-save`, { group, details }) })
+      const savedJson = saved.json
+      await load(savedJson); await settle()
+      assert.deepEqual((await model()).strata, fixture.diagram.strata)
+      for (const [index, point] of fixture.diagram.strata.entries()) expected[index] = await observeEntry(fixture, {
+        id: point.id, modelPoint: structuredClone(point), key: index < signedPolygonalCases.length ? signedPolygonalCases[index].key : 'zero-axis', ambientDimension }, point.id)
+      const outputs = await tikzArtifacts(stem)
+      await page.getByLabel('SVG export background', { exact: true }).selectOption('transparent')
+      await page.evaluate((ids) => window.stzAppLabels.armPointExportClick(ids), fixture.diagram.strata.map(({ id }) => id))
+      const beforeExportState = await state()
+      const preExport = await page.evaluate(observeSignedPointPreExport)
+      preExport.renderOrderProof = signedPointRenderOrderProof
+      await observe(`${stem}-before-export-click`, { group, result: 'observed', beforeExportState, expected, preExport })
+      const { event: download } = await event(stem, 'download', () => page.getByRole('button', { name: 'Export current diagram view as SVG', exact: true }).click())
+      const click = await page.evaluate(() => window.stzAppLabels.pointExportClick())
+      const svgPath = resolve(artifactDir, `${stem}.svg`); await download.saveAs(svgPath)
+      const xml = await readFile(svgPath, 'utf8'), fileUrl = pathToFileURL(svgPath).href
+      const standalone = await context.newPage()
+      const raw = await capturePointLayoutStandalone({ standalone, artifactDir, evidencePublisher,
+        details: { scenario: stem, group, background: 'transparent', ambientDimension, svgPath, fileUrl, pageErrors, expected, click, outputs, xml, savedJson, beforeExportState, preExport },
+        observe: (candidate) => observe(`${stem}-standalone-observed`, { group, result: 'observed', candidate }),
+        reopen: async (standalone) => {
+          const observation = await standalone.evaluate(observeSignedPointReopening)
+          const association = createSignedPointAssociationCandidate({ expected, click, beforeExportState,
+            savedJson, preExport, ...observation, fileUrl })
+          return { ...observation, association }
+        },
+        assertReopened: (candidate) => {
+          const { requests, document } = candidate
+          const binding = assertSignedPointStandaloneAssociation(candidate, xml)
+          assertSignedPointStandaloneGeometry(candidate, binding)
+          assert.deepEqual(requests, [fileUrl]); assert.equal(document.forbiddenCount, 0)
+          assert.deepEqual(document.externalReferences, []); assert.equal(document.backgroundCount, 0)
+        } })
+      const { zeroAxis } = assertSignedPointStandaloneAssociation(raw, xml)
+      raw.strokePixels = observeZeroAxisPixels(await readFile(resolve(artifactDir, `${stem}.png`)), zeroAxis.screenCTM)
+      await publish(`${stem}-standalone.json`, raw)
+      await observe(`${stem}-standalone-pixels-before-assertion`, { group, result: 'observed', raw })
+      assertZeroAxisPixelEvidence(raw.strokePixels)
+      downloads.push({ scenario: stem, group, background: 'transparent', ambientDimension, expected, click, outputs, savedJson, beforeExportState, preExport,
+        capture: raw.capture, strokePixels: raw.strokePixels })
+      await page.evaluate(() => window.stzAppLabels.releasePointExportClick())
+    }
+    // Additive correction coverage stays within this existing mandatory matrix
+    // identity. Neither immutable pending fixture nor its download flow changes.
+    const geometryConformance = []
+    for (const ambientDimension of [2, 3]) for (const key of conformanceCases) {
+      const stem = conformanceStem(key, ambientDimension), spec = conformanceSpec(key), reference = conformanceReference(key)
+      const input = await document(spec.shape, spec.layout, '', ambientDimension)
+      input.diagram.strata[0].style.shapeParameters = spec.parameters
+      input.diagram.strata[0].style.paint = conformancePaint(key)
+      await load(input); await settle()
+      const native = { key, ambientDimension, rendered: await select(), state: await state() }
+      await publish(`${stem}.json`, { scenario: stem, group, result: 'observed', native, reference })
+      assertConformancePlacement(native, reference)
+      conformanceImageAttempt = true
+      const live = await captureConformancePaint({ page, key, stage: 'live', stem, artifactDir, contour: native.rendered.contour,
+        reference, retain: probe => publish(`${stem}-live-paint.json`, probe) })
+      const screenshot = await page.screenshot({ path: resolve(artifactDir, `${stem}-live.png`), fullPage: false, scale: 'css', timeout: 5000 })
+      const liveCapture = { attempts: 1, bytes: screenshot.length, sha256: createHash('sha256').update(screenshot).digest('hex'),
+        width: screenshot.readUInt32BE(16), height: screenshot.readUInt32BE(20) }, afterLive = await state()
+      for (const field of ['json', 'runtimeDiagramJson', 'history', 'labelDocumentRevision']) assert.equal(afterLive[field], native.state[field])
+      const saved = await saveAppJson({ page, artifactDir, name: `${stem}-saved`, owned: waits,
+        diagnose: details => observe(`${stem}-save`, { group, details }) })
+      const savedJson = saved.json, outputs = await tikzArtifacts(stem)
+      await page.getByLabel('SVG export background', { exact: true }).selectOption('transparent')
+      await page.evaluate(() => window.stzAppLabels.armPointExportClick(['app-point']))
+      const beforeExportState = await state(), preExport = await page.evaluate(observeSignedPointPreExport)
+      const expected = [{ id: 'app-point', source: '', shape: spec.shape, modelPoint: JSON.parse(savedJson).diagram.strata[0], rendered: native.rendered }]
+      await observe(`${stem}-before-export-click`, { group, result: 'observed', beforeExportState, preExport, expected, live, liveCapture })
+      const { event: download } = await event(stem, 'download', () => page.getByRole('button', { name: 'Export current diagram view as SVG', exact: true }).click())
+      const click = await page.evaluate(() => window.stzAppLabels.pointExportClick()), svgPath = resolve(artifactDir, `${stem}.svg`)
+      await download.saveAs(svgPath)
+      const xml = await readFile(svgPath, 'utf8'), fileUrl = pathToFileURL(svgPath).href
+      let reopenedPaint
+      const standalone = await context.newPage()
+      const raw = await capturePointLayoutStandalone({ standalone, artifactDir, evidencePublisher,
+        details: { scenario: stem, group, background: 'transparent', ambientDimension, key, svgPath, fileUrl, pageErrors,
+          expected, click, outputs, xml, savedJson, beforeExportState, preExport, native, reference, live, liveCapture, afterLive },
+        observe: candidate => observe(`${stem}-standalone-observed`, { group, result: 'observed', candidate }),
+        reopen: standalone => standalone.evaluate(observeSignedPointReopening),
+        assertReopened: async candidate => {
+          assert.equal(candidate.reopened.length, 1)
+          const actual = candidate.reopened[0]
+          assert.deepEqual(actual.contour, native.rendered.contour); assert.equal(actual.nodeTransform, native.rendered.nodeTransform)
+          reopenedPaint = await captureConformancePaint({ page: standalone, key,
+            stage: 'reopened', stem, artifactDir, contour: actual.contour, reference,
+            retain: probe => publish(`${stem}-reopened-paint.json`, probe) })
+        } })
+      raw.reopenedPaint = reopenedPaint
+      raw.terminal = { key, ambientDimension, artifact: `${stem}.json`, svg: `${stem}.svg`, result: 'passed' }
+      geometryConformance.push(raw.terminal)
+      await publish(`${stem}.json`, raw)
+      await page.evaluate(() => window.stzAppLabels.releasePointExportClick())
+      conformanceImageAttempt = false
+    }
+    assertConformanceEvidence({ geometryConformance }, artifactDir)
+    await save({ polygonalCases, zeroAxisCases, downloads, geometryConformance })
+
+    // The PGF zero-divisor input is authored and valid model data. Native
+    // Inspector edits change only the intended minimum-width option; the live
+    // warning and warning-only download retain that raw cylinder intent.
+    for (const diagnosticScenario of cylinderDiagnosticScenarios) {
+    scenario = diagnosticScenario
+    const singularCases = [], singularDownloads = []
+    for (const ambientDimension of [2, 3]) {
+      const stem = `${scenario}-${ambientDimension}d`, id = singularCylinderOwner
+      const initialLayout = structuredClone(cylinderDiagnosticLayout(scenario))
+      initialLayout.minimumWidth = 12
+      initialLayout.units.minimumWidth = { source: '12pt', unit: 'pt', texPoints: 12 }
+      const input = await document('cylinder', initialLayout, '', ambientDimension)
+      input.diagram.strata[0].id = id
+      input.diagram.strata[0].style.shapeParameters = structuredClone(singularCylinderParameters)
+      await load(input); await settle(); await select(id)
+      const entry = { ambientDimension, transitions: [] }
+      entry.transitions.push({ state: await state(), rendered: await page.evaluate(observeSingularCylinderPoint, id) })
+      await publish(`${stem}-native.json`, { scenario, group, result: 'observed', case: entry })
+      assertSingularCylinderObservation(entry.transitions[0].rendered, entry.transitions[0].state, { singular: false })
+      for (const value of ['0pt', '12pt', '0pt']) {
+        const field = await nativeField('minimumWidth', value, value === '0pt' ? 0 : 12)
+        await settle()
+        entry.transitions.push({ field, state: await state(), rendered: await page.evaluate(observeSingularCylinderPoint, id) })
+        await publish(`${stem}-native.json`, { scenario, group, result: 'observed', case: entry })
+        await observe(`${stem}-transition-before-assertion`, { group, result: 'observed', artifact: `${stem}-native.json` })
+        assertSingularCylinderObservation(entry.transitions.at(-1).rendered, entry.transitions.at(-1).state, { singular: value === '0pt' })
+      }
+      entry.native = await runSingularCylinderNative({ page, readState: state, id,
+        token: `${stem}:diagnostic:${++selectionSequence}`, secondaryErrors: pageErrors,
+        diagnose: async (details) => {
+          entry.native = structuredClone(details.entry)
+          await publish(`${stem}-native.json`, { scenario, group, result: 'observed', case: entry })
+          await observe(`${stem}-diagnostic-${details.stage}`, { group, result: 'observed', artifact: `${stem}-native.json` })
+        } })
+      singularCases.push(entry)
+      const saved = await saveAppJson({ page, artifactDir, name: `${stem}-saved`, owned: waits,
+        diagnose: (details) => observe(`${stem}-save`, { group, details }) })
+      const savedJson = saved.json
+      await load(savedJson); await settle()
+      const savedPoint = JSON.parse(savedJson).diagram.strata[0]
+      const rendered = await page.evaluate(observeSingularCylinderPoint, id)
+      const expected = [{ id, source: '', shape: 'cylinder', modelPoint: savedPoint, rendered }]
+      const outputs = await tikzArtifacts(stem)
+      await page.getByLabel('SVG export background', { exact: true }).selectOption('transparent')
+      await page.evaluate((ids) => window.stzAppLabels.armPointExportClick(ids), [id])
+      const beforeExportState = await state(), preExport = await page.evaluate(observeSingularCylinderPreExport, id)
+      preExport.point = await page.evaluate(observeSingularCylinderPoint, id)
+      await observe(`${stem}-before-export-click`, { group, result: 'observed', expected, beforeExportState, preExport })
+      const { event: download } = await event(stem, 'download', () => page.getByRole('button', { name: 'Export current diagram view as SVG', exact: true }).click())
+      const click = await page.evaluate(() => window.stzAppLabels.pointExportClick())
+      const svgPath = resolve(artifactDir, `${stem}.svg`); await download.saveAs(svgPath)
+      const xml = await readFile(svgPath, 'utf8'), fileUrl = pathToFileURL(svgPath).href
+      const raw = await capturePointLayoutStandalone({ standalone: await context.newPage(), artifactDir, evidencePublisher,
+        details: { scenario: stem, group, background: 'transparent', ambientDimension, svgPath, fileUrl, pageErrors,
+          expected, click, outputs, xml, savedJson, beforeExportState, preExport },
+        observe: (candidate) => observe(`${stem}-standalone-observed`, { group, result: 'observed', candidate }),
+        reopen: (standalone) => standalone.evaluate(observeSingularCylinderReopening),
+        assertReopened: (candidate) => { assertSingularCylinderSvg(candidate, xml); assert.deepEqual(candidate.requests, [fileUrl]) } })
+      raw.warningPixels = observeSingularCylinderPixels(await readFile(resolve(artifactDir, `${stem}.png`)), raw.reopened[0].matrices.warningScreenCTM)
+      await publish(`${stem}-standalone.json`, raw)
+      await observe(`${stem}-pixels-before-assertion`, { group, result: 'observed', raw })
+      assertSingularCylinderPixels(raw.warningPixels)
+      singularDownloads.push({ scenario: stem, group, background: 'transparent', ambientDimension, expected, click, outputs, savedJson,
+        beforeExportState, preExport, capture: raw.capture, warningPixels: raw.warningPixels })
+      await page.evaluate(() => window.stzAppLabels.releasePointExportClick())
+    }
+    await save({ cases: singularCases, downloads: singularDownloads })
+    }
+
+    scenario = foldedCylinderScenario
+    const foldedCases = [], foldedDownloads = [], reference = foldedCylinderReference()
+    for (const ambientDimension of [2, 3]) {
+      const stem = `${scenario}-${ambientDimension}d`, id = foldedCylinderOwner
+      const input = await document('cylinder', foldedCylinderLayout, '', ambientDimension)
+      input.diagram.strata[0].id = id; input.diagram.strata[0].style.shapeParameters = { aspect: 1 }
+      await load(input); await settle(); await select(id)
+      const entry = { ambientDimension, anchors: [] }
+      for (const anchor of reference.anchors) {
+        const field = await nativeField('anchor', anchor), current = await state(), rendered = await observeLayoutPoint(page, id)
+        const observed = { ambientDimension, anchor, field, state: current, rendered }
+        entry.anchors.push(observed)
+        await publish(`${stem}-native.json`, { scenario, group, result: 'observed', reference, case: entry })
+        await observe(`${stem}-anchor-${anchor}-before-assertion`, { group, result: 'observed', artifact: `${stem}-native.json` })
+        assertFoldedCylinderPlacement(observed, reference)
+      }
+      const field = await nativeField('anchor', 'bottom'), rendered = await select(id)
+      entry.final = { ambientDimension, anchor: 'bottom', field, state: await state(), rendered }
+      foldedCases.push(entry)
+      await publish(`${stem}-native.json`, { scenario, group, result: 'observed', reference, case: entry })
+      await observe(`${stem}-native-before-assertion`, { group, result: 'observed', artifact: `${stem}-native.json` })
+      assertFoldedCylinderPlacement(entry.final, reference)
+      const saved = await saveAppJson({ page, artifactDir, name: `${stem}-saved`, owned: waits,
+        diagnose: details => observe(`${stem}-save`, { group, details }) })
+      const savedJson = saved.json
+      await load(savedJson); await settle()
+      const expected = [{ id, source: '', shape: 'cylinder', modelPoint: JSON.parse(savedJson).diagram.strata[0], rendered: await observeLayoutPoint(page, id) }]
+      const outputs = await tikzArtifacts(stem)
+      await page.getByLabel('SVG export background', { exact: true }).selectOption('transparent')
+      await page.evaluate(ids => window.stzAppLabels.armPointExportClick(ids), [id])
+      const beforeExportState = await state(), preExport = await page.evaluate(observeSignedPointPreExport)
+      await observe(`${stem}-before-export-click`, { group, result: 'observed', expected, beforeExportState, preExport })
+      const { event: download } = await event(stem, 'download', () => page.getByRole('button', { name: 'Export current diagram view as SVG', exact: true }).click())
+      const click = await page.evaluate(() => window.stzAppLabels.pointExportClick())
+      const svgPath = resolve(artifactDir, `${stem}.svg`); await download.saveAs(svgPath)
+      const xml = await readFile(svgPath, 'utf8'), fileUrl = pathToFileURL(svgPath).href
+      const raw = await capturePointLayoutStandalone({ standalone: await context.newPage(), artifactDir, evidencePublisher,
+        details: { scenario: stem, group, background: 'transparent', ambientDimension, svgPath, fileUrl, pageErrors,
+          expected, click, outputs, xml, savedJson, beforeExportState, preExport },
+        observe: candidate => observe(`${stem}-standalone-observed`, { group, result: 'observed', candidate }),
+        reopen: standalone => standalone.evaluate(observeFoldedCylinderReopening),
+        assertReopened: candidate => { assertFoldedCylinderSvg(candidate, xml); assert.deepEqual(candidate.requests, [fileUrl]) } })
+      raw.paintPixels = observeFoldedCylinderPixels(await readFile(resolve(artifactDir, `${stem}.png`)), raw.reopened[0].matrices.outlineScreenCTM)
+      await publish(`${stem}-standalone.json`, raw)
+      await observe(`${stem}-pixels-before-assertion`, { group, result: 'observed', raw })
+      assertFoldedCylinderPixels(raw.paintPixels)
+      foldedDownloads.push({ scenario: stem, group, background: 'transparent', ambientDimension, expected, click, outputs, savedJson,
+        beforeExportState, preExport, capture: raw.capture, paintPixels: raw.paintPixels })
+      await page.evaluate(() => window.stzAppLabels.releasePointExportClick())
+    }
+    await save({ reference, cases: foldedCases, downloads: foldedDownloads })
+
+    for (const background of ['transparent', 'white']) {
+      scenario = `point-layout-pending-${background}-${background === 'transparent' ? 'edit' : 'load'}`
+      const captured = `captured ${background} $\\frac{anchor_{32D}}{1+\\frac{x}{y}}$`
+      const input = buildPendingLayoutFixture(await document('circle', {}, captured, 2, true), captured, layoutShapes, layoutShapeParameters)
+      assertPendingLayoutFixture(input, captured, layoutShapes, layoutShapeParameters)
+      await page.evaluate((source) => window.stzAppLabels.hold(source), captured); held.add(captured); await load(input)
+      await page.waitForFunction((source) => window.stzAppLabels.pending(source)?.started > 0, captured)
+      const pending = await observeLayoutPoint(page, 'layout-circle')
+      const selected = await select('layout-circle', observeLayoutPoint, input), pendingPreparation = selected.pendingPreparation
+      await page.getByLabel('SVG export background', { exact: true }).selectOption(background)
+      const points = input.diagram.strata.filter(({ geometricKind }) => geometricKind === 'point')
+      await page.evaluate((ids) => window.stzAppLabels.armPointExportClick(ids), points.map(({ id }) => id))
+      const beforeExportClick = await capturePendingLayoutPreparation({ page, readState: state, fixture: input, source: captured })
+      await observe(`${scenario}-before-export-click`, { group, result: 'observed', pendingPreparation, beforeExportClick })
+      let click, capturedRelease, postClickView
+      const { event: download } = await event(scenario, 'download', async ({ check }) => {
+        await page.getByRole('button', { name: 'Export current diagram view as SVG', exact: true }).click(); check()
+        click = await page.evaluate(() => window.stzAppLabels.pointExportClick())
+        await observe(`${scenario}-export-click-held`, { group, result: 'observed', pendingPreparation, beforeExportClick, click,
+          heldAfterClick: await page.evaluate((source) => window.stzAppLabels.pending(source), captured) })
+        assertPendingLayoutClickContinuation(pendingPreparation, click, beforeExportClick)
+        if (background === 'transparent') {
+          await (await resolvePointInspectorField(page, 'Node text', 'textarea')).fill('later $changed$')
+          await nativeField('anchor', 'north'); await nativeField('minimumWidth', 110)
+          postClickView = await changePendingLayoutView({ page, scenario, source: captured, click, secondaryErrors: pageErrors,
+            persist: async (view) => {
+              const entry = { scenario: `${scenario}-post-click-view`, group, result: 'observed', postClickView: structuredClone(view) }
+              await publish(`${scenario}-post-click-view.json`, entry)
+              await observe(entry.scenario, entry)
+            } })
+        } else await load(await document('rectangle', { anchor: 'west', minimumWidth: 110 }, 'replacement $loaded$'))
+        check()
+        const beforeRelease = await page.evaluate((source) => window.stzAppLabels.pending(source), captured)
+        capturedRelease = { source: captured, before: beforeRelease,
+          result: await page.evaluate((source) => window.stzAppLabels.release(source), captured) }
+        held.delete(captured)
+        capturedRelease.after = await page.evaluate((source) => window.stzAppLabels.pending(source), captured)
+        await observe(`${scenario}-captured-release`, { group, result: 'observed', capturedRelease })
+      })
+      const svgPath = resolve(artifactDir, `${scenario}.svg`); await download.saveAs(svgPath)
+      const xml = await readFile(svgPath, 'utf8'); assert.ok(xml.includes(captured)); assert.ok(!xml.includes('later $changed$') && !xml.includes('replacement $loaded$'))
+      await load(input); await settle()
+      const expected = []
+      for (const point of points) expected.push(await observeEntry(input, { id: point.id }, point.id))
+      const outputs = await tikzArtifacts()
+      for (const code of Object.values(outputs)) { assert.ok(code.includes('anchor=base')); assert.ok(code.includes('anchor=shape center')) }
+      assertPointTikzSourceByMode(outputs, captured)
+      const standalone = await context.newPage(), fileUrl = pathToFileURL(svgPath).href
+      const standaloneEvidence = await capturePointLayoutStandalone({ standalone, artifactDir, evidencePublisher,
+        details: { scenario, group, background, svgPath, fileUrl, pageErrors, expected, click, pending, outputs, xml,
+          pendingPreparation, beforeExportClick, capturedRelease, ...(postClickView ? { postClickView } : {}) },
+        observe: (candidate) => observe(`${scenario}-standalone-observed`, { group, result: 'observed', candidate }),
+        reopen: async (standalone) => standalone.evaluate((expected) => {
+          const clean = (element) => ({ tag: element.localName, attributes: Object.fromEntries([...element.attributes].filter(({ name }) => !name.startsWith('data-') && name !== 'pointer-events').map(({ name, value }) => [name, value])) })
+          const reopened = expected.map((entry) => {
+            const title = [...document.querySelectorAll('title')].find((element) => element.textContent === entry.source), body = title?.parentElement, node = body?.parentElement
+            const contour = node && [...node.children].find((element) => ['path', 'polygon', 'circle', 'ellipse', 'rect'].includes(element.localName) && element.hasAttribute('stroke') && element.getAttribute('stroke') !== 'none')
+            return { source: title?.textContent, shape: entry.shape, contour: contour && clean(contour), nodeTransform: node?.getAttribute('transform'), bodyTransform: body?.getAttribute('transform'),
+              glyphs: body?.querySelectorAll('path,use').length, errors: document.querySelectorAll('parsererror,foreignObject,image,script').length }
+          })
+          const root = document.documentElement
+          return { reopened, document: { root: { localName: root.localName, namespace: root.namespaceURI,
+            width: root.getAttribute('width'), height: root.getAttribute('height'), viewBox: root.getAttribute('viewBox') },
+            forbiddenCount: document.querySelectorAll('parsererror,foreignObject,image,script,[data-svg-export-exclude]').length,
+            externalReferences: [...document.querySelectorAll('[href]')].map((element) => element.getAttribute('href'))
+              .filter((href) => !href.startsWith('#') || !document.getElementById(href.slice(1))),
+            backgroundCount: document.querySelectorAll('[data-stratified-tikz-export-background]').length } }
+        }, expected),
+        assertReopened: ({ reopened, requests, document }) => {
+          for (const [index, actual] of reopened.entries()) {
+            assert.equal(actual.source, expected[index].source); assert.equal(actual.errors, 0); assert.ok(actual.glyphs > 0)
+            assert.deepEqual(actual.contour, expected[index].rendered.contour); assert.equal(actual.nodeTransform, expected[index].rendered.nodeTransform)
+            assert.equal(actual.bodyTransform, expected[index].rendered.bodyTransform)
+          }
+          assert.notDeepEqual(pending.contour, expected[0].rendered.contour, 'The accepted settled export cannot retain a pending-sized contour')
+          assert.ok(input.diagram.labels.every(({ text }) => xml.includes(text.replaceAll('&', '&amp;').replaceAll('<', '&lt;'))))
+          const inline = resolvePendingLayoutInlineNodes(input)
+          assert.ok(inline.every(({ text }) => xml.includes(text.replaceAll('&', '&amp;').replaceAll('<', '&lt;'))))
+          assert.deepEqual(requests, [fileUrl], 'Reopened SVG requests only its downloaded file')
+          assert.equal(document.forbiddenCount, 0); assert.deepEqual(document.externalReferences, [])
+          assert.equal(document.backgroundCount, background === 'white' ? 1 : 0)
+        } })
+      await save({ background, actualDownload: true, capturedPending: click.snapshot.points[0].status === 'pending', reopened: true, immutableSource: true, immutableLayout: true,
+        immutablePlacement: true, settledContour: true, combinedLabels: true, noExternalAssets: true, expected, click, pending,
+        pendingPreparation, beforeExportClick, capturedRelease, ...(postClickView ? { postClickView } : {}),
+        capture: standaloneEvidence.capture })
+    }
+    assert.deepEqual(pageErrors, []); assert.deepEqual(selectionSecondaryErrors, []); await completeGroup(group)
+  } catch (error) {
+    primary = error
+    evidencePublisher.fail(error)
+    if (currentLiveCapture) markZeroAxisLiveCaptureFailure(error)
+    const liveCapture = isZeroAxisLiveCaptureFailure(error) ? currentLiveCapture : undefined
+    await retainFailure('point-layout-failure.json', { scenario, group, result: 'failed', pageErrors,
+      secondaryErrors: selectionSecondaryErrors, liveCapture, error: { message: error.message, stack: error.stack } })
+    try { await app.failure(error, { scenario, pageErrors, secondaryErrors: selectionSecondaryErrors, liveCapture }, { captureScreenshot: !scenario.startsWith('point-layout-pending-')
+      && !isZeroAxisLiveCaptureFailure(error) && !conformanceImageAttempt }) } catch (diagnosticError) {
+      await retainFailure('point-layout-secondary-failure.json', { primary: error.message, diagnostic: diagnosticError.message })
+    }
+    throw error
+  } finally {
+    for (const wait of waits) wait.dispose()
+    const pendingCleanup = { scenario, result: 'observed', primary: primary?.message, holds: [], errors: [] }
+    if (scenario.startsWith('point-layout-pending-') || scenario === signedPolygonalScenario || scenario === foldedCylinderScenario || cylinderDiagnosticScenarios.includes(scenario)) {
+      try {
+        await boundedPointDiagnostic(() => page.evaluate(() => window.stzAppLabels.releasePointExportClick()), 'Pending export listener cleanup')
+        pendingCleanup.exportListenerReleased = true
+      } catch (error) {
+        primary ??= error; pendingCleanup.errors.push({ operation: 'export listener cleanup', message: error.message })
+        selectionSecondaryErrors.push(`Pending export listener cleanup: ${error.message}`)
+      }
+    }
+    for (const source of held) {
+      const release = { source }
+      pendingCleanup.holds.push(release)
+      try {
+        release.before = await page.evaluate((source) => window.stzAppLabels.pending(source), source)
+        release.result = await page.evaluate((source) => window.stzAppLabels.release(source), source)
+        release.after = await page.evaluate((source) => window.stzAppLabels.pending(source), source)
+      } catch (error) {
+        primary ??= error; release.error = error.message; selectionSecondaryErrors.push(`Held layout conversion cleanup: ${error.message}`)
+      }
+    }
+    if (scenario.startsWith('point-layout-pending-')) await retainFailure('point-layout-pending-cleanup.json', pendingCleanup)
+    try { await context.close() } catch (error) { primary ??= error; await retainFailure('point-layout-cleanup-failure.json', { primary: primary.message, cleanup: error.message }) }
+    await Promise.allSettled(waits.map((wait) => wait.drain()))
+  }
+  if (primary) throw primary
+}

@@ -1,4 +1,6 @@
 import { PointShapeFields } from './PointShapeFields.tsx'
+import { PointLayoutFields } from './PointLayoutFields.tsx'
+import { updateLegacyPointSize } from '../../model/pointNodeLayout.ts'
 import { markPointShapeOverrides } from '../../model/pointShapeParameters.ts'
 import { PointPaintFields } from './PointPaintFields.tsx'
 import { getPointPaint, updatePointColor, updatePointFill } from '../../model/styles.ts'
@@ -819,7 +821,7 @@ function PresetStyleFields({
           <EditablePositiveNumberField
             label="Preset size"
             value={preset.style.size}
-            onChange={(size) => onChange({ ...preset.style, size })}
+            onChange={(size) => onChange(updateLegacyPointSize(preset.style, size))}
           />
           <EditableSelectField<PointShape>
             label="Preset shape"
@@ -828,6 +830,7 @@ function PresetStyleFields({
             onChange={(shape) => onChange(markPointShapeOverrides({ ...preset.style, shape }, ['shape']))}
           />
           <PointShapeFields style={preset.style} prefix="Preset " onChange={onChange} />
+          <PointLayoutFields style={preset.style} prefix="Preset " onChange={onChange} />
           <EditableSelectField<PointFill>
             label="Preset fill"
             value={preset.style.fill}

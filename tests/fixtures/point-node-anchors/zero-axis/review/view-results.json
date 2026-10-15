@@ -1,0 +1,68 @@
+[
+  {
+    "ambientDimension": 2,
+    "validation": {
+      "valid": true,
+      "errors": []
+    },
+    "savedRoundTrip": true,
+    "stateStatus": "ready",
+    "geometryLimitation": null,
+    "shapeBounds": {
+      "minX": 0,
+      "minY": -33.941125496954285,
+      "maxX": 0,
+      "maxY": 33.941125496954285
+    },
+    "paintedBounds": {
+      "minX": -0.24,
+      "minY": -33.941125496954285,
+      "maxX": 0.24,
+      "maxY": 33.941125496954285
+    },
+    "selectionRadius": 33.941974014485375,
+    "markup": "<title></title><g transform=\"translate(0 0)\" data-point-node=\"[&quot;point-node&quot;,1,&quot;zero-x&quot;]\" data-point-request=\"[&quot;&quot;,&quot;Inter, ui-sans-serif, system-ui, &#x27;Segoe UI&#x27;, Roboto, sans-serif&quot;,12,&quot;400&quot;,&quot;normal&quot;,0,4,0.2,&quot;[\\&quot;point-node\\&quot;,1,\\&quot;zero-x\\&quot;]&quot;]\" data-point-shape=\"ellipse\" data-point-shape-parameters=\"{&quot;aspect&quot;:1,&quot;borderRotate&quot;:0,&quot;borderUsesIncircle&quot;:false,&quot;trapeziumLeftAngle&quot;:60,&quot;trapeziumRightAngle&quot;:60,&quot;trapeziumStretches&quot;:false,&quot;trapeziumStretchesBody&quot;:false,&quot;regularPolygonSides&quot;:5,&quot;starPoints&quot;:5,&quot;starPointHeight&quot;:14.226377952755904,&quot;starPointRatio&quot;:1.5,&quot;starPointMode&quot;:&quot;ratio&quot;,&quot;isoscelesTriangleApexAngle&quot;:45,&quot;isoscelesTriangleStretches&quot;:false,&quot;kiteUpperVertexAngle&quot;:120,&quot;kiteLowerVertexAngle&quot;:60,&quot;dartTipAngle&quot;:45,&quot;dartTailAngle&quot;:135,&quot;circularSectorAngle&quot;:60,&quot;cylinderUsesCustomFill&quot;:false,&quot;cylinderEndFill&quot;:&quot;#FFFFFF&quot;,&quot;cylinderBodyFill&quot;:&quot;#FFFFFF&quot;}\" data-point-layout=\"{&quot;innerXSep&quot;:0,&quot;innerYSep&quot;:20,&quot;outerXSep&quot;:0,&quot;outerYSep&quot;:0,&quot;minimumWidth&quot;:0,&quot;minimumHeight&quot;:0,&quot;anchor&quot;:&quot;center&quot;,&quot;fontContext&quot;:{&quot;fontSizePt&quot;:10,&quot;xHeightPt&quot;:4.30554}}\" data-point-anchor=\"center\" data-point-anchor-offset=\"0 0\" data-point-body-origin=\"0 0\" data-point-text-origin=\"0 0\" data-point-body-baseline=\"0\" data-point-body-bounds=\"0 0 0 0\" data-point-anchor-bounds=\"0 -33.941125496954285 0 33.941125496954285\" data-point-shape-bounds=\"0 -33.941125496954285 0 33.941125496954285\" data-point-painted-bounds=\"-0.24 -33.941125496954285 0.24 33.941125496954285\"><path fill=\"#000000\" fill-opacity=\"1\" stroke=\"#000000\" stroke-opacity=\"1\" stroke-width=\"0.48\" stroke-dashoffset=\"0\" stroke-linecap=\"butt\" stroke-linejoin=\"miter\" stroke-miterlimit=\"10\" data-point-contour=\"true\" d=\"M 0 0 A 0 33.941125496954 0 0 0 0 0 A 0 33.941125496954 0 0 0 0 0 Z\"></path><g transform=\"translate(0 0)\" data-label-state=\"ready\" data-label-source=\"\" data-label-request=\"[&quot;&quot;,&quot;Inter, ui-sans-serif, system-ui, &#x27;Segoe UI&#x27;, Roboto, sans-serif&quot;,12,&quot;400&quot;,&quot;normal&quot;,0,4,0.2,&quot;[\\&quot;point-node\\&quot;,1,\\&quot;zero-x\\&quot;]&quot;]\" data-label-owner=\"[&quot;point-node&quot;,1,&quot;zero-x&quot;]\" data-label-bounds=\"0 0 0 0\" aria-label=\"\" role=\"img\"><g transform=\"translate(0 0)\" opacity=\"1\" fill=\"#000000\" color=\"#000000\" pointer-events=\"none\"><g data-label-content=\"true\"></g></g></g></g>",
+    "settledUsesSameContour": true,
+    "pngMetrics": "1 1 1",
+    "hitAtLocalY20": [
+      {
+        "id": "zero-x",
+        "kind": "point"
+      }
+    ],
+    "path": "M 0 0 A 0 33.941125496954 0 0 0 0 0 A 0 33.941125496954 0 0 0 0 0 Z"
+  },
+  {
+    "ambientDimension": 3,
+    "validation": {
+      "valid": true,
+      "errors": []
+    },
+    "savedRoundTrip": true,
+    "stateStatus": "ready",
+    "geometryLimitation": null,
+    "shapeBounds": {
+      "minX": 0,
+      "minY": -33.941125496954285,
+      "maxX": 0,
+      "maxY": 33.941125496954285
+    },
+    "paintedBounds": {
+      "minX": -0.24,
+      "minY": -33.941125496954285,
+      "maxX": 0.24,
+      "maxY": 33.941125496954285
+    },
+    "selectionRadius": 33.941974014485375,
+    "markup": "<title></title><g transform=\"translate(0 0)\" data-point-node=\"[&quot;point-node&quot;,1,&quot;zero-x&quot;]\" data-point-request=\"[&quot;&quot;,&quot;Inter, ui-sans-serif, system-ui, &#x27;Segoe UI&#x27;, Roboto, sans-serif&quot;,12,&quot;400&quot;,&quot;normal&quot;,0,4,0.2,&quot;[\\&quot;point-node\\&quot;,1,\\&quot;zero-x\\&quot;]&quot;]\" data-point-shape=\"ellipse\" data-point-shape-parameters=\"{&quot;aspect&quot;:1,&quot;borderRotate&quot;:0,&quot;borderUsesIncircle&quot;:false,&quot;trapeziumLeftAngle&quot;:60,&quot;trapeziumRightAngle&quot;:60,&quot;trapeziumStretches&quot;:false,&quot;trapeziumStretchesBody&quot;:false,&quot;regularPolygonSides&quot;:5,&quot;starPoints&quot;:5,&quot;starPointHeight&quot;:14.226377952755904,&quot;starPointRatio&quot;:1.5,&quot;starPointMode&quot;:&quot;ratio&quot;,&quot;isoscelesTriangleApexAngle&quot;:45,&quot;isoscelesTriangleStretches&quot;:false,&quot;kiteUpperVertexAngle&quot;:120,&quot;kiteLowerVertexAngle&quot;:60,&quot;dartTipAngle&quot;:45,&quot;dartTailAngle&quot;:135,&quot;circularSectorAngle&quot;:60,&quot;cylinderUsesCustomFill&quot;:false,&quot;cylinderEndFill&quot;:&quot;#FFFFFF&quot;,&quot;cylinderBodyFill&quot;:&quot;#FFFFFF&quot;}\" data-point-layout=\"{&quot;innerXSep&quot;:0,&quot;innerYSep&quot;:20,&quot;outerXSep&quot;:0,&quot;outerYSep&quot;:0,&quot;minimumWidth&quot;:0,&quot;minimumHeight&quot;:0,&quot;anchor&quot;:&quot;center&quot;,&quot;fontContext&quot;:{&quot;fontSizePt&quot;:10,&quot;xHeightPt&quot;:4.30554}}\" data-point-anchor=\"center\" data-point-anchor-offset=\"0 0\" data-point-body-origin=\"0 0\" data-point-text-origin=\"0 0\" data-point-body-baseline=\"0\" data-point-body-bounds=\"0 0 0 0\" data-point-anchor-bounds=\"0 -33.941125496954285 0 33.941125496954285\" data-point-shape-bounds=\"0 -33.941125496954285 0 33.941125496954285\" data-point-painted-bounds=\"-0.24 -33.941125496954285 0.24 33.941125496954285\"><path fill=\"#000000\" fill-opacity=\"1\" stroke=\"#000000\" stroke-opacity=\"1\" stroke-width=\"0.48\" stroke-dashoffset=\"0\" stroke-linecap=\"butt\" stroke-linejoin=\"miter\" stroke-miterlimit=\"10\" data-point-contour=\"true\" d=\"M 0 0 A 0 33.941125496954 0 0 0 0 0 A 0 33.941125496954 0 0 0 0 0 Z\"></path><g transform=\"translate(0 0)\" data-label-state=\"ready\" data-label-source=\"\" data-label-request=\"[&quot;&quot;,&quot;Inter, ui-sans-serif, system-ui, &#x27;Segoe UI&#x27;, Roboto, sans-serif&quot;,12,&quot;400&quot;,&quot;normal&quot;,0,4,0.2,&quot;[\\&quot;point-node\\&quot;,1,\\&quot;zero-x\\&quot;]&quot;]\" data-label-owner=\"[&quot;point-node&quot;,1,&quot;zero-x&quot;]\" data-label-bounds=\"0 0 0 0\" aria-label=\"\" role=\"img\"><g transform=\"translate(0 0)\" opacity=\"1\" fill=\"#000000\" color=\"#000000\" pointer-events=\"none\"><g data-label-content=\"true\"></g></g></g></g>",
+    "settledUsesSameContour": true,
+    "pngMetrics": "1 1 1",
+    "hitAtLocalY20": [
+      {
+        "id": "zero-x",
+        "kind": "point"
+      }
+    ],
+    "path": "M 0 0 A 0 33.941125496954 0 0 0 0 0 A 0 33.941125496954 0 0 0 0 0 Z"
+  }
+]

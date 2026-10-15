@@ -679,6 +679,36 @@ export type ImportedPointShape = {
   overriddenFields: PointShapeField[]
 }
 
+/** Stored layout dimensions are TeX points (72.27 per inch), never CSS pixels. */
+export type PointNodeFontContext = { fontSizePt: number; xHeightPt: number }
+export type PointNodeDimensionUnit = 'pt' | 'mm' | 'cm' | 'in' | 'bp' | 'em' | 'ex'
+export type PointNodeDimensionField = 'innerXSep' | 'innerYSep' | 'outerXSep' | 'outerYSep' | 'minimumWidth' | 'minimumHeight'
+export type PointNodeDimensionSource = {
+  source: string
+  unit: PointNodeDimensionUnit
+  texPoints: number
+  /** The context actually used by this axis; other axes may use another font. */
+  fontContext?: PointNodeFontContext
+}
+export type PointNodeLayoutField = PointNodeDimensionField | 'anchor'
+export type PointNodeLayoutOptions = {
+  innerXSep?: number
+  innerYSep?: number
+  outerXSep?: number
+  outerYSep?: number
+  minimumWidth?: number
+  minimumHeight?: number
+  anchor?: string
+  /** Default context for new em/ex inputs and old metadata; no typography override. */
+  fontContext?: PointNodeFontContext
+  units?: Partial<Record<PointNodeDimensionField, PointNodeDimensionSource>>
+}
+export type ImportedPointLayout = {
+  referenceId: string
+  baseline: PointNodeLayoutOptions
+  overriddenFields: PointNodeLayoutField[]
+}
+
 export type PointStyle = {
   kind: 'pointStyle'
   /** Authoritative paint when present; absence denotes legacy paint semantics. */
@@ -691,6 +721,9 @@ export type PointStyle = {
   shape: PointShape
   shapeParameters?: PointShapeParameters
   importedShape?: ImportedPointShape
+  /** Explicit axes override legacy size/2 individually; omission retains defaults. */
+  layout?: PointNodeLayoutOptions
+  importedLayout?: ImportedPointLayout
   fill: PointFill
   size: number
 }

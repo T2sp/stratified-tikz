@@ -7,6 +7,7 @@ export const appGeometryLimits = Object.freeze({ samples: 1024, events: 128, anc
   animations: 16, monitorSamples: 8, recordBytes: 64_000, string: 4000,
   controlFrames: 24, controlEvents: 32, controlScan: 512, controlMatches: 2, hitTargets: 4, stateParse: 256_000 })
 const observerKey = '__stzAppGeometryDiagnostics'
+const waitOwners = new WeakMap()
 const clipped = (value, limit = 4000) => String(value ?? '').slice(0, limit)
 const errorDetails = (error) => ({ message: clipped(error?.message ?? error), stack: clipped(error?.stack, 12_000),
   ...(Array.isArray(error?.log) ? { log: error.log.slice(0, 64).map((line) => clipped(line, 500)),
@@ -65,7 +66,8 @@ export function installAppGeometryObserver({ key = '__stzAppGeometryDiagnostics'
   const stop = () => {
     if (stopped) return
     stopped = true; cancelAnimationFrame(raf); clearTimeout(lease)
-    for (const release of listeners) release()
+    raf = null; lease = undefined
+    for (const release of listeners.splice(0)) release()
     add('observer-stopped')
   }
   // A lost host must not leave instrumentation running forever. Each successful
@@ -240,9 +242,20 @@ export function installAppGeometryObserver({ key = '__stzAppGeometryDiagnostics'
           .map((input) => ({ name: text(input.getAttribute('aria-label')), value: text(input.value), rect: rect(input.getBoundingClientRect()) })) },
       animations, ...(nativeControls ? { nativeControls: nativeSnapshot() } : {}) }
   }
-  Object.defineProperty(window, key, { value: { snapshot, stop, assertOwnership }, configurable: false })
+  const identityEvidence = () => {
+    const marker = window.__stzOwnedAppDocument, label = document.querySelector('[data-label-id="app-label"] [data-label-state]')
+    return { generation: expected.generation, url: expected.url, currentGeneration: marker?.generation ?? null,
+      currentUrl: location.href, sameInstance: expected.api === window.stzAppLabels && marker?.api === expected.api,
+      stopped, source: label ? text(label.getAttribute('data-label-source')) : null,
+      request: label ? text(label.getAttribute('data-label-request')) : null, status: label?.getAttribute('data-label-state') ?? null,
+      bounds: label ? text(label.getAttribute('data-label-bounds')) : null,
+      attributesTruncated: !!label && ['data-label-source', 'data-label-request', 'data-label-bounds']
+        .some((name) => (label.getAttribute(name)?.length ?? 0) > limits.string),
+      cleanup: { observerFramePending: raf !== null, observerTimerPending: lease !== undefined, listeners: listeners.length } }
+  }
+  Object.defineProperty(window, key, { value: { snapshot, stop, assertOwnership, identity: identityEvidence }, configurable: false })
   add('observer-installed'); raf = requestAnimationFrame(tick); renew()
-  return { installed: true, generation: expected.generation }
+  return { installed: true, generation: expected.generation, url: expected.url }
 }
 
 export function readAppGeometryObserver({ key = '__stzAppGeometryDiagnostics' } = {}) {
@@ -253,27 +266,74 @@ export function readAppGeometryObserver({ key = '__stzAppGeometryDiagnostics' } 
 export function stopAppGeometryObserver({ key = '__stzAppGeometryDiagnostics' } = {}) {
   window[key]?.stop()
   for (const wait of window.__stzAppGeometryWaits?.values() ?? []) wait.cancel('App geometry diagnostics disposed')
+  window.__stzAppGeometryCancelledWaits?.clear()
+  return { identity: window[key]?.identity?.() ?? null, waits: window.__stzAppGeometryWaits?.size ?? 0,
+    cancelledTokens: window.__stzAppGeometryCancelledWaits?.size ?? 0 }
 }
 
 /** Serialized once into the owned page. Browser timers bound stopped frames;
  * host deadlines additionally bound an unresponsive evaluation/renderer. */
-export function waitForAppGeometryInDocument({ token, mode, frames, timeoutMs, key = '__stzAppGeometryDiagnostics' }) {
+export function waitForAppGeometryInDocument({ token, mode, frames, timeoutMs, identity,
+  context, key = '__stzAppGeometryDiagnostics' }) {
   const waits = window.__stzAppGeometryWaits ??= new Map()
+  const cancelled = window.__stzAppGeometryCancelledWaits ??= new Map()
+  const records = window.__stzAppGeometryWaitRecords ??= new Map()
+  const entry = performance.now(), deadline = entry + timeoutMs
+  const record = { token, mode, context, clock: 'browser-performance', entry, deadline,
+    entryWall: Date.now(), frames: 0, stableFrames: 0, samples: [], droppedSamples: 0, result: 'running',
+    limits: { frames: 600, snapshots: 3, progress: 16, activeWaits: 8, retainedWaits: 8 } }
   if (waits.size >= 8) throw new Error('App geometry frame wait budget exceeded')
+  if (records.size >= 8) {
+    const completed = [...records.keys()].find((candidate) => !waits.has(candidate))
+    if (completed !== undefined) records.delete(completed)
+  }
+  records.set(token, record)
+  const stamp = (event, details = {}) => {
+    record.samples.push({ event, at: performance.now(), wall: Date.now(), ...details })
+    if (record.samples.length > 16) { record.samples.splice(1, 1); record.droppedSamples++ }
+  }
+  record.entryIdentity = window[key]?.identity?.() ?? null
+  stamp('wait-entered')
+  if (cancelled.has(token)) {
+    const tombstone = cancelled.get(token); cancelled.delete(token)
+    record.result = 'cancelled-before-registration'; record.settlement = performance.now()
+    record.settlementWall = Date.now()
+    record.cleanup = { framePending: false, timerPending: false, mapHasToken: waits.has(token) }
+    stamp('late-registration-rejected', { cancelledAt: tombstone.at })
+    throw new Error('App frame wait cancelled before browser registration')
+  }
   return new Promise((resolve, reject) => {
     let raf, timer, count = 0, stable = 0, previous, finished = false
     const samples = []
     const finish = (error, result) => {
       if (finished) return
       finished = true; clearTimeout(timer); cancelAnimationFrame(raf); waits.delete(token)
-      if (error) reject(error); else resolve(result)
+      raf = undefined; timer = undefined
+      record.result = error ? 'failed' : 'passed'; record.settlement = performance.now(); record.settlementWall = Date.now()
+      record.frames = count; record.stableFrames = stable
+      record.cleanup = { framePending: false, timerPending: false, mapHasToken: waits.has(token) }
+      stamp(error ? 'wait-rejected' : 'wait-completed', { error: error?.message ?? null })
+      if (error) reject(error); else resolve({ ...result, timing: record })
+    }
+    const timeout = () => new Error(`App ${mode === 'stable' ? 'geometry never stabilized' : 'animation frames stalled'} within ${timeoutMs}ms`)
+    const guard = () => {
+      // Browser and host clocks have separate absolute deadlines. A withheld
+      // browser timer cannot authorize a late third frame or delayed snapshot.
+      if (performance.now() >= deadline) throw timeout()
+      const observer = window[key]
+      if (!observer) throw new Error('App geometry observer missing during stability wait')
+      observer.assertOwnership?.()
+      const current = observer.identity?.()
+      if (identity && current && (current.generation !== identity.generation || current.url !== identity.url)) {
+        throw new Error('Owned App URL/document/API continuity lost during geometry stability wait')
+      }
+      if (current?.stopped) throw new Error('App geometry observer stopped before stability wait')
     }
     waits.set(token, { cancel: (reason) => finish(new Error(reason)) })
     const measure = () => {
-      const observer = window[key]
-      if (!observer) throw new Error('App geometry observer missing during stability wait')
-      const snapshot = observer.snapshot()
-      if (!snapshot.generation || snapshot.generation !== snapshot.observerGeneration || snapshot.url !== snapshot.observerUrl || !snapshot.api.sameInstance) {
+      const snapshot = window[key].snapshot()
+      if (!snapshot.generation || snapshot.generation !== snapshot.observerGeneration || snapshot.url !== snapshot.observerUrl || !snapshot.api.sameInstance
+        || (identity && (snapshot.generation !== identity.generation || snapshot.url !== identity.url))) {
         throw new Error('Owned App URL/document/API continuity lost during geometry stability wait')
       }
       if (snapshot.labelAttributesTruncated) throw new Error('App source/request exceeds geometry stability evidence budget')
@@ -296,13 +356,19 @@ export function waitForAppGeometryInDocument({ token, mode, frames, timeoutMs, k
       stable = previous === comparison ? stable + 1 : 1
       previous = comparison
       samples.push(snapshot); if (samples.length > 3) samples.shift()
+      record.current = { source: snapshot.labelSource, request: snapshot.labelRequest,
+        status: snapshot.labelStatus, bounds: snapshot.labelBounds }
+      stamp('frame-sampled', { frame: count, stableFrames: stable,
+        generation: snapshot.generation, url: snapshot.url, sameInstance: snapshot.api.sameInstance,
+        observerFrames: snapshot.frames.count, observerLastFrame: snapshot.frames.last ?? null })
       return snapshot
     }
     const tick = () => {
       if (finished) return
       try {
-        count++
+        guard(); count++
         const snapshot = mode === 'stable' ? measure() : undefined
+        guard()
         if (mode === 'stable' ? stable >= 3 : count >= frames) {
           finish(null, { mode, frames: count, stableFrames: stable, snapshot, samples }); return
         }
@@ -310,27 +376,113 @@ export function waitForAppGeometryInDocument({ token, mode, frames, timeoutMs, k
         raf = requestAnimationFrame(tick)
       } catch (error) { finish(error) }
     }
-    timer = setTimeout(() => finish(new Error(`App ${mode === 'stable' ? 'geometry never stabilized' : 'animation frames stalled'} within ${timeoutMs}ms`)), timeoutMs)
-    raf = requestAnimationFrame(tick)
+    try {
+      guard()
+      timer = setTimeout(() => { stamp('inner-timer-delivered'); finish(timeout()) }, timeoutMs)
+      raf = requestAnimationFrame(tick)
+    } catch (error) { finish(error) }
   })
 }
 
-export function cancelAppGeometryWait({ token }) {
-  window.__stzAppGeometryWaits?.get(token)?.cancel('App frame wait host deadline or evaluation failure')
+export function cancelAppGeometryWait({ token, identity, key = '__stzAppGeometryDiagnostics' }) {
+  const observer = window[key]
+  if (!observer) throw new Error('Original App observer unavailable during frame cancellation')
+  observer.assertOwnership?.()
+  const current = observer.identity?.()
+  if (identity && current && (current.generation !== identity.generation || current.url !== identity.url)) {
+    throw new Error('Original owned App document lost before frame cancellation')
+  }
+  const waits = window.__stzAppGeometryWaits ??= new Map(), wait = waits.get(token)
+  const records = window.__stzAppGeometryWaitRecords ??= new Map()
+  const cancelled = window.__stzAppGeometryCancelledWaits ??= new Map()
+  const registered = !!wait
+  if (wait) wait.cancel('App frame wait host deadline or evaluation failure')
+  else if (!records.has(token)) {
+    // Cancellation may overtake evaluate entry. Retain a token-specific fence
+    // in this original document; a late entry consumes it without scheduling rAF.
+    if (cancelled.size >= 8) throw new Error('App geometry cancellation token budget exceeded')
+    cancelled.set(token, { at: performance.now(), identity: current ?? identity })
+  }
+  return { token, cancelled: registered, registered, tombstoned: cancelled.has(token),
+    cleanup: records.get(token)?.cleanup ?? { framePending: false, timerPending: false, mapHasToken: waits.has(token) },
+    browser: records.get(token) ?? null, identity: current ?? null, at: performance.now(), wall: Date.now() }
 }
 
-async function waitForAppGeometry(page, mode, { timeoutMs = 2000, frames = 2 } = {}) {
+/** A late registration rejection cannot transport custom Error properties.
+ * Read its compact retained record only from the original document, without
+ * taking a snapshot, renewing a lease, or restarting any observer. */
+export function readAppGeometryWaitRecord({ token, identity, key = '__stzAppGeometryDiagnostics' }) {
+  const observer = window[key]
+  if (!observer) throw new Error('Original App observer unavailable during wait drain')
+  observer.assertOwnership?.()
+  const current = observer.identity?.()
+  if (identity && current && (current.generation !== identity.generation || current.url !== identity.url)) {
+    throw new Error('Original owned App document lost before wait drain')
+  }
+  return window.__stzAppGeometryWaitRecords?.get(token) ?? null
+}
+
+async function waitForAppGeometry(page, mode, { timeoutMs = 2000, frames = 2, identity = waitOwners.get(page),
+  token = randomUUID(), context, observeWait, scheduleDeadline, cancellationScheduleDeadline } = {}) {
   if (!Number.isFinite(timeoutMs) || timeoutMs <= 0 || timeoutMs > 30_000) throw new Error('App geometry wait timeout must be in (0, 30000]')
   if (!Number.isInteger(frames) || frames < 1 || frames > 10) throw new Error('App frame count must be in [1, 10]')
-  const token = randomUUID()
+  const now = scheduleDeadline?.monotonicNow ?? (() => performance.now())
+  const emit = (event, details = {}) => {
+    try { observeWait?.({ token, event, host: { wall: Date.now(), monotonic: now() }, ...details }) }
+    catch { /* Compact timing evidence never changes operation ownership. */ }
+  }
+  emit('wait-start', { mode, frames, timeoutMs, hostTimeoutMs: timeoutMs + 100, cancellationTimeoutMs: 250,
+    context, identity, clocks: 'host-performance and browser-performance are independent; token pairs endpoints only' })
+  let operation, primary
+  const scheduler = (expire, budget, owned) => {
+    operation = owned
+    emit('host-deadline-armed', { operation: owned.snapshot() })
+    const deliver = () => { emit('host-timer-delivered'); expire() }
+    if (scheduleDeadline) return scheduleDeadline(deliver, budget, owned)
+    const timer = setTimeout(deliver, budget)
+    return () => clearTimeout(timer)
+  }
+  scheduler.monotonicNow = now
   try {
-    return await boundedPointDiagnostic(() => page.evaluate(waitForAppGeometryInDocument,
-      { token, mode, frames, timeoutMs }), `App ${mode} frame wait`, timeoutMs + 100)
+    const result = await boundedPointDiagnostic((owned) => {
+      operation = owned; emit('evaluation-entered', { operation: owned.snapshot() })
+      // Own both raw transport outcomes immediately, including after expiry.
+      owned.assertActive('browser-evaluation-start')
+      const evaluation = Promise.resolve(page.evaluate(waitForAppGeometryInDocument,
+        { token, mode, frames, timeoutMs, identity, context }))
+      const active = () => owned.state === 'active' && now() < owned.deadlineMs
+      evaluation.then((value) => emit(active() ? 'evaluation-returned' : 'late-fulfillment', { browser: value?.timing }),
+        (error) => emit(active() ? 'evaluation-rejected' : 'late-rejection', { error: errorDetails(error) }))
+      return evaluation
+    }, `App ${mode} frame wait`, timeoutMs + 100, scheduler)
+    emit('host-settled', { result: 'passed', operation: operation?.snapshot() })
+    return result
   } catch (error) {
-    // The initial evaluate retains its rejection handler after a host deadline.
-    // Cancel work in a responsive document; never wait indefinitely for cleanup.
-    await boundedPointDiagnostic(() => page.evaluate(cancelAppGeometryWait, { token }), 'App frame cancellation', 250).catch(() => {})
-    throw error
+    primary = error
+    emit('host-settled', { result: 'failed', error: errorDetails(error), operation: operation?.snapshot() })
+    let cancellationOperation
+    try {
+      emit('cancellation-entered')
+      const cancelNow = cancellationScheduleDeadline?.monotonicNow ?? (() => performance.now())
+      const cancelScheduler = (expire, budget, owned) => {
+        cancellationOperation = owned
+        emit('cancellation-deadline-armed', { operation: owned.snapshot() })
+        const deliver = () => { emit('cancellation-timer-delivered'); expire() }
+        if (cancellationScheduleDeadline) return cancellationScheduleDeadline(deliver, budget, owned)
+        const timer = setTimeout(deliver, budget)
+        return () => clearTimeout(timer)
+      }
+      cancelScheduler.monotonicNow = cancelNow
+      const cancellation = await boundedPointDiagnostic((owned) => {
+        const evaluation = Promise.resolve(page.evaluate(cancelAppGeometryWait, { token, identity }))
+        const active = () => owned.state === 'active' && cancelNow() < owned.deadlineMs
+        evaluation.then((value) => emit(active() ? 'cancellation-evaluation-returned' : 'late-cancellation-fulfillment', { cancellation: value }),
+          (secondary) => emit(active() ? 'cancellation-evaluation-rejected' : 'late-cancellation-rejection', { error: errorDetails(secondary) }))
+        return evaluation
+      }, 'App frame cancellation', 250, cancelScheduler)
+      emit('cancellation-returned', { cancellation, operation: cancellationOperation?.snapshot() })
+    } catch (secondary) { emit('cancellation-rejected', { error: errorDetails(secondary), operation: cancellationOperation?.snapshot() }) }
+    throw primary
   }
 }
 export const waitForAppFrames = (page, options) => waitForAppGeometry(page, 'frames', options)
@@ -379,8 +531,8 @@ function boundedDetails(value, depth = 0, budget = { bytes: 16_000 }) {
 export function createAppGeometryDiagnostics({ page, artifactDir, timeoutMs = 2000, prefix = 'app-geometry', nativeControls = false }) {
   if (!Number.isFinite(timeoutMs) || timeoutMs <= 0 || timeoutMs > 10_000) throw new Error('App diagnostic timeout must be in (0, 10000]')
   if (!/^[a-z0-9-]+$/i.test(prefix)) throw new Error('Invalid App diagnostic artifact prefix')
-  const events = [], index = [], listeners = [], diagnosticErrors = []
-  let sequence = 0, droppedEvents = 0, droppedSamples = 0, pendingEvaluation, disposed = false, activeMonitor, failureRecord, capturedFailure = false
+  const events = [], index = [], listeners = [], diagnosticErrors = [], waitIndex = [], dirtyWaits = new Set(), recentWaits = new Map()
+  let sequence = 0, waitSequence = 0, droppedWaits = 0, droppedEvents = 0, droppedSamples = 0, pendingEvaluation, disposed = false, activeMonitor, failureRecord, capturedFailure = false
   const host = () => ({ wall: Date.now(), monotonic: performance.now(), url: clipped(page.url()), closed: page.isClosed() })
   const note = (event, details = {}) => {
     events.push({ event, ...host(), details: boundedDetails(details) })
@@ -397,7 +549,61 @@ export function createAppGeometryDiagnostics({ page, artifactDir, timeoutMs = 20
   }
   const persist = () => safeWrite(resolve(artifactDir, `${prefix}-index.json`), {
     schema: 1, result: 'diagnostics-only', limits: appGeometryLimits, index, events, droppedEvents, droppedSamples,
-    diagnosticErrors, failure: failureRecord, disposed })
+    diagnosticErrors, failure: failureRecord, disposed, waitIndex, droppedWaits })
+  const flushWaits = async () => {
+    // Only compact changed wait records, never accumulated App/native reports.
+    // Writes happen outside stable-wait ownership and have ordinary I/O bounds.
+    for (const record of [...dirtyWaits].slice(0, 8)) {
+      dirtyWaits.delete(record)
+      await safeWrite(resolve(artifactDir, record.artifact), record)
+    }
+  }
+  const wait = async (mode, details = {}, options = {}) => {
+    if (disposed) throw new Error('App geometry diagnostics disposed')
+    if (!['stable', 'frames'].includes(mode)) throw new Error('Unknown App geometry wait mode')
+    if (waitIndex.length >= appGeometryLimits.samples) {
+      droppedWaits++; await persist()
+      throw new Error('App geometry wait evidence sample budget exceeded')
+    }
+    const artifact = `${prefix}-wait-${String(++waitSequence).padStart(4, '0')}.json`
+    const entryArtifact = `${prefix}-wait-${String(waitSequence).padStart(4, '0')}-entry.json`
+    const context = boundedDetails(details), token = randomUUID(), identity = options.identity ?? waitOwners.get(page)
+    const record = { schema: 1, sequence: waitSequence, token, identity, result: 'running', artifact, entryArtifact,
+      mode, context, host: host(), events: [], droppedEvents: 0 }
+    const entry = { artifact, entryArtifact, token, sequence: waitSequence, mode, context, host: record.host, result: 'running' }
+    waitIndex.push(entry)
+    recentWaits.set(token, record)
+    if (recentWaits.size > 8) recentWaits.delete(recentWaits.keys().next().value)
+    // Retain entry/probe independently before asking the renderer to run.
+    // Separate immutable entry bytes prevent a late ordinary entry write from
+    // overwriting terminal wait disposition. Neither file is phase acceptance.
+    await safeWrite(resolve(artifactDir, entryArtifact), record)
+    let result, primary
+    const observeWait = (event) => {
+      record.token ??= event.token; entry.token ??= event.token
+      const { browser, cancellation, ...compact } = event
+      if (browser) record.browser = browser
+      if (cancellation) {
+        const { browser: cancelledBrowser, ...outcome } = cancellation
+        if (cancelledBrowser) record.browser = cancelledBrowser
+        record.cancellation = outcome
+      }
+      record.events.push(compact)
+      if (record.events.length > 32) { record.events.splice(1, 1); record.droppedEvents++ }
+      dirtyWaits.add(record)
+      options.observeWait?.(event)
+    }
+    try {
+      result = await waitForAppGeometry(page, mode, { ...options, token, identity, context, observeWait })
+      record.result = 'passed'
+    } catch (error) { primary = error; record.result = 'failed'; record.error = errorDetails(error) }
+    // A late raw transport event can append timing, but cannot change this
+    // disposition or produce a running/pass checkpoint after host expiration.
+    entry.result = record.result; record.completed = host()
+    dirtyWaits.add(record); await flushWaits(); await persist()
+    if (primary) throw primary
+    return result
+  }
   const evaluate = async (callback, args) => {
     if (pendingEvaluation) throw new Error('Prior App diagnostic evaluation remains pending; further evaluation omitted')
     const work = Promise.resolve().then(() => page.evaluate(callback, args))
@@ -407,6 +613,7 @@ export function createAppGeometryDiagnostics({ page, artifactDir, timeoutMs = 20
     return boundedPointDiagnostic(() => work, 'App geometry browser observation', timeoutMs)
   }
   async function capture(boundary, details = {}) {
+    await flushWaits()
     const record = { boundary: clipped(boundary, 300), host: host(), details: boundedDetails(details), browser: { status: 'pending' } }
     if (sequence >= appGeometryLimits.samples && (boundary !== 'primary-failure' || capturedFailure)) {
       droppedSamples++; record.browser = { status: 'unavailable', reason: 'sample budget exhausted' }; await persist(); return record
@@ -464,13 +671,28 @@ export function createAppGeometryDiagnostics({ page, artifactDir, timeoutMs = 20
     return value
   }
   return {
-    capture, around,
+    capture, around, wait,
+    async drain() {
+      for (const record of recentWaits.values()) {
+        if (record.result !== 'failed' || record.browser || record.drain || !record.events.some(({ event }) => event === 'late-rejection')) continue
+        record.drain = { started: host(), status: 'pending' }
+        try {
+          const browser = await boundedPointDiagnostic(() => page.evaluate(readAppGeometryWaitRecord,
+            { token: record.token, identity: record.identity }), 'App late wait record drain', timeoutMs)
+          if (browser) { record.browser = browser; record.drain.status = 'available' }
+          else record.drain.status = 'missing'
+        } catch (error) { record.drain.status = 'unavailable'; record.drain.error = errorDetails(error) }
+        record.drain.completed = host(); dirtyWaits.add(record)
+      }
+      await flushWaits(); await persist()
+    },
     async install() {
       const installed = await evaluate(installAppGeometryObserver, { key: observerKey, limits: appGeometryLimits, nativeControls })
+      if (installed.generation && installed.url) waitOwners.set(page, { generation: installed.generation, url: installed.url })
       note('observer-installed', installed); await persist(); return installed
     },
     async failure(error, details = {}) {
-      failureRecord = { error: errorDetails(error), ...host(), details: boundedDetails(details) }
+      failureRecord ??= { error: errorDetails(error), ...host(), details: boundedDetails(details) }
       await persist()
       return capture('primary-failure', failureRecord)
     },
@@ -482,11 +704,12 @@ export function createAppGeometryDiagnostics({ page, artifactDir, timeoutMs = 20
           .catch((error) => note('disposal-drain-unavailable', errorDetails(error)))
       }
       for (const release of listeners) release()
-      try { await evaluate(stopAppGeometryObserver, { key: observerKey }) }
+      try { note('observer-stop-returned', await evaluate(stopAppGeometryObserver, { key: observerKey })) }
       catch (error) { note('observer-stop-unavailable', errorDetails(error)) }
       // At most one pending diagnostic evaluate is owned. Its rejection handler
       // remains installed until the caller closes this owned page.
-      note('disposed', { pendingEvaluation: !!pendingEvaluation }); await persist()
+      note('disposed', { pendingEvaluation: !!pendingEvaluation }); await flushWaits(); await persist()
+      waitOwners.delete(page)
     },
   }
 }

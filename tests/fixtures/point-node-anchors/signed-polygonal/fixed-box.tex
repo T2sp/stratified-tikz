@@ -1,0 +1,66 @@
+\documentclass{article}
+\usepackage{tikz}
+\usetikzlibrary{shapes.geometric}
+\typeout{STZ PGF VERSION \pgfversion}
+\pagestyle{empty}
+\makeatletter
+\newwrite\fixtureout
+\immediate\openout\fixtureout=geometry.txt
+\newcommand\fixedshape[8]{%
+\begin{pgfpicture}\begingroup\normalfont
+\pgfkeys{#7}%
+\setbox\pgfnodeparttextbox=\hbox{}%
+\wd\pgfnodeparttextbox=#3pt\ht\pgfnodeparttextbox=#4pt\dp\pgfnodeparttextbox=#5pt%
+\pgfsetlinewidth{#6pt}%
+\immediate\write\fixtureout{CASE #1}%
+\pgfmathsetlength\pgf@x{1em}\pgfmathsetlength\pgf@y{1ex}%
+\immediate\write\fixtureout{FONT \the\pgf@x,\the\pgf@y}%
+\let\originalusepath\pgfusepath
+\def\pgfusepath##1{\pgfgetpath\fixturepath\immediate\write\fixtureout{PAINT ##1; PATH \meaning\fixturepath}\originalusepath{##1}}%
+\pgfmultipartnode{#2}{center}{fixture}{\pgfusepath{stroke}}%
+\foreach\anchorname in {#8}{\pgfpointanchor{fixture}{\anchorname}\immediate\write\fixtureout{ANCHOR \anchorname; \the\pgf@x,\the\pgf@y}}%
+\endgroup\end{pgfpicture}\par}
+\newif\ifstzdartfitting
+\let\stzoriginalreciprocal\pgfmathreciprocal@
+\def\pgfmathreciprocal@#1{\edef\stzreciprocalinput{#1}\stzoriginalreciprocal{#1}\ifstzdartfitting\immediate\write\fixtureout{DARTRECIP \stzreciprocalinput; \pgfmathresult}\fi}
+\let\stzoriginalresavedmacro\pgf@sh@resavedmacro
+\def\pgf@sh@resavedmacro#1#2{\stzoriginalresavedmacro{#1}{%
+\edef\stzmacroname{\string#1}\edef\stzdartname{\string\installdartparameters}%
+\ifx\stzmacroname\stzdartname\stzdartfittingtrue\fi%
+#2%
+\ifstzdartfitting\immediate\write\fixtureout{DARTFITTING \dartlength,\taillength,\halftailseparation,\deltax}\stzdartfittingfalse\fi}}
+\makeatother
+\begin{document}
+\fixedshape{polygon-signed-body-rotated}{regular polygon}{20}{8}{3}{0.4}{/pgf/inner xsep=-30pt,/pgf/inner ysep=-30pt,/pgf/outer xsep=3pt,/pgf/outer ysep=3pt,/pgf/minimum width=-200pt,/pgf/minimum height=-200pt,/pgf/regular polygon sides=7,/pgf/shape border rotate=23}{center,text,base,mid,east,west,north,south,north east,north west,south east,south west,0,13,45,90,181,270,315,-30,corner 1,side 1,corner 2,side 2,corner 3,side 3,corner 4,side 4,corner 5,side 5,corner 6,side 6,corner 7,side 7}
+\fixedshape{polygon-radius-zero-transition}{regular polygon}{0}{0}{0}{0.4}{/pgf/inner xsep=-30pt,/pgf/inner ysep=-30pt,/pgf/outer xsep=3pt,/pgf/outer ysep=3pt,/pgf/minimum width=0pt,/pgf/minimum height=0pt}{center,text,base,mid,east,west,north,south,north east,north west,south east,south west,0,13,45,90,181,270,315,-30,corner 1,side 1,corner 2,side 2,corner 3,side 3,corner 4,side 4,corner 5,side 5}
+\fixedshape{polygon-positive-body-negative-clearance}{regular polygon}{20}{8}{3}{0.4}{/pgf/inner xsep=2pt,/pgf/inner ysep=3pt,/pgf/outer xsep=-3pt,/pgf/outer ysep=-3pt,/pgf/minimum width=-20pt,/pgf/minimum height=-20pt,/pgf/regular polygon sides=6,/pgf/shape border rotate=17}{center,text,base,mid,east,west,north,south,north east,north west,south east,south west,0,13,45,90,181,270,315,-30,corner 1,side 1,corner 2,side 2,corner 3,side 3,corner 4,side 4,corner 5,side 5,corner 6,side 6}
+\fixedshape{square-signed-rotated}{regular polygon}{20}{8}{3}{0.4}{/pgf/inner xsep=-30pt,/pgf/inner ysep=-30pt,/pgf/outer xsep=3pt,/pgf/outer ysep=3pt,/pgf/minimum width=-20pt,/pgf/minimum height=-20pt,/pgf/regular polygon sides=4,/pgf/shape border rotate=-47}{center,text,base,mid,east,west,north,south,north east,north west,south east,south west,0,13,45,90,181,270,315,-30,corner 1,side 1,corner 2,side 2,corner 3,side 3,corner 4,side 4}
+\fixedshape{triangle-signed-body-rotated}{regular polygon}{20}{8}{3}{0.4}{/pgf/inner xsep=-30pt,/pgf/inner ysep=-30pt,/pgf/outer xsep=3pt,/pgf/outer ysep=3pt,/pgf/minimum width=-200pt,/pgf/minimum height=-200pt,/pgf/regular polygon sides=3,/pgf/shape border rotate=21}{center,text,base,mid,east,west,north,south,north east,north west,south east,south west,0,13,45,90,181,270,315,-30,corner 1,side 1,corner 2,side 2,corner 3,side 3}
+\fixedshape{star-negative-ratio-minimum}{star}{20}{8}{3}{0.4}{/pgf/inner xsep=-30pt,/pgf/inner ysep=-30pt,/pgf/outer xsep=3pt,/pgf/outer ysep=3pt,/pgf/minimum width=-20pt,/pgf/minimum height=-20pt,/pgf/star points=7,/pgf/star point ratio=3}{center,text,base,mid,east,west,north,south,north east,north west,south east,south west,0,13,45,90,181,270,315,-30,outer point 1,inner point 1,outer point 2,inner point 2,outer point 3,inner point 3,outer point 4,inner point 4,outer point 5,inner point 5,outer point 6,inner point 6,outer point 7,inner point 7}
+\fixedshape{star-negative-height-body-rotated}{star}{0}{0}{0}{0.4}{/pgf/inner xsep=-30pt,/pgf/inner ysep=-30pt,/pgf/outer xsep=3pt,/pgf/outer ysep=3pt,/pgf/minimum width=-200pt,/pgf/minimum height=-200pt,/pgf/star point height=12pt,/pgf/shape border rotate=31}{center,text,base,mid,east,west,north,south,north east,north west,south east,south west,0,13,45,90,181,270,315,-30,outer point 1,inner point 1,outer point 2,inner point 2,outer point 3,inner point 3,outer point 4,inner point 4,outer point 5,inner point 5}
+\fixedshape{star-mixed-height-body}{star}{0}{0}{0}{0.4}{/pgf/inner xsep=-2pt,/pgf/inner ysep=-2pt,/pgf/outer xsep=3pt,/pgf/outer ysep=3pt,/pgf/minimum width=0pt,/pgf/minimum height=0pt,/pgf/star point height=12pt}{center,text,base,mid,east,west,north,south,north east,north west,south east,south west,0,13,45,90,181,270,315,-30,outer point 1,inner point 1,outer point 2,inner point 2,outer point 3,inner point 3,outer point 4,inner point 4,outer point 5,inner point 5}
+\fixedshape{star-mixed-height-minimum}{star}{20}{8}{3}{0.4}{/pgf/inner xsep=-30pt,/pgf/inner ysep=-30pt,/pgf/outer xsep=3pt,/pgf/outer ysep=3pt,/pgf/minimum width=12pt,/pgf/minimum height=12pt,/pgf/star point height=15pt,/pgf/shape border rotate=-19}{center,text,base,mid,east,west,north,south,north east,north west,south east,south west,0,13,45,90,181,270,315,-30,outer point 1,inner point 1,outer point 2,inner point 2,outer point 3,inner point 3,outer point 4,inner point 4,outer point 5,inner point 5}
+\fixedshape{star-positive-ratio-minimum}{star}{20}{8}{3}{0.4}{/pgf/inner xsep=2pt,/pgf/inner ysep=2pt,/pgf/outer xsep=3pt,/pgf/outer ysep=3pt,/pgf/minimum width=60pt,/pgf/minimum height=50pt,/pgf/star points=6,/pgf/star point ratio=2}{center,text,base,mid,east,west,north,south,north east,north west,south east,south west,0,13,45,90,181,270,315,-30,outer point 1,inner point 1,outer point 2,inner point 2,outer point 3,inner point 3,outer point 4,inner point 4,outer point 5,inner point 5,outer point 6,inner point 6}
+\fixedshape{isosceles-negative-stretch}{isosceles triangle}{20}{8}{3}{0.4}{/pgf/inner xsep=-30pt,/pgf/inner ysep=-30pt,/pgf/outer xsep=3pt,/pgf/outer ysep=3pt,/pgf/minimum width=-20pt,/pgf/minimum height=-20pt,/pgf/isosceles triangle stretches=true}{center,text,base,mid,east,west,north,south,north east,north west,south east,south west,0,13,45,90,181,270,315,-30,base east,base west,mid east,mid west,apex,left corner,right corner,left side,right side,lower side}
+\fixedshape{isosceles-mixed-stretch}{isosceles triangle}{20}{8}{3}{0.4}{/pgf/inner xsep=-30pt,/pgf/inner ysep=-30pt,/pgf/outer xsep=3pt,/pgf/outer ysep=3pt,/pgf/minimum width=20pt,/pgf/minimum height=-20pt,/pgf/isosceles triangle stretches=true}{center,text,base,mid,east,west,north,south,north east,north west,south east,south west,0,13,45,90,181,270,315,-30,base east,base west,mid east,mid west,apex,left corner,right corner,left side,right side,lower side}
+\fixedshape{isosceles-negative-incircle-rotated}{isosceles triangle}{0}{0}{0}{0.4}{/pgf/inner xsep=-10pt,/pgf/inner ysep=-10pt,/pgf/outer xsep=3pt,/pgf/outer ysep=3pt,/pgf/minimum width=-20pt,/pgf/minimum height=-20pt,/pgf/isosceles triangle apex angle=70,/pgf/shape border uses incircle=true,/pgf/shape border rotate=31}{center,text,base,mid,east,west,north,south,north east,north west,south east,south west,0,13,45,90,181,270,315,-30,base east,base west,mid east,mid west,apex,left corner,right corner,left side,right side,lower side}
+\fixedshape{isosceles-positive-stretch}{isosceles triangle}{20}{8}{3}{0.4}{/pgf/inner xsep=2pt,/pgf/inner ysep=2pt,/pgf/outer xsep=3pt,/pgf/outer ysep=3pt,/pgf/minimum width=80pt,/pgf/minimum height=15pt,/pgf/isosceles triangle stretches=true}{center,text,base,mid,east,west,north,south,north east,north west,south east,south west,0,13,45,90,181,270,315,-30,base east,base west,mid east,mid west,apex,left corner,right corner,left side,right side,lower side}
+\fixedshape{dart-negative-height-minimum}{dart}{0}{0}{0}{0.4}{/pgf/inner xsep=-30pt,/pgf/inner ysep=-30pt,/pgf/outer xsep=3pt,/pgf/outer ysep=3pt,/pgf/minimum width=-200pt,/pgf/minimum height=-20pt}{center,text,base,mid,east,west,north,south,north east,north west,south east,south west,0,13,45,90,181,270,315,-30,base east,base west,mid east,mid west,tip,left tail,right tail,tail center,left side,right side}
+\fixedshape{dart-negative-width-minimum}{dart}{0}{0}{0}{0.4}{/pgf/inner xsep=-5pt,/pgf/inner ysep=-5pt,/pgf/outer xsep=3pt,/pgf/outer ysep=3pt,/pgf/minimum width=-2pt,/pgf/minimum height=-200pt}{center,text,base,mid,east,west,north,south,north east,north west,south east,south west,0,13,45,90,181,270,315,-30,base east,base west,mid east,mid west,tip,left tail,right tail,tail center,left side,right side}
+\fixedshape{dart-signed-offset-positive-length}{dart}{0}{0}{0}{0.4}{/pgf/inner xsep=-30pt,/pgf/inner ysep=30pt,/pgf/outer xsep=3pt,/pgf/outer ysep=3pt,/pgf/minimum width=-20pt,/pgf/minimum height=-20pt}{center,text,base,mid,east,west,north,south,north east,north west,south east,south west,0,13,45,90,181,270,315,-30,base east,base west,mid east,mid west,tip,left tail,right tail,tail center,left side,right side}
+\fixedshape{dart-positive-incircle-rotated-minima}{dart}{20}{8}{3}{0.4}{/pgf/inner xsep=2pt,/pgf/inner ysep=2pt,/pgf/outer xsep=3pt,/pgf/outer ysep=3pt,/pgf/minimum width=80pt,/pgf/minimum height=100pt,/pgf/dart tip angle=38,/pgf/dart tail angle=118,/pgf/shape border uses incircle=true,/pgf/shape border rotate=32}{center,text,base,mid,east,west,north,south,north east,north west,south east,south west,0,13,45,90,181,270,315,-30,base east,base west,mid east,mid west,tip,left tail,right tail,tail center,left side,right side}
+\makeatletter
+\pgfmathreciprocal{100.5}\immediate\write\fixtureout{RECIPROCAL 100.5; \pgfmathresult}
+\pgfmathreciprocal{-100.5}\immediate\write\fixtureout{RECIPROCAL -100.5; \pgfmathresult}
+\pgfmathreciprocal{200.125}\immediate\write\fixtureout{RECIPROCAL 200.125; \pgfmathresult}
+\pgfmathreciprocal{-200.125}\immediate\write\fixtureout{RECIPROCAL -200.125; \pgfmathresult}
+\pgfmathreciprocal{-322.8842}\immediate\write\fixtureout{RECIPROCAL -322.8842; \pgfmathresult}
+\pgfmathreciprocal{100}\immediate\write\fixtureout{RECIPROCAL 100; \pgfmathresult}
+\pgfmathreciprocal{-100}\immediate\write\fixtureout{RECIPROCAL -100; \pgfmathresult}
+\pgfmathreciprocal{0.38268}\immediate\write\fixtureout{RECIPROCAL 0.38268; \pgfmathresult}
+\pgfmathreciprocal{-0.38268}\immediate\write\fixtureout{RECIPROCAL -0.38268; \pgfmathresult}
+\pgfmathdivide{-10}{-132.426}\let\quotient\pgfmathresult\pgfmathatan{\quotient}\immediate\write\fixtureout{DIVIDEATAN -10,-132.426; \quotient,\pgfmathresult}
+\pgfmathdivide{10}{-132.426}\let\quotient\pgfmathresult\pgfmathatan{\quotient}\immediate\write\fixtureout{DIVIDEATAN 10,-132.426; \quotient,\pgfmathresult}
+\pgfmathdivide{-10}{-20}\let\quotient\pgfmathresult\pgfmathatan{\quotient}\immediate\write\fixtureout{DIVIDEATAN -10,-20; \quotient,\pgfmathresult}
+\makeatother
+\end{document}

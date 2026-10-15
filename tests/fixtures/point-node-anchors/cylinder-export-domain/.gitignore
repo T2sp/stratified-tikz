@@ -1,0 +1,2 @@
+# Retain compiler logs in the exact authenticated checkout inventory.
+!**/*.log

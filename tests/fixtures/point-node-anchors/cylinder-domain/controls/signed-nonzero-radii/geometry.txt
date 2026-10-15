@@ -1,0 +1,8 @@
+CASE signed-nonzero-radii
+FONT 10.00002pt,4.30554pt
+PAINT stroke; PATH macro:->\pgfsyssoftpath@movetotoken {1.0pt}{-3.0pt}\pgfsyssoftpath@curvetosupportatoken {2.65688pt}{-3.0pt}\pgfsyssoftpath@curvetosupportbtoken {4.0pt}{-1.65688pt}\pgfsyssoftpath@curvetotoken {4.0pt}{0.0pt}\pgfsyssoftpath@curvetosupportatoken {4.0pt}{1.65688pt}\pgfsyssoftpath@curvetosupportbtoken {2.65688pt}{3.0pt}\pgfsyssoftpath@curvetotoken {1.0pt}{3.0pt}\pgfsyssoftpath@linetotoken {-6.8pt}{3.0pt}\pgfsyssoftpath@curvetosupportatoken {-8.45688pt}{3.0pt}\pgfsyssoftpath@curvetosupportbtoken {-9.8pt}{1.65688pt}\pgfsyssoftpath@curvetotoken {-9.8pt}{0.0pt}\pgfsyssoftpath@curvetosupportatoken {-9.8pt}{-1.65688pt}\pgfsyssoftpath@curvetosupportbtoken {-8.45688pt}{-3.0pt}\pgfsyssoftpath@curvetotoken {-6.8pt}{-3.0pt}\pgfsyssoftpath@closepathtoken {1.0pt}{-3.0pt}\pgfsyssoftpath@movetotoken {-6.8pt}{-3.0pt}\pgfsyssoftpath@curvetosupportatoken {-5.14313pt}{-3.0pt}\pgfsyssoftpath@curvetosupportbtoken {-3.8pt}{-1.65688pt}\pgfsyssoftpath@curvetotoken {-3.8pt}{0.0pt}\pgfsyssoftpath@curvetosupportatoken {-3.8pt}{1.65688pt}\pgfsyssoftpath@curvetosupportbtoken {-5.14313pt}{3.0pt}\pgfsyssoftpath@curvetotoken {-6.8pt}{3.0pt}
+ANCHOR center; 0.0pt,0.0pt
+ANCHOR text; 0.0pt,0.0pt
+ANCHOR base; 0.0pt,0.0pt
+ANCHOR mid; 0.0pt,2.15277pt
+ANCHOR west; -9.79996pt,-0.00055pt

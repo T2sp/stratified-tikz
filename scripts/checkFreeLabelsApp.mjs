@@ -7,7 +7,7 @@ import { ownPageEvent } from './ownedPageEvent.mjs'
 import { boundedPointDiagnostic } from './pointCheckDiagnostics.mjs'
 import { saveAppJson, checkAppJsonReload } from './appJsonPersistence.mjs'
 import { createOwnedAppPage } from './ownedAppPage.mjs'
-import { clickAppPointer, createAppGeometryDiagnostics, readAppGeometry, waitForAppFrames, waitForStableAppGeometry } from './appGeometryDiagnostics.mjs'
+import { clickAppPointer, createAppGeometryDiagnostics, readAppGeometry } from './appGeometryDiagnostics.mjs'
 
 export async function runAppChecks({ browser, origin, record, artifactDir, ownedServer }) {
   const page = await browser.newPage({ viewport: { width: 1600, height: 1200 }, acceptDownloads: true })
@@ -91,7 +91,8 @@ export async function runAppChecks({ browser, origin, record, artifactDir, owned
   }
   async function save(name) {
     const saved = await boundary('pending-or-ready-download', () => saveAppJson({ page, artifactDir, name,
-      diagnose: diagnosePersistence, owned, waitForFrames: () => waitForAppFrames(page) }), { name })
+      diagnose: diagnosePersistence, owned, waitForFrames: () => diagnostics.wait('frames',
+        { stage: { ...stage }, probe: { kind: 'json-download', phase: 'before-download', name } }) }), { name })
     downloads.set(saved.json, saved)
     actions.push({ action: 'Download JSON', path: saved.path, source: saved.payload.diagram.labels[0].text })
     return saved.json
@@ -168,7 +169,8 @@ export async function runAppChecks({ browser, origin, record, artifactDir, owned
     // Preserve the native scroll and its original deadline. Diagnose failures;
     // do not replace stability with a force action or a different scroll path.
     await boundary('scroll', () => page.locator('svg.svg-diagram').scrollIntoViewIfNeeded({ timeout: 30_000 }), { preserveView })
-    await boundary('stable-geometry', () => waitForStableAppGeometry(page), { preserveView })
+    await boundary('stable-geometry', () => diagnostics.wait('stable',
+      { stage: { ...stage }, probe: { kind: 'geometry-framing', phase: 'after-scroll' }, preserveView }), { preserveView })
     await assertUsableGeometry(await coordinates())
     return boundedPointDiagnostic(() => page.evaluate(() => window.stzAppLabels.inspectContent('app-label')), 'App painted geometry')
   }
@@ -206,9 +208,10 @@ export async function runAppChecks({ browser, origin, record, artifactDir, owned
         ] }
     })
   }
-  async function pointer(point, expected, alt = false) {
+  async function pointer(point, expected, alt = false, probe = { location: 'center' }) {
+    const identity = { kind: 'pointer', ...probe, alt, point: { ...point }, expected }
     await clearSelection()
-    await waitForStableAppGeometry(page)
+    await diagnostics.wait('stable', { stage: { ...stage }, probe: { ...identity, phase: 'before-click' } })
     const surface = await readAppGeometry(page, ({ x, y }) => {
       const target = document.elementFromPoint(x, y)
       return { tag: target?.tagName, onCanvas: !!target?.closest('svg.svg-diagram'),
@@ -216,7 +219,7 @@ export async function runAppChecks({ browser, origin, record, artifactDir, owned
     }, point)
     assert.ok(surface.onCanvas && !surface.handle, `App pointer probe avoids controls/handles: ${JSON.stringify({ point, surface })}`)
     await clickAppPointer(page, point, alt)
-    await waitForAppFrames(page)
+    await diagnostics.wait('frames', { stage: { ...stage }, probe: { ...identity, phase: 'after-click' } })
     const selected = (await state()).selection
     assert.deepEqual(selected, expected, `Real App ${alt ? 'Alt-' : ''}click at ${JSON.stringify(point)}`)
     return { point, alt, selection: selected, surface }
@@ -259,14 +262,16 @@ export async function runAppChecks({ browser, origin, record, artifactDir, owned
     } : null
     for (const alt of [false, true]) {
       for (const edge of points.probes) {
-        pointerEvidence.push({ edge: edge.edge, location: 'inside', ...await pointer(edge.inside, { kind: 'label', id: 'app-label' }, alt) })
-        pointerEvidence.push({ edge: edge.edge, location: 'outside', ...await pointer(edge.outside, null, alt) })
+        pointerEvidence.push({ edge: edge.edge, location: 'inside',
+          ...await pointer(edge.inside, { kind: 'label', id: 'app-label' }, alt, { edge: edge.edge, location: 'inside' }) })
+        pointerEvidence.push({ edge: edge.edge, location: 'outside',
+          ...await pointer(edge.outside, null, alt, { edge: edge.edge, location: 'outside' }) })
       }
       if (obsoleteClientPoint) pointerEvidence.push({ location: 'obsolete-layout-only', local: obsoletePoint,
-        ...await pointer(obsoleteClientPoint, null, alt) })
+        ...await pointer(obsoleteClientPoint, null, alt, { location: 'obsolete-layout-only', local: { ...obsoletePoint } }) })
     }
-    await pointer(points.center, { kind: 'label', id: 'app-label' })
-    await waitForStableAppGeometry(page)
+    await pointer(points.center, { kind: 'label', id: 'app-label' }, false, { location: 'stage-center' })
+    await diagnostics.wait('stable', { stage: { ...stage }, probe: { kind: 'final-stage', phase: 'after-pointer-probes' } })
     const finalPoints = await coordinates()
     assert.deepEqual(finalPoints, points, 'Pointer and selection events retain the measured canvas/client transform and bounds')
     await assertUsableGeometry(finalPoints)
@@ -280,7 +285,7 @@ export async function runAppChecks({ browser, origin, record, artifactDir, owned
     await closeInspector()
     await geometry()
     const points = await coordinates()
-    await pointer(points.center, { kind: 'label', id: 'app-label' })
+    await pointer(points.center, { kind: 'label', id: 'app-label' }, false, { location: 'editor-center' })
     await page.getByRole('button', { name: 'Open inspector drawer', exact: true }).click()
     const expand = page.locator('#preview-inspector-drawer').getByRole('button', { name: 'Expand', exact: true })
     if (await expand.count()) await expand.click()
@@ -472,7 +477,8 @@ export async function runAppChecks({ browser, origin, record, artifactDir, owned
   } finally {
     for (const wait of owned) wait.dispose()
     for (const [name, cleanup] of [
-      ['diagnostics', () => diagnostics.dispose()], ['page', () => page.close()], ['ownership', () => app.dispose()],
+      ['diagnostics', () => diagnostics.dispose()], ['page', () => page.close()],
+      ['wait evidence', () => diagnostics.drain()], ['ownership', () => app.dispose()],
       ...owned.map((wait) => ['event', () => wait.drain()]),
     ]) {
       try { await boundedPointDiagnostic(cleanup, `App ${name} cleanup`, 2500) }

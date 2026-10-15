@@ -1,0 +1,15 @@
+CASE physical-mm-tie
+FONT 10.00002pt,4.30554pt
+STAGE innerXSp; 0
+STAGE innerYSp; 2
+STAGE initialXSp; 0
+STAGE initialYSp; 2
+STAGE fittedXSp; 0
+STAGE fittedYSp; 2
+STAGE transverseInnerSepSp; 2
+STAGE minimumWidthSp; 0
+STAGE divisorSp; 2
+STAGE bodyWidthHalfSp; 0
+STAGE bodyHeightHalfSp; 0
+STAGE bodyDepthHalfSp; 0
+STAGE minimumWidthHalfSp; 0

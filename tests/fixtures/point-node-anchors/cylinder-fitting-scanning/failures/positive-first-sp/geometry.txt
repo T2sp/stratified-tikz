@@ -1,0 +1,15 @@
+CASE positive-first-sp
+FONT 10.00002pt,4.30554pt
+STAGE innerXSp; 0
+STAGE innerYSp; 1
+STAGE initialXSp; 0
+STAGE initialYSp; 1
+STAGE fittedXSp; 0
+STAGE fittedYSp; 1
+STAGE transverseInnerSepSp; 1
+STAGE minimumWidthSp; 0
+STAGE divisorSp; 1
+STAGE bodyWidthHalfSp; 0
+STAGE bodyHeightHalfSp; 0
+STAGE bodyDepthHalfSp; 0
+STAGE minimumWidthHalfSp; 0

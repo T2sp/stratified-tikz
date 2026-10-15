@@ -1,32 +1,25 @@
 import assert from 'node:assert/strict'
 import { spawnSync } from 'node:child_process'
-import {
-  mkdirSync,
-  mkdtempSync,
-  readFileSync,
-  realpathSync,
-  rmSync,
-  writeFileSync,
-} from 'node:fs'
+import { createHash } from 'node:crypto'
+import { existsSync, mkdirSync, mkdtempSync, readFileSync, realpathSync, rmSync, unlinkSync, writeFileSync } from 'node:fs'
+import { writeFile } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import { dirname, join, relative } from 'node:path'
 import test from 'node:test'
-import {
-  browserChecksForPhase,
-  pointNodeScenarios,
-  pointNodeScenarioArtifacts,
-  captureCheckoutIdentity,
-  runPhaseVerification,
-  verificationMatchesCheckout,
-  hasWholePointSvg,
-} from '../../scripts/automation/phase-verification.mjs'
+import { browserChecksForPhase, pointNodeScenarios, pointNodeScenarioArtifacts, captureCheckoutIdentity, runPhaseVerification, verificationMatchesCheckout, hasWholePointSvg, validateBrowserEvidence, allPointNodeScenarios } from '../../scripts/automation/phase-verification.mjs'
+import { createEvidencePublisher, readEvidenceDocumentSync } from '../../scripts/evidencePublication.mjs'
+import { awaitPublicationEntry, ownPublication, publicationGate, publicationValue } from './ownedPublicationProgressFixture.mjs'
+import { layoutAnchorGroup, assertLayoutStandaloneEvidence, assertLayoutPostClickViewDiagnostic } from '../../scripts/pointLayoutAnchorsContract.mjs'
+import { syntheticStandalonePointDownload } from './standalonePointDownloadFixture.mjs'
+import { populatePhase32dParentEvidence } from './phase32dParentEvidenceFixture.mjs'
+import { syntheticZeroPng } from './signedPointStandaloneFixture.mjs'
+import { singularCylinderScenario, singularCylinderWarningPath } from '../../scripts/singularCylinderDiagnosticContract.mjs'
+import { pointGroups, importRegressionScenarios, correctionScenarios, continuityScenarios, targetedPaintScenarios, synchronizeClearSnapshot, polygonJoinEvidence, completePointEvidence } from './phase32abParentEvidenceFixture.mjs'
 
 import { dashCapScenario, dashCapArtifacts } from '../../scripts/pointDashCapContract.mjs'
-import { dashCapEvidence, syntheticDashCapLivePng } from './dashCapEvidenceFixture.mjs'
 import { dashCapMechanismStem, dashCapMechanismArtifacts } from '../../scripts/pointDashCapMechanismContract.mjs'
-import { syntheticMechanismEvidence, syntheticMechanismLiveSvg, syntheticMechanismLivePng } from './pointDashCapMechanismFixture.mjs'
 
-import { polygonJoinScenario, polygonJoinCases, polygonJoinScales, polygonJoinArtifacts, assertPolygonJoinEvidence } from '../../scripts/pointPolygonJoinContract.mjs'
+import { polygonJoinScenario, polygonJoinArtifacts, assertPolygonJoinEvidence } from '../../scripts/pointPolygonJoinContract.mjs'
 
 const freeLabelGroups = [
   'existing-renderer-regressions',
@@ -486,19 +479,6 @@ for (const phase of ['31B', '31D']) {
   })
 }
 
-const pointGroups = [...combinedLabelGroups, ...Object.keys(pointNodeScenarios)]
-const importRegressionScenarios = [
-  'point-paint-local-override-intent', 'point-paint-cross-file-resolution', 'point-paint-unsupported-color-bindings',
-]
-const correctionScenarios = ['point-paint-unsupported-mutations', 'point-paint-clear-imported-style']
-const continuityScenarios = ['point-paint-mutation-directory-uncertainty', 'point-paint-app-continuity']
-const targetedPaintScenarios = [
-  'point-paint-namespace-aliases',
-  'point-paint-responsive-circle',
-  'point-paint-responsive-triangle',
-  'point-paint-responsive-downloads',
-  ...importRegressionScenarios, ...correctionScenarios, ...continuityScenarios, polygonJoinScenario, dashCapScenario,
-]
 test('32B preserves its original groups and scenarios and requires namespace and responsive paint evidence', () => {
   assert.equal(pointGroups.length, 16)
   assert.equal(Object.values(pointNodeScenarios).flat().length, 29)
@@ -557,270 +537,6 @@ test('point SVG artifact gate accepts sanitized structure and rejects absent/dam
     `<!-- <g><circle/>${body}</g> --><svg/>`,
   ]) assert.equal(hasWholePointSvg(broken), false, broken)
 })
-function importRegressionEvidence(name) {
-  const snapshot = (key, expected, warnings = []) => {
-    const colors = Object.entries(expected).filter(([, value]) => typeof value === 'string' && value.startsWith('#'))
-    const definitions = colors.map(([channel, value]) => `\\definecolor{${channel}Color}{HTML}{${value.slice(1)}}`).join('\n')
-    const options = Object.entries(expected).filter(([, value]) => value !== null)
-      .map(([channel, value]) => `${channel}=${value.startsWith('#') ? `${channel}Color` : value}`).join(',')
-    const code = `%   \\input{base.sty}\n%   \\input{outer.sty}\n${definitions}\n\\node[${key},${options}] at (0,0) {};`
-    return { key, current: { importedTikzStyleReferenceId: 'fixture-reference' }, warnings,
-      observation: { contour: { fill: 'rgb(0, 0, 0)' }, leaves: [{ fill: 'rgb(0, 0, 0)' }] },
-      state: { json: '{}', history: '{}' }, output: { standalone: code, inlineMath: code } }
-  }
-  const result = { download: { boundary: 'download', differencePaths: [] }, reload: { boundary: 'reload', differencePaths: [] },
-    standalone: { pageErrors: [], observation: { contour: { fill: 'rgb(0, 0, 0)' }, leaves: [{ fill: 'rgb(0, 0, 0)' }] } } }
-  if (name === 'point-paint-local-override-intent') {
-    for (const boundary of ['untouched', 'reset']) result[boundary] = snapshot('example', { fill: null, text: null })
-    for (const boundary of ['away', 'undone']) result[boundary] = snapshot('example', { fill: '#123456', text: null })
-    for (const boundary of ['back', 'redone', 'reloaded']) result[boundary] = snapshot('example', { fill: '#000000', text: null })
-    result.settingsBefore = snapshot('unknown controls', { fill: null, text: null, draw: null, 'fill opacity': null, 'line width': null })
-    result.settingsFocusBlur = snapshot('unknown controls', { fill: null, text: null, draw: null, 'fill opacity': null, 'line width': null })
-    result.settingsFocusBlur.current.style = { importedPaint: { overriddenFields: [] } }
-    result.settingsFocusBlur.focusBlurControls = ['Fill opacity', 'Border width'].map((name) => ({ name, before: '1', after: '1', focused: true, blurred: true }))
-    result.settingsBack = snapshot('unknown controls', { fill: null, text: null, draw: null, 'fill opacity': '1', 'line width': '0.4pt' })
-    const source = '\\tikzstyle{example}=[fill=\\mycolor,text=red]\n\\tikzstyle{unknown controls}=[fill=\\mycolor,text=\\mytext,draw=\\myborder,fill opacity=\\myalpha,line width=\\mywidth]\n'
-    for (const boundary of ['untouched', 'away', 'back', 'undone', 'redone', 'reloaded', 'reset', 'settingsBefore', 'settingsFocusBlur', 'settingsBack']) {
-      const entry = result[boundary]
-      entry.warnings = ['Unsupported executable paint option: fill=\\mycolor. Runtime color bindings and option handlers remain unknown; later paint cannot restore certainty.']
-      entry.modelDiagnostics = { validation: { valid: true }, resolution: { executionUncertain: true, diagnostics: entry.warnings,
-        unresolvedFields: ['fillColor', 'fillEnabled', 'drawColor', 'drawEnabled', 'textColor', 'fillOpacity', 'drawOpacity',
-          'textOpacity', 'lineWidth', 'dashPattern', 'dashPhase', 'lineCap', 'lineJoin'] }, reference: { previewDiagnostics: entry.warnings } }
-      entry.diagram = { externalTikzStyleSources: [{ rawSource: source }] }
-      const overriddenFields = ['untouched', 'reset', 'settingsBefore', 'settingsFocusBlur'].includes(boundary) ? []
-        : boundary === 'settingsBack' ? ['fill.opacity', 'stroke.width'] : ['fill.color']
-      entry.current.style = { paint: { fill: { color: ['away', 'undone'].includes(boundary) ? '#123456' : '#000000' } }, importedPaint: { overriddenFields } }
-      entry.observation.leaves[0].fillAlpha = 1
-    }
-    result.standalone.observation = result.reloaded.observation
-  } else if (name === 'point-paint-cross-file-resolution') {
-    for (const boundary of ['crossFile', 'reloaded']) result[boundary] = snapshot('outer', { fill: '#ff0000', text: '#00ff00', draw: '#0000ff' })
-    result.priorColor = snapshot('outer', { fill: '#123456', text: '#00ff00', draw: '#0000ff' })
-    result.redefined = snapshot('outer', { fill: '#ffff00', text: '#0000ff', draw: '#00ff00' })
-    result.missing = snapshot('outer', { fill: null, text: null, draw: null }, ['Unsupported absent base'])
-    result.missing.modelDiagnostics = { resolution: { executionUncertain: true,
-      diagnostics: ['Unsupported absent base'], unresolvedFields: ['fillColor', 'drawColor', 'textColor'] } }
-    result.laterUndone = snapshot('outer', { fill: '#000000', text: null })
-    for (const boundary of ['later', 'laterRedone', 'laterReloaded']) result[boundary] = snapshot('outer', { fill: '#000000', text: '#00ff00', draw: '#0000ff' })
-    result.laterDownload = { boundary: 'download', differencePaths: [] }; result.laterReload = { boundary: 'reload', differencePaths: [] }
-  } else if (name === 'point-paint-mutation-directory-uncertainty') {
-    result.directory = snapshot('outer', { fill: null, text: null, draw: null })
-    result.independent = snapshot('independent', { fill: '#0000ff', text: '#00ff00', draw: '#ff0000' })
-    result.independent.modelDiagnostics = { validation: { valid: true }, resolution: {} }
-    result.independent.observation = { contour: { fill: 'rgb(0, 0, 255)', stroke: 'rgb(255, 0, 0)' }, leaves: [{ fill: 'rgb(0, 255, 0)', fillAlpha: 1 }] }
-    for (const boundary of ['away', 'undone']) result[boundary] = snapshot('outer', { fill: null, text: '#123456', draw: null })
-    for (const boundary of ['back', 'redone', 'reloaded']) result[boundary] = snapshot('outer', { fill: null, text: '#ff0000', draw: null })
-    const source = '\\tikzset{\n  myPoint/.style={fill=red,text=red},\n  myPoint/.append style={/other/.cd},\n  /other/text/.style={/tikz/text=blue,/tikz/.cd},\n  outer/.style={myPoint,text=green}\n}'
-    for (const boundary of ['directory', 'away', 'back', 'undone', 'redone', 'reloaded']) {
-      const entry = result[boundary]
-      entry.warnings = ['Unsupported runtime directory /.cd']
-      entry.modelDiagnostics = { validation: { valid: true }, resolution: { unresolvedFields: ['textColor'] }, reference: { previewDiagnostics: entry.warnings } }
-      entry.diagram = { externalTikzStyleSources: [{ rawSource: source }] }
-      entry.current.style = { paint: { text: { color: ['away', 'undone'].includes(boundary) ? '#123456' : '#ff0000' } },
-        importedPaint: { overriddenFields: boundary === 'directory' ? [] : ['text.color'] } }
-      entry.observation = { contour: { fill: 'rgb(255, 0, 0)' }, leaves: [{ fill: 'rgb(255, 0, 0)', fillAlpha: 1 }] }
-    }
-    result.away.state.history = JSON.stringify({ past: [{ earlier: 1 }], present: { text: '#123456' }, future: [] })
-    result.back.state.history = JSON.stringify({ past: [{ earlier: 1 }, { text: '#123456' }], present: { text: '#ff0000' }, future: [] })
-    result.standalone.observation = result.reloaded.observation
-  } else if (name === 'point-paint-unsupported-mutations') {
-    result.mutation = snapshot('myPoint', { fill: null, text: null, draw: null })
-    for (const boundary of ['away', 'undone']) result[boundary] = snapshot('myPoint', { fill: '#123456', text: null, draw: null })
-    for (const boundary of ['back', 'redone', 'reloaded']) result[boundary] = snapshot('myPoint', { fill: '#ff0000', text: null, draw: null })
-    const source = '\\tikzset{\n  myPoint/.style={fill=red,text=red},\n  myPoint/.append style={fill=blue,text=blue}\n}'
-    for (const boundary of ['mutation', 'away', 'back', 'undone', 'redone', 'reloaded']) {
-      const entry = result[boundary]
-      entry.warnings = ['Unsupported myPoint/.append style']
-      entry.modelDiagnostics = { validation: { valid: true }, resolution: { unresolvedFields: ['fillColor', 'textColor'] },
-        reference: { previewDiagnostics: entry.warnings } }
-      entry.diagram = { externalTikzStyleSources: [{ rawSource: source }] }
-      entry.current.style = { paint: { fill: { color: ['away', 'undone'].includes(boundary) ? '#123456' : '#ff0000' } },
-        importedPaint: { overriddenFields: boundary === 'mutation' ? [] : ['fill.color'] } }
-      entry.observation = { contour: { fill: 'rgb(255, 0, 0)' }, leaves: [{ fill: 'rgb(255, 0, 0)', fillAlpha: 1 }] }
-    }
-    result.standalone.observation = result.reloaded.observation
-  } else {
-    result.unsupported = snapshot('myPoint', { fill: null, text: null, draw: '#000000' }, ['Unsupported red'])
-    for (const boundary of ['away', 'undone']) result[boundary] = snapshot('myPoint', { fill: '#123456', text: null })
-    for (const boundary of ['back', 'redone', 'reloaded']) result[boundary] = snapshot('myPoint', { fill: '#000000', text: null })
-  }
-  return result
-}
-function clearRegressionEvidence() {
-  const basePaint = { text: { color: '#000000', opacity: 1 }, fill: { enabled: true, color: '#ff0000', opacity: 1 },
-    stroke: { enabled: true, color: '#000000', opacity: 1, width: .4, lineStyle: 'solid', dashPhase: 0, lineCap: 'butt', lineJoin: 'miter' } }
-  const mixedPaint = { text: { color: '#654321', opacity: .5 }, fill: { enabled: true, color: '#123456', opacity: .25 },
-    stroke: { enabled: true, color: '#008000', opacity: .75, width: 3, lineStyle: 'solid', dashPattern: [3, 2], dashPhase: 1, lineCap: 'round', lineJoin: 'bevel' } }
-  const expectedObservation = (paint) => {
-    const rgb = (hex) => `rgb(${[1, 3, 5].map((index) => parseInt(hex.slice(index, index + 2), 16)).join(', ')})`
-    return { contour: { fill: rgb(paint.fill.color), fillAlpha: paint.fill.opacity, stroke: rgb(paint.stroke.color),
-      strokeAlpha: paint.stroke.opacity, strokeWidth: paint.stroke.width * 1.2, dash: paint.stroke.dashPattern ? '3, 2' : 'none',
-      dashOffset: paint.stroke.dashPhase * 1.2, cap: paint.stroke.lineCap, join: paint.stroke.lineJoin },
-    leaves: [{ fill: rgb(paint.text.color), fillAlpha: paint.text.opacity }], bodyBounds: { width: 2 }, shapeBounds: { width: 5 } }
-  }
-  const makeCase = (ids) => {
-    const multiple = ids.length === 2, key = multiple ? 'independent point' : 'redpoint'
-    const secondPaint = { text: { color: '#ff0000', opacity: .6 }, fill: { enabled: true, color: '#0000ff', opacity: .35 },
-      stroke: { enabled: true, color: '#00ff00', opacity: .7, width: 2, lineStyle: 'solid', dashPattern: [3, 2], dashPhase: 1, lineCap: 'round', lineJoin: 'bevel' } }
-    const points = ['app-point', 'bulk-point', 'copy-point'].map((id, index) => ({
-      current: { id, text: ['Clear target', 'Clear second', 'Control point'][index], stylePresetId: 'preset', importedTikzStyleReferenceId: 'reference',
-        style: { opacity: 1, paint: structuredClone(multiple ? index === 0 ? mixedPaint : secondPaint : basePaint), importedPaint: { referenceId: 'reference' } } },
-      observation: expectedObservation(multiple ? index === 0 ? mixedPaint : secondPaint : basePaint),
-    }))
-    const snapshot = (detached) => {
-      const current = structuredClone(points)
-      if (detached) for (const { current: point } of current) if (ids.includes(point.id)) {
-        delete point.stylePresetId; delete point.importedTikzStyleReferenceId; delete point.style.importedPaint; delete point.style.importedShape
-      }
-      const diagram = { strata: current.map((point) => point.current), userStylePresets: [{ id: 'preset' }],
-        externalTikzStyleSources: [{ id: 'source', rawSource: 'preserved source' }], importedTikzStyleReferences: [{ id: 'reference', key }] }
-      const nodes = current.map(({ current: point }, index) => {
-        const { paint } = point.style
-        const colors = ['fill', 'text', 'stroke'].map((channel) => `\\definecolor{${channel}${index}}{HTML}{${paint[channel].color.slice(1)}}`).join('\n')
-        const dash = paint.stroke.dashPattern ? `dash pattern=on 3pt off 2pt` : 'solid'
-        return `${colors}\n\\node[${point.importedTikzStyleReferenceId ? `${key},` : ''}fill=fill${index},text=text${index},draw=stroke${index},fill opacity=${paint.fill.opacity},text opacity=${paint.text.opacity},draw opacity=${paint.stroke.opacity},line width=${paint.stroke.width}pt,${dash},dash phase=${paint.stroke.dashPhase}pt,line cap=${paint.stroke.lineCap},line join=${paint.stroke.lineJoin}] at (${index},0) {${point.text}};`
-      }).join('\n')
-      // Synthetic policy evidence only; these markers are not browser/model observations.
-      const beforePresent = { clear: 'before', ids }, afterPresent = { clear: 'after', ids }
-      return { points: current, diagram, output: { standalone: nodes, inlineMath: nodes }, modelDiagnostics: { validation: { valid: true } },
-        state: { json: JSON.stringify({ diagram }), history: JSON.stringify({
-          past: detached ? [{ before: 'retained' }, beforePresent] : [{ before: 'retained' }],
-          present: detached ? afterPresent : beforePresent, future: [],
-        }) } }
-    }
-    const entry = { ids, nativeAction: { selector: 'TikZ style selector', action: 'Clear TikZ style' },
-      before: snapshot(false), cleared: snapshot(true), undone: snapshot(false), redone: snapshot(true), reloaded: snapshot(true),
-      download: { boundary: 'download', differencePaths: [] }, reload: { boundary: 'reload', differencePaths: [] },
-      standalone: { pageErrors: [], observation: points[0].observation,
-        points: multiple ? [{ id: 'bulk-point', observation: points[1].observation }] : [] } }
-    return entry
-  }
-  return { single: makeCase(['app-point']), multiple: makeCase(['app-point', 'bulk-point']) }
-}
-function appContinuityEvidence() {
-  // Policy fixtures only; native App transitions and negative controls run in
-  // check:free-labels and cannot be substituted with these synthetic records.
-  const expectedUrl = 'http://fixture/stratified-tikz/scripts/fixtures/freeLabelsApp.html'
-  const snapshot = (boundary, pageId = 'app-main', generation = 'document-main') => ({ boundary, pageId, expectedUrl,
-    closed: false, crashed: false, document: { url: expectedUrl, generation, readyState: 'complete',
-      api: { type: 'object', stateType: 'function', sameInstance: true }, root: { children: 1 },
-      scripts: [{ type: 'module', src: 'http://fixture/stratified-tikz/scripts/fixtures/freeLabelsApp.tsx' }] },
-    state: { json: '{}', runtimeDiagramJson: '{}', history: '{}', labelDocumentRevision: 1 } })
-  const names = ['point-paint-local-override-intent', 'point-paint-cross-file-resolution', 'point-paint-unsupported-color-bindings',
-    'point-paint-unsupported-mutations', 'point-paint-mutation-directory-uncertainty', 'point-paint-clear-imported-style', 'point-paint-clear-imported-style-multi']
-  const transitions = names.map((name, index) => ({ name, result: 'passed', before: snapshot(`${name}:before-standalone`), after: snapshot(`${name}:after-standalone-close`),
-    standalonePages: [{ pageId: `svg-${index}`, closed: true, events: [{ event: 'main-frame-navigation', url: `file:///tmp/${name}.svg` }, { event: 'close' }] }] }))
-  const files = {}
-  const controls = ['missing-api', 'wrong-api', 'same-url-reload'].map((fault) => {
-    const prefix = `point-paint-app-control-${fault}`, pageId = `app-${fault}`
-    const before = snapshot('startup', pageId, `document-${fault}`)
-    const failed = structuredClone(before); failed.boundary = 'failure'
-    failed.document.dom = { nodes: [{ tag: 'html' }], bytes: 14, maxNodes: 512, maxBytes: 64_000 }
-    if (fault === 'same-url-reload') failed.document.generation += '-new'
-    if (fault === 'missing-api') failed.document.api.type = 'undefined'
-    if (fault === 'wrong-api') failed.document.api.sameInstance = false
-    const evidence = { pageId, expectedUrl, deliberateNegativeControl: true, fault, snapshot: failed,
-      screenshot: `${prefix}-failure.png`, error: { message: fault === 'same-url-reload' ? 'generation changed' : fault === 'missing-api' ? 'API missing' : 'API instance changed' } }
-    files[`${prefix}-failure.json`] = evidence
-    files[`${prefix}-lifecycle.json`] = { pageId, expectedUrl, events: [{ event: 'document-observation', boundary: 'failure' }] }
-    return { fault, result: 'passed', before, evidence }
-  })
-  const evidence = { schema: 1, startup: snapshot('startup-committed'), transitions, controls,
-    helperReturn: snapshot('import-helper-return'), beforeNextLoad: snapshot('before-next-app-load'), afterControls: snapshot('after-native-continuity-controls') }
-  files['point-paint-app-transitions.json'] = { transitions }
-  files['point-paint-app-lifecycle.json'] = { schema: 1, pageId: 'app-main', expectedUrl, expected: { generation: 'document-main' },
-    events: [{ event: 'document-observation', boundary: 'import-helper-return' }] }
-  files['point-paint-app-controls.json'] = { schema: 1, controls }
-  return { evidence, files }
-}
-function polygonJoinEvidence() {
-  return { scenario: polygonJoinScenario, group: 'point-node-paint-import-persistence', result: 'passed',
-    cases: polygonJoinCases.flatMap((specification) => polygonJoinScales.map((scale) => ({
-      key: specification.key, scale, specification, modelUnchanged: true,
-      observation: { source: '', bodyStatus: 'ready', vertices: Array.from({ length: specification.shape === 'star' ? 10 : 3 }, (_, index) => {
-          const angle = -Math.PI / 2 - index * Math.PI / (specification.shape === 'star' ? 5 : 1.5)
-          const radius = specification.size * 1.2 / 2 * Math.SQRT2 * (specification.shape === 'star' ? index % 2 === 0 ? 1.5 : 1 : 2)
-          return { x: Math.cos(angle) * radius, y: Math.sin(angle) * radius }
-        }),
-        strokeWidth: specification.widthPt * 1.2, fill: 'none', join: specification.join,
-        miterLimit: 10, resolution: 16, boundaryPixelCount: 100, boundsMatch: true,
-        declaredBounds: [-10, specification.key === 'triangle-bevel-wide' ? -15.4544155877 : -10, 10, specification.key === 'triangle-miter-wide' ? 20.5455844123 : 10],
-        rasterBounds: { minX: -10, minY: specification.key === 'triangle-bevel-wide' ? -15.4544155877 : -10, maxX: 10, maxY: specification.key === 'triangle-miter-wide' ? 20.5455844123 : 10 }, ctm: { a: scale, b: 0, c: 0, d: scale, e: 10, f: 10 } },
-      probes: ['paint', 'within', 'outside', 'interior', ...(specification.exact ? ['exact'] : []),
-        ...(specification.key === 'triangle-miter-wide' ? ['miter-tip'] : []),
-        ...(specification.key === 'triangle-bevel-wide' ? ['bevel-edge'] : [])].map((kind) => {
-        const candidates = ['outside', 'exact'].includes(kind) ? ['control'] : ['control', 'p']
-        const local = kind === 'exact' ? specification.exact : kind === 'miter-tip' ? { x: 0, y: -40.8 } : kind === 'bevel-edge' ? { x: 10, y: -14 } : { x: 0, y: 0 }
-        return { kind, screenshot: `${polygonJoinScenario}-${specification.key}-scale-${scale}-${kind}.png`, nativeStrokeContains: true, local, transform: { ctm: { a: scale, b: 0, c: 0, d: scale, e: 10, f: 20 } }, selectionCleared: true,
-          rasterDistance: ({ paint: 0, within: 5.5, outside: 6.5, interior: 0, exact: specification.join === 'miter' ? 7.4544155877 : 8.5455844123, 'miter-tip': 0, 'bevel-edge': 0 })[kind],
-          actions: [false, true, true, true].map((alt, index) => ({ alt, trusted: true, beforeSelection: null,
-            overlayExcluded: true, candidates, screen: { x: scale * local.x + 10, y: scale * local.y + 20 }, point: { x: 450 + local.x, y: 350 + local.y }, selection: { id: index === 0 && ['paint', 'miter-tip', 'bevel-edge'].includes(kind) ? 'p' : candidates[index % candidates.length] } })) }
-      }),
-    }))) }
-}
-
-function completePointEvidence(fixture) {
-  fixture.env.STZ_TEST_FREE_LABEL_GROUPS = JSON.stringify(pointGroups)
-  fixture.env.STZ_TEST_POINT_ARTIFACTS = 'yes'
-  const bodyStructure = (background) => ({ title: 'Scale', expectedBackground: background,
-    exportBackground: { markers: background === 'white'
-      ? [{ attribute: { namespace: null, name: 'data-stratified-tikz-export-background', value: 'white' } }] : [] },
-  })
-  const bodySample = (background, shape, variant, scale) => ({ background, shape, variant, scale,
-    bodyContractPassed: true, output: { capture: { coordinatesStable: true } },
-    bodyObservation: { structure: bodyStructure(background),
-      literal: { source: 'Scale', documentUnchanged: true, fontReadiness: { status: 'loaded', checked: true } },
-      settling: { documentUnchanged: true, status: 'loaded', leaves: [{ readiness: { status: 'loaded', checked: true } }] } },
-  })
-  const evidence = { checkout: captureCheckoutIdentity({ cwd: fixture.cwd, env: fixture.env }),
-    evidence: Object.entries(pointNodeScenarios).flatMap(([group, names]) => names.map((name) =>
-      ({ group, name, result: 'passed', artifacts: pointNodeScenarioArtifacts(name) }))) }
-  fixture.env.STZ_TEST_POINT_EVIDENCE = JSON.stringify(evidence)
-  fixture.env.STZ_TEST_POINT_ARTIFACT_VALUES = JSON.stringify(Object.fromEntries(targetedPaintScenarios.map((name) => [
-    `${name}.json`, { scenario: name, group: 'point-node-paint-import-persistence', result: 'passed',
-      ...(name === dashCapScenario ? dashCapEvidence() : name === polygonJoinScenario ? polygonJoinEvidence() : name === 'point-paint-app-continuity' ? appContinuityEvidence().evidence : name === 'point-paint-clear-imported-style' ? clearRegressionEvidence() : [...importRegressionScenarios, 'point-paint-unsupported-mutations', 'point-paint-mutation-directory-uncertainty'].includes(name) ? importRegressionEvidence(name) : name === 'point-paint-responsive-downloads' ? {
-        cases: ['transparent', 'white'].flatMap((background) => [['circle', 'solid'], ['triangle', 'solid'], ['circle', 'dashed']]
-          .map(([shape, variant]) => ({ background, shape, variant,
-            baseline: { fixture: { source: 'Scale' }, expectedBackground: background, saved: bodyStructure(background) },
-            fileUnchanged: true, documentRestored: true,
-            scales: [.5, 2].map((scale) => bodySample(background, shape, variant, scale)),
-            returnScale: bodySample(background, shape, variant, .5),
-            negativeControls: [['text-mutation', 'foreground content/order'], ['body-displacement', 'body local placement transform'],
-              ['font-change', 'text font family']].map(([kind, reason]) =>
-              ({ kind, rejected: true, reason: `displayed file: ${reason}`, documentUnchanged: true })),
-          }))),
-      } : name.startsWith('point-paint-responsive-') ? { cases: [.5, 2].map((scale) => ({ scale, negativeControlRejected: true })) }
-        : { cases: ['shadowing', 'missing', 'aliases'].map((name) => ({ name, source: 'fixture style',
-          output: { standalone: 'fixture', inlineMath: 'fixture' },
-          reloadedOutput: { standalone: 'fixture', inlineMath: 'fixture' },
-          editedOutput: { standalone: 'fixture', inlineMath: 'fixture' },
-          uneditedDownload: { boundary: 'download', differencePaths: [] }, uneditedReload: { boundary: 'reload', differencePaths: [] },
-          editedDownload: { boundary: 'download', differencePaths: [] }, editedReload: { boundary: 'reload', differencePaths: [] },
-        })) }),
-    },
-  ])))
-  const mechanism = syntheticMechanismEvidence()
-  fixture.env.STZ_TEST_POINT_ARTIFACT_VALUES = JSON.stringify({
-    ...JSON.parse(fixture.env.STZ_TEST_POINT_ARTIFACT_VALUES), ...appContinuityEvidence().files,
-    [`${dashCapMechanismStem}.json`]: mechanism,
-    ...Object.fromEntries(mechanism.cases.flatMap((entry) => {
-      const stem = `${dashCapMechanismStem}-${entry.key}`
-      return [[`${stem}.json`, entry], [`${stem}.live.svg`, syntheticMechanismLiveSvg(entry)],
-        ...entry.livePaint.captures.map((capture) => [capture.file, { syntheticPngBase64: syntheticMechanismLivePng(capture.scale, entry.key).toString('base64') }]),
-        ...['input.svg', 'solid.input.svg'].map((suffix) =>
-        [`${stem}.${suffix}`, `<svg xmlns="http://www.w3.org/2000/svg"><polygon points="${entry.source.rawPoints}" fill="none" stroke="#000000" stroke-width="${entry.specification.width}" stroke-dasharray="${suffix === 'solid.input.svg' ? 'none' : entry.specification.pattern?.join(' ') ?? 'none'}" stroke-dashoffset="${suffix === 'solid.input.svg' ? 0 : entry.specification.phase}" stroke-linecap="${entry.specification.cap}" stroke-linejoin="${entry.specification.join}" stroke-miterlimit="${entry.specification.miterLimit}"></polygon></svg>`])]
-    })),
-    ...Object.fromEntries(dashCapEvidence().cases.filter((entry) => entry.specification.audit).flatMap((entry) => {
-      const stem = `${dashCapScenario}-${entry.key}-scale-${entry.scale}`
-      return [[`${stem}-engine-audit.json`, entry.observation.engineAudit],
-        ...[...(entry.observation.livePaint?.captures ?? []), ...entry.probes.flatMap(({ liveCapture }) => liveCapture ? [liveCapture] : [])]
-          .map((capture) => [capture.screenshot, { syntheticPngBase64: syntheticDashCapLivePng(capture, entry.key).toString('base64') }]),
-        ...['.input.svg', '-solid.input.svg'].map((suffix) =>
-        [`${stem}${suffix}`, `<svg xmlns="http://www.w3.org/2000/svg"><polygon points="${entry.observation.engineAudit.rawPoints}" fill="none" stroke="black"></polygon></svg>`])]
-    })),
-  })
-  return evidence
-}
 for (const background of ['transparent', 'white']) {
   for (const boundary of ['baseline', 'saved', 'scale-0.5', 'scale-2', 'return-scale-0.5']) {
     for (const fault of ['missing-mode', 'wrong-mode', ...(boundary === 'baseline' ? [] : ['missing-background', 'empty-background'])]) {
@@ -900,12 +616,12 @@ for (const phase of ['32A', '32B', '32C', '32D']) {
     const fixture = checkoutFixture(t)
     completePointEvidence(fixture)
     if (phase === '32A' || phase === '32B') assert.equal(verify(t, fixture, phase).status, 'passed')
-    else assert.throws(() => verify(t, fixture, phase), /17 required groups/)
+    else assert.throws(() => verify(t, fixture, phase), phase === '32D' ? /18 required groups/ : /17 required groups/)
   })
   test(`${phase} rejects an otherwise successful Phase 31F report`, (t) => {
     const fixture = checkoutFixture(t)
     fixture.env.STZ_TEST_FREE_LABEL_GROUPS = JSON.stringify(combinedLabelGroups)
-    assert.throws(() => verify(t, fixture, phase), phase === '32A' ? /15 required groups/ : phase === '32B' ? /16 required groups/ : /17 required groups/)
+    assert.throws(() => verify(t, fixture, phase), phase === '32A' ? /15 required groups/ : phase === '32B' ? /16 required groups/ : phase === '32D' ? /18 required groups/ : /17 required groups/)
   })
 }
 for (const fault of ['scenarios', 'terminal', 'identity', 'artifacts', 'corrupt-artifacts', 'page-error']) {
@@ -930,7 +646,7 @@ for (const phase of ['32B', '32C', '32D']) {
     fixture.env.STZ_TEST_FREE_LABEL_GROUPS = JSON.stringify(pointGroups.filter((group) => group !== 'point-node-paint-import-persistence'))
     evidence.evidence = evidence.evidence.filter((entry) => entry.group !== 'point-node-paint-import-persistence')
     fixture.env.STZ_TEST_POINT_EVIDENCE = JSON.stringify(evidence)
-    assert.throws(() => verify(t, fixture, phase), phase === '32B' ? /16 required groups/ : /17 required groups/)
+    assert.throws(() => verify(t, fixture, phase), phase === '32B' ? /16 required groups/ : phase === '32D' ? /18 required groups/ : /17 required groups/)
   })
 }
 test('32A continues accepting its complete pre-paint group and scenario set', (t) => {
@@ -1077,29 +793,72 @@ for (const boundary of ['mutation', 'away', 'back', 'undone', 'redone', 'reloade
     })
   }
 }
+test('32B synthetic Clear policy preserves explicit layout and restores imported provenance on undo', (t) => {
+  const fixture = checkoutFixture(t)
+  completePointEvidence(fixture)
+  const clear = JSON.parse(fixture.env.STZ_TEST_POINT_ARTIFACT_VALUES)['point-paint-clear-imported-style.json']
+  assert.equal(clear.evidenceKind, 'synthetic-policy')
+  for (const kind of ['single', 'multiple']) {
+    const entry = clear[kind]
+    assert.equal(entry.evidenceKind, 'synthetic-policy')
+    for (const { current: original } of entry.before.points) {
+      const { layout, importedLayout } = original.style
+      assert.ok(layout.innerXSep > importedLayout.baseline.innerXSep, 'Fixture contains a deliberate local axis override')
+      assert.deepEqual(importedLayout.overriddenFields, ['innerXSep'])
+      assert.equal(importedLayout.referenceId, original.importedTikzStyleReferenceId)
+      assert.equal(layout.units.innerXSep.unit, 'em')
+      assert.equal(layout.units.innerYSep.unit, 'ex')
+      assert.notDeepEqual(layout.units.innerXSep.fontContext, layout.units.innerYSep.fontContext)
+      for (const boundary of ['cleared', 'redone', 'reloaded']) {
+        const actual = entry[boundary].points.find((point) => point.current.id === original.id).current
+        assert.deepEqual(actual.style.layout, layout, `Explicit layout survives ${kind} ${boundary}`)
+        if (entry.ids.includes(original.id)) assert.equal(Object.hasOwn(actual.style, 'importedLayout'), false)
+        else assert.deepEqual(actual, original, 'Unselected layout and provenance remain exact')
+      }
+      assert.deepEqual(entry.undone.points.find((point) => point.current.id === original.id).current, original,
+        'Undo restores the exact original layout baseline and override metadata')
+    }
+  }
+  assert.equal(verify(t, fixture, '32B').status, 'passed')
+})
+
 for (const kind of ['single', 'multiple']) for (const boundary of ['cleared', 'redone', 'reloaded']) {
-  for (const fault of ['retained-reference', 'retained-provenance', 'retained-preset', 'changed-paint', 'changed-control', 'false-validity', 'missing-preview', 'wrong-target-output']) {
-    test(`32B requires explicit detached native state: ${kind} ${boundary} ${fault}`, (t) => {
+  for (const fault of ['retained-reference', 'retained-provenance', 'retained-layout-provenance', 'retained-preset',
+    'changed-paint', 'changed-control', 'changed-layout', 'dropped-layout', 'changed-layout-units', 'changed-layout-context',
+    'changed-control-layout', 'changed-control-layout-provenance', 'false-validity', 'missing-preview', 'wrong-target-output']) {
+    test(`32B synthetic policy requires explicit detached state: ${kind} ${boundary} ${fault}`, (t) => {
       const fixture = checkoutFixture(t)
       completePointEvidence(fixture)
       const artifacts = JSON.parse(fixture.env.STZ_TEST_POINT_ARTIFACT_VALUES)
-      const entry = artifacts['point-paint-clear-imported-style.json'][kind][boundary], target = entry.points[0]
+      const regression = artifacts['point-paint-clear-imported-style.json'][kind]
+      const entry = regression[boundary], target = entry.points[0]
       if (fault === 'retained-reference') target.current.importedTikzStyleReferenceId = 'reference'
       if (fault === 'retained-provenance') target.current.style.importedPaint = { referenceId: 'reference' }
+      if (fault === 'retained-layout-provenance') target.current.style.importedLayout = structuredClone(regression.before.points[0].current.style.importedLayout)
       if (fault === 'retained-preset') target.current.stylePresetId = 'preset'
       if (fault === 'changed-paint') target.current.style.paint.stroke.dashPhase = 8
       if (fault === 'changed-control') entry.points[2].current.style.paint.text.color = '#0000ff'
+      if (fault === 'changed-layout') target.current.style.layout.innerXSep += 1
+      if (fault === 'dropped-layout') delete target.current.style.layout
+      if (fault === 'changed-layout-units') target.current.style.layout.units.innerXSep.source = '2em'
+      if (fault === 'changed-layout-context') target.current.style.layout.units.innerYSep.fontContext.xHeightPt += 1
+      if (fault === 'changed-control-layout') entry.points[2].current.style.layout.anchor = 'north east'
+      if (fault === 'changed-control-layout-provenance') entry.points[2].current.style.importedLayout.overriddenFields = []
       if (fault === 'false-validity') entry.modelDiagnostics.validation.valid = false
       if (fault === 'missing-preview') delete target.observation
       if (fault === 'wrong-target-output') entry.output.inlineMath = entry.output.inlineMath.replace('text=text0', 'text=fill0')
+      synchronizeClearSnapshot(entry)
       fixture.env.STZ_TEST_POINT_ARTIFACT_VALUES = JSON.stringify(artifacts)
-      assert.throws(() => verify(t, fixture, '32B'), /evidence is incomplete or invalid/)
+      const expectedFailure = fault === 'retained-layout-provenance' ? /Clear removes imported layout provenance/
+        : fault.includes('layout') ? /Clear preserves explicit point data and unselected controls/
+          : /evidence is incomplete or invalid/
+      assert.throws(() => verify(t, fixture, '32B'), expectedFailure)
     })
   }
 }
 for (const fault of ['missing-single', 'missing-multi', 'missing-action', 'missing-history', 'extra-history', 'changed-earlier-history', 'undo-lost-reference',
-  'missing-reload', 'missing-svg', 'missing-second-svg', 'svg-paint', 'svg-error']) {
-  test(`32B rejects incomplete clear workflow evidence: ${fault}`, (t) => {
+  'undo-lost-layout-provenance', 'missing-reload', 'missing-svg', 'missing-second-svg', 'svg-paint', 'svg-error']) {
+  test(`32B synthetic policy rejects incomplete clear workflow evidence: ${fault}`, (t) => {
     const fixture = checkoutFixture(t)
     completePointEvidence(fixture)
     const artifacts = JSON.parse(fixture.env.STZ_TEST_POINT_ARTIFACT_VALUES)
@@ -1111,13 +870,16 @@ for (const fault of ['missing-single', 'missing-multi', 'missing-action', 'missi
     if (fault === 'extra-history') entry.cleared.state.history = JSON.stringify({ past: [{}, {}, {}] })
     if (fault === 'changed-earlier-history') entry.cleared.state.history = JSON.stringify({ past: [{ changed: true }, {}] })
     if (fault === 'undo-lost-reference') delete entry.undone.points[0].current.importedTikzStyleReferenceId
+    if (fault === 'undo-lost-layout-provenance') delete entry.undone.points[0].current.style.importedLayout
+    if (fault.startsWith('undo-')) synchronizeClearSnapshot(entry.undone)
     if (fault === 'missing-reload') delete entry.reload
     if (fault === 'missing-svg') delete entry.standalone
     if (fault === 'missing-second-svg') entry.standalone.points = []
     if (fault === 'svg-paint') entry.standalone.observation.contour.strokeWidth = .4
     if (fault === 'svg-error') entry.standalone.pageErrors.push('page error')
     fixture.env.STZ_TEST_POINT_ARTIFACT_VALUES = JSON.stringify(artifacts)
-    assert.throws(() => verify(t, fixture, '32B'), /evidence is incomplete or invalid/)
+    assert.throws(() => verify(t, fixture, '32B'), fault === 'undo-lost-layout-provenance'
+      ? /Native undo restores imported points/ : /evidence is incomplete or invalid/)
   })
 }
 
@@ -1425,3 +1187,613 @@ for (const target of ['named-full-closed-limitation', 'unrelated-App-failure']) 
     assert.equal(failedVerification(t, fixture, '32B').report.status, 'failed')
   })
 }
+
+function referencedParentFixture(t) {
+  const artifactDir = realpathSync(mkdtempSync(join(tmpdir(), 'stz-parent-publication-')))
+  t.after(() => rmSync(artifactDir, { recursive: true, force: true }))
+  const checkout = { revision: '1'.repeat(40), trackedDiffSha256: '2'.repeat(64),
+    untrackedSha256: { 'current-observation.mjs': '3'.repeat(64) }, fingerprint: '4'.repeat(64) }
+  const publisher = createEvidencePublisher({ artifactDir, checkout: { ...checkout, status: ' M current-observation.mjs\n' } })
+  const report = { result: 'passed', stage: 'complete', environment: { browserVersion: 'controlled parent-policy fixture' },
+    checkout: { ...checkout, status: ' M current-observation.mjs\n' },
+    started: [...combinedLabelGroups, ...Object.keys(allPointNodeScenarios)],
+    completed: [...combinedLabelGroups, ...Object.keys(allPointNodeScenarios)],
+    incompleteGroups: [], unexecuted: [], pageErrors: [], evidence: [],
+    diagnostics: [{ name: 'preserved-observation', group: layoutAnchorGroup, result: 'observed',
+      state: { history: 'exact-history-'.repeat(20), source: 'exact raw $x$ source', owner: '["point-node",17,"current-point"]' } }] }
+  return { artifactDir, checkout, publisher, report }
+}
+
+// These records precede the awaited operation. A stalled boundary therefore
+// identifies its actual owner/stage instead of leaving only a containing file
+// cancellation. Publisher deadlines remain bounded at their production default.
+function publicationProgress(publisher) {
+  const stages = [], pending = new Set()
+  const publish = (name, value, options) => {
+    const record = { name, stage: options.stage, outcome: 'pending', before: publisher.metrics.boundaries }
+    stages.push(record)
+    console.log(`[32D verifier] publication entered: ${options.stage}: ${name}`)
+    let publication
+    try { publication = publisher.publish(name, value, options) } catch (error) { publication = Promise.reject(error) }
+    const outcome = ownPublication(publication).then(result => {
+      record.outcome = result.ok ? 'fulfilled' : 'rejected'
+      record.after = publisher.metrics.boundaries
+      if (!result.ok) record.error = result.error
+      return result
+    })
+    pending.add(outcome)
+    // Install both fulfillment and rejection ownership before callers await an
+    // entry gate. Never reject a secondary observer that nobody owns.
+    void outcome.then(() => { pending.delete(outcome) })
+    return outcome
+  }
+  return { publish, stages, pending, drain: async () => { await Promise.all([...pending]) } }
+}
+
+async function publishParentStage(t, publisher, name, value, options) {
+  const progress = publicationProgress(publisher)
+  try { return publicationValue(await progress.publish(name, value, options)) }
+  finally {
+    await progress.drain(); assert.equal(progress.pending.size, 0)
+    t.diagnostic(`publication drained: ${options.stage}: ${name}: ${progress.stages[0]?.outcome}`)
+  }
+}
+
+function restoreReplayFiles(artifactDir, originals) {
+  for (const [name, bytes] of originals) {
+    const path = join(artifactDir, name)
+    if (bytes === null) { if (existsSync(path)) unlinkSync(path); assert.equal(existsSync(path), false) }
+    else { writeFileSync(path, bytes); assert.deepEqual(readFileSync(path), bytes, `Exact control fixture restored: ${name}`) }
+  }
+}
+
+function replayProgress(records, fault) {
+  const record = { fault, stages: ['entered'] }
+  records.push(record)
+  console.log(`[32D verifier] replay entered: ${fault}`)
+  return record
+}
+
+function assertReplayComplete(records, count) {
+  assert.equal(records.length, count, 'Every declared replay subtest was awaited')
+  for (const record of records) assert.deepEqual(record.stages, ['entered', 'mutated', 'rejected', 'restored'],
+    `The complete exact-file replay and cleanup finished: ${record.fault}`)
+}
+
+for (const fault of ['failure-before-entry', 'held-writer-deadline']) {
+  test(`32D real parent publication progress owns ${fault}, queued outcomes and cleanup`, async t => {
+    const fixture = completePhase32dParentFixture(t), stem = 'point-layout-signed-polygonal-zero-axis-2d'
+    // Prepare the complete independently replayed values before the deliberate
+    // hold. Both operations still retain and authenticate ordinary file bytes.
+    const firstValue = fixture.readJson(`${stem}-native.json`)
+    const nextValue = fixture.readJson(`${stem}-standalone.json`)
+    const entered = publicationGate(), release = publicationGate(), finished = publicationGate(), deadlines = []
+    const injected = new Error('controlled ordinary parent writer failed before entry')
+    let held = false, controlled = true
+    const unhandled = [], onUnhandled = error => unhandled.push(error)
+    process.on('unhandledRejection', onUnhandled)
+    const publisher = createEvidencePublisher({ artifactDir: fixture.artifactDir, checkout: fixture.checkout,
+      scheduleDeadline: (expire, timeoutMs) => {
+        assert.equal(timeoutMs, 5000)
+        if (!controlled) { const timer = setTimeout(expire, timeoutMs); return () => clearTimeout(timer) }
+        const deadline = { expire, cancelled: false }; deadlines.push(deadline)
+        return () => { deadline.cancelled = true }
+      }, write: async (path, bytes) => {
+        if (controlled && !held) {
+          if (fault === 'failure-before-entry') throw injected
+          held = true; entered.resolve()
+          try { await release.promise; await writeFile(path, bytes) } finally { finished.resolve() }
+          return
+        }
+        await writeFile(path, bytes)
+      } })
+    const progress = publicationProgress(publisher)
+    let first, queued, primary
+    try {
+      first = progress.publish(`${stem}-native.json`, firstValue, { stage: 'actual-native-before-authority' })
+      queued = progress.publish(`${stem}-standalone.json`, nextValue, { stage: 'actual-standalone-queued-authority' })
+      if (fault === 'failure-before-entry') {
+        await assert.rejects(awaitPublicationEntry(entered, first), error => error === injected)
+        assert.equal(entered.settled, false, 'The entry wait fails promptly without fabricating writer entry')
+      } else {
+        await awaitPublicationEntry(entered, first)
+        assert.equal(progress.pending.size, 2)
+        assert.equal(publisher.metrics.boundaries, 0)
+        // Fire only this owner's selected deadline after actual writer entry.
+        // The test does not charge fixture construction or scheduling latency.
+        deadlines[0].expire()
+      }
+      const firstOutcome = await first, queuedOutcome = await queued
+      assert.equal(firstOutcome.ok, false); assert.equal(queuedOutcome.ok, false)
+      primary = firstOutcome.error
+      if (fault === 'failure-before-entry') assert.equal(primary, injected)
+      else assert.match(primary.message, /Timed out after 5000ms during evidence publication actual-native-before-authority/)
+      assert.equal(queuedOutcome.error, primary, 'Queued publication propagates the exact primary before entering its writer')
+      assert.equal(publisher.primary, primary)
+      assert.deepEqual(progress.stages.map(({ outcome }) => outcome), ['rejected', 'rejected'])
+      controlled = false
+      await publishParentStage(t, publisher, 'free-labels-evidence.json', { ...fixture.report, result: 'failed',
+        error: { message: primary.message, stack: primary.stack } }, { stage: 'complete', disposition: 'failed' })
+      const authority = readFileSync(join(fixture.artifactDir, 'free-labels-evidence.json'))
+      assert.throws(() => validateBrowserEvidence('check:free-labels', fixture.artifactDir, '32D', fixture.checkout),
+        /did not reach complete/, 'A failed actual parent publication cannot appear accepted')
+      release.resolve()
+      if (held) await finished.promise
+      await new Promise(resolve => setImmediate(resolve))
+      assert.deepEqual(readFileSync(join(fixture.artifactDir, 'free-labels-evidence.json')), authority)
+      assert.equal(publisher.primary, primary)
+    } finally {
+      entered.resolve(); release.resolve()
+      if (held) await finished.promise
+      await progress.drain()
+      await new Promise(resolve => setImmediate(resolve))
+      process.off('unhandledRejection', onUnhandled)
+    }
+    assert.equal(progress.pending.size, 0)
+    assert.equal(entered.settled, true); assert.equal(release.settled, true)
+    if (held) assert.equal(finished.settled, true, 'The late ordinary write finished before fixture removal')
+    t.diagnostic(`publication cleanup complete: ${fault}: pending=0 writer=${held ? 'finished' : 'never-entered'}`)
+    assert.ok(deadlines.every(({ cancelled }) => cancelled), 'All scoped owner deadlines are cancelled')
+    assert.deepEqual(unhandled, [])
+  })
+}
+
+async function publishParentReport(fixture, disposition = 'passed') {
+  const { artifactDir, publisher, report } = fixture
+  await publisher.publish('preserved-observation.json', report.diagnostics[0], { stage: 'before-current-report' })
+  await publisher.publish('free-labels-evidence.json', report, { stage: 'complete', disposition })
+  return JSON.parse(readFileSync(join(artifactDir, 'free-labels-evidence.json'), 'utf8'))
+}
+
+function replaceParentPointer(artifactDir, document) {
+  writeFileSync(join(artifactDir, 'free-labels-evidence.json'), JSON.stringify(document) + '\n')
+  const indexPath = join(artifactDir, 'evidence-publication-index.json')
+  const index = JSON.parse(readFileSync(indexPath, 'utf8'))
+  index.documents['free-labels-evidence.json'] = document
+  writeFileSync(indexPath, JSON.stringify(index) + '\n')
+}
+
+function replaceParentBoundary(artifactDir, document, boundary) {
+  const bytes = Buffer.from(JSON.stringify(boundary) + '\n')
+  writeFileSync(join(artifactDir, document.artifact.path), bytes)
+  document.artifact.bytes = bytes.length
+  document.artifact.sha256 = createHash('sha256').update(bytes).digest('hex')
+  replaceParentPointer(artifactDir, document)
+  const indexPath = join(artifactDir, 'evidence-publication-index.json')
+  const index = JSON.parse(readFileSync(indexPath, 'utf8'))
+  index.history.find(entry => entry.sequence === document.identity.sequence).artifact = document.artifact
+  writeFileSync(indexPath, JSON.stringify(index) + '\n')
+}
+
+function parentPackReferences(artifactDir, boundary) {
+  assert.equal(boundary.schema, 'stz-evidence-boundary-v2')
+  const chunks = []
+  for (let ref = boundary.packReferences; ref; ) {
+    const chunk = JSON.parse(readFileSync(join(artifactDir, ref.path), 'utf8'))
+    chunks.push({ ref, chunk }); ref = chunk.previous
+  }
+  return { chunks, packs: chunks.toReversed().flatMap(({ chunk }) => chunk.packs) }
+}
+
+function replaceParentChunk(artifactDir, document, boundary, chunk) {
+  const bytes = Buffer.from(JSON.stringify(chunk) + '\n')
+  writeFileSync(join(artifactDir, boundary.packReferences.path), bytes)
+  boundary.packReferences.bytes = bytes.length
+  boundary.packReferences.sha256 = createHash('sha256').update(bytes).digest('hex')
+  replaceParentBoundary(artifactDir, document, boundary)
+}
+
+test('32D parent resolves current-tree report references without accepting a complete group count alone', async t => {
+  const fixture = referencedParentFixture(t)
+  await publishParentReport(fixture)
+  assert.deepEqual(readEvidenceDocumentSync(fixture.artifactDir, 'free-labels-evidence.json', { checkout: fixture.checkout }), fixture.report,
+    'Browser-only git status provenance does not change the authenticated tree identity')
+  assert.throws(() => validateBrowserEvidence('check:free-labels', fixture.artifactDir, '32D', fixture.checkout),
+    /Missing completed point-node scenario/, 'All 18 groups still require terminal named scenarios and raw artifact replay')
+})
+
+test('32D parent rejects a referenced complete predecessor report before review', async t => {
+  const fixture = referencedParentFixture(t)
+  fixture.report.completed = fixture.report.completed.filter(group => group !== layoutAnchorGroup)
+  fixture.report.started = [...fixture.report.completed]
+  await publishParentReport(fixture)
+  assert.throws(() => validateBrowserEvidence('check:free-labels', fixture.artifactDir, '32D', fixture.checkout), /18 required groups/)
+})
+
+for (const fault of ['running-document', 'running-index', 'wrong-terminal-stage']) {
+  test(`parent rejects compact complete flags without matching terminal publication: ${fault}`, async t => {
+    const fixture = referencedParentFixture(t), { artifactDir, publisher, report, checkout } = fixture
+    report.completed = [...combinedLabelGroups]
+    report.started = [...combinedLabelGroups]
+    await publisher.publish('free-labels-evidence.json', report, {
+      stage: fault === 'wrong-terminal-stage' ? 'uncompleted-stage' : 'complete',
+      disposition: fault === 'running-document' ? 'running' : 'passed',
+    })
+    if (fault === 'running-index') {
+      const path = join(artifactDir, 'evidence-publication-index.json'), index = JSON.parse(readFileSync(path, 'utf8'))
+      index.disposition = 'running'
+      writeFileSync(path, JSON.stringify(index) + '\n')
+    }
+    assert.throws(() => validateBrowserEvidence('check:free-labels', artifactDir, '31F', checkout),
+      'A complete raw body must agree with durable terminal document and index authority')
+  })
+}
+
+for (const fault of ['missing-boundary', 'missing-pack', 'truncated-pack', 'wrong-hash', 'wrong-length',
+  'wrong-owner', 'wrong-stage', 'wrong-pack-order', 'untracked-tree', 'stale-current-pointer',
+  'missing-identity', 'wrong-identity-owner', 'substituted-identity', 'missing-reference-chunk',
+  'wrong-reference-hash', 'wrong-reference-owner', 'wrong-reference-sequence']) {
+  test(`32D parent rejects unauthenticated referenced report: ${fault}`, async t => {
+    const fixture = referencedParentFixture(t), { artifactDir, checkout, publisher, report } = fixture
+    const document = await publishParentReport(fixture, fault === 'stale-current-pointer' ? 'running' : 'passed')
+    const boundary = JSON.parse(readFileSync(join(artifactDir, document.artifact.path), 'utf8'))
+    const { chunks, packs } = parentPackReferences(artifactDir, boundary)
+    assert.ok(packs.length >= 2, 'The control includes retained shared data and current report data')
+    if (fault === 'missing-boundary') unlinkSync(join(artifactDir, document.artifact.path))
+    if (fault === 'missing-pack') unlinkSync(join(artifactDir, packs[0].path))
+    if (fault === 'truncated-pack') {
+      const path = join(artifactDir, packs[0].path), bytes = readFileSync(path)
+      writeFileSync(path, bytes.subarray(0, bytes.length - 1))
+    }
+    if (fault === 'wrong-hash') { document.artifact.sha256 = '0'.repeat(64); replaceParentPointer(artifactDir, document) }
+    if (fault === 'wrong-length') { document.artifact.bytes++; replaceParentPointer(artifactDir, document) }
+    if (fault === 'wrong-owner') { document.identity.owner = 'foreign-publisher'; replaceParentPointer(artifactDir, document) }
+    if (fault === 'wrong-stage') { boundary.identity.stage = 'unexecuted-stage'; replaceParentBoundary(artifactDir, document, boundary) }
+    if (fault === 'wrong-pack-order') {
+      const chunk = chunks[0].chunk
+      chunk.packs[0] = packs[0]
+      replaceParentChunk(artifactDir, document, boundary, chunk)
+    }
+    if (fault === 'missing-identity') unlinkSync(join(artifactDir, document.identity.checkout.path))
+    if (fault === 'wrong-identity-owner' || fault === 'substituted-identity') {
+      const path = join(artifactDir, document.identity.checkout.path)
+      const identity = JSON.parse(readFileSync(path, 'utf8'))
+      if (fault === 'wrong-identity-owner') identity.owner = 'foreign-canonical-owner'
+      else identity.checkout.untrackedSha256['current-observation.mjs'] = 'substituted-bytes'
+      writeFileSync(path, JSON.stringify(identity) + '\n')
+    }
+    if (fault === 'missing-reference-chunk') unlinkSync(join(artifactDir, boundary.packReferences.path))
+    if (fault === 'wrong-reference-hash') {
+      boundary.packReferences.sha256 = '0'.repeat(64)
+      replaceParentBoundary(artifactDir, document, boundary)
+    }
+    if (fault === 'wrong-reference-owner' || fault === 'wrong-reference-sequence') {
+      const chunk = chunks[0].chunk
+      if (fault === 'wrong-reference-owner') chunk.identity.owner = 'foreign-reference-owner'
+      else chunk.identity.sequence++
+      replaceParentChunk(artifactDir, document, boundary, chunk)
+    }
+    if (fault === 'untracked-tree') checkout.untrackedSha256['current-observation.mjs'] = 'stale-untracked-bytes'
+    if (fault === 'stale-current-pointer') {
+      report.diagnostics.push({ name: 'new-terminal-observation', group: layoutAnchorGroup, result: 'observed' })
+      await publisher.publish('free-labels-evidence.json', report, { stage: report.stage, disposition: 'passed' })
+      writeFileSync(join(artifactDir, 'free-labels-evidence.json'), JSON.stringify(document) + '\n')
+    }
+    assert.throws(() => validateBrowserEvidence('check:free-labels', artifactDir, '32D', checkout),
+      error => !/Missing completed point-node scenario/.test(error.message), 'Reference authentication fails before summary or scenario acceptance')
+  })
+}
+
+test('32D parent pending file replay and ordered post-click prefixes consume resolved original observations', async t => {
+  const { artifactDir, checkout, publisher } = referencedParentFixture(t)
+  const scenario = 'point-layout-pending-transparent-edit', { evidence, raw } = syntheticStandalonePointDownload(artifactDir, scenario)
+  for (const suffix of ['preparation', 'post-click-view']) {
+    const name = `${scenario}-${suffix}.json`, value = JSON.parse(readFileSync(join(artifactDir, name), 'utf8'))
+    await publisher.publish(name, value, { stage: suffix })
+  }
+  const common = { name: `${scenario}-post-click-view`, group: layoutAnchorGroup, result: 'observed' }
+  const diagnostics = [0, 1, 2, 3].map(count => ({ ...common, postClickView: { ...structuredClone(evidence.postClickView),
+    result: 'observed', stages: structuredClone(evidence.postClickView.stages.slice(0, count)) } }))
+    .concat({ ...common, postClickView: structuredClone(evidence.postClickView) })
+  await publisher.publish(`${scenario}.json`, evidence, { stage: 'terminal-scenario' })
+  await publisher.publish(`${scenario}-standalone.json`, raw, { stage: 'reopened-file' })
+  await publisher.publish('ordered-post-click-diagnostics.json', { diagnostics }, { stage: 'ordered-post-click-diagnostics' })
+  const terminal = readEvidenceDocumentSync(artifactDir, `${scenario}.json`, { checkout })
+  const standalone = readEvidenceDocumentSync(artifactDir, `${scenario}-standalone.json`, { checkout })
+  const resolved = readEvidenceDocumentSync(artifactDir, 'ordered-post-click-diagnostics.json', { checkout })
+  assert.deepEqual(terminal, evidence); assert.deepEqual(standalone, raw); assert.deepEqual(resolved.diagnostics, diagnostics)
+  assertLayoutStandaloneEvidence(terminal, standalone, artifactDir, { checkout })
+  assertLayoutPostClickViewDiagnostic(terminal, resolved.diagnostics)
+  resolved.diagnostics.splice(2, 1)
+  assert.throws(() => assertLayoutPostClickViewDiagnostic(terminal, resolved.diagnostics), /immediate-input/,
+    'Lossless references preserve mandatory raw stage prefixes instead of replacing them with terminal flags')
+})
+
+function completePhase32dParentFixture(t) {
+  console.log('[32D verifier] complete parent fixture preparation entered')
+  const earlier = checkoutFixture(t)
+  const base = completePointEvidence(earlier)
+  const artifactDir = realpathSync(mkdtempSync(join(tmpdir(), 'stz-authenticated-empty-parent-')))
+  t.after(() => rmSync(artifactDir, { recursive: true, force: true }))
+  const fixture = populatePhase32dParentEvidence(artifactDir, base.checkout,
+    JSON.parse(earlier.env.STZ_TEST_POINT_ARTIFACT_VALUES), combinedLabelGroups)
+  console.log(`[32D verifier] complete parent fixture ready: ${fixture.report.completed.length} groups; ${fixture.report.evidence.length} records`)
+  return fixture
+}
+
+test('32D real complete parent artifact loop accepts seven native empty-source bodies in both dimensions', t => {
+  const fixture = completePhase32dParentFixture(t)
+  assert.equal(fixture.report.completed.length, 18)
+  for (const { raw } of fixture.signed) {
+    assert.deepEqual(raw.expected.map(({ id }) => id), ['signed-regular-polygon', 'signed-square', 'signed-triangle', 'signed-star',
+      'signed-isosceles-triangle', 'signed-dart', 'signed-zero-axis'])
+    assert.deepEqual(raw.preExport.points.map(({ id }) => id), ['signed-dart', 'signed-isosceles-triangle', 'signed-regular-polygon',
+      'signed-square', 'signed-star', 'signed-triangle', 'signed-zero-axis'])
+    assert.equal((raw.xml.match(/<title\/>/gu) ?? []).length, 7)
+    assert.equal(/<text|<use|data-|aria-/u.test(raw.xml), false)
+    assert.equal(hasWholePointSvg(raw.xml), false, 'Legacy painted-body envelope keeps its default rejection')
+  }
+  validateBrowserEvidence('check:free-labels', fixture.artifactDir, '32D', fixture.checkout)
+})
+
+test('32D strict parent rejects exit-zero complete reports missing or mismatching fresh geometry conformance', t => {
+  const fixture = completePhase32dParentFixture(t), scenario = 'point-layout-signed-polygonal-zero-axis'
+  const terminal = fixture.readJson(`${scenario}.json`), retained = structuredClone(terminal)
+  delete terminal.geometryConformance; fixture.save(`${scenario}.json`, terminal)
+  assert.throws(() => validateBrowserEvidence('check:free-labels', fixture.artifactDir, '32D', fixture.checkout), /geometryConformance/)
+  fixture.save(`${scenario}.json`, retained)
+  const artifact = retained.geometryConformance.find(entry => entry.key === 'ellipse-signed-dashes').artifact
+  const raw = fixture.readJson(artifact)
+  raw.live.actual.svg = raw.live.old.svg; fixture.save(artifact, raw)
+  assert.throws(() => validateBrowserEvidence('check:free-labels', fixture.artifactDir, '32D', fixture.checkout), /SVG|equal|strictly/u)
+})
+
+test('32D real complete parent dispatch accepts explicitly closed empty titles and authenticated raw publications', async t => {
+  const fixture = completePhase32dParentFixture(t)
+  const publisher = createEvidencePublisher({ artifactDir: fixture.artifactDir, checkout: fixture.checkout })
+  for (const entry of fixture.signed) {
+    entry.raw.xml = entry.raw.xml.replaceAll('<title/>', '<title></title>')
+    writeFileSync(entry.svgPath, entry.raw.xml)
+    fixture.save(`${entry.download.scenario}-standalone.json`, entry.raw)
+  }
+  for (const name of [
+    'point-layout-signed-polygonal-zero-axis.json',
+    ...fixture.signed.flatMap(({ download }) => ['native', 'live-capture', 'standalone'].map(suffix => `${download.scenario}-${suffix}.json`)),
+  ]) await publisher.publish(name, fixture.readJson(name), { stage: 'observed-exact-artifact' })
+  await publisher.publish('free-labels-evidence.json', fixture.report, { stage: 'complete', disposition: 'passed' })
+  assert.equal(JSON.parse(readFileSync(join(fixture.artifactDir, 'free-labels-evidence.json'), 'utf8')).schema, 'stz-evidence-document-v2')
+  assert.deepEqual(readEvidenceDocumentSync(fixture.artifactDir, 'free-labels-evidence.json', { checkout: fixture.checkout }), fixture.report)
+  validateBrowserEvidence('check:free-labels', fixture.artifactDir, '32D', fixture.checkout)
+})
+
+const emptyParentFaults = [
+  ['missing-scenario', f => f.report(report => { report.evidence = report.evidence.filter(entry => entry.name !== f.scenario) })],
+  ['wrong-scenario-group', f => f.report(report => { report.evidence.find(entry => entry.name === f.scenario).group = 'point-node-settled-export' })],
+  ['missing-exact-artifact', f => f.report(report => { const record = report.evidence.find(entry => entry.name === f.scenario); record.artifacts = record.artifacts.filter(name => name !== `${f.stem}.svg`) })],
+  ['foreign-artifact', f => { f.write('foreign-empty.svg', f.raw().xml); f.report(report => report.evidence.find(entry => entry.name === f.scenario).artifacts.push('foreign-empty.svg')) }],
+  ['legacy-reuse', f => { const record = f.fixture.report.evidence.find(entry => entry.group === 'point-node-settled-export');
+    f.write('legacy-empty.svg', f.raw().xml); f.report(report => report.evidence.find(entry => entry.name === record.name).artifacts.push('legacy-empty.svg')) }],
+  ['wrong-raw-scenario', f => f.json(`${f.stem}-standalone.json`, raw => { raw.scenario += '-foreign' })],
+  ['nonempty-source', f => f.json(`${f.scenario}.json`, evidence => { evidence.downloads[0].expected[0].source = 'invented' })],
+  ['wrong-saved-source', f => f.json(`${f.stem}-standalone.json`, raw => { const saved = JSON.parse(raw.savedJson); saved.diagram.strata[0].text = 'foreign'; raw.savedJson = JSON.stringify(saved) })],
+  ['wrong-click-source', f => f.json(`${f.scenario}.json`, evidence => { evidence.downloads[0].click.snapshot.points[0].source = 'foreign' })],
+  ['wrong-native-record', f => f.json(`${f.stem}-native.json`, native => { native.polygonalCases[0].state.json += 'corrupt' })],
+  ['missing-owner', f => f.json(`${f.stem}-standalone.json`, raw => { delete raw.preExport.points[0].owner })],
+  ['duplicate-owner', f => f.json(`${f.stem}-standalone.json`, raw => { raw.preExport.points[1].owner = raw.preExport.points[0].owner })],
+  ['foreign-owner', f => f.json(`${f.stem}-standalone.json`, raw => { raw.preExport.points[0].owner = '["point-node",100,"foreign"]' })],
+  ['missing-title', f => f.xml(xml => xml.replace('<title/>', ''))],
+  ['duplicate-title', f => f.xml(xml => xml.replace('<title/>', '<title/><title/>'))],
+  ['foreign-title-attribute', f => f.xml(xml => xml.replace('<title/>', '<title class="foreign"/>'))],
+  ['foreign-title', f => f.xml(xml => xml.replace('<title/>', '<title>foreign</title>'))],
+  ['missing-body', f => f.xml(xml => xml.replace(/<g transform="[^"]*"><title\/><g transform="translate\(0 0\)"[^>]*><g\/><\/g><\/g>/u, ''))],
+  ['duplicate-body', f => f.xml(xml => xml.replace(/(<g transform="[^"]*"><title\/><g transform="translate\(0 0\)"[^>]*><g\/><\/g><\/g>)/u, '$1$1'))],
+  ['missing-ink', f => f.xml(xml => xml.replace(/<g transform="translate\(0 0\)"[^>]*><g\/><\/g>/u, ''))],
+  ['duplicate-ink', f => f.xml(xml => xml.replace(/(<g transform="translate\(0 0\)"[^>]*><g\/><\/g>)/u, '$1$1'))],
+  ['duplicate-content', f => f.xml(xml => xml.replace('<g/></g></g>', '<g/><g/></g></g>'))],
+  ['missing-content', f => f.xml(xml => xml.replace('<g/></g></g>', '</g></g>'))],
+  ['ink-stray-text', f => f.xml(xml => xml.replace('<g/></g></g>', 'foreign<g/></g></g>'))],
+  ['content-stray-text', f => f.xml(xml => xml.replace('<g/></g></g>', '<g>foreign</g></g></g>'))],
+  ['foreign-content-attribute', f => f.xml(xml => xml.replace('<g/></g></g>', '<g transform="translate(1 0)"/></g></g>'))],
+  ['nested-wrong-shell', f => f.xml(xml => xml.replace('<g/></g></g>', '<g><g/></g></g></g>'))],
+  ['missing-contour', f => f.xml(xml => xml.replace(/<path [^>]*\/>/u, ''))],
+  ['duplicate-contour', f => f.xml(xml => xml.replace(/(<path [^>]*\/>)/u, '$1$1'))],
+  ['extra-node', f => f.xml(xml => xml.replace('</svg>', '<g><path d="M 0 0 L 1 1"/></g></svg>'))],
+  ['reordered-native-nodes', f => f.json(`${f.stem}-standalone.json`, raw => raw.preExport.points.reverse())],
+  ['reordered-file-nodes', f => f.xml(xml => { const pattern = /<g><g transform="[^"]*"><path [^>]*\/><g transform="[^"]*"><title\/><g[^>]*><g\/><\/g><\/g><\/g><\/g>/gu;
+    const nodes = [...xml.matchAll(pattern)].map(match => match[0]); assert.equal(nodes.length, 7); let ordinal = 0;
+    return xml.replace(pattern, () => nodes[[1, 0, 2, 3, 4, 5, 6][ordinal++]]) })],
+  ['wrong-body-owner', f => f.json(`${f.stem}-standalone.json`, raw => { raw.reopened[0].structure.bodyPath = raw.reopened[1].structure.bodyPath })],
+  ['wrong-namespace', f => f.xml(xml => xml.replace('http://www.w3.org/2000/svg', 'http://foreign.invalid/svg'))],
+  ['nested-root', f => f.xml(xml => xml.replace('</svg>', '<svg/></svg>'))],
+  ['wrong-closing-tag', f => f.xml(xml => xml.replace('</svg>', '</g></svg>'))],
+  ['comment-only-root', f => f.xml(xml => `<!-- ${xml} -->`)],
+  ['changed-ink-paint', f => f.xml(xml => xml.replace('opacity="1" fill=', 'opacity="0.5" fill='))],
+  ['changed-ink-color', f => f.xml(xml => xml.replace('color="#000000"', 'color="#ff0000"'))],
+  ['changed-ink-transform', f => f.xml(xml => xml.replace('<g transform="translate(0 0)" opacity=', '<g transform="translate(1 0)" opacity='))],
+  ['changed-contour-paint', f => f.xml(xml => xml.replace('fill="#d8ecff"', 'fill="#00ff00"'))],
+  ['changed-placement', f => f.xml(xml => xml.replace(/<g transform="translate\([^)]*\)">/u, '<g transform="translate(0 0)">'))],
+  ['changed-reopened-CTM', f => f.json(`${f.stem}-standalone.json`, raw => { raw.reopened[0].matrices.nodeCTM.e += 1 })],
+  ['blank-PNG', f => f.write(`${f.stem}.png`, syntheticZeroPng(f.fixture.signed[0].zeroAxis.screenCTM, false))],
+  ['short-PNG', f => f.write(`${f.stem}.png`, f.fixture.signed[0].png.subarray(0, 33))],
+  ['mismatched-PNG', f => f.write(`${f.stem}.png`, f.fixture.signed[0].livePng)],
+  ['changed-TikZ', f => f.write(`${f.stem}-inlineMath.tex`, '\\node {foreign};')],
+  ['changed-saved-file', f => f.write(`${f.stem}-saved.json`, '{}')],
+]
+
+test('32D real parent contextual empty-body failures reach mandatory full replay with exact-file mutations', async t => {
+  const fixture = completePhase32dParentFixture(t)
+  const scenario = 'point-layout-signed-polygonal-zero-axis', stem = `${scenario}-2d`, progress = []
+  // Share the unchanged cumulative predecessor bytes and complete PNGs. Each
+  // independent control restores only its own changed files before the next.
+  for (const [fault, mutate] of emptyParentFaults) {
+    t.diagnostic(`awaiting contextual replay: ${fault}`)
+    await t.test(fault, () => {
+    const stage = replayProgress(progress, fault)
+    const originals = new Map()
+    const write = (name, value) => {
+      if (!originals.has(name)) { try { originals.set(name, readFileSync(join(fixture.artifactDir, name))) } catch (error) { if (error.code !== 'ENOENT') throw error; originals.set(name, null) } }
+      writeFileSync(join(fixture.artifactDir, name), value)
+    }
+    const json = (name, change) => { const value = fixture.readJson(name); change(value); write(name, JSON.stringify(value)) }
+    const controls = { fixture, scenario, stem, write, json, raw: () => fixture.readJson(`${stem}-standalone.json`),
+      report: change => json('free-labels-evidence.json', change),
+      xml: change => { const raw = fixture.readJson(`${stem}-standalone.json`); raw.xml = change(raw.xml);
+        write(`${stem}.svg`, raw.xml); write(`${stem}-standalone.json`, JSON.stringify(raw)) } }
+    try {
+      mutate(controls)
+      stage.stages.push('mutated')
+      assert.ok(originals.size > 0)
+      assert.throws(() => validateBrowserEvidence('check:free-labels', fixture.artifactDir, '32D', fixture.checkout),
+        error => ['foreign-artifact', 'legacy-reuse'].includes(fault) || !/Invalid whole-point SVG artifact/.test(error.message),
+        `Mandatory targeted replay rejects ${fault}; the generic painted-body envelope cannot mask the rejection`)
+      stage.stages.push('rejected')
+    } finally {
+      restoreReplayFiles(fixture.artifactDir, originals)
+      stage.stages.push('restored')
+      console.log(`[32D verifier] replay restored: ${fault}: ${originals.size} exact files`)
+    }
+    })
+    t.diagnostic(`contextual replay awaited: ${fault}`)
+  }
+  assertReplayComplete(progress, emptyParentFaults.length)
+  t.diagnostic(`contextual replay cleanup complete: ${progress.length}/${emptyParentFaults.length}`)
+})
+
+test('32D real parent empty-body route retains current scenario/native/live/standalone publication authority', async t => {
+  const fixture = completePhase32dParentFixture(t), scenario = 'point-layout-signed-polygonal-zero-axis', stem = `${scenario}-2d`
+  const publisher = createEvidencePublisher({ artifactDir: fixture.artifactDir, checkout: fixture.checkout })
+  const names = [`${scenario}.json`, `${stem}-native.json`, `${stem}-live-capture.json`, `${stem}-standalone.json`]
+  const stale = {}
+  for (const name of names) {
+    const value = fixture.readJson(name)
+    await publishParentStage(t, publisher, name, value, { stage: 'first-exact-raw' })
+    stale[name] = readFileSync(join(fixture.artifactDir, name))
+    await publishParentStage(t, publisher, name, value, { stage: 'current-exact-raw' })
+  }
+  await publishParentStage(t, publisher, 'free-labels-evidence.json', fixture.report, { stage: 'complete', disposition: 'passed' })
+  validateBrowserEvidence('check:free-labels', fixture.artifactDir, '32D', fixture.checkout)
+  const controls = [
+    ...names.map(name => [`missing-${name}`, ({ remove }) => remove(name)]),
+    ...names.map(name => [`stale-${name}`, ({ write }) => write(name, stale[name])]),
+    ['corrupt-native-boundary', ({ write }) => { const doc = JSON.parse(readFileSync(join(fixture.artifactDir, `${stem}-native.json`), 'utf8')); write(doc.artifact.path, '{corrupt') }],
+    ['wrong-live-hash', ({ write }) => { const name = `${stem}-live-capture.json`, doc = JSON.parse(readFileSync(join(fixture.artifactDir, name), 'utf8')); doc.artifact.sha256 = '0'.repeat(64); write(name, JSON.stringify(doc)) }],
+    ['wrong-standalone-file-binding', ({ write }) => write(`${stem}-standalone.json`, readFileSync(join(fixture.artifactDir, `${stem}-native.json`)))],
+    ['wrong-current-checkout', controls => { controls.checkout = { ...fixture.checkout, trackedDiffSha256: 'f'.repeat(64) } }],
+  ]
+  const progress = []
+  for (const [fault, change] of controls) {
+    t.diagnostic(`awaiting publication authority replay: ${fault}`)
+    await t.test(fault, () => {
+    const stage = replayProgress(progress, fault)
+    const originals = new Map()
+    const retain = name => { if (!originals.has(name)) originals.set(name, readFileSync(join(fixture.artifactDir, name))) }
+    const controls = { checkout: fixture.checkout,
+      write: (name, bytes) => { retain(name); writeFileSync(join(fixture.artifactDir, name), bytes) },
+      remove: name => { retain(name); unlinkSync(join(fixture.artifactDir, name)) } }
+    try {
+      change(controls)
+      stage.stages.push('mutated')
+      assert.throws(() => validateBrowserEvidence('check:free-labels', fixture.artifactDir, '32D', controls.checkout),
+        error => !/Invalid whole-point SVG artifact/.test(error.message), 'Authentication must fail before an empty body can be accepted')
+      stage.stages.push('rejected')
+    } finally { restoreReplayFiles(fixture.artifactDir, originals); stage.stages.push('restored') }
+    })
+  }
+  assertReplayComplete(progress, controls.length)
+  t.diagnostic(`publication authority cleanup complete: ${progress.length}/${controls.length}`)
+})
+
+test('32D complete parent dispatch authenticates separate warning-only cylinder files in both dimensions', t => {
+  const fixture = completePhase32dParentFixture(t)
+  assert.equal(fixture.report.completed.length, 18)
+  assert.equal(fixture.report.evidence.filter(({ group }) => group === layoutAnchorGroup).length, 12)
+  for (const { raw } of fixture.singular) {
+    assert.equal(hasWholePointSvg(raw.xml), false, 'Legacy glyph/contour envelope still rejects a warning-only file')
+    assert.ok(raw.xml.includes(singularCylinderWarningPath))
+    assert.equal((raw.xml.match(/<path\b/gu) ?? []).length, 1)
+  }
+  validateBrowserEvidence('check:free-labels', fixture.artifactDir, '32D', fixture.checkout)
+})
+
+test('32D parent diagnostic context rejects missing or damaged proof before legacy classification', async t => {
+  const fixture = completePhase32dParentFixture(t), scenario = singularCylinderScenario, stem = `${scenario}-2d`
+  const faults = [
+    ['missing-scenario', f => f.json('free-labels-evidence.json', report => { report.evidence = report.evidence.filter(({ name }) => name !== scenario) })],
+    ['missing-exact-file', f => f.json('free-labels-evidence.json', report => { const record = report.evidence.find(({ name }) => name === scenario); record.artifacts = record.artifacts.filter(name => name !== `${stem}.svg`) })],
+    ['foreign-file', f => { f.write('foreign-cylinder.svg', f.raw().xml); f.json('free-labels-evidence.json', report => report.evidence.find(({ name }) => name === scenario).artifacts.push('foreign-cylinder.svg')) }],
+    ['wrong-case-source', f => f.json(`${scenario}.json`, evidence => { evidence.downloads[0].expected[0].source = 'foreign' })],
+    ['wrong-owner', f => f.json(`${scenario}.json`, evidence => { evidence.downloads[0].click.snapshot.points[0].owner = '["point-node",100,"foreign"]' })],
+    ['wrong-request', f => f.json(`${scenario}.json`, evidence => { evidence.downloads[0].click.snapshot.points[0].pointRequest = 'foreign' })],
+    ['wrong-revision', f => f.json(`${scenario}.json`, evidence => { evidence.downloads[0].click.snapshot.runtime.documentRevision += 1 })],
+    ['wrong-file-context', f => f.json(`${stem}-standalone.json`, raw => { raw.svgPath = join(fixture.artifactDir, 'foreign-cylinder.svg') })],
+    ['missing-warning', f => f.xml(xml => xml.replace(/<path\b[^>]*>[\s\S]*?<\/path>/u, ''))],
+    ['damaged-warning-path', f => f.xml(xml => xml.replace(singularCylinderWarningPath, 'M 0 0 L 1 1'))],
+    ['damaged-warning-title', f => f.xml(xml => xml.replace('Shape preview unavailable:', 'Foreign diagnostic:'))],
+    ['missing-empty-title', f => f.xml(xml => xml.replace(/<title\s*\/>|<title><\/title>/u, ''))],
+    ['invented-cylinder-contour', f => f.xml(xml => xml.replace('</svg>', '<path d="M 0 0 L 10 10"/></svg>'))],
+    ['invented-custom-region', f => f.xml(xml => xml.replace('</svg>', '<g><path d="M 0 0 Z" fill="#00FF00"/></g></svg>'))],
+    ['changed-warning-paint', f => f.xml(xml => xml.replace('#B45309', '#00FF00'))],
+    ['changed-placement', f => f.xml(xml => xml.replace(/translate\([^)]*\)/u, 'translate(0 0)'))],
+    ['missing-native-record', f => f.remove(`${stem}-native.json`)],
+    ['wrong-native-warning-owner', f => f.json(`${stem}-native.json`, native => { native.case.native.clicks[1].observation.owner = '["point-node",100,"foreign"]' })],
+    ['wrong-png-bytes', f => f.write(`${stem}.png`, fixture.signed[0].png)],
+    ['lost-authored-tikz', f => f.write(`${stem}-standalone.tex`, '\\node at (0,0) {};')],
+    ['coherent-wrong-tikz-coordinate', f => f.tikz(source => {
+      assert.ok(source.includes('at (3,3)'))
+      return source.replaceAll('at (3,3)', 'at (4,3)')
+    })],
+  ]
+  const progress = []
+  for (const [fault, mutate] of faults) {
+    t.diagnostic(`awaiting diagnostic replay: ${fault}`)
+    await t.test(fault, () => {
+    const stage = replayProgress(progress, fault)
+    const originals = new Map()
+    const remember = name => {
+      if (!originals.has(name)) { try { originals.set(name, readFileSync(join(fixture.artifactDir, name))) }
+        catch (error) { if (error.code !== 'ENOENT') throw error; originals.set(name, null) } }
+    }
+    const write = (name, bytes) => { remember(name); writeFileSync(join(fixture.artifactDir, name), bytes) }
+    const json = (name, change) => { const value = fixture.readJson(name); change(value); write(name, JSON.stringify(value)) }
+    const controls = { write, json, raw: () => fixture.readJson(`${stem}-standalone.json`),
+      remove: name => { remember(name); unlinkSync(join(fixture.artifactDir, name)) },
+      tikz: change => {
+        const raw = fixture.readJson(`${stem}-standalone.json`), value = fixture.readJson(`${scenario}.json`)
+        for (const mode of ['standalone', 'inlineMath']) {
+          raw.outputs[mode] = change(raw.outputs[mode])
+          value.downloads[0].outputs[mode] = raw.outputs[mode]
+          write(`${stem}-${mode}.tex`, raw.outputs[mode])
+        }
+        write(`${stem}-standalone.json`, JSON.stringify(raw)); write(`${scenario}.json`, JSON.stringify(value))
+      },
+      xml: change => { const raw = fixture.readJson(`${stem}-standalone.json`); raw.xml = change(raw.xml);
+        write(`${stem}.svg`, raw.xml); write(`${stem}-standalone.json`, JSON.stringify(raw)) } }
+    try {
+      mutate(controls)
+      stage.stages.push('mutated')
+      assert.ok(originals.size > 0)
+      assert.throws(() => validateBrowserEvidence('check:free-labels', fixture.artifactDir, '32D', fixture.checkout),
+        error => fault === 'foreign-file' || !/Invalid whole-point SVG artifact/.test(error.message),
+        'Exact diagnostic replay rejects damaged context before the legacy glyph envelope')
+      stage.stages.push('rejected')
+    } finally {
+      restoreReplayFiles(fixture.artifactDir, originals)
+      stage.stages.push('restored')
+    }
+    })
+  }
+  assertReplayComplete(progress, faults.length)
+  t.diagnostic(`diagnostic replay cleanup complete: ${progress.length}/${faults.length}`)
+})
+
+test('32D diagnostic files require current authenticated native and standalone references', async t => {
+  const fixture = completePhase32dParentFixture(t), stem = `${singularCylinderScenario}-2d`
+  const publisher = createEvidencePublisher({ artifactDir: fixture.artifactDir, checkout: fixture.checkout })
+  const names = [`${singularCylinderScenario}.json`, `${stem}-native.json`, `${stem}-standalone.json`], stale = {}
+  for (const name of names) {
+    const value = fixture.readJson(name)
+    await publishParentStage(t, publisher, name, value, { stage: 'observed-diagnostic' })
+    stale[name] = readFileSync(join(fixture.artifactDir, name))
+    await publishParentStage(t, publisher, name, value, { stage: 'current-diagnostic' })
+  }
+  await publishParentStage(t, publisher, 'free-labels-evidence.json', fixture.report, { stage: 'complete', disposition: 'passed' })
+  validateBrowserEvidence('check:free-labels', fixture.artifactDir, '32D', fixture.checkout)
+  for (const name of names) await t.test(`stale ${name}`, () => {
+    const current = readFileSync(join(fixture.artifactDir, name))
+    try {
+      writeFileSync(join(fixture.artifactDir, name), stale[name])
+      assert.throws(() => validateBrowserEvidence('check:free-labels', fixture.artifactDir, '32D', fixture.checkout),
+        error => !/Invalid whole-point SVG artifact/.test(error.message))
+    } finally { writeFileSync(join(fixture.artifactDir, name), current) }
+  })
+})

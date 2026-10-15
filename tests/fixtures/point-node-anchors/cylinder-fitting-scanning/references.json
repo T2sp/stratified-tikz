@@ -1,0 +1,5413 @@
+{
+  "schema": "stz-pgf-cylinder-fitting-scanning-v1",
+  "pgfVersion": "3.1.11a",
+  "upstream": "https://github.com/pgf-tikz/pgf/releases/tag/3.1.11a",
+  "engine": "pdfTeX 3.141592653-2.6-1.40.29 (TeX Live 2026)",
+  "engineBinarySha256": "3ead7baeffb81c638fe75599602278566370e6319c0469f6ab00ff62bff4b0eb",
+  "sourceHashes": {
+    "/usr/local/texlive/2026/texmf-dist/tex/generic/pgf/libraries/shapes/pgflibraryshapes.geometric.code.tex": "bbd6abe9df51153e2f4f61cca3ad669de34a6648cf37795df44da931402b69ee",
+    "/usr/local/texlive/2026/texmf-dist/tex/generic/pgf/modules/pgfmoduleshapes.code.tex": "01dd81e3f2c56a8db7864916ada1a5036964aff2e8176aafd4773244e236bb27",
+    "/usr/local/texlive/2026/texmf-dist/tex/generic/pgf/basiclayer/pgfcorepoints.code.tex": "7533dd80c95a5124726b0a617a5f458226d4a7490bcd209e3fd7e717e24dc127",
+    "/usr/local/texlive/2026/texmf-dist/tex/generic/pgf/math/pgfmathcalc.code.tex": "58fcc94547646458470315a6d10953a9729e7962e3def5273633b06fb444a5aa",
+    "/usr/local/texlive/2026/texmf-dist/tex/generic/pgf/math/pgfmathfunctions.trigonometric.code.tex": "1c8834abe00807467a52d31ef96032d5084b2560eea45995018084d13a3cde3c",
+    "/usr/local/texlive/2026/texmf-dist/tex/generic/pgf/math/pgfmathfunctions.basic.code.tex": "c94abbd89ad0556546d9e5053af16b58ce7f38d19c379b27309e5fefd23908f8",
+    "/usr/local/texlive/2026/texmf-dist/tex/generic/pgf/basiclayer/pgfcoretransformations.code.tex": "bdea875774b4ad7a1e12debc67c46286245031f5c2e287c9e192f3ca4b6193b6",
+    "/usr/local/texlive/2026/texmf-dist/tex/generic/pgf/math/pgfmathparser.code.tex": "317b4a8059ee9afd04b052dd2974c1c9a059d1b8e301f9578efa9ac0b9984990"
+  },
+  "originalReferenceSha256": "d88d83fdecd840cd9c8ebfc2a23b69d2254164a33d2cec35360ccbc22de4cd8e",
+  "generatorSha256": "f369717f855df5129bd7d45b06d66b3267aea22ef7910f5aad966f970ae8d27d",
+  "units": "TeX pt; raw PGF positive-Y-up is reversed once in parsed paint and anchor coordinates; stage traces are signed scaled-point registers.",
+  "namedAnchors": [
+    "center",
+    "text",
+    "base",
+    "mid",
+    "east",
+    "north east",
+    "north",
+    "north west",
+    "west",
+    "south west",
+    "south",
+    "south east",
+    "base east",
+    "base west",
+    "mid east",
+    "mid west",
+    "shape center",
+    "before top",
+    "top",
+    "after top",
+    "before bottom",
+    "bottom",
+    "after bottom"
+  ],
+  "numericAnchors": [
+    "0",
+    "37",
+    "45",
+    "90",
+    "135",
+    "180",
+    "225",
+    "270",
+    "315",
+    "450",
+    "90.8",
+    "+45.7",
+    "-90.8",
+    "-0.5"
+  ],
+  "retainedReviewHashes": {
+    "folded/comparison.json": "4699e8ff895e9891242b24ad8362c2bcd67a17f0a90eba78d3820c555486df09",
+    "folded/fixed-box.tex": "f4ff25f69b064cb837a08db0c9f7c20a1c3ac24b7594f54abb67888795b50e8f",
+    "folded/geometry.txt": "45239f8f548fecdc3abd83e54c8fc0e98b3b1ef51cdc1f13182c3fea8f8b1e9d",
+    "folded/fixed-box.log": "ebfbee2499578cf3d64a71a9657dd3eeedbdc4f338077be8f1300e7c9d10ed1e",
+    "folded/command.log": "483521ec5105eacd0a90a504d1356e626f4e60a8996b7fcc202bc18d95d62e85",
+    "folded/actual-generated.tex": "1341ca2c8e77dd0ae80237ef3bcbd6747e410107688ae476ed58ae750081a65c",
+    "subsp/comparison.json": "f078524b19fa685dce07f60402bb705beeb8e017d146752c0ed17e4467ab96cb",
+    "subsp/command.log": "55eec7b8e97d16090796cfb767ed657b7f50157c540b261b4cb3ec6b9e4bea80",
+    "subsp/actual-generated.tex": "8c501dbd7ed5cde5264941cd3ad613de4aea1c10e7ed540bd42763635173303c",
+    "subsp/actual-generated-wrapped.tex": "f4c0b3ee6284ffaf8f4f96ba8b4c0ce6310978263bd5d9e1884812669f08d7c0",
+    "subsp/actual-generated-wrapped.log": "cc0e3d26a7d4d63657a909523eefb5af224a8348170fddd95ec13dacd143630c"
+  },
+  "artifactHashes": {
+    ".gitignore": "a2706999aaa25d50663c61d11494d19b8fc68a91eaeef28730f692aa2ebc5e3e",
+    "staged-upstream-source.tex": "678b34a090cdd9b4bfeff1f6cf9432d60febcd4d60dae8bdba99258b5b2235da",
+    "failures/subsp/fixed-box.tex": "fdea136a5ebf6fca3e179d51244265e54fee4272a5f5959bcebb966471fe8f00",
+    "failures/subsp/geometry.txt": "236fa5db8a38c030ce6d3b5540e2a97dadf358dec712fa6358a34781810968c2",
+    "failures/subsp/compilation.txt": "c4c0936922af81d5e86735b2845d8f835f9a32b88e8accbeff679716d8dbb04e",
+    "failures/subsp/fixed-box.log": "7504c9f82b58ebb4c3d48fac6c4da56f015cd7d8697d8c28dd30e61131836159",
+    "failures/nonempty-scanned-cancellation/fixed-box.tex": "64dd5b01b1e04559c8d604b2aa906f478a655717ddb5cd64286e45020f7ebace",
+    "failures/nonempty-scanned-cancellation/geometry.txt": "6ce42c903511416ca7eb44cd74b4239f01a9ec35c0d0bf8025b02a938256dc41",
+    "failures/nonempty-scanned-cancellation/compilation.txt": "baf1d45674b259be61cc10532c3ef7e34b8b62110d6de823306eb9539600fde3",
+    "failures/nonempty-scanned-cancellation/fixed-box.log": "6445957b72e1a21a0b5cbcdd5a5bccfc98a28cccae88f241f5df5970d8eb4beb",
+    "failures/below-half-sp-positive/fixed-box.tex": "82b04b8d2fb5237dd4fc63213307c73c47bff9c05ee22bf3e5e58aa6f411301a",
+    "failures/below-half-sp-positive/geometry.txt": "e8a6a299d1196b3310092199c3930a7aefe431e5d9c9c6b93f91b455777e1565",
+    "failures/below-half-sp-positive/compilation.txt": "c4c0936922af81d5e86735b2845d8f835f9a32b88e8accbeff679716d8dbb04e",
+    "failures/below-half-sp-positive/fixed-box.log": "7504c9f82b58ebb4c3d48fac6c4da56f015cd7d8697d8c28dd30e61131836159",
+    "failures/below-half-sp-negative/fixed-box.tex": "0e711aadb6c35b5ffcebf2a1539385f6266de968cfb031423ba7c722e70974f3",
+    "failures/below-half-sp-negative/geometry.txt": "f98153b0352143bd7e684a80aefaed204c78473eeccd4f7962d4a046ba7149c9",
+    "failures/below-half-sp-negative/compilation.txt": "c4c0936922af81d5e86735b2845d8f835f9a32b88e8accbeff679716d8dbb04e",
+    "failures/below-half-sp-negative/fixed-box.log": "abb0441fa4ec2cead2a75f5554f67ccc4c1003edd4a41cd321845f04145fbd06",
+    "failures/minimum-one-sp/fixed-box.tex": "e925dbf9cf9611fa902f4f11fb8c9f21f707d6a1d3a410b65e78ec26defab841",
+    "failures/minimum-one-sp/geometry.txt": "8efec382b36d9bd34df016c31fccdabb43307a69afbb8b61a48ef2e71cf0d720",
+    "failures/minimum-one-sp/compilation.txt": "c4c0936922af81d5e86735b2845d8f835f9a32b88e8accbeff679716d8dbb04e",
+    "failures/minimum-one-sp/fixed-box.log": "d678e02b5b5f787fad3672efa08f2a31bef37b3435100c344cd81217dd23bcd5",
+    "failures/separate-odd-half-products-zero/fixed-box.tex": "2cfcf07ea2ac93916d6278aeb4f61b05ac93036e3cb5fcb7e4b447d4882b63aa",
+    "failures/separate-odd-half-products-zero/geometry.txt": "3175e74bb436c056fdb6d9edbc7f637635d1db7df5a04b4085de3a59bed33f0f",
+    "failures/separate-odd-half-products-zero/compilation.txt": "c4c0936922af81d5e86735b2845d8f835f9a32b88e8accbeff679716d8dbb04e",
+    "failures/separate-odd-half-products-zero/fixed-box.log": "7504c9f82b58ebb4c3d48fac6c4da56f015cd7d8697d8c28dd30e61131836159",
+    "failures/half-product-cancellation/fixed-box.tex": "e2776a352f8a2ede1aad7990a5dd88366794c0a611dd3faa0ed273b348892582",
+    "failures/half-product-cancellation/geometry.txt": "9554e2e191e9320bce06843ea38ede5773ec417536cf3a9f8d595dd3142f3f3c",
+    "failures/half-product-cancellation/compilation.txt": "a1d9d3975c364e65e1c788fbae728c32297f3a54690aca0ad2689cc21abca189",
+    "failures/half-product-cancellation/fixed-box.log": "04883a562f53d47b76b2c6d29215c8bab1dc216afe2959c16046b5e8ce50708c",
+    "failures/rotation90-subsp/fixed-box.tex": "ed0bfb020ffb4c24a89d5398a6cca235ddff06dfe55a82323e43c6e13f356328",
+    "failures/rotation90-subsp/geometry.txt": "1372175dbbf125935bf5f5e64d32bc4c03ef0bc67425c2a1cf17c2ab01091d2c",
+    "failures/rotation90-subsp/compilation.txt": "c4c0936922af81d5e86735b2845d8f835f9a32b88e8accbeff679716d8dbb04e",
+    "failures/rotation90-subsp/fixed-box.log": "27983f4335fcc29c35c9fe65bd96cfb642b6f62e472c82cdbba9f3d1c68886d6",
+    "failures/rotation270-subsp/fixed-box.tex": "4f4fd0ddbb210c6a6770479cdfb03083f79e2b0a7cb5b5d0c441b6455fc77926",
+    "failures/rotation270-subsp/geometry.txt": "6b09b019f546f38e5681b2452577f7ee9fbe022bd3e53804f2a04364f6a6961b",
+    "failures/rotation270-subsp/compilation.txt": "c4c0936922af81d5e86735b2845d8f835f9a32b88e8accbeff679716d8dbb04e",
+    "failures/rotation270-subsp/fixed-box.log": "27983f4335fcc29c35c9fe65bd96cfb642b6f62e472c82cdbba9f3d1c68886d6",
+    "failures/incircle-subsp/fixed-box.tex": "b9958e395e0a9d2f750e5be3faf2b3bd28e7b13dcbfb997fc83bdf4b331ed957",
+    "failures/incircle-subsp/geometry.txt": "7589524eaad7790ca2d03abe81533abea6e3bf99752ee50bf920a4c017061102",
+    "failures/incircle-subsp/compilation.txt": "c4c0936922af81d5e86735b2845d8f835f9a32b88e8accbeff679716d8dbb04e",
+    "failures/incircle-subsp/fixed-box.log": "dcf16cc7657ac54faed6d5c278f1fbe03ca04446d324819bbfed90cb1ab1667a",
+    "failures/subsp-outer-line-nonrescue/fixed-box.tex": "65a3d0e76815d8e48d519799839af80beb28469ac464103d75dc10c475a911e9",
+    "failures/subsp-outer-line-nonrescue/geometry.txt": "a6da90d39abb63d446013863c83cdeb21054c985f79f6c26fe18b717856eb553",
+    "failures/subsp-outer-line-nonrescue/compilation.txt": "c4c0936922af81d5e86735b2845d8f835f9a32b88e8accbeff679716d8dbb04e",
+    "failures/subsp-outer-line-nonrescue/fixed-box.log": "5d9d883e9f0be7f6fcde125b509d28c027a91ab49933009e005b48a04b6e28c0",
+    "failures/contextual-em-subsp/fixed-box.tex": "f8328e885247746a2a7ffff2ec3a07fbfeba258f2447c85ea05da87ab5c51dc0",
+    "failures/contextual-em-subsp/geometry.txt": "e6c394cc048d39f9503c75d227ddfd65a58065e81ad2f8a40a658d18728ce705",
+    "failures/contextual-em-subsp/compilation.txt": "c4c0936922af81d5e86735b2845d8f835f9a32b88e8accbeff679716d8dbb04e",
+    "failures/contextual-em-subsp/fixed-box.log": "7504c9f82b58ebb4c3d48fac6c4da56f015cd7d8697d8c28dd30e61131836159",
+    "failures/contextual-ex-subsp/fixed-box.tex": "c27275a3c49e7e93373b956a579c69d29a8feb3857b703b40c7fe9c6ef821037",
+    "failures/contextual-ex-subsp/geometry.txt": "24f56637d4cd6e4b4e3a80b8ef628ab6d9295db79e17d40649e551271e30a501",
+    "failures/contextual-ex-subsp/compilation.txt": "c4c0936922af81d5e86735b2845d8f835f9a32b88e8accbeff679716d8dbb04e",
+    "failures/contextual-ex-subsp/fixed-box.log": "7504c9f82b58ebb4c3d48fac6c4da56f015cd7d8697d8c28dd30e61131836159",
+    "controls/folded/fixed-box.tex": "02c1fb41973c1edf6abdbd840f76a77ee535ba8a9391b06a9f65625c8fc2dacc",
+    "controls/folded/geometry.txt": "c42f06be8d0e7de1c3f23e8b94b3acc22573fd41b85cafbfa36da3d4447c3233",
+    "controls/folded/compilation.txt": "483521ec5105eacd0a90a504d1356e626f4e60a8996b7fcc202bc18d95d62e85",
+    "controls/folded/fixed-box.log": "fd2fcf35a6f4f8c8ac3273a87bcc995b428a8b72b30d37bea7612e84d48d6b23",
+    "controls/folded-custom-fill/fixed-box.tex": "b748413462734bd077205f46e87f95c6e87aeaf70dd8ad6e3cccbfb7fe480f40",
+    "controls/folded-custom-fill/geometry.txt": "e204203ac3b5f91e37f9102b98783426400b42511aa1b2212bba9a3ea5374d44",
+    "controls/folded-custom-fill/compilation.txt": "2b645c15dfbd55986699bdb9a14b8eaf4b30276105ccdc5000751dd1540bf9f7",
+    "controls/folded-custom-fill/fixed-box.log": "edc956292051bec0966db0e57d6672e11c729fa47d549283a0ba22c1658f4725",
+    "controls/positive-five-sp/fixed-box.tex": "6cae603c5c1dd590be45735b7c23104f99d2825fff8c8cd2b35cf77fbc5881a5",
+    "controls/positive-five-sp/geometry.txt": "fe2b16e3411ba972abe748a4a64410f0fec62aaac396a6eb8c73590fbb4f37bd",
+    "controls/positive-five-sp/compilation.txt": "30adb006f7fb7286d432fef77a32ae87cec21a2a92f78720777832d295e9ea33",
+    "controls/positive-five-sp/fixed-box.log": "38252afd7ab86654a009d12400a838ce8b2cad8c117a4be45902ffda40fb522b",
+    "controls/negative-five-sp/fixed-box.tex": "2e0e117afbc587bba4b43906796c4e6bb1f9c84e79738d092e2a367753fd2bf8",
+    "controls/negative-five-sp/geometry.txt": "00c35a127142915bad74594cebd72ecc808db1307315e2fdc2aa382af9f7272f",
+    "controls/negative-five-sp/compilation.txt": "ffaf4c650587e74d840cc3906fb2c535a7f013cf4589787074e79e24ab9aeafa",
+    "controls/negative-five-sp/fixed-box.log": "c2c1d916bf5ae44d13e041550ea746af231001fcf0c74f4a4b101e11fb8a2f72",
+    "controls/signed-nonzero/fixed-box.tex": "c79c0c2dac27098f3378e2e1b5d79a490f26f4b698721379ca222741f7e7b22e",
+    "controls/signed-nonzero/geometry.txt": "6418bd5e332c77e66a2164935a075e201ecc15298ffcc4fd471a177697229283",
+    "controls/signed-nonzero/compilation.txt": "e706e6d55846235a5fa67956b5568d3d2f6c1106214d4c69d7c5f45f01805194",
+    "controls/signed-nonzero/fixed-box.log": "4f539531cfc99f75d935f44637f50934192777b9c58ff6bdac58166cc90425ab",
+    "controls/axial-minimum/fixed-box.tex": "32dd86fef700bfdb8bc7f216ab9661dd8162b0a27d8d185512ab2db3081335c3",
+    "controls/axial-minimum/geometry.txt": "875426e29958a808c9799f65d34f40a94df1bc262b9acd604fa5b6a022bbc829",
+    "controls/axial-minimum/compilation.txt": "c2d9753d565e47d4dc6025fe54897ecc3c04752b3c9df029898d9274e85a61d3",
+    "controls/axial-minimum/fixed-box.log": "5294892f69279a853074b12b3f9f6559f0e9132b75db28b3312d9d166ca0e185",
+    "controls/transverse-minimum/fixed-box.tex": "52bc7a0d9b693538c6007bfccf0188edff42fc8ab7ef27b47ce19dd0fed5fc80",
+    "controls/transverse-minimum/geometry.txt": "60c8ce71c8b7a1097b425a58061c42a25c0ad8713864eab4a06b9b783fb057e7",
+    "controls/transverse-minimum/compilation.txt": "94c89fa59123ba9fbf470b675902f864371abc31285f7ca8f418dff6929bd56e",
+    "controls/transverse-minimum/fixed-box.log": "249a570d7060f4e32d1bddb0a21e03d0d20352127a064de9353d8d645a77cbc8",
+    "controls/rx-zero/fixed-box.tex": "f4650254b254d55b7601fc8bdfbe6ea771234398f8c39dafbbc621b413184c48",
+    "controls/rx-zero/geometry.txt": "0079b356b7b45dffeee8bd809c33323ff8c44aa37765b25c24c19010166b72f2",
+    "controls/rx-zero/compilation.txt": "f35578286847ba84f972ceb413a8821dd234cbf22b9f2e2d3ee1a0b6f9de5ef3",
+    "controls/rx-zero/fixed-box.log": "c3ee66e0b0774c2cc73a4d26457233b23dc813ded13adbcec176a093a4640261",
+    "controls/folded-rotation90/fixed-box.tex": "65586ed61b87de48141f507cdcba5eda28d47fa6b0f5b6ccb36281463541fe79",
+    "controls/folded-rotation90/geometry.txt": "de5eba1a47725d8190db16f2a06f50e6008ef7715263d8e2da328b3782b3027c",
+    "controls/folded-rotation90/compilation.txt": "9f0cb27f40b50d203b26d1100bbd049f677b9544c6c2e11a99858bf78ec4a3b1",
+    "controls/folded-rotation90/fixed-box.log": "f89a39e9b925e07eb133a17462d02afd6af6e1b26c11e75442588a2212badb4c",
+    "controls/folded-rotation270/fixed-box.tex": "b4a3535effffc2a596b3b21b414d3a03eb646550e27a54ada67de92d5802512a",
+    "controls/folded-rotation270/geometry.txt": "ce1828b6438122866c19275041031b9516ccdff5eb8ae0495dd8dd025dcc5cd4",
+    "controls/folded-rotation270/compilation.txt": "e9ec85408539ce2aa5c5142260367d22723a0ef84ac387697502ebd5c151f349",
+    "controls/folded-rotation270/fixed-box.log": "d663b9f4af73bf4adcd8cc9df44cc742f13163b5466b889bb6d338e74b58957a",
+    "controls/incircle/fixed-box.tex": "88ec6f725ce68f21eb57b32fbc2e43442ef0af36eb9a236fd4ffbdddf1f3c169",
+    "controls/incircle/geometry.txt": "f97703515cbc5170f798da42122861c820406e27b2ea3f2e3ae8a769054084df",
+    "controls/incircle/compilation.txt": "a30167c58d5529060062d01110a342caf08a4aa0de870701d6297189350925c1",
+    "controls/incircle/fixed-box.log": "6f81b736ac31bb2cfbc9233fde715cbd1872d90a442231c1ae20a2c74c848c15",
+    "controls/folded-unequal-signed-outer/fixed-box.tex": "79e1eb6fb0c6a7c3391ffd4add37dc4c896ba1159944dd8b0094c1d580df97fd",
+    "controls/folded-unequal-signed-outer/geometry.txt": "6ceafa13835fac95a1b173f5a96569c0ab64443550145ab2222ce6c81bc6c602",
+    "controls/folded-unequal-signed-outer/compilation.txt": "483521ec5105eacd0a90a504d1356e626f4e60a8996b7fcc202bc18d95d62e85",
+    "controls/folded-unequal-signed-outer/fixed-box.log": "c872a72e334464b16176045510b2e3acf584e92d653005fb903e436fc773614e",
+    "controls/contextual-em-tie/fixed-box.tex": "82e54b0189a3158082344d268f8ad5cb8e030a7164b86309fd348044396803e3",
+    "controls/contextual-em-tie/geometry.txt": "1fd52c651d8a235da66312e39fe68e3d62fffd3a9f9c3d231737575ac6fc0f53",
+    "controls/contextual-em-tie/compilation.txt": "f35578286847ba84f972ceb413a8821dd234cbf22b9f2e2d3ee1a0b6f9de5ef3",
+    "controls/contextual-em-tie/fixed-box.log": "5822eed7b2f7942920eea741ad2cb827a4afa4383b841c23d1060fd77c92e2ad",
+    "failures/positive-tie/fixed-box.tex": "620f499518d875065f5ba1b7ffc90cabbc4126b8def39ef688d108aabbf195dd",
+    "failures/positive-tie/geometry.txt": "5f91f90d9f83f0c6066e9eb73a1a151a328e6fab83900077194514cf1503179c",
+    "failures/positive-tie/compilation.txt": "f13c20171e67b68158ccc467abc6d2e3e0978ff96a649d3e1edc9566aef6d14a",
+    "failures/positive-tie/fixed-box.log": "cd56b09de5f47871eb30c3e56287476096bbc41ad87e12e7ae73e9533a028f1c",
+    "failures/negative-tie/fixed-box.tex": "6a51035114a2836ec3c003502e35364437e7bb990f8d58f8c5431c4b250924d4",
+    "failures/negative-tie/geometry.txt": "4e91597c37f6b36ac1bf7f4983d66e311df203887680c02a7879825542dbb910",
+    "failures/negative-tie/compilation.txt": "2e74c067ebccd0eabca5a71bb3f8bde72a2d284688bf69a9e716dcbe980b3728",
+    "failures/negative-tie/fixed-box.log": "388ec41cdf2a49e076bc2ff9f30a95f9f52646420a233b93eb6ad30fc9b6e98f",
+    "failures/positive-first-sp/fixed-box.tex": "288680abaa7b9843e9796c32c347cb2b6ff02a78e749b0fab698142785f1bab6",
+    "failures/positive-first-sp/geometry.txt": "adb3baddb8098524ba4e8c1716d53e785327e31af391a228289b3004eddc4793",
+    "failures/positive-first-sp/compilation.txt": "f13c20171e67b68158ccc467abc6d2e3e0978ff96a649d3e1edc9566aef6d14a",
+    "failures/positive-first-sp/fixed-box.log": "cd56b09de5f47871eb30c3e56287476096bbc41ad87e12e7ae73e9533a028f1c",
+    "failures/negative-first-sp/fixed-box.tex": "177825e18892ce82c0a1b7ebb20d17f99d4990225c1d2d10a6361bdbc7844635",
+    "failures/negative-first-sp/geometry.txt": "7d1ae6a629ed051403e6738c9a2e473ccba3b82bae5180bf600b5d6b186b7b50",
+    "failures/negative-first-sp/compilation.txt": "2e74c067ebccd0eabca5a71bb3f8bde72a2d284688bf69a9e716dcbe980b3728",
+    "failures/negative-first-sp/fixed-box.log": "388ec41cdf2a49e076bc2ff9f30a95f9f52646420a233b93eb6ad30fc9b6e98f",
+    "failures/minimum-two-sp/fixed-box.tex": "1c8f15adc12947bf90c935896838fb5176df22e95eb33211d3f1b0d79764045e",
+    "failures/minimum-two-sp/geometry.txt": "7a5af7456a73e4438e000d22123560bf1553586f1876ad155647ef7aa013692f",
+    "failures/minimum-two-sp/compilation.txt": "f13c20171e67b68158ccc467abc6d2e3e0978ff96a649d3e1edc9566aef6d14a",
+    "failures/minimum-two-sp/fixed-box.log": "b22bb54fe8415dffdaefd3774fd0dfa36b3734524631b54aad6f18e484ef22c5",
+    "failures/half-height-two-sp/fixed-box.tex": "b45e2c466da7c5fe6f837619200faf863e62463ec250907e99a56ffed8e14999",
+    "failures/half-height-two-sp/geometry.txt": "b1011aea18a87cbd63798253f3887940896531d787ebdaf3053d63e8227aed3c",
+    "failures/half-height-two-sp/compilation.txt": "f13c20171e67b68158ccc467abc6d2e3e0978ff96a649d3e1edc9566aef6d14a",
+    "failures/half-height-two-sp/fixed-box.log": "b2e06e0724457bd2e5bdc17e7490ea88069c90c7b3201f1ad250b80a62477530",
+    "failures/separate-half-products-survive/fixed-box.tex": "5415518c815ec18201bfafe92dc52eb2ae6722cc7ccb4391e31563ef83ad9462",
+    "failures/separate-half-products-survive/geometry.txt": "7a90a6212a88cdfa1a4337feb9bc8bff7201d5e6181e17a9fdf1093d52390d05",
+    "failures/separate-half-products-survive/compilation.txt": "f13c20171e67b68158ccc467abc6d2e3e0978ff96a649d3e1edc9566aef6d14a",
+    "failures/separate-half-products-survive/fixed-box.log": "cd56b09de5f47871eb30c3e56287476096bbc41ad87e12e7ae73e9533a028f1c",
+    "failures/rotation90-first-sp/fixed-box.tex": "87a46177742960da3be0c5da1ad273d71d873dbecf63fcd0f320b3ea8dc25605",
+    "failures/rotation90-first-sp/geometry.txt": "02dd6f295851f081894bab3483ad25cd8d925ac88895ffdb8233d66506d29eea",
+    "failures/rotation90-first-sp/compilation.txt": "f13c20171e67b68158ccc467abc6d2e3e0978ff96a649d3e1edc9566aef6d14a",
+    "failures/rotation90-first-sp/fixed-box.log": "e0f129ad499b0c8fef80491a2a5bc567ee41a1655c172248a97c43a6e67717a1",
+    "failures/rotation270-first-sp/fixed-box.tex": "dcf131f46f7036edd37f65c1b2fc4b991118238e28d173d5da3a8b6db71e3d1a",
+    "failures/rotation270-first-sp/geometry.txt": "d3423b2f975571499531627c4676cbf70468d2e035da5e26275503b22c0f9ca1",
+    "failures/rotation270-first-sp/compilation.txt": "f13c20171e67b68158ccc467abc6d2e3e0978ff96a649d3e1edc9566aef6d14a",
+    "failures/rotation270-first-sp/fixed-box.log": "e0f129ad499b0c8fef80491a2a5bc567ee41a1655c172248a97c43a6e67717a1",
+    "failures/incircle-first-sp/fixed-box.tex": "97d487742fdb3e76ec74cc20b0bdc84281593e0c90bd79d2c23b3e59904e7545",
+    "failures/incircle-first-sp/geometry.txt": "d6bc1f75d4d4de90bb0df8fb8fbccf00b1eb75c54c3b803e12d9315d37ee7593",
+    "failures/incircle-first-sp/compilation.txt": "f13c20171e67b68158ccc467abc6d2e3e0978ff96a649d3e1edc9566aef6d14a",
+    "failures/incircle-first-sp/fixed-box.log": "72f38b2ee65942723e7c977d9e4d7f066cb16898c24c739e91428d7b75b02856",
+    "failures/contextual-ex-tie/fixed-box.tex": "f4b505e6392cab8b6a094bf7a4e65e03fa68419c220ff07b3cd7423766fef8f9",
+    "failures/contextual-ex-tie/geometry.txt": "237883a3201b7f1ddd3901fd9fe75df8e1e24a01b023d2a976160c2b53a2d9d3",
+    "failures/contextual-ex-tie/compilation.txt": "f13c20171e67b68158ccc467abc6d2e3e0978ff96a649d3e1edc9566aef6d14a",
+    "failures/contextual-ex-tie/fixed-box.log": "cd56b09de5f47871eb30c3e56287476096bbc41ad87e12e7ae73e9533a028f1c",
+    "failures/physical-mm-tie/fixed-box.tex": "79429cf8d539dde0b6f9b5e63861bea0fc2ca4fb12d84268563b39e06e0d207c",
+    "failures/physical-mm-tie/geometry.txt": "b98f8bc0ed05b5b2dcc2542ddd3adf78280886a5e6ce8b8ab3829b6eb3a4aa33",
+    "failures/physical-mm-tie/compilation.txt": "f13c20171e67b68158ccc467abc6d2e3e0978ff96a649d3e1edc9566aef6d14a",
+    "failures/physical-mm-tie/fixed-box.log": "bf6c6d877a779b430e52175f794f6304a01d339d4d26bf98defe9792faaeedd5",
+    "review/folded/comparison.json": "4699e8ff895e9891242b24ad8362c2bcd67a17f0a90eba78d3820c555486df09",
+    "review/folded/fixed-box.tex": "f4ff25f69b064cb837a08db0c9f7c20a1c3ac24b7594f54abb67888795b50e8f",
+    "review/folded/geometry.txt": "45239f8f548fecdc3abd83e54c8fc0e98b3b1ef51cdc1f13182c3fea8f8b1e9d",
+    "review/folded/fixed-box.log": "ebfbee2499578cf3d64a71a9657dd3eeedbdc4f338077be8f1300e7c9d10ed1e",
+    "review/folded/command.log": "483521ec5105eacd0a90a504d1356e626f4e60a8996b7fcc202bc18d95d62e85",
+    "review/folded/actual-generated.tex": "1341ca2c8e77dd0ae80237ef3bcbd6747e410107688ae476ed58ae750081a65c",
+    "review/folded/recompiled-wrapped.tex": "f8d88df2e72f7722dc9812b7b49ba578b4058a84510abb8c24213185118bf416",
+    "review/folded/recompiled-compilation.txt": "2a091fbfb93a39ba1cb81d56e33d599658e8e8fe7626bd1344969e4695069f4f",
+    "review/folded/recompiled-wrapped.log": "d526dd8e8d3d0b57f9b97d989a2f891f9df8661ca414086db9819928aa9ba4f2",
+    "review/subsp/comparison.json": "f078524b19fa685dce07f60402bb705beeb8e017d146752c0ed17e4467ab96cb",
+    "review/subsp/command.log": "55eec7b8e97d16090796cfb767ed657b7f50157c540b261b4cb3ec6b9e4bea80",
+    "review/subsp/actual-generated.tex": "8c501dbd7ed5cde5264941cd3ad613de4aea1c10e7ed540bd42763635173303c",
+    "review/subsp/actual-generated-wrapped.tex": "f4c0b3ee6284ffaf8f4f96ba8b4c0ce6310978263bd5d9e1884812669f08d7c0",
+    "review/subsp/actual-generated-wrapped.log": "cc0e3d26a7d4d63657a909523eefb5af224a8348170fddd95ec13dacd143630c",
+    "review/subsp/recompiled-wrapped.tex": "f4c0b3ee6284ffaf8f4f96ba8b4c0ce6310978263bd5d9e1884812669f08d7c0",
+    "review/subsp/recompiled-compilation.txt": "55eec7b8e97d16090796cfb767ed657b7f50157c540b261b4cb3ec6b9e4bea80",
+    "review/subsp/recompiled-wrapped.log": "21790cd9c5e015297aec757281ac640e0663b1be8e8a125e08ad4199a10c1f59"
+  },
+  "failures": [
+    {
+      "id": "subsp",
+      "shape": "cylinder",
+      "body": {
+        "width": 0,
+        "height": 0,
+        "depth": 0
+      },
+      "innerXSep": 0,
+      "innerYSep": 0.000001,
+      "outerXSep": 0,
+      "outerYSep": 0,
+      "minimumWidth": 0,
+      "minimumHeight": 80,
+      "lineWidth": 0.4,
+      "anchors": [
+        "center",
+        "text",
+        "base",
+        "mid",
+        "shape center",
+        "top",
+        "bottom",
+        "west"
+      ],
+      "exitCode": 1,
+      "command": [
+        "/Library/TeX/texbin/pdflatex",
+        "-no-shell-escape",
+        "-interaction=nonstopmode",
+        "-halt-on-error",
+        "fixed-box.tex"
+      ],
+      "artifacts": {
+        "input": "failures/subsp/fixed-box.tex",
+        "geometry": "failures/subsp/geometry.txt",
+        "compilation": "failures/subsp/compilation.txt",
+        "compilerLog": "failures/subsp/fixed-box.log"
+      },
+      "expectedError": "You've asked me to divide",
+      "expectedStages": {
+        "innerXSp": 0,
+        "innerYSp": 0,
+        "initialXSp": 0,
+        "initialYSp": 0,
+        "fittedXSp": 0,
+        "fittedYSp": 0,
+        "transverseInnerSepSp": 0,
+        "minimumWidthSp": 0,
+        "divisorSp": 0,
+        "bodyWidthHalfSp": 0,
+        "bodyHeightHalfSp": 0,
+        "bodyDepthHalfSp": 0,
+        "minimumWidthHalfSp": 0
+      },
+      "expectedAnchors": {},
+      "paints": []
+    },
+    {
+      "id": "nonempty-scanned-cancellation",
+      "shape": "cylinder",
+      "body": {
+        "width": 20,
+        "height": 8,
+        "depth": 2
+      },
+      "innerXSep": 0,
+      "innerYSep": -4.999999,
+      "outerXSep": 0,
+      "outerYSep": 0,
+      "minimumWidth": 0,
+      "minimumHeight": 80,
+      "lineWidth": 0.4,
+      "anchors": [
+        "center",
+        "text",
+        "base",
+        "mid",
+        "shape center",
+        "top",
+        "bottom",
+        "west"
+      ],
+      "exitCode": 1,
+      "command": [
+        "/Library/TeX/texbin/pdflatex",
+        "-no-shell-escape",
+        "-interaction=nonstopmode",
+        "-halt-on-error",
+        "fixed-box.tex"
+      ],
+      "artifacts": {
+        "input": "failures/nonempty-scanned-cancellation/fixed-box.tex",
+        "geometry": "failures/nonempty-scanned-cancellation/geometry.txt",
+        "compilation": "failures/nonempty-scanned-cancellation/compilation.txt",
+        "compilerLog": "failures/nonempty-scanned-cancellation/fixed-box.log"
+      },
+      "expectedError": "You've asked me to divide",
+      "expectedStages": {
+        "innerXSp": 0,
+        "innerYSp": -327680,
+        "initialXSp": 655360,
+        "initialYSp": 0,
+        "fittedXSp": 655360,
+        "fittedYSp": 0,
+        "transverseInnerSepSp": -327680,
+        "minimumWidthSp": 0,
+        "divisorSp": 0,
+        "bodyWidthHalfSp": 655360,
+        "bodyHeightHalfSp": 262144,
+        "bodyDepthHalfSp": 65536,
+        "minimumWidthHalfSp": 0
+      },
+      "expectedAnchors": {},
+      "paints": []
+    },
+    {
+      "id": "below-half-sp-positive",
+      "shape": "cylinder",
+      "body": {
+        "width": 0,
+        "height": 0,
+        "depth": 0
+      },
+      "innerXSep": 0,
+      "innerYSep": 0.00000762929453125,
+      "outerXSep": 0,
+      "outerYSep": 0,
+      "minimumWidth": 0,
+      "minimumHeight": 80,
+      "lineWidth": 0.4,
+      "anchors": [
+        "center",
+        "text",
+        "base",
+        "mid",
+        "shape center",
+        "top",
+        "bottom",
+        "west"
+      ],
+      "exitCode": 1,
+      "command": [
+        "/Library/TeX/texbin/pdflatex",
+        "-no-shell-escape",
+        "-interaction=nonstopmode",
+        "-halt-on-error",
+        "fixed-box.tex"
+      ],
+      "artifacts": {
+        "input": "failures/below-half-sp-positive/fixed-box.tex",
+        "geometry": "failures/below-half-sp-positive/geometry.txt",
+        "compilation": "failures/below-half-sp-positive/compilation.txt",
+        "compilerLog": "failures/below-half-sp-positive/fixed-box.log"
+      },
+      "expectedError": "You've asked me to divide",
+      "expectedStages": {
+        "innerXSp": 0,
+        "innerYSp": 0,
+        "initialXSp": 0,
+        "initialYSp": 0,
+        "fittedXSp": 0,
+        "fittedYSp": 0,
+        "transverseInnerSepSp": 0,
+        "minimumWidthSp": 0,
+        "divisorSp": 0,
+        "bodyWidthHalfSp": 0,
+        "bodyHeightHalfSp": 0,
+        "bodyDepthHalfSp": 0,
+        "minimumWidthHalfSp": 0
+      },
+      "expectedAnchors": {},
+      "paints": []
+    },
+    {
+      "id": "below-half-sp-negative",
+      "shape": "cylinder",
+      "body": {
+        "width": 0,
+        "height": 0,
+        "depth": 0
+      },
+      "innerXSep": 0,
+      "innerYSep": -0.00000762929453125,
+      "outerXSep": 0,
+      "outerYSep": 0,
+      "minimumWidth": -20,
+      "minimumHeight": -20,
+      "lineWidth": 0.4,
+      "anchors": [
+        "center",
+        "text",
+        "base",
+        "mid",
+        "shape center",
+        "top",
+        "bottom",
+        "west"
+      ],
+      "exitCode": 1,
+      "command": [
+        "/Library/TeX/texbin/pdflatex",
+        "-no-shell-escape",
+        "-interaction=nonstopmode",
+        "-halt-on-error",
+        "fixed-box.tex"
+      ],
+      "artifacts": {
+        "input": "failures/below-half-sp-negative/fixed-box.tex",
+        "geometry": "failures/below-half-sp-negative/geometry.txt",
+        "compilation": "failures/below-half-sp-negative/compilation.txt",
+        "compilerLog": "failures/below-half-sp-negative/fixed-box.log"
+      },
+      "expectedError": "You've asked me to divide",
+      "expectedStages": {
+        "innerXSp": 0,
+        "innerYSp": 0,
+        "initialXSp": 0,
+        "initialYSp": 0,
+        "fittedXSp": 0,
+        "fittedYSp": 0,
+        "transverseInnerSepSp": 0,
+        "minimumWidthSp": -1310720,
+        "divisorSp": 0,
+        "bodyWidthHalfSp": 0,
+        "bodyHeightHalfSp": 0,
+        "bodyDepthHalfSp": 0,
+        "minimumWidthHalfSp": -655360
+      },
+      "expectedAnchors": {},
+      "paints": []
+    },
+    {
+      "id": "minimum-one-sp",
+      "shape": "cylinder",
+      "body": {
+        "width": 0,
+        "height": 0,
+        "depth": 0
+      },
+      "innerXSep": 0,
+      "innerYSep": 0,
+      "outerXSep": 0,
+      "outerYSep": 0,
+      "minimumWidth": 0.0000152587890625,
+      "minimumHeight": 80,
+      "lineWidth": 0.4,
+      "anchors": [
+        "center",
+        "text",
+        "base",
+        "mid",
+        "shape center",
+        "top",
+        "bottom",
+        "west"
+      ],
+      "exitCode": 1,
+      "command": [
+        "/Library/TeX/texbin/pdflatex",
+        "-no-shell-escape",
+        "-interaction=nonstopmode",
+        "-halt-on-error",
+        "fixed-box.tex"
+      ],
+      "artifacts": {
+        "input": "failures/minimum-one-sp/fixed-box.tex",
+        "geometry": "failures/minimum-one-sp/geometry.txt",
+        "compilation": "failures/minimum-one-sp/compilation.txt",
+        "compilerLog": "failures/minimum-one-sp/fixed-box.log"
+      },
+      "expectedError": "You've asked me to divide",
+      "expectedStages": {
+        "innerXSp": 0,
+        "innerYSp": 0,
+        "initialXSp": 0,
+        "initialYSp": 0,
+        "fittedXSp": 0,
+        "fittedYSp": 0,
+        "transverseInnerSepSp": 0,
+        "minimumWidthSp": 1,
+        "divisorSp": 0,
+        "bodyWidthHalfSp": 0,
+        "bodyHeightHalfSp": 0,
+        "bodyDepthHalfSp": 0,
+        "minimumWidthHalfSp": 0
+      },
+      "expectedAnchors": {},
+      "paints": []
+    },
+    {
+      "id": "separate-odd-half-products-zero",
+      "shape": "cylinder",
+      "body": {
+        "width": 0,
+        "height": 0.0000152587890625,
+        "depth": 0.0000152587890625
+      },
+      "innerXSep": 0,
+      "innerYSep": 0,
+      "outerXSep": 0,
+      "outerYSep": 0,
+      "minimumWidth": 0,
+      "minimumHeight": 0,
+      "lineWidth": 0.4,
+      "anchors": [
+        "center",
+        "text",
+        "base",
+        "mid",
+        "shape center",
+        "top",
+        "bottom",
+        "west"
+      ],
+      "exitCode": 1,
+      "command": [
+        "/Library/TeX/texbin/pdflatex",
+        "-no-shell-escape",
+        "-interaction=nonstopmode",
+        "-halt-on-error",
+        "fixed-box.tex"
+      ],
+      "artifacts": {
+        "input": "failures/separate-odd-half-products-zero/fixed-box.tex",
+        "geometry": "failures/separate-odd-half-products-zero/geometry.txt",
+        "compilation": "failures/separate-odd-half-products-zero/compilation.txt",
+        "compilerLog": "failures/separate-odd-half-products-zero/fixed-box.log"
+      },
+      "expectedError": "You've asked me to divide",
+      "expectedStages": {
+        "innerXSp": 0,
+        "innerYSp": 0,
+        "initialXSp": 0,
+        "initialYSp": 0,
+        "fittedXSp": 0,
+        "fittedYSp": 0,
+        "transverseInnerSepSp": 0,
+        "minimumWidthSp": 0,
+        "divisorSp": 0,
+        "bodyWidthHalfSp": 0,
+        "bodyHeightHalfSp": 0,
+        "bodyDepthHalfSp": 0,
+        "minimumWidthHalfSp": 0
+      },
+      "expectedAnchors": {},
+      "paints": []
+    },
+    {
+      "id": "half-product-cancellation",
+      "shape": "cylinder",
+      "body": {
+        "width": 0,
+        "height": 0.0000457763671875,
+        "depth": 0.0000457763671875
+      },
+      "innerXSep": 0,
+      "innerYSep": -0.000030517578125,
+      "outerXSep": 0,
+      "outerYSep": 0,
+      "minimumWidth": 0,
+      "minimumHeight": 0,
+      "lineWidth": 0.4,
+      "anchors": [
+        "center",
+        "text",
+        "base",
+        "mid",
+        "shape center",
+        "top",
+        "bottom",
+        "west"
+      ],
+      "exitCode": 1,
+      "command": [
+        "/Library/TeX/texbin/pdflatex",
+        "-no-shell-escape",
+        "-interaction=nonstopmode",
+        "-halt-on-error",
+        "fixed-box.tex"
+      ],
+      "artifacts": {
+        "input": "failures/half-product-cancellation/fixed-box.tex",
+        "geometry": "failures/half-product-cancellation/geometry.txt",
+        "compilation": "failures/half-product-cancellation/compilation.txt",
+        "compilerLog": "failures/half-product-cancellation/fixed-box.log"
+      },
+      "expectedError": "You've asked me to divide",
+      "expectedStages": {
+        "innerXSp": 0,
+        "innerYSp": -2,
+        "initialXSp": 0,
+        "initialYSp": 0,
+        "fittedXSp": 0,
+        "fittedYSp": 0,
+        "transverseInnerSepSp": -2,
+        "minimumWidthSp": 0,
+        "divisorSp": 0,
+        "bodyWidthHalfSp": 0,
+        "bodyHeightHalfSp": 1,
+        "bodyDepthHalfSp": 1,
+        "minimumWidthHalfSp": 0
+      },
+      "expectedAnchors": {},
+      "paints": []
+    },
+    {
+      "id": "rotation90-subsp",
+      "shape": "cylinder",
+      "body": {
+        "width": 0,
+        "height": 0,
+        "depth": 0
+      },
+      "innerXSep": 0.000001,
+      "innerYSep": 5,
+      "outerXSep": 0,
+      "outerYSep": 0,
+      "minimumWidth": 0,
+      "minimumHeight": 80,
+      "lineWidth": 0.4,
+      "anchors": [
+        "center",
+        "text",
+        "base",
+        "mid",
+        "shape center",
+        "top",
+        "bottom",
+        "west"
+      ],
+      "parameters": {
+        "borderRotate": 90
+      },
+      "options": [
+        "/pgf/shape border rotate=90"
+      ],
+      "exitCode": 1,
+      "command": [
+        "/Library/TeX/texbin/pdflatex",
+        "-no-shell-escape",
+        "-interaction=nonstopmode",
+        "-halt-on-error",
+        "fixed-box.tex"
+      ],
+      "artifacts": {
+        "input": "failures/rotation90-subsp/fixed-box.tex",
+        "geometry": "failures/rotation90-subsp/geometry.txt",
+        "compilation": "failures/rotation90-subsp/compilation.txt",
+        "compilerLog": "failures/rotation90-subsp/fixed-box.log"
+      },
+      "expectedError": "You've asked me to divide",
+      "expectedStages": {
+        "innerXSp": 0,
+        "innerYSp": 327680,
+        "initialXSp": 0,
+        "initialYSp": 327680,
+        "fittedXSp": 327680,
+        "fittedYSp": 0,
+        "transverseInnerSepSp": 0,
+        "minimumWidthSp": 0,
+        "divisorSp": 0,
+        "bodyWidthHalfSp": 0,
+        "bodyHeightHalfSp": 0,
+        "bodyDepthHalfSp": 0,
+        "minimumWidthHalfSp": 0
+      },
+      "expectedAnchors": {},
+      "paints": []
+    },
+    {
+      "id": "rotation270-subsp",
+      "shape": "cylinder",
+      "body": {
+        "width": 0,
+        "height": 0,
+        "depth": 0
+      },
+      "innerXSep": 0.000001,
+      "innerYSep": 5,
+      "outerXSep": 0,
+      "outerYSep": 0,
+      "minimumWidth": 0,
+      "minimumHeight": 80,
+      "lineWidth": 0.4,
+      "anchors": [
+        "center",
+        "text",
+        "base",
+        "mid",
+        "shape center",
+        "top",
+        "bottom",
+        "west"
+      ],
+      "parameters": {
+        "borderRotate": 270
+      },
+      "options": [
+        "/pgf/shape border rotate=270"
+      ],
+      "exitCode": 1,
+      "command": [
+        "/Library/TeX/texbin/pdflatex",
+        "-no-shell-escape",
+        "-interaction=nonstopmode",
+        "-halt-on-error",
+        "fixed-box.tex"
+      ],
+      "artifacts": {
+        "input": "failures/rotation270-subsp/fixed-box.tex",
+        "geometry": "failures/rotation270-subsp/geometry.txt",
+        "compilation": "failures/rotation270-subsp/compilation.txt",
+        "compilerLog": "failures/rotation270-subsp/fixed-box.log"
+      },
+      "expectedError": "You've asked me to divide",
+      "expectedStages": {
+        "innerXSp": 0,
+        "innerYSp": 327680,
+        "initialXSp": 0,
+        "initialYSp": 327680,
+        "fittedXSp": 327680,
+        "fittedYSp": 0,
+        "transverseInnerSepSp": 0,
+        "minimumWidthSp": 0,
+        "divisorSp": 0,
+        "bodyWidthHalfSp": 0,
+        "bodyHeightHalfSp": 0,
+        "bodyDepthHalfSp": 0,
+        "minimumWidthHalfSp": 0
+      },
+      "expectedAnchors": {},
+      "paints": []
+    },
+    {
+      "id": "incircle-subsp",
+      "shape": "cylinder",
+      "body": {
+        "width": 0,
+        "height": 0,
+        "depth": 0
+      },
+      "innerXSep": 0.000001,
+      "innerYSep": -0.000001,
+      "outerXSep": 0,
+      "outerYSep": 0,
+      "minimumWidth": 0,
+      "minimumHeight": 80,
+      "lineWidth": 0.4,
+      "anchors": [
+        "center",
+        "text",
+        "base",
+        "mid",
+        "shape center",
+        "top",
+        "bottom",
+        "west"
+      ],
+      "parameters": {
+        "borderUsesIncircle": true
+      },
+      "options": [
+        "/pgf/shape border uses incircle=true"
+      ],
+      "exitCode": 1,
+      "command": [
+        "/Library/TeX/texbin/pdflatex",
+        "-no-shell-escape",
+        "-interaction=nonstopmode",
+        "-halt-on-error",
+        "fixed-box.tex"
+      ],
+      "artifacts": {
+        "input": "failures/incircle-subsp/fixed-box.tex",
+        "geometry": "failures/incircle-subsp/geometry.txt",
+        "compilation": "failures/incircle-subsp/compilation.txt",
+        "compilerLog": "failures/incircle-subsp/fixed-box.log"
+      },
+      "expectedError": "You've asked me to divide",
+      "expectedStages": {
+        "innerXSp": 0,
+        "innerYSp": 0,
+        "initialXSp": 0,
+        "initialYSp": 0,
+        "fittedXSp": 0,
+        "fittedYSp": 0,
+        "transverseInnerSepSp": 0,
+        "minimumWidthSp": 0,
+        "divisorSp": 0,
+        "bodyWidthHalfSp": 0,
+        "bodyHeightHalfSp": 0,
+        "bodyDepthHalfSp": 0,
+        "minimumWidthHalfSp": 0
+      },
+      "expectedAnchors": {},
+      "paints": []
+    },
+    {
+      "id": "subsp-outer-line-nonrescue",
+      "shape": "cylinder",
+      "body": {
+        "width": 0,
+        "height": 0,
+        "depth": 0
+      },
+      "innerXSep": 0,
+      "innerYSep": 0.000001,
+      "outerXSep": 20,
+      "outerYSep": 25,
+      "minimumWidth": 0,
+      "minimumHeight": 80,
+      "lineWidth": 9,
+      "anchors": [
+        "center",
+        "text",
+        "base",
+        "mid",
+        "shape center",
+        "top",
+        "bottom",
+        "west"
+      ],
+      "exitCode": 1,
+      "command": [
+        "/Library/TeX/texbin/pdflatex",
+        "-no-shell-escape",
+        "-interaction=nonstopmode",
+        "-halt-on-error",
+        "fixed-box.tex"
+      ],
+      "artifacts": {
+        "input": "failures/subsp-outer-line-nonrescue/fixed-box.tex",
+        "geometry": "failures/subsp-outer-line-nonrescue/geometry.txt",
+        "compilation": "failures/subsp-outer-line-nonrescue/compilation.txt",
+        "compilerLog": "failures/subsp-outer-line-nonrescue/fixed-box.log"
+      },
+      "expectedError": "You've asked me to divide",
+      "expectedStages": {
+        "innerXSp": 0,
+        "innerYSp": 0,
+        "initialXSp": 0,
+        "initialYSp": 0,
+        "fittedXSp": 0,
+        "fittedYSp": 0,
+        "transverseInnerSepSp": 0,
+        "minimumWidthSp": 0,
+        "divisorSp": 0,
+        "bodyWidthHalfSp": 0,
+        "bodyHeightHalfSp": 0,
+        "bodyDepthHalfSp": 0,
+        "minimumWidthHalfSp": 0
+      },
+      "expectedAnchors": {},
+      "paints": []
+    },
+    {
+      "id": "contextual-em-subsp",
+      "shape": "cylinder",
+      "body": {
+        "width": 0,
+        "height": 0,
+        "depth": 0
+      },
+      "innerXSep": 0,
+      "innerYSep": 0.000009999999999999999,
+      "outerXSep": 0,
+      "outerYSep": 0,
+      "minimumWidth": 0,
+      "minimumHeight": 0,
+      "lineWidth": 0.4,
+      "anchors": [
+        "center",
+        "text",
+        "base",
+        "mid",
+        "shape center",
+        "top",
+        "bottom",
+        "west"
+      ],
+      "sources": {
+        "innerYSep": "0.000001em"
+      },
+      "dimensionSources": {
+        "innerYSep": {
+          "source": "0.000001em",
+          "unit": "em",
+          "texPoints": 0.000009999999999999999,
+          "fontContext": {
+            "fontSizePt": 10,
+            "xHeightPt": 4.30554
+          }
+        }
+      },
+      "exitCode": 1,
+      "command": [
+        "/Library/TeX/texbin/pdflatex",
+        "-no-shell-escape",
+        "-interaction=nonstopmode",
+        "-halt-on-error",
+        "fixed-box.tex"
+      ],
+      "artifacts": {
+        "input": "failures/contextual-em-subsp/fixed-box.tex",
+        "geometry": "failures/contextual-em-subsp/geometry.txt",
+        "compilation": "failures/contextual-em-subsp/compilation.txt",
+        "compilerLog": "failures/contextual-em-subsp/fixed-box.log"
+      },
+      "expectedError": "You've asked me to divide",
+      "expectedStages": {
+        "innerXSp": 0,
+        "innerYSp": 0,
+        "initialXSp": 0,
+        "initialYSp": 0,
+        "fittedXSp": 0,
+        "fittedYSp": 0,
+        "transverseInnerSepSp": 0,
+        "minimumWidthSp": 0,
+        "divisorSp": 0,
+        "bodyWidthHalfSp": 0,
+        "bodyHeightHalfSp": 0,
+        "bodyDepthHalfSp": 0,
+        "minimumWidthHalfSp": 0
+      },
+      "expectedAnchors": {},
+      "paints": []
+    },
+    {
+      "id": "contextual-ex-subsp",
+      "shape": "cylinder",
+      "body": {
+        "width": 0,
+        "height": 0,
+        "depth": 0
+      },
+      "innerXSep": 0,
+      "innerYSep": 0.000004305539999999999,
+      "outerXSep": 0,
+      "outerYSep": 0,
+      "minimumWidth": 0,
+      "minimumHeight": 0,
+      "lineWidth": 0.4,
+      "anchors": [
+        "center",
+        "text",
+        "base",
+        "mid",
+        "shape center",
+        "top",
+        "bottom",
+        "west"
+      ],
+      "sources": {
+        "innerYSep": "0.000001ex"
+      },
+      "dimensionSources": {
+        "innerYSep": {
+          "source": "0.000001ex",
+          "unit": "ex",
+          "texPoints": 0.000004305539999999999,
+          "fontContext": {
+            "fontSizePt": 10,
+            "xHeightPt": 4.30554
+          }
+        }
+      },
+      "exitCode": 1,
+      "command": [
+        "/Library/TeX/texbin/pdflatex",
+        "-no-shell-escape",
+        "-interaction=nonstopmode",
+        "-halt-on-error",
+        "fixed-box.tex"
+      ],
+      "artifacts": {
+        "input": "failures/contextual-ex-subsp/fixed-box.tex",
+        "geometry": "failures/contextual-ex-subsp/geometry.txt",
+        "compilation": "failures/contextual-ex-subsp/compilation.txt",
+        "compilerLog": "failures/contextual-ex-subsp/fixed-box.log"
+      },
+      "expectedError": "You've asked me to divide",
+      "expectedStages": {
+        "innerXSp": 0,
+        "innerYSp": 0,
+        "initialXSp": 0,
+        "initialYSp": 0,
+        "fittedXSp": 0,
+        "fittedYSp": 0,
+        "transverseInnerSepSp": 0,
+        "minimumWidthSp": 0,
+        "divisorSp": 0,
+        "bodyWidthHalfSp": 0,
+        "bodyHeightHalfSp": 0,
+        "bodyDepthHalfSp": 0,
+        "minimumWidthHalfSp": 0
+      },
+      "expectedAnchors": {},
+      "paints": []
+    }
+  ],
+  "controls": [
+    {
+      "id": "folded",
+      "shape": "cylinder",
+      "body": {
+        "width": 0,
+        "height": 0,
+        "depth": 0
+      },
+      "innerXSep": -30,
+      "innerYSep": 5,
+      "outerXSep": 0,
+      "outerYSep": 0,
+      "minimumWidth": 1,
+      "minimumHeight": 1,
+      "lineWidth": 0.4,
+      "anchors": [
+        "center",
+        "text",
+        "base",
+        "mid",
+        "east",
+        "north east",
+        "north",
+        "north west",
+        "west",
+        "south west",
+        "south",
+        "south east",
+        "base east",
+        "base west",
+        "mid east",
+        "mid west",
+        "shape center",
+        "before top",
+        "top",
+        "after top",
+        "before bottom",
+        "bottom",
+        "after bottom",
+        "0",
+        "37",
+        "45",
+        "90",
+        "135",
+        "180",
+        "225",
+        "270",
+        "315",
+        "450",
+        "90.8",
+        "+45.7",
+        "-90.8",
+        "-0.5"
+      ],
+      "anchor": "bottom",
+      "exitCode": 0,
+      "command": [
+        "/Library/TeX/texbin/pdflatex",
+        "-no-shell-escape",
+        "-interaction=nonstopmode",
+        "-halt-on-error",
+        "fixed-box.tex"
+      ],
+      "artifacts": {
+        "input": "controls/folded/fixed-box.tex",
+        "geometry": "controls/folded/geometry.txt",
+        "compilation": "controls/folded/compilation.txt",
+        "compilerLog": "controls/folded/fixed-box.log"
+      },
+      "expectedStages": {
+        "innerXSp": -1966080,
+        "innerYSp": 327680,
+        "initialXSp": -1966080,
+        "initialYSp": 327680,
+        "fittedXSp": -1966080,
+        "fittedYSp": 327680,
+        "transverseInnerSepSp": 327680,
+        "minimumWidthSp": 65536,
+        "divisorSp": 327680,
+        "bodyWidthHalfSp": 0,
+        "bodyHeightHalfSp": 0,
+        "bodyDepthHalfSp": 0,
+        "minimumWidthHalfSp": 32768
+      },
+      "expectedAnchors": {
+        "0": {
+          "x": 5.59991,
+          "y": -0.00092
+        },
+        "37": {
+          "x": 4.6,
+          "y": 0
+        },
+        "45": {
+          "x": 4.6,
+          "y": 0
+        },
+        "90": {
+          "x": 4.6,
+          "y": 0
+        },
+        "135": {
+          "x": 4.6,
+          "y": 0
+        },
+        "180": {
+          "x": 6.06447,
+          "y": 3.53554
+        },
+        "225": {
+          "x": 6.06447,
+          "y": 3.53554
+        },
+        "270": {
+          "x": 6.06447,
+          "y": 3.53554
+        },
+        "315": {
+          "x": 6.06447,
+          "y": 3.53554
+        },
+        "450": {
+          "x": 4.6,
+          "y": 0
+        },
+        "center": {
+          "x": 0,
+          "y": 0
+        },
+        "text": {
+          "x": 0,
+          "y": 0
+        },
+        "base": {
+          "x": 0,
+          "y": 0
+        },
+        "mid": {
+          "x": 0,
+          "y": -2.15277
+        },
+        "east": {
+          "x": 5.59991,
+          "y": -0.00092
+        },
+        "north east": {
+          "x": 4.6,
+          "y": 0
+        },
+        "north": {
+          "x": 4.6,
+          "y": 0
+        },
+        "north west": {
+          "x": 4.6,
+          "y": 0
+        },
+        "west": {
+          "x": 6.06447,
+          "y": 3.53554
+        },
+        "south west": {
+          "x": 6.06447,
+          "y": 3.53554
+        },
+        "south": {
+          "x": 6.06447,
+          "y": 3.53554
+        },
+        "south east": {
+          "x": 6.06447,
+          "y": 3.53554
+        },
+        "base east": {
+          "x": 5.59991,
+          "y": -0.00092
+        },
+        "base west": {
+          "x": 6.06447,
+          "y": 3.53554
+        },
+        "mid east": {
+          "x": 6.06447,
+          "y": -3.53554
+        },
+        "mid west": {
+          "x": 4.6,
+          "y": 0
+        },
+        "shape center": {
+          "x": 5.09999,
+          "y": 0
+        },
+        "before top": {
+          "x": 0.59999,
+          "y": -5
+        },
+        "top": {
+          "x": 5.59999,
+          "y": 0
+        },
+        "after top": {
+          "x": 0.59999,
+          "y": 5
+        },
+        "before bottom": {
+          "x": 9.6,
+          "y": 5
+        },
+        "bottom": {
+          "x": 4.6,
+          "y": 0
+        },
+        "after bottom": {
+          "x": 9.6,
+          "y": -5
+        },
+        "90.8": {
+          "x": 4.6,
+          "y": 0
+        },
+        "+45.7": {
+          "x": 4.6,
+          "y": 0
+        },
+        "-90.8": {
+          "x": 6.06447,
+          "y": 3.53554
+        },
+        "-0.5": {
+          "x": 5.59991,
+          "y": -0.00092
+        }
+      },
+      "paints": [
+        {
+          "action": "stroke",
+          "tokens": [
+            {
+              "kind": "movetotoken",
+              "x": 9.6,
+              "y": -5
+            },
+            {
+              "kind": "curvetosupportatoken",
+              "x": 6.83855,
+              "y": -5
+            },
+            {
+              "kind": "curvetosupportbtoken",
+              "x": 4.6,
+              "y": -2.76146
+            },
+            {
+              "kind": "curvetotoken",
+              "x": 4.6,
+              "y": 0
+            },
+            {
+              "kind": "curvetosupportatoken",
+              "x": 4.6,
+              "y": 2.76146
+            },
+            {
+              "kind": "curvetosupportbtoken",
+              "x": 6.83855,
+              "y": 5
+            },
+            {
+              "kind": "curvetotoken",
+              "x": 9.6,
+              "y": 5
+            },
+            {
+              "kind": "linetotoken",
+              "x": 0.59999,
+              "y": 5
+            },
+            {
+              "kind": "curvetosupportatoken",
+              "x": 3.36145,
+              "y": 5
+            },
+            {
+              "kind": "curvetosupportbtoken",
+              "x": 5.59999,
+              "y": 2.76146
+            },
+            {
+              "kind": "curvetotoken",
+              "x": 5.59999,
+              "y": 0
+            },
+            {
+              "kind": "curvetosupportatoken",
+              "x": 5.59999,
+              "y": -2.76146
+            },
+            {
+              "kind": "curvetosupportbtoken",
+              "x": 3.36145,
+              "y": -5
+            },
+            {
+              "kind": "curvetotoken",
+              "x": 0.59999,
+              "y": -5
+            },
+            {
+              "kind": "closepathtoken",
+              "x": 9.6,
+              "y": -5
+            },
+            {
+              "kind": "movetotoken",
+              "x": 0.59999,
+              "y": -5
+            },
+            {
+              "kind": "curvetosupportatoken",
+              "x": -2.16147,
+              "y": -5
+            },
+            {
+              "kind": "curvetosupportbtoken",
+              "x": -4.40001,
+              "y": -2.76146
+            },
+            {
+              "kind": "curvetotoken",
+              "x": -4.40001,
+              "y": 0
+            },
+            {
+              "kind": "curvetosupportatoken",
+              "x": -4.40001,
+              "y": 2.76146
+            },
+            {
+              "kind": "curvetosupportbtoken",
+              "x": -2.16147,
+              "y": 5
+            },
+            {
+              "kind": "curvetotoken",
+              "x": 0.59999,
+              "y": 5
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "folded-custom-fill",
+      "shape": "cylinder",
+      "body": {
+        "width": 0,
+        "height": 0,
+        "depth": 0
+      },
+      "innerXSep": -30,
+      "innerYSep": 5,
+      "outerXSep": 0,
+      "outerYSep": 0,
+      "minimumWidth": 1,
+      "minimumHeight": 1,
+      "lineWidth": 0.4,
+      "anchors": [
+        "center",
+        "text",
+        "base",
+        "mid",
+        "east",
+        "north east",
+        "north",
+        "north west",
+        "west",
+        "south west",
+        "south",
+        "south east",
+        "base east",
+        "base west",
+        "mid east",
+        "mid west",
+        "shape center",
+        "before top",
+        "top",
+        "after top",
+        "before bottom",
+        "bottom",
+        "after bottom"
+      ],
+      "parameters": {
+        "cylinderUsesCustomFill": true,
+        "cylinderBodyFill": "#0000FF",
+        "cylinderEndFill": "#FF0000"
+      },
+      "options": [
+        "/pgf/cylinder uses custom fill=true",
+        "/pgf/cylinder body fill=blue",
+        "/pgf/cylinder end fill=red"
+      ],
+      "exitCode": 0,
+      "command": [
+        "/Library/TeX/texbin/pdflatex",
+        "-no-shell-escape",
+        "-interaction=nonstopmode",
+        "-halt-on-error",
+        "fixed-box.tex"
+      ],
+      "artifacts": {
+        "input": "controls/folded-custom-fill/fixed-box.tex",
+        "geometry": "controls/folded-custom-fill/geometry.txt",
+        "compilation": "controls/folded-custom-fill/compilation.txt",
+        "compilerLog": "controls/folded-custom-fill/fixed-box.log"
+      },
+      "expectedStages": {
+        "innerXSp": -1966080,
+        "innerYSp": 327680,
+        "initialXSp": -1966080,
+        "initialYSp": 327680,
+        "fittedXSp": -1966080,
+        "fittedYSp": 327680,
+        "transverseInnerSepSp": 327680,
+        "minimumWidthSp": 65536,
+        "divisorSp": 327680,
+        "bodyWidthHalfSp": 0,
+        "bodyHeightHalfSp": 0,
+        "bodyDepthHalfSp": 0,
+        "minimumWidthHalfSp": 32768
+      },
+      "expectedAnchors": {
+        "center": {
+          "x": 0,
+          "y": 0
+        },
+        "text": {
+          "x": 0,
+          "y": 0
+        },
+        "base": {
+          "x": 0,
+          "y": 0
+        },
+        "mid": {
+          "x": 0,
+          "y": -2.15277
+        },
+        "east": {
+          "x": 5.59991,
+          "y": -0.00092
+        },
+        "north east": {
+          "x": 4.6,
+          "y": 0
+        },
+        "north": {
+          "x": 4.6,
+          "y": 0
+        },
+        "north west": {
+          "x": 4.6,
+          "y": 0
+        },
+        "west": {
+          "x": 6.06447,
+          "y": 3.53554
+        },
+        "south west": {
+          "x": 6.06447,
+          "y": 3.53554
+        },
+        "south": {
+          "x": 6.06447,
+          "y": 3.53554
+        },
+        "south east": {
+          "x": 6.06447,
+          "y": 3.53554
+        },
+        "base east": {
+          "x": 5.59991,
+          "y": -0.00092
+        },
+        "base west": {
+          "x": 6.06447,
+          "y": 3.53554
+        },
+        "mid east": {
+          "x": 6.06447,
+          "y": -3.53554
+        },
+        "mid west": {
+          "x": 4.6,
+          "y": 0
+        },
+        "shape center": {
+          "x": 5.09999,
+          "y": 0
+        },
+        "before top": {
+          "x": 0.59999,
+          "y": -5
+        },
+        "top": {
+          "x": 5.59999,
+          "y": 0
+        },
+        "after top": {
+          "x": 0.59999,
+          "y": 5
+        },
+        "before bottom": {
+          "x": 9.6,
+          "y": 5
+        },
+        "bottom": {
+          "x": 4.6,
+          "y": 0
+        },
+        "after bottom": {
+          "x": 9.6,
+          "y": -5
+        }
+      },
+      "paints": [
+        {
+          "action": "fill",
+          "tokens": [
+            {
+              "kind": "movetotoken",
+              "x": 9.6,
+              "y": -5
+            },
+            {
+              "kind": "curvetosupportatoken",
+              "x": 6.83855,
+              "y": -5
+            },
+            {
+              "kind": "curvetosupportbtoken",
+              "x": 4.6,
+              "y": -2.76146
+            },
+            {
+              "kind": "curvetotoken",
+              "x": 4.6,
+              "y": 0
+            },
+            {
+              "kind": "curvetosupportatoken",
+              "x": 4.6,
+              "y": 2.76146
+            },
+            {
+              "kind": "curvetosupportbtoken",
+              "x": 6.83855,
+              "y": 5
+            },
+            {
+              "kind": "curvetotoken",
+              "x": 9.6,
+              "y": 5
+            },
+            {
+              "kind": "linetotoken",
+              "x": 0.59999,
+              "y": 5
+            },
+            {
+              "kind": "curvetosupportatoken",
+              "x": -2.16147,
+              "y": 5
+            },
+            {
+              "kind": "curvetosupportbtoken",
+              "x": -4.40001,
+              "y": 2.76146
+            },
+            {
+              "kind": "curvetotoken",
+              "x": -4.40001,
+              "y": 0
+            },
+            {
+              "kind": "curvetosupportatoken",
+              "x": -4.40001,
+              "y": -2.76146
+            },
+            {
+              "kind": "curvetosupportbtoken",
+              "x": -2.16147,
+              "y": -5
+            },
+            {
+              "kind": "curvetotoken",
+              "x": 0.59999,
+              "y": -5
+            },
+            {
+              "kind": "closepathtoken",
+              "x": 9.6,
+              "y": -5
+            }
+          ]
+        },
+        {
+          "action": "fill",
+          "tokens": [
+            {
+              "kind": "movetotoken",
+              "x": 0.59999,
+              "y": -5
+            },
+            {
+              "kind": "curvetosupportatoken",
+              "x": 3.36145,
+              "y": -5
+            },
+            {
+              "kind": "curvetosupportbtoken",
+              "x": 5.59999,
+              "y": -2.76146
+            },
+            {
+              "kind": "curvetotoken",
+              "x": 5.59999,
+              "y": 0
+            },
+            {
+              "kind": "curvetosupportatoken",
+              "x": 5.59999,
+              "y": 2.76146
+            },
+            {
+              "kind": "curvetosupportbtoken",
+              "x": 3.36145,
+              "y": 5
+            },
+            {
+              "kind": "curvetotoken",
+              "x": 0.59999,
+              "y": 5
+            },
+            {
+              "kind": "curvetosupportatoken",
+              "x": -2.16147,
+              "y": 5
+            },
+            {
+              "kind": "curvetosupportbtoken",
+              "x": -4.40001,
+              "y": 2.76146
+            },
+            {
+              "kind": "curvetotoken",
+              "x": -4.40001,
+              "y": 0
+            },
+            {
+              "kind": "curvetosupportatoken",
+              "x": -4.40001,
+              "y": -2.76146
+            },
+            {
+              "kind": "curvetosupportbtoken",
+              "x": -2.16147,
+              "y": -5
+            },
+            {
+              "kind": "curvetotoken",
+              "x": 0.59999,
+              "y": -5
+            },
+            {
+              "kind": "closepathtoken",
+              "x": 0.59999,
+              "y": -5
+            }
+          ]
+        },
+        {
+          "action": "stroke",
+          "tokens": [
+            {
+              "kind": "movetotoken",
+              "x": 9.6,
+              "y": -5
+            },
+            {
+              "kind": "curvetosupportatoken",
+              "x": 6.83855,
+              "y": -5
+            },
+            {
+              "kind": "curvetosupportbtoken",
+              "x": 4.6,
+              "y": -2.76146
+            },
+            {
+              "kind": "curvetotoken",
+              "x": 4.6,
+              "y": 0
+            },
+            {
+              "kind": "curvetosupportatoken",
+              "x": 4.6,
+              "y": 2.76146
+            },
+            {
+              "kind": "curvetosupportbtoken",
+              "x": 6.83855,
+              "y": 5
+            },
+            {
+              "kind": "curvetotoken",
+              "x": 9.6,
+              "y": 5
+            },
+            {
+              "kind": "linetotoken",
+              "x": 0.59999,
+              "y": 5
+            },
+            {
+              "kind": "curvetosupportatoken",
+              "x": 3.36145,
+              "y": 5
+            },
+            {
+              "kind": "curvetosupportbtoken",
+              "x": 5.59999,
+              "y": 2.76146
+            },
+            {
+              "kind": "curvetotoken",
+              "x": 5.59999,
+              "y": 0
+            },
+            {
+              "kind": "curvetosupportatoken",
+              "x": 5.59999,
+              "y": -2.76146
+            },
+            {
+              "kind": "curvetosupportbtoken",
+              "x": 3.36145,
+              "y": -5
+            },
+            {
+              "kind": "curvetotoken",
+              "x": 0.59999,
+              "y": -5
+            },
+            {
+              "kind": "closepathtoken",
+              "x": 9.6,
+              "y": -5
+            },
+            {
+              "kind": "movetotoken",
+              "x": 0.59999,
+              "y": -5
+            },
+            {
+              "kind": "curvetosupportatoken",
+              "x": -2.16147,
+              "y": -5
+            },
+            {
+              "kind": "curvetosupportbtoken",
+              "x": -4.40001,
+              "y": -2.76146
+            },
+            {
+              "kind": "curvetotoken",
+              "x": -4.40001,
+              "y": 0
+            },
+            {
+              "kind": "curvetosupportatoken",
+              "x": -4.40001,
+              "y": 2.76146
+            },
+            {
+              "kind": "curvetosupportbtoken",
+              "x": -2.16147,
+              "y": 5
+            },
+            {
+              "kind": "curvetotoken",
+              "x": 0.59999,
+              "y": 5
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "positive-five-sp",
+      "shape": "cylinder",
+      "body": {
+        "width": 0,
+        "height": 0,
+        "depth": 0
+      },
+      "innerXSep": 0,
+      "innerYSep": 0.0000762939453125,
+      "outerXSep": 0,
+      "outerYSep": 0,
+      "minimumWidth": 0,
+      "minimumHeight": 0,
+      "lineWidth": 0.4,
+      "anchors": [
+        "center",
+        "text",
+        "base",
+        "mid",
+        "shape center",
+        "top",
+        "bottom",
+        "west"
+      ],
+      "exitCode": 0,
+      "command": [
+        "/Library/TeX/texbin/pdflatex",
+        "-no-shell-escape",
+        "-interaction=nonstopmode",
+        "-halt-on-error",
+        "fixed-box.tex"
+      ],
+      "artifacts": {
+        "input": "controls/positive-five-sp/fixed-box.tex",
+        "geometry": "controls/positive-five-sp/geometry.txt",
+        "compilation": "controls/positive-five-sp/compilation.txt",
+        "compilerLog": "controls/positive-five-sp/fixed-box.log"
+      },
+      "expectedStages": {
+        "innerXSp": 0,
+        "innerYSp": 5,
+        "initialXSp": 0,
+        "initialYSp": 5,
+        "fittedXSp": 0,
+        "fittedYSp": 5,
+        "transverseInnerSepSp": 5,
+        "minimumWidthSp": 0,
+        "divisorSp": 5,
+        "bodyWidthHalfSp": 0,
+        "bodyHeightHalfSp": 0,
+        "bodyDepthHalfSp": 0,
+        "minimumWidthHalfSp": 0
+      },
+      "expectedAnchors": {
+        "center": {
+          "x": 0,
+          "y": 0
+        },
+        "text": {
+          "x": 0,
+          "y": 0
+        },
+        "base": {
+          "x": 0,
+          "y": 0
+        },
+        "mid": {
+          "x": 0,
+          "y": -2.15277
+        },
+        "shape center": {
+          "x": 0.10007,
+          "y": 0
+        },
+        "top": {
+          "x": 0.20015,
+          "y": 0
+        },
+        "bottom": {
+          "x": 0,
+          "y": 0
+        },
+        "west": {
+          "x": 0.20012,
+          "y": 0.00005
+        }
+      },
+      "paints": [
+        {
+          "action": "stroke",
+          "tokens": [
+            {
+              "kind": "movetotoken",
+              "x": 0.00008,
+              "y": -0.00008
+            },
+            {
+              "kind": "curvetosupportatoken",
+              "x": 0.00005,
+              "y": -0.00008
+            },
+            {
+              "kind": "curvetosupportbtoken",
+              "x": 0,
+              "y": -0.00003
+            },
+            {
+              "kind": "curvetotoken",
+              "x": 0,
+              "y": 0
+            },
+            {
+              "kind": "curvetosupportatoken",
+              "x": 0,
+              "y": 0.00003
+            },
+            {
+              "kind": "curvetosupportbtoken",
+              "x": 0.00005,
+              "y": 0.00008
+            },
+            {
+              "kind": "curvetotoken",
+              "x": 0.00008,
+              "y": 0.00008
+            },
+            {
+              "kind": "linetotoken",
+              "x": 0.20007,
+              "y": 0.00008
+            },
+            {
+              "kind": "curvetosupportatoken",
+              "x": 0.2001,
+              "y": 0.00008
+            },
+            {
+              "kind": "curvetosupportbtoken",
+              "x": 0.20015,
+              "y": 0.00003
+            },
+            {
+              "kind": "curvetotoken",
+              "x": 0.20015,
+              "y": 0
+            },
+            {
+              "kind": "curvetosupportatoken",
+              "x": 0.20015,
+              "y": -0.00003
+            },
+            {
+              "kind": "curvetosupportbtoken",
+              "x": 0.2001,
+              "y": -0.00008
+            },
+            {
+              "kind": "curvetotoken",
+              "x": 0.20007,
+              "y": -0.00008
+            },
+            {
+              "kind": "closepathtoken",
+              "x": 0.00008,
+              "y": -0.00008
+            },
+            {
+              "kind": "movetotoken",
+              "x": 0.20007,
+              "y": -0.00008
+            },
+            {
+              "kind": "curvetosupportatoken",
+              "x": 0.20004,
+              "y": -0.00008
+            },
+            {
+              "kind": "curvetosupportbtoken",
+              "x": 0.2,
+              "y": -0.00003
+            },
+            {
+              "kind": "curvetotoken",
+              "x": 0.2,
+              "y": 0
+            },
+            {
+              "kind": "curvetosupportatoken",
+              "x": 0.2,
+              "y": 0.00003
+            },
+            {
+              "kind": "curvetosupportbtoken",
+              "x": 0.20004,
+              "y": 0.00008
+            },
+            {
+              "kind": "curvetotoken",
+              "x": 0.20007,
+              "y": 0.00008
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "negative-five-sp",
+      "shape": "cylinder",
+      "body": {
+        "width": 0,
+        "height": 0,
+        "depth": 0
+      },
+      "innerXSep": 0,
+      "innerYSep": -0.0000762939453125,
+      "outerXSep": 0,
+      "outerYSep": 0,
+      "minimumWidth": -20,
+      "minimumHeight": -20,
+      "lineWidth": 0.4,
+      "anchors": [
+        "center",
+        "text",
+        "base",
+        "mid",
+        "bottom"
+      ],
+      "exitCode": 0,
+      "command": [
+        "/Library/TeX/texbin/pdflatex",
+        "-no-shell-escape",
+        "-interaction=nonstopmode",
+        "-halt-on-error",
+        "fixed-box.tex"
+      ],
+      "artifacts": {
+        "input": "controls/negative-five-sp/fixed-box.tex",
+        "geometry": "controls/negative-five-sp/geometry.txt",
+        "compilation": "controls/negative-five-sp/compilation.txt",
+        "compilerLog": "controls/negative-five-sp/fixed-box.log"
+      },
+      "expectedStages": {
+        "innerXSp": 0,
+        "innerYSp": -5,
+        "initialXSp": 0,
+        "initialYSp": -5,
+        "fittedXSp": 0,
+        "fittedYSp": -5,
+        "transverseInnerSepSp": -5,
+        "minimumWidthSp": -1310720,
+        "divisorSp": -5,
+        "bodyWidthHalfSp": 0,
+        "bodyHeightHalfSp": 0,
+        "bodyDepthHalfSp": 0,
+        "minimumWidthHalfSp": -655360
+      },
+      "expectedAnchors": {
+        "center": {
+          "x": 0,
+          "y": 0
+        },
+        "text": {
+          "x": 0,
+          "y": 0
+        },
+        "base": {
+          "x": 0,
+          "y": 0
+        },
+        "mid": {
+          "x": 0,
+          "y": -2.15277
+        },
+        "bottom": {
+          "x": 0,
+          "y": 0
+        }
+      },
+      "paints": [
+        {
+          "action": "stroke",
+          "tokens": [
+            {
+              "kind": "movetotoken",
+              "x": -0.00008,
+              "y": 0.00008
+            },
+            {
+              "kind": "curvetosupportatoken",
+              "x": -0.00005,
+              "y": 0.00008
+            },
+            {
+              "kind": "curvetosupportbtoken",
+              "x": 0,
+              "y": 0.00003
+            },
+            {
+              "kind": "curvetotoken",
+              "x": 0,
+              "y": 0
+            },
+            {
+              "kind": "curvetosupportatoken",
+              "x": 0,
+              "y": -0.00003
+            },
+            {
+              "kind": "curvetosupportbtoken",
+              "x": -0.00005,
+              "y": -0.00008
+            },
+            {
+              "kind": "curvetotoken",
+              "x": -0.00008,
+              "y": -0.00008
+            },
+            {
+              "kind": "linetotoken",
+              "x": 0.19992,
+              "y": -0.00008
+            },
+            {
+              "kind": "curvetosupportatoken",
+              "x": 0.19989,
+              "y": -0.00008
+            },
+            {
+              "kind": "curvetosupportbtoken",
+              "x": 0.19984,
+              "y": -0.00003
+            },
+            {
+              "kind": "curvetotoken",
+              "x": 0.19984,
+              "y": 0
+            },
+            {
+              "kind": "curvetosupportatoken",
+              "x": 0.19984,
+              "y": 0.00003
+            },
+            {
+              "kind": "curvetosupportbtoken",
+              "x": 0.19989,
+              "y": 0.00008
+            },
+            {
+              "kind": "curvetotoken",
+              "x": 0.19992,
+              "y": 0.00008
+            },
+            {
+              "kind": "closepathtoken",
+              "x": -0.00008,
+              "y": 0.00008
+            },
+            {
+              "kind": "movetotoken",
+              "x": 0.19992,
+              "y": 0.00008
+            },
+            {
+              "kind": "curvetosupportatoken",
+              "x": 0.19995,
+              "y": 0.00008
+            },
+            {
+              "kind": "curvetosupportbtoken",
+              "x": 0.2,
+              "y": 0.00003
+            },
+            {
+              "kind": "curvetotoken",
+              "x": 0.2,
+              "y": 0
+            },
+            {
+              "kind": "curvetosupportatoken",
+              "x": 0.2,
+              "y": -0.00003
+            },
+            {
+              "kind": "curvetosupportbtoken",
+              "x": 0.19995,
+              "y": -0.00008
+            },
+            {
+              "kind": "curvetotoken",
+              "x": 0.19992,
+              "y": -0.00008
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "signed-nonzero",
+      "shape": "cylinder",
+      "body": {
+        "width": 0,
+        "height": 0,
+        "depth": 0
+      },
+      "innerXSep": -4,
+      "innerYSep": -3,
+      "outerXSep": 0,
+      "outerYSep": 0,
+      "minimumWidth": -20,
+      "minimumHeight": -20,
+      "lineWidth": 0.4,
+      "anchors": [
+        "center",
+        "text",
+        "base",
+        "mid",
+        "shape center",
+        "before top",
+        "top",
+        "after top",
+        "before bottom",
+        "bottom",
+        "after bottom",
+        "west"
+      ],
+      "exitCode": 0,
+      "command": [
+        "/Library/TeX/texbin/pdflatex",
+        "-no-shell-escape",
+        "-interaction=nonstopmode",
+        "-halt-on-error",
+        "fixed-box.tex"
+      ],
+      "artifacts": {
+        "input": "controls/signed-nonzero/fixed-box.tex",
+        "geometry": "controls/signed-nonzero/geometry.txt",
+        "compilation": "controls/signed-nonzero/compilation.txt",
+        "compilerLog": "controls/signed-nonzero/fixed-box.log"
+      },
+      "expectedStages": {
+        "innerXSp": -262144,
+        "innerYSp": -196608,
+        "initialXSp": -262144,
+        "initialYSp": -196608,
+        "fittedXSp": -262144,
+        "fittedYSp": -196608,
+        "transverseInnerSepSp": -196608,
+        "minimumWidthSp": -1310720,
+        "divisorSp": -196608,
+        "bodyWidthHalfSp": 0,
+        "bodyHeightHalfSp": 0,
+        "bodyDepthHalfSp": 0,
+        "minimumWidthHalfSp": -655360
+      },
+      "expectedAnchors": {
+        "center": {
+          "x": 0,
+          "y": 0
+        },
+        "text": {
+          "x": 0,
+          "y": 0
+        },
+        "base": {
+          "x": 0,
+          "y": 0
+        },
+        "mid": {
+          "x": 0,
+          "y": -2.15277
+        },
+        "shape center": {
+          "x": -2.9,
+          "y": 0
+        },
+        "before top": {
+          "x": -6.8,
+          "y": 3
+        },
+        "top": {
+          "x": -9.8,
+          "y": 0
+        },
+        "after top": {
+          "x": -6.8,
+          "y": -3
+        },
+        "before bottom": {
+          "x": 1,
+          "y": -3
+        },
+        "bottom": {
+          "x": 4,
+          "y": 0
+        },
+        "after bottom": {
+          "x": 1,
+          "y": 3
+        },
+        "west": {
+          "x": -9.79996,
+          "y": 0.00055
+        }
+      },
+      "paints": [
+        {
+          "action": "stroke",
+          "tokens": [
+            {
+              "kind": "movetotoken",
+              "x": 1,
+              "y": 3
+            },
+            {
+              "kind": "curvetosupportatoken",
+              "x": 2.65688,
+              "y": 3
+            },
+            {
+              "kind": "curvetosupportbtoken",
+              "x": 4,
+              "y": 1.65688
+            },
+            {
+              "kind": "curvetotoken",
+              "x": 4,
+              "y": 0
+            },
+            {
+              "kind": "curvetosupportatoken",
+              "x": 4,
+              "y": -1.65688
+            },
+            {
+              "kind": "curvetosupportbtoken",
+              "x": 2.65688,
+              "y": -3
+            },
+            {
+              "kind": "curvetotoken",
+              "x": 1,
+              "y": -3
+            },
+            {
+              "kind": "linetotoken",
+              "x": -6.8,
+              "y": -3
+            },
+            {
+              "kind": "curvetosupportatoken",
+              "x": -8.45688,
+              "y": -3
+            },
+            {
+              "kind": "curvetosupportbtoken",
+              "x": -9.8,
+              "y": -1.65688
+            },
+            {
+              "kind": "curvetotoken",
+              "x": -9.8,
+              "y": 0
+            },
+            {
+              "kind": "curvetosupportatoken",
+              "x": -9.8,
+              "y": 1.65688
+            },
+            {
+              "kind": "curvetosupportbtoken",
+              "x": -8.45688,
+              "y": 3
+            },
+            {
+              "kind": "curvetotoken",
+              "x": -6.8,
+              "y": 3
+            },
+            {
+              "kind": "closepathtoken",
+              "x": 1,
+              "y": 3
+            },
+            {
+              "kind": "movetotoken",
+              "x": -6.8,
+              "y": 3
+            },
+            {
+              "kind": "curvetosupportatoken",
+              "x": -5.14313,
+              "y": 3
+            },
+            {
+              "kind": "curvetosupportbtoken",
+              "x": -3.8,
+              "y": 1.65688
+            },
+            {
+              "kind": "curvetotoken",
+              "x": -3.8,
+              "y": 0
+            },
+            {
+              "kind": "curvetosupportatoken",
+              "x": -3.8,
+              "y": -1.65688
+            },
+            {
+              "kind": "curvetosupportbtoken",
+              "x": -5.14313,
+              "y": -3
+            },
+            {
+              "kind": "curvetotoken",
+              "x": -6.8,
+              "y": -3
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "axial-minimum",
+      "shape": "cylinder",
+      "body": {
+        "width": 20,
+        "height": 8,
+        "depth": 2
+      },
+      "innerXSep": 2,
+      "innerYSep": 3,
+      "outerXSep": 0,
+      "outerYSep": 0,
+      "minimumWidth": 0,
+      "minimumHeight": 80,
+      "lineWidth": 0.4,
+      "anchors": [
+        "center",
+        "text",
+        "base",
+        "mid",
+        "east",
+        "north east",
+        "north",
+        "north west",
+        "west",
+        "south west",
+        "south",
+        "south east",
+        "base east",
+        "base west",
+        "mid east",
+        "mid west",
+        "shape center",
+        "before top",
+        "top",
+        "after top",
+        "before bottom",
+        "bottom",
+        "after bottom"
+      ],
+      "exitCode": 0,
+      "command": [
+        "/Library/TeX/texbin/pdflatex",
+        "-no-shell-escape",
+        "-interaction=nonstopmode",
+        "-halt-on-error",
+        "fixed-box.tex"
+      ],
+      "artifacts": {
+        "input": "controls/axial-minimum/fixed-box.tex",
+        "geometry": "controls/axial-minimum/geometry.txt",
+        "compilation": "controls/axial-minimum/compilation.txt",
+        "compilerLog": "controls/axial-minimum/fixed-box.log"
+      },
+      "expectedStages": {
+        "innerXSp": 131072,
+        "innerYSp": 196608,
+        "initialXSp": 786432,
+        "initialYSp": 524288,
+        "fittedXSp": 786432,
+        "fittedYSp": 524288,
+        "transverseInnerSepSp": 196608,
+        "minimumWidthSp": 0,
+        "divisorSp": 524288,
+        "bodyWidthHalfSp": 655360,
+        "bodyHeightHalfSp": 262144,
+        "bodyDepthHalfSp": 65536,
+        "minimumWidthHalfSp": 0
+      },
+      "expectedAnchors": {
+        "center": {
+          "x": 0,
+          "y": 0
+        },
+        "text": {
+          "x": -10,
+          "y": 3
+        },
+        "base": {
+          "x": 0,
+          "y": 3
+        },
+        "mid": {
+          "x": 0,
+          "y": 0.84723
+        },
+        "east": {
+          "x": 47.22218,
+          "y": -0.00073
+        },
+        "north east": {
+          "x": 8.00162,
+          "y": -8.00098
+        },
+        "north": {
+          "x": 0.00177,
+          "y": -8.00183
+        },
+        "north west": {
+          "x": -7.99977,
+          "y": -8.00098
+        },
+        "west": {
+          "x": -32.77768,
+          "y": 0
+        },
+        "south west": {
+          "x": -7.9998,
+          "y": 8.00044
+        },
+        "south": {
+          "x": 0.00177,
+          "y": 8.00082
+        },
+        "south east": {
+          "x": 8.00165,
+          "y": 8.00044
+        },
+        "base east": {
+          "x": 46.6382,
+          "y": 3.00024
+        },
+        "base west": {
+          "x": -32.19357,
+          "y": 3.00024
+        },
+        "mid east": {
+          "x": 47.17702,
+          "y": 0.84802
+        },
+        "mid west": {
+          "x": -32.73239,
+          "y": 0.84802
+        },
+        "shape center": {
+          "x": 7.2223,
+          "y": 0
+        },
+        "before top": {
+          "x": 39.2223,
+          "y": -8
+        },
+        "top": {
+          "x": 47.2223,
+          "y": 0
+        },
+        "after top": {
+          "x": 39.2223,
+          "y": 8
+        },
+        "before bottom": {
+          "x": -24.77768,
+          "y": 8
+        },
+        "bottom": {
+          "x": -32.77768,
+          "y": 0
+        },
+        "after bottom": {
+          "x": -24.77768,
+          "y": -8
+        }
+      },
+      "paints": [
+        {
+          "action": "stroke",
+          "tokens": [
+            {
+              "kind": "movetotoken",
+              "x": -24.77768,
+              "y": -8
+            },
+            {
+              "kind": "curvetosupportatoken",
+              "x": -29.19601,
+              "y": -8
+            },
+            {
+              "kind": "curvetosupportbtoken",
+              "x": -32.77768,
+              "y": -4.41833
+            },
+            {
+              "kind": "curvetotoken",
+              "x": -32.77768,
+              "y": 0
+            },
+            {
+              "kind": "curvetosupportatoken",
+              "x": -32.77768,
+              "y": 4.41833
+            },
+            {
+              "kind": "curvetosupportbtoken",
+              "x": -29.19601,
+              "y": 8
+            },
+            {
+              "kind": "curvetotoken",
+              "x": -24.77768,
+              "y": 8
+            },
+            {
+              "kind": "linetotoken",
+              "x": 39.2223,
+              "y": 8
+            },
+            {
+              "kind": "curvetosupportatoken",
+              "x": 43.64064,
+              "y": 8
+            },
+            {
+              "kind": "curvetosupportbtoken",
+              "x": 47.2223,
+              "y": 4.41833
+            },
+            {
+              "kind": "curvetotoken",
+              "x": 47.2223,
+              "y": 0
+            },
+            {
+              "kind": "curvetosupportatoken",
+              "x": 47.2223,
+              "y": -4.41833
+            },
+            {
+              "kind": "curvetosupportbtoken",
+              "x": 43.64064,
+              "y": -8
+            },
+            {
+              "kind": "curvetotoken",
+              "x": 39.2223,
+              "y": -8
+            },
+            {
+              "kind": "closepathtoken",
+              "x": -24.77768,
+              "y": -8
+            },
+            {
+              "kind": "movetotoken",
+              "x": 39.2223,
+              "y": -8
+            },
+            {
+              "kind": "curvetosupportatoken",
+              "x": 34.80397,
+              "y": -8
+            },
+            {
+              "kind": "curvetosupportbtoken",
+              "x": 31.2223,
+              "y": -4.41833
+            },
+            {
+              "kind": "curvetotoken",
+              "x": 31.2223,
+              "y": 0
+            },
+            {
+              "kind": "curvetosupportatoken",
+              "x": 31.2223,
+              "y": 4.41833
+            },
+            {
+              "kind": "curvetosupportbtoken",
+              "x": 34.80397,
+              "y": 8
+            },
+            {
+              "kind": "curvetotoken",
+              "x": 39.2223,
+              "y": 8
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "transverse-minimum",
+      "shape": "cylinder",
+      "body": {
+        "width": 0,
+        "height": 0,
+        "depth": 0
+      },
+      "innerXSep": 5,
+      "innerYSep": 2,
+      "outerXSep": 0,
+      "outerYSep": 0,
+      "minimumWidth": 12,
+      "minimumHeight": 0,
+      "lineWidth": 0.4,
+      "anchors": [
+        "center",
+        "text",
+        "base",
+        "mid",
+        "east",
+        "north east",
+        "north",
+        "north west",
+        "west",
+        "south west",
+        "south",
+        "south east",
+        "base east",
+        "base west",
+        "mid east",
+        "mid west",
+        "shape center",
+        "before top",
+        "top",
+        "after top",
+        "before bottom",
+        "bottom",
+        "after bottom"
+      ],
+      "exitCode": 0,
+      "command": [
+        "/Library/TeX/texbin/pdflatex",
+        "-no-shell-escape",
+        "-interaction=nonstopmode",
+        "-halt-on-error",
+        "fixed-box.tex"
+      ],
+      "artifacts": {
+        "input": "controls/transverse-minimum/fixed-box.tex",
+        "geometry": "controls/transverse-minimum/geometry.txt",
+        "compilation": "controls/transverse-minimum/compilation.txt",
+        "compilerLog": "controls/transverse-minimum/fixed-box.log"
+      },
+      "expectedStages": {
+        "innerXSp": 327680,
+        "innerYSp": 131072,
+        "initialXSp": 327680,
+        "initialYSp": 131072,
+        "fittedXSp": 327680,
+        "fittedYSp": 131072,
+        "transverseInnerSepSp": 131072,
+        "minimumWidthSp": 786432,
+        "divisorSp": 393216,
+        "bodyWidthHalfSp": 0,
+        "bodyHeightHalfSp": 0,
+        "bodyDepthHalfSp": 0,
+        "minimumWidthHalfSp": 393216
+      },
+      "expectedAnchors": {
+        "center": {
+          "x": 0,
+          "y": 0
+        },
+        "text": {
+          "x": 0,
+          "y": 0
+        },
+        "base": {
+          "x": 0,
+          "y": 0
+        },
+        "mid": {
+          "x": 0,
+          "y": -2.15277
+        },
+        "east": {
+          "x": 9.19997,
+          "y": -0.00055
+        },
+        "north east": {
+          "x": 6.0004,
+          "y": -6.0004
+        },
+        "north": {
+          "x": 0,
+          "y": -6.00089
+        },
+        "north west": {
+          "x": -4.73685,
+          "y": -4.73685
+        },
+        "west": {
+          "x": -5.50937,
+          "y": 0
+        },
+        "south west": {
+          "x": -4.73685,
+          "y": 4.73685
+        },
+        "south": {
+          "x": 0,
+          "y": 6.00089
+        },
+        "south east": {
+          "x": 6.0004,
+          "y": 6.0004
+        },
+        "base east": {
+          "x": 9.19997,
+          "y": -0.00055
+        },
+        "base west": {
+          "x": -5.50937,
+          "y": 0
+        },
+        "mid east": {
+          "x": 9.04768,
+          "y": -2.29596
+        },
+        "mid west": {
+          "x": -5.37616,
+          "y": -2.15286
+        },
+        "shape center": {
+          "x": 1.8453,
+          "y": 0
+        },
+        "before top": {
+          "x": 7.2,
+          "y": -6
+        },
+        "top": {
+          "x": 9.2,
+          "y": 0
+        },
+        "after top": {
+          "x": 7.2,
+          "y": 6
+        },
+        "before bottom": {
+          "x": -3.50937,
+          "y": 6
+        },
+        "bottom": {
+          "x": -5.50937,
+          "y": 0
+        },
+        "after bottom": {
+          "x": -3.50937,
+          "y": -6
+        }
+      },
+      "paints": [
+        {
+          "action": "stroke",
+          "tokens": [
+            {
+              "kind": "movetotoken",
+              "x": -3.50937,
+              "y": -6
+            },
+            {
+              "kind": "curvetosupportatoken",
+              "x": -4.61395,
+              "y": -6
+            },
+            {
+              "kind": "curvetosupportbtoken",
+              "x": -5.50937,
+              "y": -3.31375
+            },
+            {
+              "kind": "curvetotoken",
+              "x": -5.50937,
+              "y": 0
+            },
+            {
+              "kind": "curvetosupportatoken",
+              "x": -5.50937,
+              "y": 3.31375
+            },
+            {
+              "kind": "curvetosupportbtoken",
+              "x": -4.61395,
+              "y": 6
+            },
+            {
+              "kind": "curvetotoken",
+              "x": -3.50937,
+              "y": 6
+            },
+            {
+              "kind": "linetotoken",
+              "x": 7.2,
+              "y": 6
+            },
+            {
+              "kind": "curvetosupportatoken",
+              "x": 8.30458,
+              "y": 6
+            },
+            {
+              "kind": "curvetosupportbtoken",
+              "x": 9.2,
+              "y": 3.31375
+            },
+            {
+              "kind": "curvetotoken",
+              "x": 9.2,
+              "y": 0
+            },
+            {
+              "kind": "curvetosupportatoken",
+              "x": 9.2,
+              "y": -3.31375
+            },
+            {
+              "kind": "curvetosupportbtoken",
+              "x": 8.30458,
+              "y": -6
+            },
+            {
+              "kind": "curvetotoken",
+              "x": 7.2,
+              "y": -6
+            },
+            {
+              "kind": "closepathtoken",
+              "x": -3.50937,
+              "y": -6
+            },
+            {
+              "kind": "movetotoken",
+              "x": 7.2,
+              "y": -6
+            },
+            {
+              "kind": "curvetosupportatoken",
+              "x": 6.09541,
+              "y": -6
+            },
+            {
+              "kind": "curvetosupportbtoken",
+              "x": 5.2,
+              "y": -3.31375
+            },
+            {
+              "kind": "curvetotoken",
+              "x": 5.2,
+              "y": 0
+            },
+            {
+              "kind": "curvetosupportatoken",
+              "x": 5.2,
+              "y": 3.31375
+            },
+            {
+              "kind": "curvetosupportbtoken",
+              "x": 6.09541,
+              "y": 6
+            },
+            {
+              "kind": "curvetotoken",
+              "x": 7.2,
+              "y": 6
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "rx-zero",
+      "shape": "cylinder",
+      "body": {
+        "width": 0,
+        "height": 0,
+        "depth": 0
+      },
+      "innerXSep": 0,
+      "innerYSep": 0,
+      "outerXSep": 0,
+      "outerYSep": 0,
+      "minimumWidth": 10,
+      "minimumHeight": 20,
+      "lineWidth": 0.4,
+      "anchors": [
+        "center",
+        "text",
+        "base",
+        "mid",
+        "east",
+        "north east",
+        "north",
+        "north west",
+        "west",
+        "south west",
+        "south",
+        "south east",
+        "base east",
+        "base west",
+        "mid east",
+        "mid west",
+        "shape center",
+        "before top",
+        "top",
+        "after top",
+        "before bottom",
+        "bottom",
+        "after bottom"
+      ],
+      "exitCode": 0,
+      "command": [
+        "/Library/TeX/texbin/pdflatex",
+        "-no-shell-escape",
+        "-interaction=nonstopmode",
+        "-halt-on-error",
+        "fixed-box.tex"
+      ],
+      "artifacts": {
+        "input": "controls/rx-zero/fixed-box.tex",
+        "geometry": "controls/rx-zero/geometry.txt",
+        "compilation": "controls/rx-zero/compilation.txt",
+        "compilerLog": "controls/rx-zero/fixed-box.log"
+      },
+      "expectedStages": {
+        "innerXSp": 0,
+        "innerYSp": 0,
+        "initialXSp": 0,
+        "initialYSp": 0,
+        "fittedXSp": 0,
+        "fittedYSp": 0,
+        "transverseInnerSepSp": 0,
+        "minimumWidthSp": 655360,
+        "divisorSp": 327680,
+        "bodyWidthHalfSp": 0,
+        "bodyHeightHalfSp": 0,
+        "bodyDepthHalfSp": 0,
+        "minimumWidthHalfSp": 327680
+      },
+      "expectedAnchors": {
+        "center": {
+          "x": 0,
+          "y": 0
+        },
+        "text": {
+          "x": 0,
+          "y": 0
+        },
+        "base": {
+          "x": 0,
+          "y": 0
+        },
+        "mid": {
+          "x": 0,
+          "y": -2.15277
+        },
+        "east": {
+          "x": 10.09999,
+          "y": -0.00092
+        },
+        "north east": {
+          "x": 5.00044,
+          "y": -5.00044
+        },
+        "north": {
+          "x": 0,
+          "y": -5.00116
+        },
+        "north west": {
+          "x": -5.00044,
+          "y": -5.00044
+        },
+        "west": {
+          "x": -9.9,
+          "y": 0
+        },
+        "south west": {
+          "x": -5.00044,
+          "y": 5.00044
+        },
+        "south": {
+          "x": 0,
+          "y": 5.00116
+        },
+        "south east": {
+          "x": 5.00044,
+          "y": 5.00044
+        },
+        "base east": {
+          "x": 10.09999,
+          "y": -0.00092
+        },
+        "base west": {
+          "x": -9.9,
+          "y": 0
+        },
+        "mid east": {
+          "x": 10.09999,
+          "y": -3.53554
+        },
+        "mid west": {
+          "x": -9.9,
+          "y": -2.15324
+        },
+        "shape center": {
+          "x": 0.09999,
+          "y": 0
+        },
+        "before top": {
+          "x": 10.09999,
+          "y": -5
+        },
+        "top": {
+          "x": 10.09999,
+          "y": 0
+        },
+        "after top": {
+          "x": 10.09999,
+          "y": 5
+        },
+        "before bottom": {
+          "x": -9.9,
+          "y": 5
+        },
+        "bottom": {
+          "x": -9.9,
+          "y": 0
+        },
+        "after bottom": {
+          "x": -9.9,
+          "y": -5
+        }
+      },
+      "paints": [
+        {
+          "action": "stroke",
+          "tokens": [
+            {
+              "kind": "movetotoken",
+              "x": -9.9,
+              "y": -5
+            },
+            {
+              "kind": "curvetosupportatoken",
+              "x": -9.9,
+              "y": -5
+            },
+            {
+              "kind": "curvetosupportbtoken",
+              "x": -9.9,
+              "y": -2.76146
+            },
+            {
+              "kind": "curvetotoken",
+              "x": -9.9,
+              "y": 0
+            },
+            {
+              "kind": "curvetosupportatoken",
+              "x": -9.9,
+              "y": 2.76146
+            },
+            {
+              "kind": "curvetosupportbtoken",
+              "x": -9.9,
+              "y": 5
+            },
+            {
+              "kind": "curvetotoken",
+              "x": -9.9,
+              "y": 5
+            },
+            {
+              "kind": "linetotoken",
+              "x": 10.09999,
+              "y": 5
+            },
+            {
+              "kind": "curvetosupportatoken",
+              "x": 10.09999,
+              "y": 5
+            },
+            {
+              "kind": "curvetosupportbtoken",
+              "x": 10.09999,
+              "y": 2.76146
+            },
+            {
+              "kind": "curvetotoken",
+              "x": 10.09999,
+              "y": 0
+            },
+            {
+              "kind": "curvetosupportatoken",
+              "x": 10.09999,
+              "y": -2.76146
+            },
+            {
+              "kind": "curvetosupportbtoken",
+              "x": 10.09999,
+              "y": -5
+            },
+            {
+              "kind": "curvetotoken",
+              "x": 10.09999,
+              "y": -5
+            },
+            {
+              "kind": "closepathtoken",
+              "x": -9.9,
+              "y": -5
+            },
+            {
+              "kind": "movetotoken",
+              "x": 10.09999,
+              "y": -5
+            },
+            {
+              "kind": "curvetosupportatoken",
+              "x": 10.09999,
+              "y": -5
+            },
+            {
+              "kind": "curvetosupportbtoken",
+              "x": 10.09999,
+              "y": -2.76146
+            },
+            {
+              "kind": "curvetotoken",
+              "x": 10.09999,
+              "y": 0
+            },
+            {
+              "kind": "curvetosupportatoken",
+              "x": 10.09999,
+              "y": 2.76146
+            },
+            {
+              "kind": "curvetosupportbtoken",
+              "x": 10.09999,
+              "y": 5
+            },
+            {
+              "kind": "curvetotoken",
+              "x": 10.09999,
+              "y": 5
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "folded-rotation90",
+      "shape": "cylinder",
+      "body": {
+        "width": 0,
+        "height": 0,
+        "depth": 0
+      },
+      "innerXSep": 5,
+      "innerYSep": -30,
+      "outerXSep": 0,
+      "outerYSep": 0,
+      "minimumWidth": 1,
+      "minimumHeight": 1,
+      "lineWidth": 0.4,
+      "anchors": [
+        "center",
+        "text",
+        "base",
+        "mid",
+        "east",
+        "north east",
+        "north",
+        "north west",
+        "west",
+        "south west",
+        "south",
+        "south east",
+        "base east",
+        "base west",
+        "mid east",
+        "mid west",
+        "shape center",
+        "before top",
+        "top",
+        "after top",
+        "before bottom",
+        "bottom",
+        "after bottom"
+      ],
+      "parameters": {
+        "borderRotate": 90
+      },
+      "options": [
+        "/pgf/shape border rotate=90"
+      ],
+      "exitCode": 0,
+      "command": [
+        "/Library/TeX/texbin/pdflatex",
+        "-no-shell-escape",
+        "-interaction=nonstopmode",
+        "-halt-on-error",
+        "fixed-box.tex"
+      ],
+      "artifacts": {
+        "input": "controls/folded-rotation90/fixed-box.tex",
+        "geometry": "controls/folded-rotation90/geometry.txt",
+        "compilation": "controls/folded-rotation90/compilation.txt",
+        "compilerLog": "controls/folded-rotation90/fixed-box.log"
+      },
+      "expectedStages": {
+        "innerXSp": 327680,
+        "innerYSp": -1966080,
+        "initialXSp": 327680,
+        "initialYSp": -1966080,
+        "fittedXSp": -1966080,
+        "fittedYSp": 327680,
+        "transverseInnerSepSp": 327680,
+        "minimumWidthSp": 65536,
+        "divisorSp": 327680,
+        "bodyWidthHalfSp": 0,
+        "bodyHeightHalfSp": 0,
+        "bodyDepthHalfSp": 0,
+        "minimumWidthHalfSp": 32768
+      },
+      "expectedAnchors": {
+        "center": {
+          "x": 0,
+          "y": 0
+        },
+        "text": {
+          "x": 0,
+          "y": 0
+        },
+        "base": {
+          "x": 0,
+          "y": 0
+        },
+        "mid": {
+          "x": 0,
+          "y": -2.15277
+        },
+        "east": {
+          "x": 3.53554,
+          "y": -6.06447
+        },
+        "north east": {
+          "x": 3.53554,
+          "y": -6.06447
+        },
+        "north": {
+          "x": -0.00092,
+          "y": -5.59991
+        },
+        "north west": {
+          "x": 0,
+          "y": -4.6
+        },
+        "west": {
+          "x": 0,
+          "y": -4.6
+        },
+        "south west": {
+          "x": 0,
+          "y": -4.6
+        },
+        "south": {
+          "x": 3.53554,
+          "y": -6.06447
+        },
+        "south east": {
+          "x": 3.53554,
+          "y": -6.06447
+        },
+        "base east": {
+          "x": 3.53554,
+          "y": -6.06447
+        },
+        "base west": {
+          "x": 0,
+          "y": -4.6
+        },
+        "mid east": {
+          "x": 3.53554,
+          "y": -6.06447
+        },
+        "mid west": {
+          "x": 0,
+          "y": -4.6
+        },
+        "shape center": {
+          "x": 0,
+          "y": -5.09999
+        },
+        "before top": {
+          "x": -5,
+          "y": -0.59999
+        },
+        "top": {
+          "x": 0,
+          "y": -5.59999
+        },
+        "after top": {
+          "x": 5,
+          "y": -0.59999
+        },
+        "before bottom": {
+          "x": 5,
+          "y": -9.6
+        },
+        "bottom": {
+          "x": 0,
+          "y": -4.6
+        },
+        "after bottom": {
+          "x": -5,
+          "y": -9.6
+        }
+      },
+      "paints": [
+        {
+          "action": "stroke",
+          "tokens": [
+            {
+              "kind": "movetotoken",
+              "x": -5,
+              "y": -9.6
+            },
+            {
+              "kind": "curvetosupportatoken",
+              "x": -5,
+              "y": -6.83855
+            },
+            {
+              "kind": "curvetosupportbtoken",
+              "x": -2.76146,
+              "y": -4.6
+            },
+            {
+              "kind": "curvetotoken",
+              "x": 0,
+              "y": -4.6
+            },
+            {
+              "kind": "curvetosupportatoken",
+              "x": 2.76146,
+              "y": -4.6
+            },
+            {
+              "kind": "curvetosupportbtoken",
+              "x": 5,
+              "y": -6.83855
+            },
+            {
+              "kind": "curvetotoken",
+              "x": 5,
+              "y": -9.6
+            },
+            {
+              "kind": "linetotoken",
+              "x": 5,
+              "y": -0.59999
+            },
+            {
+              "kind": "curvetosupportatoken",
+              "x": 5,
+              "y": -3.36145
+            },
+            {
+              "kind": "curvetosupportbtoken",
+              "x": 2.76146,
+              "y": -5.59999
+            },
+            {
+              "kind": "curvetotoken",
+              "x": 0,
+              "y": -5.59999
+            },
+            {
+              "kind": "curvetosupportatoken",
+              "x": -2.76146,
+              "y": -5.59999
+            },
+            {
+              "kind": "curvetosupportbtoken",
+              "x": -5,
+              "y": -3.36145
+            },
+            {
+              "kind": "curvetotoken",
+              "x": -5,
+              "y": -0.59999
+            },
+            {
+              "kind": "closepathtoken",
+              "x": -5,
+              "y": -9.6
+            },
+            {
+              "kind": "movetotoken",
+              "x": -5,
+              "y": -0.59999
+            },
+            {
+              "kind": "curvetosupportatoken",
+              "x": -5,
+              "y": 2.16147
+            },
+            {
+              "kind": "curvetosupportbtoken",
+              "x": -2.76146,
+              "y": 4.40001
+            },
+            {
+              "kind": "curvetotoken",
+              "x": 0,
+              "y": 4.40001
+            },
+            {
+              "kind": "curvetosupportatoken",
+              "x": 2.76146,
+              "y": 4.40001
+            },
+            {
+              "kind": "curvetosupportbtoken",
+              "x": 5,
+              "y": 2.16147
+            },
+            {
+              "kind": "curvetotoken",
+              "x": 5,
+              "y": -0.59999
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "folded-rotation270",
+      "shape": "cylinder",
+      "body": {
+        "width": 0,
+        "height": 0,
+        "depth": 0
+      },
+      "innerXSep": 5,
+      "innerYSep": -30,
+      "outerXSep": 0,
+      "outerYSep": 0,
+      "minimumWidth": 1,
+      "minimumHeight": 1,
+      "lineWidth": 0.4,
+      "anchors": [
+        "center",
+        "text",
+        "base",
+        "mid",
+        "east",
+        "north east",
+        "north",
+        "north west",
+        "west",
+        "south west",
+        "south",
+        "south east",
+        "base east",
+        "base west",
+        "mid east",
+        "mid west",
+        "shape center",
+        "before top",
+        "top",
+        "after top",
+        "before bottom",
+        "bottom",
+        "after bottom"
+      ],
+      "parameters": {
+        "borderRotate": 270
+      },
+      "options": [
+        "/pgf/shape border rotate=270"
+      ],
+      "exitCode": 0,
+      "command": [
+        "/Library/TeX/texbin/pdflatex",
+        "-no-shell-escape",
+        "-interaction=nonstopmode",
+        "-halt-on-error",
+        "fixed-box.tex"
+      ],
+      "artifacts": {
+        "input": "controls/folded-rotation270/fixed-box.tex",
+        "geometry": "controls/folded-rotation270/geometry.txt",
+        "compilation": "controls/folded-rotation270/compilation.txt",
+        "compilerLog": "controls/folded-rotation270/fixed-box.log"
+      },
+      "expectedStages": {
+        "innerXSp": 327680,
+        "innerYSp": -1966080,
+        "initialXSp": 327680,
+        "initialYSp": -1966080,
+        "fittedXSp": -1966080,
+        "fittedYSp": 327680,
+        "transverseInnerSepSp": 327680,
+        "minimumWidthSp": 65536,
+        "divisorSp": 327680,
+        "bodyWidthHalfSp": 0,
+        "bodyHeightHalfSp": 0,
+        "bodyDepthHalfSp": 0,
+        "minimumWidthHalfSp": 32768
+      },
+      "expectedAnchors": {
+        "center": {
+          "x": 0,
+          "y": 0
+        },
+        "text": {
+          "x": 0,
+          "y": 0
+        },
+        "base": {
+          "x": 0,
+          "y": 0
+        },
+        "mid": {
+          "x": 0,
+          "y": -2.15277
+        },
+        "east": {
+          "x": 0,
+          "y": 4.6
+        },
+        "north east": {
+          "x": 0,
+          "y": 4.6
+        },
+        "north": {
+          "x": -3.53554,
+          "y": 6.06447
+        },
+        "north west": {
+          "x": -3.53554,
+          "y": 6.06447
+        },
+        "west": {
+          "x": -3.53554,
+          "y": 6.06447
+        },
+        "south west": {
+          "x": -3.53554,
+          "y": 6.06447
+        },
+        "south": {
+          "x": 0.00092,
+          "y": 5.59991
+        },
+        "south east": {
+          "x": 0,
+          "y": 4.6
+        },
+        "base east": {
+          "x": 0,
+          "y": 4.6
+        },
+        "base west": {
+          "x": -3.53554,
+          "y": 6.06447
+        },
+        "mid east": {
+          "x": 0,
+          "y": 4.6
+        },
+        "mid west": {
+          "x": -3.53554,
+          "y": 6.06447
+        },
+        "shape center": {
+          "x": 0,
+          "y": 5.09999
+        },
+        "before top": {
+          "x": 5,
+          "y": 0.59999
+        },
+        "top": {
+          "x": 0,
+          "y": 5.59999
+        },
+        "after top": {
+          "x": -5,
+          "y": 0.59999
+        },
+        "before bottom": {
+          "x": -5,
+          "y": 9.6
+        },
+        "bottom": {
+          "x": 0,
+          "y": 4.6
+        },
+        "after bottom": {
+          "x": 5,
+          "y": 9.6
+        }
+      },
+      "paints": [
+        {
+          "action": "stroke",
+          "tokens": [
+            {
+              "kind": "movetotoken",
+              "x": 5,
+              "y": 9.6
+            },
+            {
+              "kind": "curvetosupportatoken",
+              "x": 5,
+              "y": 6.83855
+            },
+            {
+              "kind": "curvetosupportbtoken",
+              "x": 2.76146,
+              "y": 4.6
+            },
+            {
+              "kind": "curvetotoken",
+              "x": 0,
+              "y": 4.6
+            },
+            {
+              "kind": "curvetosupportatoken",
+              "x": -2.76146,
+              "y": 4.6
+            },
+            {
+              "kind": "curvetosupportbtoken",
+              "x": -5,
+              "y": 6.83855
+            },
+            {
+              "kind": "curvetotoken",
+              "x": -5,
+              "y": 9.6
+            },
+            {
+              "kind": "linetotoken",
+              "x": -5,
+              "y": 0.59999
+            },
+            {
+              "kind": "curvetosupportatoken",
+              "x": -5,
+              "y": 3.36145
+            },
+            {
+              "kind": "curvetosupportbtoken",
+              "x": -2.76146,
+              "y": 5.59999
+            },
+            {
+              "kind": "curvetotoken",
+              "x": 0,
+              "y": 5.59999
+            },
+            {
+              "kind": "curvetosupportatoken",
+              "x": 2.76146,
+              "y": 5.59999
+            },
+            {
+              "kind": "curvetosupportbtoken",
+              "x": 5,
+              "y": 3.36145
+            },
+            {
+              "kind": "curvetotoken",
+              "x": 5,
+              "y": 0.59999
+            },
+            {
+              "kind": "closepathtoken",
+              "x": 5,
+              "y": 9.6
+            },
+            {
+              "kind": "movetotoken",
+              "x": 5,
+              "y": 0.59999
+            },
+            {
+              "kind": "curvetosupportatoken",
+              "x": 5,
+              "y": -2.16147
+            },
+            {
+              "kind": "curvetosupportbtoken",
+              "x": 2.76146,
+              "y": -4.40001
+            },
+            {
+              "kind": "curvetotoken",
+              "x": 0,
+              "y": -4.40001
+            },
+            {
+              "kind": "curvetosupportatoken",
+              "x": -2.76146,
+              "y": -4.40001
+            },
+            {
+              "kind": "curvetosupportbtoken",
+              "x": -5,
+              "y": -2.16147
+            },
+            {
+              "kind": "curvetotoken",
+              "x": -5,
+              "y": 0.59999
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "incircle",
+      "shape": "cylinder",
+      "body": {
+        "width": 0,
+        "height": 0,
+        "depth": 0
+      },
+      "innerXSep": -30,
+      "innerYSep": 5,
+      "outerXSep": 0,
+      "outerYSep": 0,
+      "minimumWidth": 1,
+      "minimumHeight": 1,
+      "lineWidth": 0.4,
+      "anchors": [
+        "center",
+        "text",
+        "base",
+        "mid",
+        "east",
+        "north east",
+        "north",
+        "north west",
+        "west",
+        "south west",
+        "south",
+        "south east",
+        "base east",
+        "base west",
+        "mid east",
+        "mid west",
+        "shape center",
+        "before top",
+        "top",
+        "after top",
+        "before bottom",
+        "bottom",
+        "after bottom"
+      ],
+      "parameters": {
+        "borderUsesIncircle": true,
+        "borderRotate": 37
+      },
+      "options": [
+        "/pgf/shape border uses incircle=true",
+        "/pgf/shape border rotate=37"
+      ],
+      "exitCode": 0,
+      "command": [
+        "/Library/TeX/texbin/pdflatex",
+        "-no-shell-escape",
+        "-interaction=nonstopmode",
+        "-halt-on-error",
+        "fixed-box.tex"
+      ],
+      "artifacts": {
+        "input": "controls/incircle/fixed-box.tex",
+        "geometry": "controls/incircle/geometry.txt",
+        "compilation": "controls/incircle/compilation.txt",
+        "compilerLog": "controls/incircle/fixed-box.log"
+      },
+      "expectedStages": {
+        "innerXSp": -1966080,
+        "innerYSp": 327680,
+        "initialXSp": -1966080,
+        "initialYSp": 327680,
+        "fittedXSp": 463410,
+        "fittedYSp": 463410,
+        "transverseInnerSepSp": 327680,
+        "minimumWidthSp": 65536,
+        "divisorSp": 463410,
+        "bodyWidthHalfSp": 0,
+        "bodyHeightHalfSp": 0,
+        "bodyDepthHalfSp": 0,
+        "minimumWidthHalfSp": 32768
+      },
+      "expectedAnchors": {
+        "center": {
+          "x": 0,
+          "y": 0
+        },
+        "text": {
+          "x": 0,
+          "y": 0
+        },
+        "base": {
+          "x": 0,
+          "y": 0
+        },
+        "mid": {
+          "x": 0,
+          "y": -2.15277
+        },
+        "east": {
+          "x": 11.74979,
+          "y": 0
+        },
+        "north east": {
+          "x": 14.83896,
+          "y": -14.83942
+        },
+        "north": {
+          "x": 0,
+          "y": -8.8545
+        },
+        "north west": {
+          "x": -5.02559,
+          "y": -5.02551
+        },
+        "west": {
+          "x": -7.316,
+          "y": 0.00005
+        },
+        "south west": {
+          "x": -5.21693,
+          "y": 5.2171
+        },
+        "south": {
+          "x": -0.00003,
+          "y": 7.25336
+        },
+        "south east": {
+          "x": 5.04956,
+          "y": 5.04956
+        },
+        "base east": {
+          "x": 11.74979,
+          "y": 0
+        },
+        "base west": {
+          "x": -7.316,
+          "y": 0.00005
+        },
+        "mid east": {
+          "x": 15.70973,
+          "y": -2.98424
+        },
+        "mid west": {
+          "x": -6.92027,
+          "y": -2.15283
+        },
+        "shape center": {
+          "x": 5.60321,
+          "y": -4.22232
+        },
+        "before top": {
+          "x": 7.19876,
+          "y": -14.27869
+        },
+        "top": {
+          "x": 17.10156,
+          "y": -12.88693
+        },
+        "after top": {
+          "x": 15.70981,
+          "y": -2.98413
+        },
+        "before bottom": {
+          "x": 4.00769,
+          "y": 5.83403
+        },
+        "bottom": {
+          "x": -5.89511,
+          "y": 4.44228
+        },
+        "after bottom": {
+          "x": -4.50336,
+          "y": -5.46053
+        }
+      },
+      "paints": [
+        {
+          "action": "stroke",
+          "tokens": [
+            {
+              "kind": "movetotoken",
+              "x": -4.50336,
+              "y": -5.46053
+            },
+            {
+              "kind": "curvetosupportatoken",
+              "x": -7.62228,
+              "y": -3.11024
+            },
+            {
+              "kind": "curvetosupportbtoken",
+              "x": -8.24539,
+              "y": 1.32335
+            },
+            {
+              "kind": "curvetotoken",
+              "x": -5.89511,
+              "y": 4.44228
+            },
+            {
+              "kind": "curvetosupportatoken",
+              "x": -3.54483,
+              "y": 7.5612
+            },
+            {
+              "kind": "curvetosupportbtoken",
+              "x": 0.88876,
+              "y": 8.18431
+            },
+            {
+              "kind": "curvetotoken",
+              "x": 4.00769,
+              "y": 5.83403
+            },
+            {
+              "kind": "linetotoken",
+              "x": 15.70981,
+              "y": -2.98413
+            },
+            {
+              "kind": "curvetosupportatoken",
+              "x": 18.82874,
+              "y": -5.33441
+            },
+            {
+              "kind": "curvetosupportbtoken",
+              "x": 19.45184,
+              "y": -9.768
+            },
+            {
+              "kind": "curvetotoken",
+              "x": 17.10156,
+              "y": -12.88693
+            },
+            {
+              "kind": "curvetosupportatoken",
+              "x": 14.75128,
+              "y": -16.00586
+            },
+            {
+              "kind": "curvetosupportbtoken",
+              "x": 10.31769,
+              "y": -16.62897
+            },
+            {
+              "kind": "curvetotoken",
+              "x": 7.19876,
+              "y": -14.27869
+            },
+            {
+              "kind": "closepathtoken",
+              "x": -4.50336,
+              "y": -5.46053
+            },
+            {
+              "kind": "movetotoken",
+              "x": 7.19876,
+              "y": -14.27869
+            },
+            {
+              "kind": "curvetosupportatoken",
+              "x": 4.07983,
+              "y": -11.9284
+            },
+            {
+              "kind": "curvetosupportbtoken",
+              "x": 3.45673,
+              "y": -7.49481
+            },
+            {
+              "kind": "curvetotoken",
+              "x": 5.807,
+              "y": -4.37589
+            },
+            {
+              "kind": "curvetosupportatoken",
+              "x": 8.15729,
+              "y": -1.25696
+            },
+            {
+              "kind": "curvetosupportbtoken",
+              "x": 12.59088,
+              "y": -0.63385
+            },
+            {
+              "kind": "curvetotoken",
+              "x": 15.70981,
+              "y": -2.98413
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "folded-unequal-signed-outer",
+      "shape": "cylinder",
+      "body": {
+        "width": 0,
+        "height": 0,
+        "depth": 0
+      },
+      "innerXSep": -30,
+      "innerYSep": 5,
+      "outerXSep": -2,
+      "outerYSep": -1,
+      "minimumWidth": 1,
+      "minimumHeight": 1,
+      "lineWidth": 0.4,
+      "anchors": [
+        "center",
+        "text",
+        "base",
+        "mid",
+        "east",
+        "north east",
+        "north",
+        "north west",
+        "west",
+        "south west",
+        "south",
+        "south east",
+        "base east",
+        "base west",
+        "mid east",
+        "mid west",
+        "shape center",
+        "before top",
+        "top",
+        "after top",
+        "before bottom",
+        "bottom",
+        "after bottom"
+      ],
+      "exitCode": 0,
+      "command": [
+        "/Library/TeX/texbin/pdflatex",
+        "-no-shell-escape",
+        "-interaction=nonstopmode",
+        "-halt-on-error",
+        "fixed-box.tex"
+      ],
+      "artifacts": {
+        "input": "controls/folded-unequal-signed-outer/fixed-box.tex",
+        "geometry": "controls/folded-unequal-signed-outer/geometry.txt",
+        "compilation": "controls/folded-unequal-signed-outer/compilation.txt",
+        "compilerLog": "controls/folded-unequal-signed-outer/fixed-box.log"
+      },
+      "expectedStages": {
+        "innerXSp": -1966080,
+        "innerYSp": 327680,
+        "initialXSp": -1966080,
+        "initialYSp": 327680,
+        "fittedXSp": -1966080,
+        "fittedYSp": 327680,
+        "transverseInnerSepSp": 327680,
+        "minimumWidthSp": 65536,
+        "divisorSp": 327680,
+        "bodyWidthHalfSp": 0,
+        "bodyHeightHalfSp": 0,
+        "bodyDepthHalfSp": 0,
+        "minimumWidthHalfSp": 32768
+      },
+      "expectedAnchors": {
+        "center": {
+          "x": 0,
+          "y": 0
+        },
+        "text": {
+          "x": 0,
+          "y": 0
+        },
+        "base": {
+          "x": 0,
+          "y": 0
+        },
+        "mid": {
+          "x": 0,
+          "y": -2.15277
+        },
+        "east": {
+          "x": 4.59993,
+          "y": -0.00073
+        },
+        "north east": {
+          "x": 5.6,
+          "y": 0
+        },
+        "north": {
+          "x": 5.6,
+          "y": 0
+        },
+        "north west": {
+          "x": 5.6,
+          "y": 0
+        },
+        "west": {
+          "x": 6.77158,
+          "y": 2.82843
+        },
+        "south west": {
+          "x": 6.77158,
+          "y": 2.82843
+        },
+        "south": {
+          "x": 6.77158,
+          "y": 2.82843
+        },
+        "south east": {
+          "x": 6.77158,
+          "y": 2.82843
+        },
+        "base east": {
+          "x": 4.59993,
+          "y": -0.00073
+        },
+        "base west": {
+          "x": 6.77158,
+          "y": 2.82843
+        },
+        "mid east": {
+          "x": 6.77158,
+          "y": -2.82843
+        },
+        "mid west": {
+          "x": 5.6,
+          "y": 0
+        },
+        "shape center": {
+          "x": 5.09999,
+          "y": 0
+        },
+        "before top": {
+          "x": 0.59999,
+          "y": -4
+        },
+        "top": {
+          "x": 4.59999,
+          "y": 0
+        },
+        "after top": {
+          "x": 0.59999,
+          "y": 4
+        },
+        "before bottom": {
+          "x": 9.6,
+          "y": 4
+        },
+        "bottom": {
+          "x": 5.6,
+          "y": 0
+        },
+        "after bottom": {
+          "x": 9.6,
+          "y": -4
+        }
+      },
+      "paints": [
+        {
+          "action": "stroke",
+          "tokens": [
+            {
+              "kind": "movetotoken",
+              "x": 9.6,
+              "y": -5
+            },
+            {
+              "kind": "curvetosupportatoken",
+              "x": 6.83855,
+              "y": -5
+            },
+            {
+              "kind": "curvetosupportbtoken",
+              "x": 4.6,
+              "y": -2.76146
+            },
+            {
+              "kind": "curvetotoken",
+              "x": 4.6,
+              "y": 0
+            },
+            {
+              "kind": "curvetosupportatoken",
+              "x": 4.6,
+              "y": 2.76146
+            },
+            {
+              "kind": "curvetosupportbtoken",
+              "x": 6.83855,
+              "y": 5
+            },
+            {
+              "kind": "curvetotoken",
+              "x": 9.6,
+              "y": 5
+            },
+            {
+              "kind": "linetotoken",
+              "x": 0.59999,
+              "y": 5
+            },
+            {
+              "kind": "curvetosupportatoken",
+              "x": 3.36145,
+              "y": 5
+            },
+            {
+              "kind": "curvetosupportbtoken",
+              "x": 5.59999,
+              "y": 2.76146
+            },
+            {
+              "kind": "curvetotoken",
+              "x": 5.59999,
+              "y": 0
+            },
+            {
+              "kind": "curvetosupportatoken",
+              "x": 5.59999,
+              "y": -2.76146
+            },
+            {
+              "kind": "curvetosupportbtoken",
+              "x": 3.36145,
+              "y": -5
+            },
+            {
+              "kind": "curvetotoken",
+              "x": 0.59999,
+              "y": -5
+            },
+            {
+              "kind": "closepathtoken",
+              "x": 9.6,
+              "y": -5
+            },
+            {
+              "kind": "movetotoken",
+              "x": 0.59999,
+              "y": -5
+            },
+            {
+              "kind": "curvetosupportatoken",
+              "x": -2.16147,
+              "y": -5
+            },
+            {
+              "kind": "curvetosupportbtoken",
+              "x": -4.40001,
+              "y": -2.76146
+            },
+            {
+              "kind": "curvetotoken",
+              "x": -4.40001,
+              "y": 0
+            },
+            {
+              "kind": "curvetosupportatoken",
+              "x": -4.40001,
+              "y": 2.76146
+            },
+            {
+              "kind": "curvetosupportbtoken",
+              "x": -2.16147,
+              "y": 5
+            },
+            {
+              "kind": "curvetotoken",
+              "x": 0.59999,
+              "y": 5
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "contextual-em-tie",
+      "shape": "cylinder",
+      "body": {
+        "width": 0,
+        "height": 0,
+        "depth": 0
+      },
+      "innerXSep": 0,
+      "innerYSep": 0.0000762939453125,
+      "outerXSep": 0,
+      "outerYSep": 0,
+      "minimumWidth": 0,
+      "minimumHeight": 0,
+      "lineWidth": 0.4,
+      "anchors": [
+        "center",
+        "text",
+        "base",
+        "mid",
+        "shape center",
+        "top",
+        "bottom",
+        "west"
+      ],
+      "sources": {
+        "innerYSep": "0.00000762939453125em"
+      },
+      "dimensionSources": {
+        "innerYSep": {
+          "source": "0.00000762939453125em",
+          "unit": "em",
+          "texPoints": 0.0000762939453125,
+          "fontContext": {
+            "fontSizePt": 10,
+            "xHeightPt": 4.30554
+          }
+        }
+      },
+      "exitCode": 0,
+      "command": [
+        "/Library/TeX/texbin/pdflatex",
+        "-no-shell-escape",
+        "-interaction=nonstopmode",
+        "-halt-on-error",
+        "fixed-box.tex"
+      ],
+      "artifacts": {
+        "input": "controls/contextual-em-tie/fixed-box.tex",
+        "geometry": "controls/contextual-em-tie/geometry.txt",
+        "compilation": "controls/contextual-em-tie/compilation.txt",
+        "compilerLog": "controls/contextual-em-tie/fixed-box.log"
+      },
+      "expectedStages": {
+        "innerXSp": 0,
+        "innerYSp": 10,
+        "initialXSp": 0,
+        "initialYSp": 10,
+        "fittedXSp": 0,
+        "fittedYSp": 10,
+        "transverseInnerSepSp": 10,
+        "minimumWidthSp": 0,
+        "divisorSp": 10,
+        "bodyWidthHalfSp": 0,
+        "bodyHeightHalfSp": 0,
+        "bodyDepthHalfSp": 0,
+        "minimumWidthHalfSp": 0
+      },
+      "expectedAnchors": {
+        "center": {
+          "x": 0,
+          "y": 0
+        },
+        "text": {
+          "x": 0,
+          "y": 0
+        },
+        "base": {
+          "x": 0,
+          "y": 0
+        },
+        "mid": {
+          "x": 0,
+          "y": -2.15277
+        },
+        "shape center": {
+          "x": 0.10014,
+          "y": 0
+        },
+        "top": {
+          "x": 0.2003,
+          "y": 0
+        },
+        "bottom": {
+          "x": 0,
+          "y": 0
+        },
+        "west": {
+          "x": 0.20026,
+          "y": 0.0001
+        }
+      },
+      "paints": [
+        {
+          "action": "stroke",
+          "tokens": [
+            {
+              "kind": "movetotoken",
+              "x": 0.00015,
+              "y": -0.00015
+            },
+            {
+              "kind": "curvetosupportatoken",
+              "x": 0.00008,
+              "y": -0.00015
+            },
+            {
+              "kind": "curvetosupportbtoken",
+              "x": 0,
+              "y": -0.00008
+            },
+            {
+              "kind": "curvetotoken",
+              "x": 0,
+              "y": 0
+            },
+            {
+              "kind": "curvetosupportatoken",
+              "x": 0,
+              "y": 0.00008
+            },
+            {
+              "kind": "curvetosupportbtoken",
+              "x": 0.00008,
+              "y": 0.00015
+            },
+            {
+              "kind": "curvetotoken",
+              "x": 0.00015,
+              "y": 0.00015
+            },
+            {
+              "kind": "linetotoken",
+              "x": 0.20015,
+              "y": 0.00015
+            },
+            {
+              "kind": "curvetosupportatoken",
+              "x": 0.20023,
+              "y": 0.00015
+            },
+            {
+              "kind": "curvetosupportbtoken",
+              "x": 0.2003,
+              "y": 0.00008
+            },
+            {
+              "kind": "curvetotoken",
+              "x": 0.2003,
+              "y": 0
+            },
+            {
+              "kind": "curvetosupportatoken",
+              "x": 0.2003,
+              "y": -0.00008
+            },
+            {
+              "kind": "curvetosupportbtoken",
+              "x": 0.20023,
+              "y": -0.00015
+            },
+            {
+              "kind": "curvetotoken",
+              "x": 0.20015,
+              "y": -0.00015
+            },
+            {
+              "kind": "closepathtoken",
+              "x": 0.00015,
+              "y": -0.00015
+            },
+            {
+              "kind": "movetotoken",
+              "x": 0.20015,
+              "y": -0.00015
+            },
+            {
+              "kind": "curvetosupportatoken",
+              "x": 0.20007,
+              "y": -0.00015
+            },
+            {
+              "kind": "curvetosupportbtoken",
+              "x": 0.2,
+              "y": -0.00008
+            },
+            {
+              "kind": "curvetotoken",
+              "x": 0.2,
+              "y": 0
+            },
+            {
+              "kind": "curvetosupportatoken",
+              "x": 0.2,
+              "y": 0.00008
+            },
+            {
+              "kind": "curvetosupportbtoken",
+              "x": 0.20007,
+              "y": 0.00015
+            },
+            {
+              "kind": "curvetotoken",
+              "x": 0.20015,
+              "y": 0.00015
+            }
+          ]
+        }
+      ]
+    }
+  ],
+  "nonzeroDomain": [
+    {
+      "id": "positive-tie",
+      "shape": "cylinder",
+      "body": {
+        "width": 0,
+        "height": 0,
+        "depth": 0
+      },
+      "innerXSep": 0,
+      "innerYSep": 0.00000762939453125,
+      "outerXSep": 0,
+      "outerYSep": 0,
+      "minimumWidth": 0,
+      "minimumHeight": 0,
+      "lineWidth": 0.4,
+      "anchors": [
+        "center",
+        "text",
+        "base",
+        "mid",
+        "shape center",
+        "top",
+        "bottom",
+        "west"
+      ],
+      "exitCode": 1,
+      "command": [
+        "/Library/TeX/texbin/pdflatex",
+        "-no-shell-escape",
+        "-interaction=nonstopmode",
+        "-halt-on-error",
+        "fixed-box.tex"
+      ],
+      "artifacts": {
+        "input": "failures/positive-tie/fixed-box.tex",
+        "geometry": "failures/positive-tie/geometry.txt",
+        "compilation": "failures/positive-tie/compilation.txt",
+        "compilerLog": "failures/positive-tie/fixed-box.log"
+      },
+      "expectedError": "Dimension too large",
+      "expectedStages": {
+        "innerXSp": 0,
+        "innerYSp": 1,
+        "initialXSp": 0,
+        "initialYSp": 1,
+        "fittedXSp": 0,
+        "fittedYSp": 1,
+        "transverseInnerSepSp": 1,
+        "minimumWidthSp": 0,
+        "divisorSp": 1,
+        "bodyWidthHalfSp": 0,
+        "bodyHeightHalfSp": 0,
+        "bodyDepthHalfSp": 0,
+        "minimumWidthHalfSp": 0
+      },
+      "expectedAnchors": {},
+      "paints": []
+    },
+    {
+      "id": "negative-tie",
+      "shape": "cylinder",
+      "body": {
+        "width": 0,
+        "height": 0,
+        "depth": 0
+      },
+      "innerXSep": 0,
+      "innerYSep": -0.00000762939453125,
+      "outerXSep": 0,
+      "outerYSep": 0,
+      "minimumWidth": -20,
+      "minimumHeight": -20,
+      "lineWidth": 0.4,
+      "anchors": [
+        "center",
+        "text",
+        "base",
+        "mid",
+        "bottom"
+      ],
+      "exitCode": 1,
+      "command": [
+        "/Library/TeX/texbin/pdflatex",
+        "-no-shell-escape",
+        "-interaction=nonstopmode",
+        "-halt-on-error",
+        "fixed-box.tex"
+      ],
+      "artifacts": {
+        "input": "failures/negative-tie/fixed-box.tex",
+        "geometry": "failures/negative-tie/geometry.txt",
+        "compilation": "failures/negative-tie/compilation.txt",
+        "compilerLog": "failures/negative-tie/fixed-box.log"
+      },
+      "expectedError": "Dimension too large",
+      "expectedStages": {
+        "innerXSp": 0,
+        "innerYSp": -1,
+        "initialXSp": 0,
+        "initialYSp": -1,
+        "fittedXSp": 0,
+        "fittedYSp": -1,
+        "transverseInnerSepSp": -1,
+        "minimumWidthSp": -1310720,
+        "divisorSp": -1,
+        "bodyWidthHalfSp": 0,
+        "bodyHeightHalfSp": 0,
+        "bodyDepthHalfSp": 0,
+        "minimumWidthHalfSp": -655360
+      },
+      "expectedAnchors": {},
+      "paints": []
+    },
+    {
+      "id": "positive-first-sp",
+      "shape": "cylinder",
+      "body": {
+        "width": 0,
+        "height": 0,
+        "depth": 0
+      },
+      "innerXSep": 0,
+      "innerYSep": 0.0000152587890625,
+      "outerXSep": 0,
+      "outerYSep": 0,
+      "minimumWidth": 0,
+      "minimumHeight": 0,
+      "lineWidth": 0.4,
+      "anchors": [
+        "center",
+        "text",
+        "base",
+        "mid",
+        "shape center",
+        "top",
+        "bottom",
+        "west"
+      ],
+      "exitCode": 1,
+      "command": [
+        "/Library/TeX/texbin/pdflatex",
+        "-no-shell-escape",
+        "-interaction=nonstopmode",
+        "-halt-on-error",
+        "fixed-box.tex"
+      ],
+      "artifacts": {
+        "input": "failures/positive-first-sp/fixed-box.tex",
+        "geometry": "failures/positive-first-sp/geometry.txt",
+        "compilation": "failures/positive-first-sp/compilation.txt",
+        "compilerLog": "failures/positive-first-sp/fixed-box.log"
+      },
+      "expectedError": "Dimension too large",
+      "expectedStages": {
+        "innerXSp": 0,
+        "innerYSp": 1,
+        "initialXSp": 0,
+        "initialYSp": 1,
+        "fittedXSp": 0,
+        "fittedYSp": 1,
+        "transverseInnerSepSp": 1,
+        "minimumWidthSp": 0,
+        "divisorSp": 1,
+        "bodyWidthHalfSp": 0,
+        "bodyHeightHalfSp": 0,
+        "bodyDepthHalfSp": 0,
+        "minimumWidthHalfSp": 0
+      },
+      "expectedAnchors": {},
+      "paints": []
+    },
+    {
+      "id": "negative-first-sp",
+      "shape": "cylinder",
+      "body": {
+        "width": 0,
+        "height": 0,
+        "depth": 0
+      },
+      "innerXSep": 0,
+      "innerYSep": -0.0000152587890625,
+      "outerXSep": 0,
+      "outerYSep": 0,
+      "minimumWidth": -20,
+      "minimumHeight": -20,
+      "lineWidth": 0.4,
+      "anchors": [
+        "center",
+        "text",
+        "base",
+        "mid",
+        "bottom"
+      ],
+      "exitCode": 1,
+      "command": [
+        "/Library/TeX/texbin/pdflatex",
+        "-no-shell-escape",
+        "-interaction=nonstopmode",
+        "-halt-on-error",
+        "fixed-box.tex"
+      ],
+      "artifacts": {
+        "input": "failures/negative-first-sp/fixed-box.tex",
+        "geometry": "failures/negative-first-sp/geometry.txt",
+        "compilation": "failures/negative-first-sp/compilation.txt",
+        "compilerLog": "failures/negative-first-sp/fixed-box.log"
+      },
+      "expectedError": "Dimension too large",
+      "expectedStages": {
+        "innerXSp": 0,
+        "innerYSp": -1,
+        "initialXSp": 0,
+        "initialYSp": -1,
+        "fittedXSp": 0,
+        "fittedYSp": -1,
+        "transverseInnerSepSp": -1,
+        "minimumWidthSp": -1310720,
+        "divisorSp": -1,
+        "bodyWidthHalfSp": 0,
+        "bodyHeightHalfSp": 0,
+        "bodyDepthHalfSp": 0,
+        "minimumWidthHalfSp": -655360
+      },
+      "expectedAnchors": {},
+      "paints": []
+    },
+    {
+      "id": "minimum-two-sp",
+      "shape": "cylinder",
+      "body": {
+        "width": 0,
+        "height": 0,
+        "depth": 0
+      },
+      "innerXSep": 0,
+      "innerYSep": 0,
+      "outerXSep": 0,
+      "outerYSep": 0,
+      "minimumWidth": 0.000030517578125,
+      "minimumHeight": 0,
+      "lineWidth": 0.4,
+      "anchors": [
+        "center",
+        "text",
+        "base",
+        "mid",
+        "shape center",
+        "top",
+        "bottom",
+        "west"
+      ],
+      "exitCode": 1,
+      "command": [
+        "/Library/TeX/texbin/pdflatex",
+        "-no-shell-escape",
+        "-interaction=nonstopmode",
+        "-halt-on-error",
+        "fixed-box.tex"
+      ],
+      "artifacts": {
+        "input": "failures/minimum-two-sp/fixed-box.tex",
+        "geometry": "failures/minimum-two-sp/geometry.txt",
+        "compilation": "failures/minimum-two-sp/compilation.txt",
+        "compilerLog": "failures/minimum-two-sp/fixed-box.log"
+      },
+      "expectedError": "Dimension too large",
+      "expectedStages": {
+        "innerXSp": 0,
+        "innerYSp": 0,
+        "initialXSp": 0,
+        "initialYSp": 0,
+        "fittedXSp": 0,
+        "fittedYSp": 0,
+        "transverseInnerSepSp": 0,
+        "minimumWidthSp": 2,
+        "divisorSp": 1,
+        "bodyWidthHalfSp": 0,
+        "bodyHeightHalfSp": 0,
+        "bodyDepthHalfSp": 0,
+        "minimumWidthHalfSp": 1
+      },
+      "expectedAnchors": {},
+      "paints": []
+    },
+    {
+      "id": "half-height-two-sp",
+      "shape": "cylinder",
+      "body": {
+        "width": 0,
+        "height": 0.000030517578125,
+        "depth": 0
+      },
+      "innerXSep": 0,
+      "innerYSep": 0,
+      "outerXSep": 0,
+      "outerYSep": 0,
+      "minimumWidth": 0,
+      "minimumHeight": 0,
+      "lineWidth": 0.4,
+      "anchors": [
+        "center",
+        "text",
+        "base",
+        "mid",
+        "shape center",
+        "top",
+        "bottom",
+        "west"
+      ],
+      "exitCode": 1,
+      "command": [
+        "/Library/TeX/texbin/pdflatex",
+        "-no-shell-escape",
+        "-interaction=nonstopmode",
+        "-halt-on-error",
+        "fixed-box.tex"
+      ],
+      "artifacts": {
+        "input": "failures/half-height-two-sp/fixed-box.tex",
+        "geometry": "failures/half-height-two-sp/geometry.txt",
+        "compilation": "failures/half-height-two-sp/compilation.txt",
+        "compilerLog": "failures/half-height-two-sp/fixed-box.log"
+      },
+      "expectedError": "Dimension too large",
+      "expectedStages": {
+        "innerXSp": 0,
+        "innerYSp": 0,
+        "initialXSp": 0,
+        "initialYSp": 1,
+        "fittedXSp": 0,
+        "fittedYSp": 1,
+        "transverseInnerSepSp": 0,
+        "minimumWidthSp": 0,
+        "divisorSp": 1,
+        "bodyWidthHalfSp": 0,
+        "bodyHeightHalfSp": 1,
+        "bodyDepthHalfSp": 0,
+        "minimumWidthHalfSp": 0
+      },
+      "expectedAnchors": {},
+      "paints": []
+    },
+    {
+      "id": "separate-half-products-survive",
+      "shape": "cylinder",
+      "body": {
+        "width": 0,
+        "height": 0.0000457763671875,
+        "depth": 0.0000457763671875
+      },
+      "innerXSep": 0,
+      "innerYSep": -0.0000152587890625,
+      "outerXSep": 0,
+      "outerYSep": 0,
+      "minimumWidth": 0,
+      "minimumHeight": 0,
+      "lineWidth": 0.4,
+      "anchors": [
+        "center",
+        "text",
+        "base",
+        "mid",
+        "shape center",
+        "top",
+        "bottom",
+        "west"
+      ],
+      "exitCode": 1,
+      "command": [
+        "/Library/TeX/texbin/pdflatex",
+        "-no-shell-escape",
+        "-interaction=nonstopmode",
+        "-halt-on-error",
+        "fixed-box.tex"
+      ],
+      "artifacts": {
+        "input": "failures/separate-half-products-survive/fixed-box.tex",
+        "geometry": "failures/separate-half-products-survive/geometry.txt",
+        "compilation": "failures/separate-half-products-survive/compilation.txt",
+        "compilerLog": "failures/separate-half-products-survive/fixed-box.log"
+      },
+      "expectedError": "Dimension too large",
+      "expectedStages": {
+        "innerXSp": 0,
+        "innerYSp": -1,
+        "initialXSp": 0,
+        "initialYSp": 1,
+        "fittedXSp": 0,
+        "fittedYSp": 1,
+        "transverseInnerSepSp": -1,
+        "minimumWidthSp": 0,
+        "divisorSp": 1,
+        "bodyWidthHalfSp": 0,
+        "bodyHeightHalfSp": 1,
+        "bodyDepthHalfSp": 1,
+        "minimumWidthHalfSp": 0
+      },
+      "expectedAnchors": {},
+      "paints": []
+    },
+    {
+      "id": "rotation90-first-sp",
+      "shape": "cylinder",
+      "body": {
+        "width": 0,
+        "height": 0,
+        "depth": 0
+      },
+      "innerXSep": 0.0000152587890625,
+      "innerYSep": 0,
+      "outerXSep": 0,
+      "outerYSep": 0,
+      "minimumWidth": 0,
+      "minimumHeight": 0,
+      "lineWidth": 0.4,
+      "anchors": [
+        "center",
+        "text",
+        "base",
+        "mid",
+        "shape center",
+        "top",
+        "bottom",
+        "west"
+      ],
+      "parameters": {
+        "borderRotate": 90
+      },
+      "options": [
+        "/pgf/shape border rotate=90"
+      ],
+      "exitCode": 1,
+      "command": [
+        "/Library/TeX/texbin/pdflatex",
+        "-no-shell-escape",
+        "-interaction=nonstopmode",
+        "-halt-on-error",
+        "fixed-box.tex"
+      ],
+      "artifacts": {
+        "input": "failures/rotation90-first-sp/fixed-box.tex",
+        "geometry": "failures/rotation90-first-sp/geometry.txt",
+        "compilation": "failures/rotation90-first-sp/compilation.txt",
+        "compilerLog": "failures/rotation90-first-sp/fixed-box.log"
+      },
+      "expectedError": "Dimension too large",
+      "expectedStages": {
+        "innerXSp": 1,
+        "innerYSp": 0,
+        "initialXSp": 1,
+        "initialYSp": 0,
+        "fittedXSp": 0,
+        "fittedYSp": 1,
+        "transverseInnerSepSp": 1,
+        "minimumWidthSp": 0,
+        "divisorSp": 1,
+        "bodyWidthHalfSp": 0,
+        "bodyHeightHalfSp": 0,
+        "bodyDepthHalfSp": 0,
+        "minimumWidthHalfSp": 0
+      },
+      "expectedAnchors": {},
+      "paints": []
+    },
+    {
+      "id": "rotation270-first-sp",
+      "shape": "cylinder",
+      "body": {
+        "width": 0,
+        "height": 0,
+        "depth": 0
+      },
+      "innerXSep": 0.0000152587890625,
+      "innerYSep": 0,
+      "outerXSep": 0,
+      "outerYSep": 0,
+      "minimumWidth": 0,
+      "minimumHeight": 0,
+      "lineWidth": 0.4,
+      "anchors": [
+        "center",
+        "text",
+        "base",
+        "mid",
+        "shape center",
+        "top",
+        "bottom",
+        "west"
+      ],
+      "parameters": {
+        "borderRotate": 270
+      },
+      "options": [
+        "/pgf/shape border rotate=270"
+      ],
+      "exitCode": 1,
+      "command": [
+        "/Library/TeX/texbin/pdflatex",
+        "-no-shell-escape",
+        "-interaction=nonstopmode",
+        "-halt-on-error",
+        "fixed-box.tex"
+      ],
+      "artifacts": {
+        "input": "failures/rotation270-first-sp/fixed-box.tex",
+        "geometry": "failures/rotation270-first-sp/geometry.txt",
+        "compilation": "failures/rotation270-first-sp/compilation.txt",
+        "compilerLog": "failures/rotation270-first-sp/fixed-box.log"
+      },
+      "expectedError": "Dimension too large",
+      "expectedStages": {
+        "innerXSp": 1,
+        "innerYSp": 0,
+        "initialXSp": 1,
+        "initialYSp": 0,
+        "fittedXSp": 0,
+        "fittedYSp": 1,
+        "transverseInnerSepSp": 1,
+        "minimumWidthSp": 0,
+        "divisorSp": 1,
+        "bodyWidthHalfSp": 0,
+        "bodyHeightHalfSp": 0,
+        "bodyDepthHalfSp": 0,
+        "minimumWidthHalfSp": 0
+      },
+      "expectedAnchors": {},
+      "paints": []
+    },
+    {
+      "id": "incircle-first-sp",
+      "shape": "cylinder",
+      "body": {
+        "width": 0,
+        "height": 0,
+        "depth": 0
+      },
+      "innerXSep": 0.0000152587890625,
+      "innerYSep": 0,
+      "outerXSep": 0,
+      "outerYSep": 0,
+      "minimumWidth": 0,
+      "minimumHeight": 0,
+      "lineWidth": 0.4,
+      "anchors": [
+        "center",
+        "text",
+        "base",
+        "mid",
+        "shape center",
+        "top",
+        "bottom",
+        "west"
+      ],
+      "parameters": {
+        "borderUsesIncircle": true
+      },
+      "options": [
+        "/pgf/shape border uses incircle=true"
+      ],
+      "exitCode": 1,
+      "command": [
+        "/Library/TeX/texbin/pdflatex",
+        "-no-shell-escape",
+        "-interaction=nonstopmode",
+        "-halt-on-error",
+        "fixed-box.tex"
+      ],
+      "artifacts": {
+        "input": "failures/incircle-first-sp/fixed-box.tex",
+        "geometry": "failures/incircle-first-sp/geometry.txt",
+        "compilation": "failures/incircle-first-sp/compilation.txt",
+        "compilerLog": "failures/incircle-first-sp/fixed-box.log"
+      },
+      "expectedError": "Dimension too large",
+      "expectedStages": {
+        "innerXSp": 1,
+        "innerYSp": 0,
+        "initialXSp": 1,
+        "initialYSp": 0,
+        "fittedXSp": 1,
+        "fittedYSp": 1,
+        "transverseInnerSepSp": 0,
+        "minimumWidthSp": 0,
+        "divisorSp": 1,
+        "bodyWidthHalfSp": 0,
+        "bodyHeightHalfSp": 0,
+        "bodyDepthHalfSp": 0,
+        "minimumWidthHalfSp": 0
+      },
+      "expectedAnchors": {},
+      "paints": []
+    },
+    {
+      "id": "contextual-ex-tie",
+      "shape": "cylinder",
+      "body": {
+        "width": 0,
+        "height": 0,
+        "depth": 0
+      },
+      "innerXSep": 0,
+      "innerYSep": 0.00003284866333007812,
+      "outerXSep": 0,
+      "outerYSep": 0,
+      "minimumWidth": 0,
+      "minimumHeight": 0,
+      "lineWidth": 0.4,
+      "anchors": [
+        "center",
+        "text",
+        "base",
+        "mid",
+        "shape center",
+        "top",
+        "bottom",
+        "west"
+      ],
+      "sources": {
+        "innerYSep": "0.00000762939453125ex"
+      },
+      "dimensionSources": {
+        "innerYSep": {
+          "source": "0.00000762939453125ex",
+          "unit": "ex",
+          "texPoints": 0.00003284866333007812,
+          "fontContext": {
+            "fontSizePt": 10,
+            "xHeightPt": 4.30554
+          }
+        }
+      },
+      "exitCode": 1,
+      "command": [
+        "/Library/TeX/texbin/pdflatex",
+        "-no-shell-escape",
+        "-interaction=nonstopmode",
+        "-halt-on-error",
+        "fixed-box.tex"
+      ],
+      "artifacts": {
+        "input": "failures/contextual-ex-tie/fixed-box.tex",
+        "geometry": "failures/contextual-ex-tie/geometry.txt",
+        "compilation": "failures/contextual-ex-tie/compilation.txt",
+        "compilerLog": "failures/contextual-ex-tie/fixed-box.log"
+      },
+      "expectedError": "Dimension too large",
+      "expectedStages": {
+        "innerXSp": 0,
+        "innerYSp": 4,
+        "initialXSp": 0,
+        "initialYSp": 4,
+        "fittedXSp": 0,
+        "fittedYSp": 4,
+        "transverseInnerSepSp": 4,
+        "minimumWidthSp": 0,
+        "divisorSp": 4,
+        "bodyWidthHalfSp": 0,
+        "bodyHeightHalfSp": 0,
+        "bodyDepthHalfSp": 0,
+        "minimumWidthHalfSp": 0
+      },
+      "expectedAnchors": {},
+      "paints": []
+    },
+    {
+      "id": "physical-mm-tie",
+      "shape": "cylinder",
+      "body": {
+        "width": 0,
+        "height": 0,
+        "depth": 0
+      },
+      "innerXSep": 0,
+      "innerYSep": 0.000021707730030450297,
+      "outerXSep": 0,
+      "outerYSep": 0,
+      "minimumWidth": 0,
+      "minimumHeight": 0,
+      "lineWidth": 0.4,
+      "anchors": [
+        "center",
+        "text",
+        "base",
+        "mid",
+        "shape center",
+        "top",
+        "bottom",
+        "west"
+      ],
+      "sources": {
+        "innerYSep": "0.00000762939453125mm"
+      },
+      "dimensionSources": {
+        "innerYSep": {
+          "source": "0.00000762939453125mm",
+          "unit": "mm",
+          "texPoints": 0.000021707730030450297
+        }
+      },
+      "exitCode": 1,
+      "command": [
+        "/Library/TeX/texbin/pdflatex",
+        "-no-shell-escape",
+        "-interaction=nonstopmode",
+        "-halt-on-error",
+        "fixed-box.tex"
+      ],
+      "artifacts": {
+        "input": "failures/physical-mm-tie/fixed-box.tex",
+        "geometry": "failures/physical-mm-tie/geometry.txt",
+        "compilation": "failures/physical-mm-tie/compilation.txt",
+        "compilerLog": "failures/physical-mm-tie/fixed-box.log"
+      },
+      "expectedError": "Dimension too large",
+      "expectedStages": {
+        "innerXSp": 0,
+        "innerYSp": 2,
+        "initialXSp": 0,
+        "initialYSp": 2,
+        "fittedXSp": 0,
+        "fittedYSp": 2,
+        "transverseInnerSepSp": 2,
+        "minimumWidthSp": 0,
+        "divisorSp": 2,
+        "bodyWidthHalfSp": 0,
+        "bodyHeightHalfSp": 0,
+        "bodyDepthHalfSp": 0,
+        "minimumWidthHalfSp": 0
+      },
+      "expectedAnchors": {},
+      "paints": []
+    }
+  ]
+}

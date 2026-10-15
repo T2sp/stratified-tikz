@@ -1773,7 +1773,7 @@ review. 32B completed matching strict verification (4,550 tests and all 16
 browser groups), native transfer/SVG reopening and independent review, then
 was merged into main. This takes precedence over the incoming 32C branch's
 earlier [32B deferrals](../prompts/phase-32b-fix.md); those failed records remain
-historical. 32D remains planned.
+historical. 32D implementation is in progress; Phase 32 completion remains open.
 All eleven shapes and parameters now have implementation paths; fresh native
 acceptance and independent review of the combined 32C checkout remain required.
 See the
@@ -1814,3 +1814,14 @@ Phase 32A adds no schema or TikZ changes; it does not implement later stages.
 See [32A verification and handoff](PHASE_32A_IMPLEMENTATION.md) for executed checks
 and historical handoffs. The four slugs are registered. 32B adds
 `point-node-paint-import-persistence` to the cumulative 31F and 32A requirements.
+
+32D adds explicit ordered spacing/minimum values and source-unit metadata,
+shape-specific anchor clearance, noncentral placement, and the cumulative
+`point-node-layout-anchors-combined` native matrix. Its strict parent policy
+requires all eighteen groups and rejects historical 31F/32C reports, started
+scenarios, missing artifacts and checkout mismatch. Independent fixed-box PGF
+anchor references remain separate from actual MathJax/native font evidence.
+Child localhost `EPERM` leaves browser and standalone downloaded SVG execution
+pending for the browser-capable parent. Fresh required commands and independent
+review must pass before 32D or Phase 32 can be marked complete. See the
+[current combined audit and handoff](PHASE_32D_IMPLEMENTATION.md).

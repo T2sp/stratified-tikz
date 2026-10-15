@@ -1,0 +1,64 @@
+% ----------------------------------------------------------------------------
+% Styles and colors
+% ----------------------------------------------------------------------------
+
+% Required TikZ libraries for non-circular point shapes:
+% \usetikzlibrary{shapes.geometric,shapes.symbols}
+
+\definecolor{stzPointreviewnegativestarFill}{HTML}{000000}
+\definecolor{stzPointreviewnegativestarStroke}{HTML}{000000}
+\definecolor{stzPointreviewnegativestarText}{HTML}{000000}
+\pgfdeclarelayer{stratifiedLayer0}
+\pgfsetlayers{stratifiedLayer0,main}
+
+\begin{tikzpicture}[
+    line cap=round,
+    line join=round
+]
+
+    % ----------------------------------------------------------------------------
+    % Coordinates
+    % ----------------------------------------------------------------------------
+
+    \coordinate (pointPoint0p0) at (1,2);
+
+    % ----------------------------------------------------------------------------
+    % Layered drawing commands
+    % ----------------------------------------------------------------------------
+
+    % Layer 0: stratifiedLayer0
+    \begin{pgfonlayer}{stratifiedLayer0}
+        %----------------------------------------
+        % Codimension 2 strata: points
+        %----------------------------------------
+        \node[
+            star,
+            star points=5,
+            fill=stzPointreviewnegativestarFill,
+            draw=stzPointreviewnegativestarStroke,
+            text=stzPointreviewnegativestarText,
+            fill opacity=1,
+            draw opacity=1,
+            text opacity=1,
+            line width=0.4pt,
+            solid,
+            dash phase=0pt,
+            line cap=butt,
+            line join=miter,
+            inner sep=1.5pt,
+            inner xsep=-30pt,
+            inner ysep=-30pt,
+            outer xsep=3pt,
+            outer ysep=3pt,
+            minimum width=-20pt,
+            minimum height=-20pt,
+            anchor=outer point 1
+        ] at (pointPoint0p0) {};
+
+    \end{pgfonlayer}
+
+    % Codimension 0 strata: regions
+    % Codimension 1 strata: curves
+    % Labels
+
+\end{tikzpicture}

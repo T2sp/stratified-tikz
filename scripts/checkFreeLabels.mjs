@@ -1,5 +1,8 @@
 import { phase32cProfile, resolveVerificationProfile, mechanismNotRun } from './automation/phase32c-profile.mjs'
 import { runPointNodeGeometricShapeChecks } from './checkPointNodeGeometricShapes.mjs'
+import { runPointLayoutAnchorChecks } from './checkPointLayoutAnchors.mjs'
+import { layoutAnchorGroup } from './pointLayoutAnchorsContract.mjs'
+import { createEvidenceReportStorage } from './evidencePublication.mjs'
 /**
  * Actual-browser Phase 31C checks against production SvgDiagram and its event
  * handlers. Uses the existing external-Playwright convention; adds no package.
@@ -8,6 +11,7 @@ import { runPointNodeGeometricShapeChecks } from './checkPointNodeGeometricShape
  * STZ_BROWSER_EXECUTABLE=/absolute/path/to/chrome node scripts/checkFreeLabels.mjs
  */
 import assert from 'node:assert/strict'
+import { isZeroAxisLiveCaptureFailure } from './zeroAxisLiveCaptureWorkflow.mjs'
 import { mkdir, writeFile } from 'node:fs/promises'
 import { isAbsolute, resolve } from 'node:path'
 import { pathToFileURL } from 'node:url'
@@ -38,7 +42,7 @@ const scenarios = [
   'inline-node-rendering-placement-halo-picking', 'inline-node-lifecycle-path-operations-export',
   'settled-SVG-export-standalone',
   'combined-free-inline-workflows',
-  ...Object.keys(pointNodeScenarios),
+  ...Object.keys(pointNodeScenarios).filter((group) => profile !== phase32cProfile || group !== layoutAnchorGroup),
 ]
 const completed = []
 const started = []
@@ -55,14 +59,17 @@ let browser, server, page
 let stage = 'playwright-import'
 let checkpoint = null
 let primaryFailure
-async function save(result, error) {
-  await writeFile(resolve(artifactDir, 'free-labels-evidence.json'), JSON.stringify({ result, stage, environment, checkout, profile,
+const reportStorage = createEvidenceReportStorage({ artifactDir, checkout })
+async function save(result, error, options = {}) {
+  options.operation?.assertActive('report checkpoint start')
+  if (error) reportStorage.publisher.fail(error, options)
+  await reportStorage.save({ result, stage, environment, checkout, profile,
     deferredScenarios: profile === phase32cProfile ? [mechanismNotRun()] : [],
     checkpoint, started, checkpoints, completed, incompleteGroups: scenarios.filter((name) => !completed.includes(name)),
     unexecuted: scenarios.filter((name) => !started.includes(name)),
     coverageNote: 'Started/checkpoints and diagnostics describe execution, not passing assertions. Evidence records passed scenarios; groups complete only after all their assertions return.',
     diagnostics, evidence, pageErrors,
-    error: error ? { message: error.message, stack: error.stack, code: error.code } : undefined }, null, 2) + '\n')
+    error: error ? { message: error.message, stack: error.stack, code: error.code } : undefined }, options)
 }
 async function startGroup(group, name = group) {
   assert.ok(scenarios.includes(group), `Known scenario group: ${group}`)
@@ -81,11 +88,15 @@ async function completeGroup(group) {
   completed.push(group)
   await save('running')
 }
-async function observe(name, details) {
+async function observe(name, details, options = {}) {
+  options.operation?.assertActive('observation checkpoint start')
+  const observation = reportStorage.capture({ name, ...details }, options)
+  options.operation?.assertActive('observation checkpoint mutation')
   checkpoint = { group: details.group ?? checkpoint?.group, name }
   checkpoints.push(checkpoint)
-  diagnostics.push({ name, ...details })
-  await save('running')
+  diagnostics.push(observation)
+  await save(options.disposition === 'failed' ? 'failed' : 'running',
+    options.disposition === 'failed' ? options.primary ?? primaryFailure ?? reportStorage.publisher.primary : undefined, options)
 }
 function secondaryFailure(name, error) {
   diagnostics.push({ name, error: { message: error.message, stack: error.stack } })
@@ -149,10 +160,13 @@ try {
     assert.ok(found, `Rendered label ${id} exists`)
     await page.mouse.click(found.rect.x + found.rect.width / 2, found.rect.y + found.rect.height / 2)
   }
-  async function record(name, details = {}) {
-    evidence.push({ name, ...details })
+  async function record(name, details = {}, options = {}) {
+    options.operation?.assertActive('accepted scenario checkpoint start')
+    const observation = reportStorage.capture({ name, ...details }, options)
+    options.operation?.assertActive('accepted scenario checkpoint mutation')
+    evidence.push(observation)
     console.log(JSON.stringify({ result: 'passed', name }))
-    await save('running')
+    await save('running', undefined, options)
   }
 
   const fallbackSource = '  "<>&"  \\textbf{bad}\t keep \\slash\r\n tail  '
@@ -478,6 +492,8 @@ try {
   await runPointNodePaintChecks({ page, browser, origin, record, observe, artifactDir, startGroup, completeGroup, profile,
     setStage: (value) => { stage = value } })
   await runPointNodeGeometricShapeChecks({ browser, origin, record, observe, artifactDir, startGroup, completeGroup, setStage: (value) => { stage = value } })
+  if (profile !== phase32cProfile) await runPointLayoutAnchorChecks({ browser, origin, record, observe, artifactDir, startGroup, completeGroup,
+    evidencePublisher: reportStorage.publisher, setStage: (value) => { stage = value } })
   stage = 'settled-SVG-export-standalone'
   await startGroup('settled-SVG-export-standalone')
   await runSettledSvgVisibilityChecks({ browser, page, record, observe, artifactDir })
@@ -493,7 +509,7 @@ try {
   // rejects. No diagnostic or teardown error may replace the scenario error.
   await saveFailure()
   console.error(`Free-label browser acceptance failed at ${stage}; evidence: ${artifactDir}`)
-  if (page) {
+  if (page && !isZeroAxisLiveCaptureFailure(error)) {
     try {
       await page.screenshot({ path: resolve(artifactDir, 'failure.png'), fullPage: false, timeout: 5_000 })
     } catch (screenshotError) {

@@ -22,6 +22,12 @@ function pointText(point: Vec2): string {
   return `${number(point.x)} ${number(point.y)}`
 }
 
+/** Signed PGF axes and the Y reflection determine the SVG traversal direction. */
+function svgArcSweep(rx: number, ry: number, from: number, to: number): 0 | 1 {
+  const axisReflection = (rx < 0) !== (ry < 0)
+  return (to > from) === axisReflection ? 1 : 0
+}
+
 export function boundsOfPoints(points: readonly Vec2[]): PointShapeBounds {
   let minX = Infinity
   let minY = Infinity
@@ -68,11 +74,31 @@ export class ShapeContourBuilder {
       const from = start + ((end - start) * part) / parts
       const to = start + ((end - start) * (part + 1)) / parts
       const target = svgPoint(ellipsePoint(center, rx, ry, to), this.rotation)
-      this.commands.push(
-        `A ${number(rx)} ${number(ry)} ${number(-this.rotation)} 0 ${to > from ? 0 : 1} ${pointText(target)}`,
-      )
+      const degenerateTurns: number[] = []
+      if (rx === 0 || ry === 0) {
+        // A zero-radius SVG arc is a line to its endpoint; coincident endpoints
+        // omit it altogether. PGF's collapsed ellipse still travels to each
+        // intervening extremum and retraces the axis. Retain that ordered path
+        // (including quarter boundaries) for stroke length, dash phase and joins.
+        const low = Math.min(from, to)
+        const high = Math.max(from, to)
+        const firstQuarter = Math.floor(low / 90) + 1
+        // Each part spans at most 180 degrees, hence at most two quarter cuts.
+        for (let index = 0; index < 2; index += 1) {
+          const angle = (firstQuarter + index) * 90
+          if (angle > low && angle < high) degenerateTurns.push(angle)
+        }
+        if (to < from) degenerateTurns.reverse()
+        for (const angle of [...degenerateTurns, to]) {
+          this.commands.push(`L ${pointText(svgPoint(ellipsePoint(center, rx, ry, angle), this.rotation))}`)
+        }
+      } else {
+        this.commands.push(
+          `A ${number(Math.abs(rx))} ${number(Math.abs(ry))} ${number(-this.rotation)} 0 ${svgArcSweep(rx, ry, from, to)} ${pointText(target)}`,
+        )
+      }
       const span = Math.abs(to - from) * radians
-      const radius = Math.max(rx, ry)
+      const radius = Math.max(Math.abs(rx), Math.abs(ry))
       const step = radius <= sampleSagitta
         ? Math.PI / 2
         : 2 * Math.acos(Math.max(-1, 1 - sampleSagitta / radius))
@@ -82,6 +108,7 @@ export class ShapeContourBuilder {
       }
       const samples = Math.max(2, requestedSamples)
       const fractions = Array.from({ length: samples + 1 }, (_, index) => index / samples)
+      for (const angle of degenerateTurns) fractions.push((angle - from) / (to - from))
       const rotation = this.rotation * radians
       const xCritical = Math.atan2(-ry * Math.sin(rotation), rx * Math.cos(rotation)) / radians
       const yCritical = Math.atan2(ry * Math.cos(rotation), rx * Math.sin(rotation)) / radians

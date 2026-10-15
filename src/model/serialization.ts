@@ -112,6 +112,9 @@ export const savedDiagramFormat = 'stratified-tikz-diagram'
 // historical explicit values; equal-valued historical edits cannot be inferred.
 // v1 remains readable with legacy black text, white hollow fill and 0.4pt stroke.
 // Diagram.version stays 1; coordinates and source text are never rewritten here.
+// Optional layout/importedLayout are additive v2 fields. Axes store resolved
+// TeX points with optional original units/context. Omitted inner axes inherit
+// legacy size/2; explicit zero/negative values are never replaced on load.
 export const savedDiagramVersion = 2
 
 export type PersistentDiagram = {

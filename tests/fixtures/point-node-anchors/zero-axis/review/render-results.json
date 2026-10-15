@@ -1,0 +1,75 @@
+{
+  "engine": "pdfTeX 3.141592653-2.6-1.40.29 (TeX Live 2026)",
+  "pgfVersion": "3.1.11a",
+  "command": [
+    "/Library/TeX/texbin/pdflatex",
+    "-no-shell-escape",
+    "-interaction=nonstopmode",
+    "-halt-on-error",
+    "fixed-box.tex"
+  ],
+  "exitCode": 0,
+  "rsvg": "rsvg-convert version 2.63.0\n\nlibraries used:\n  cairo 1.18.4\n  pango 1.58.2\n  harfbuzz 14.4.0\n  fontconfig 2.18.3",
+  "input": {
+    "shape": "ellipse",
+    "body": {
+      "width": 0,
+      "height": 0,
+      "depth": 0
+    },
+    "innerXSep": 0,
+    "innerYSep": 20,
+    "outerXSep": 0,
+    "outerYSep": 0,
+    "minimumWidth": 0,
+    "minimumHeight": 0,
+    "lineWidth": 0.4,
+    "anchor": "center"
+  },
+  "diagnostic": null,
+  "productionPath": "M 0 0 A 0 28.284271247462 0 0 0 0 0 A 0 28.284271247462 0 0 0 0 0 Z",
+  "productionBounds": {
+    "minX": 0,
+    "minY": -28.284271247461902,
+    "maxX": 0,
+    "maxY": 28.284271247461902
+  },
+  "referencePath": " M 0 0 C 0 -15.62119 0 -28.2843 0 -28.2843 C 0 -28.2843 0 -15.62119 0 0 C 0 15.62119 0 28.2843 0 28.2843 C 0 28.2843 0 15.62119 0 0 Z M 0 0",
+  "raw": "CASE zero-x-empty\nFONT 10.00002pt,4.30554pt\nPAINT stroke; PATH macro:->\\pgfsyssoftpath@movetotoken {0.0pt}{0.0pt}\\pgfsyssoftpath@curvetosupportatoken {0.0pt}{15.62119pt}\\pgfsyssoftpath@curvetosupportbtoken {0.0pt}{28.2843pt}\\pgfsyssoftpath@curvetotoken {0.0pt}{28.2843pt}\\pgfsyssoftpath@curvetosupportatoken {0.0pt}{28.2843pt}\\pgfsyssoftpath@curvetosupportbtoken {0.0pt}{15.62119pt}\\pgfsyssoftpath@curvetotoken {0.0pt}{0.0pt}\\pgfsyssoftpath@curvetosupportatoken {0.0pt}{-15.62119pt}\\pgfsyssoftpath@curvetosupportbtoken {0.0pt}{-28.2843pt}\\pgfsyssoftpath@curvetotoken {0.0pt}{-28.2843pt}\\pgfsyssoftpath@curvetosupportatoken {0.0pt}{-28.2843pt}\\pgfsyssoftpath@curvetosupportbtoken {0.0pt}{-15.62119pt}\\pgfsyssoftpath@curvetotoken {0.0pt}{0.0pt}\\pgfsyssoftpath@closepathtoken {0.0pt}{0.0pt}\\pgfsyssoftpath@movetotoken {0.0pt}{0.0pt}\nANCHOR center; 0.0pt,0.0pt\nANCHOR north; 0.0pt,28.2843pt\nANCHOR south; 0.0pt,-28.2843pt\nANCHOR east; 0.0pt,0.0pt\nANCHOR west; 0.0pt,0.0pt\n",
+  "renders": [
+    {
+      "name": "production",
+      "command": [
+        "/opt/homebrew/bin/rsvg-convert",
+        "--output",
+        "/private/tmp/stz-32d-geometry-review/zero-axis/production.png",
+        "/private/tmp/stz-32d-geometry-review/zero-axis/production.svg"
+      ],
+      "measurementCommand": [
+        "/opt/homebrew/bin/magick",
+        "/private/tmp/stz-32d-geometry-review/zero-axis/production.png",
+        "-format",
+        "%[fx:mean] %[fx:minima] %[fx:maxima] %@",
+        "info:"
+      ],
+      "metrics": "1 1 1 0x0+800+800"
+    },
+    {
+      "name": "pgf-reference",
+      "command": [
+        "/opt/homebrew/bin/rsvg-convert",
+        "--output",
+        "/private/tmp/stz-32d-geometry-review/zero-axis/pgf-reference.png",
+        "/private/tmp/stz-32d-geometry-review/zero-axis/pgf-reference.svg"
+      ],
+      "measurementCommand": [
+        "/opt/homebrew/bin/magick",
+        "/private/tmp/stz-32d-geometry-review/zero-axis/pgf-reference.png",
+        "-format",
+        "%[fx:mean] %[fx:minima] %[fx:maxima] %@",
+        "info:"
+      ],
+      "metrics": "0.996464 0 1 4x566+398+117"
+    }
+  ]
+}

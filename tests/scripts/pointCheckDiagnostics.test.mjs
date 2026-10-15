@@ -1,10 +1,14 @@
 import assert from 'node:assert/strict'
 import test from 'node:test'
-import { mkdtemp, readFile, rm } from 'node:fs/promises'
+import { EventEmitter } from 'node:events'
+import { mkdtemp, readFile, rm, writeFile } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
-import { createPointDiagnostics, cleanupPointCheck, capturePointCheck } from '../../scripts/pointCheckDiagnostics.mjs'
+import { createPointDiagnostics, cleanupPointCheck, capturePointCheck, captureObservedPointCheck, boundedPointDiagnostic, createPointDiagnosticOperation } from '../../scripts/pointCheckDiagnostics.mjs'
 import { runPointThenAppChecks } from '../../scripts/checkPointNodes.mjs'
+import { runPointNodeGeometricShapeChecks } from '../../scripts/checkPointNodeGeometricShapes.mjs'
+import { assertGeometricShapeEvidence } from '../../scripts/pointGeometricShapesContract.mjs'
+import { syntheticGeometricVisibilityEvidence, mutateSyntheticVisibilityStageModels } from './pointGeometricVisibilityFixture.mjs'
 import { captureNativePointSetup, diagnoseNativePointFailure } from '../../scripts/pointNativeSetupDiagnostics.mjs'
 import { observePointLiteral, assertOracleCanvasDocument, diagnoseStandalonePointFailure } from '../../scripts/pointLiteralOracle.mjs'
 
@@ -34,6 +38,105 @@ test('diagnostic callback failure still retains observation bytes and creates no
   await assert.rejects(diagnose('point-node-settled-export', 'case', { point: { source: '\t\r\n' } }), /diagnostic callback/)
   const data = JSON.parse(await readFile(join(artifactDir, 'point-observation-0001.json'), 'utf8'))
   assert.equal(data.result, 'observed'); assert.equal(data.point.source, '\t\r\n')
+})
+
+test('visibility stages survive later document loads and a rejecting candidate validator as observations', async (t) => {
+  const artifactDir = await mkdtemp(join(tmpdir(), 'stz-visibility-observation-'))
+  t.after(() => rm(artifactDir, { recursive: true, force: true }))
+  const order = [], records = [], passes = []
+  const diagnose = createPointDiagnostics({ artifactDir, artifactPrefix: 'point-geometric-visibility-control',
+    observe: async (name, details) => { order.push(`persist ${records.length + 1}`); records.push({ name, ...details }) } })
+  const candidate = syntheticGeometricVisibilityEvidence()
+  candidate.result = 'observed'
+  mutateSyntheticVisibilityStageModels(candidate, 'locked', (model) => { model.layers[0].visible = false })
+  const { locked, hidden } = candidate.visibility
+  const stage = (phase, captured) => captureObservedPointCheck({ capture: async () => captured,
+    diagnose: (details) => diagnose('point-node-geometric-shapes', candidate.scenario, details),
+    details: { phase }, secondaryErrors: [], name: phase })
+  await stage('visibility-locked-before', { state: locked.before, rendered: locked.rendered })
+  await stage('visibility-locked-after', locked)
+  order.push('native hidden load')
+  await stage('visibility-hidden', hidden)
+  order.push('native dim load')
+  await stage('visibility-candidate', { candidate })
+  let primary
+  await assert.rejects((async () => {
+    try {
+      order.push('validate')
+      const terminal = { ...candidate, result: 'passed' }
+      assertGeometricShapeEvidence(terminal, candidate.scenario)
+      await writeFile(join(artifactDir, `${candidate.scenario}.json`), JSON.stringify(terminal))
+      passes.push(candidate.scenario)
+    } catch (error) { primary = error; throw error }
+    finally { await cleanupPointCheck(primary, async () => { throw new Error('secondary listener cleanup') }) }
+  })(), (error) => error === primary && /Locked point layer.*visible/.test(error.message))
+  assert.deepEqual(order, ['persist 1', 'persist 2', 'native hidden load', 'persist 3', 'native dim load', 'persist 4', 'validate'])
+  assert.deepEqual(passes, [])
+  const observations = await Promise.all(records.map(async ({ artifact }) => JSON.parse(await readFile(join(artifactDir, artifact), 'utf8'))))
+  assert.ok(observations.every(({ result }) => result === 'observed'))
+  assert.deepEqual(observations[1].stateAfter, locked.stateAfter)
+  assert.deepEqual(observations[1].renderedAfter, locked.renderedAfter)
+  assert.deepEqual(observations[2].state, hidden.state); assert.equal(observations[2].rendered, null)
+  assert.deepEqual(observations[3].candidate, candidate)
+  await assert.rejects(readFile(join(artifactDir, `${candidate.scenario}.json`)), { code: 'ENOENT' })
+})
+
+test('visibility action failure owns partial capture, callback failure and rejecting cleanup', async (t) => {
+  const artifactDir = await mkdtemp(join(tmpdir(), 'stz-visibility-secondary-'))
+  t.after(() => rm(artifactDir, { recursive: true, force: true }))
+  const primary = new Error('native locked click'), secondaryErrors = []
+  const diagnose = createPointDiagnostics({ artifactDir, observe: async () => { throw new Error('observer callback failed') } })
+  await assert.rejects(captureObservedPointCheck({ primary, name: 'locked-after', secondaryErrors,
+    details: { phase: 'visibility-locked-after', before: { json: 'raw before' } },
+    capture: async (observation) => { observation.stateAfter = { json: 'raw after' }; throw new Error('native render capture failed') },
+    diagnose: (details) => diagnose('point-node-geometric-shapes', 'point-geometric-visibility', details) }), (error) => error === primary)
+  await cleanupPointCheck(primary, async () => { throw new Error('observer cleanup failed') })
+  const observed = JSON.parse(await readFile(join(artifactDir, 'point-observation-0001.json'), 'utf8'))
+  assert.equal(observed.result, 'observed'); assert.equal(observed.actionError.message, primary.message)
+  assert.equal(observed.captureError.message, 'native render capture failed')
+  assert.deepEqual(observed.stateAfter, { json: 'raw after' })
+  assert.deepEqual(secondaryErrors, ['locked-after capture after primary failure: native render capture failed',
+    'locked-after evidence after primary failure: observer callback failed'])
+})
+
+test('visibility observation deadlines own late rejections and block validation on evidence failure', async () => {
+  const primary = new Error('native policy action'), secondaryErrors = [], observations = []
+  let rejectCapture, rejectEvidence, validated = false
+  await assert.rejects(captureObservedPointCheck({ primary, name: 'visibility-stage', timeoutMs: 15, secondaryErrors,
+    capture: () => new Promise((_resolve, reject) => { rejectCapture = reject }),
+    diagnose: async (observation) => { observations.push(observation); throw new Error('secondary evidence') } }), (error) => error === primary)
+  assert.match(observations[0].captureError.message, /Timed out after 15ms during visibility-stage capture/)
+  rejectCapture(new Error('late closed page'))
+  await assert.rejects((async () => {
+    await captureObservedPointCheck({ name: 'visibility-candidate', timeoutMs: 15, secondaryErrors,
+      capture: async () => ({ candidate: { result: 'observed' } }),
+      diagnose: () => new Promise((_resolve, reject) => { rejectEvidence = reject }) })
+    validated = true
+  })(), /Timed out after 15ms during visibility-candidate evidence/)
+  assert.equal(validated, false)
+  rejectEvidence(new Error('late evidence write'))
+  await new Promise((resolve) => setImmediate(resolve))
+})
+
+test('geometric rejection retains its first error when failure artifacts and owned context cleanup fail', async (t) => {
+  const artifactDir = await mkdtemp(join(tmpdir(), 'stz-geometric-failure-owner-'))
+  t.after(() => rm(artifactDir, { recursive: true, force: true }))
+  t.mock.method(console, 'error', () => {})
+  const primary = new Error('actual geometric native failure'), order = []
+  const page = new EventEmitter()
+  page.url = () => 'about:blank'; page.addInitScript = async () => {}
+  page.goto = async () => { await rm(artifactDir, { recursive: true }); order.push('action failure'); throw primary }
+  page.evaluate = async () => { throw new Error('secondary native capture') }
+  page.isClosed = () => false
+  page.screenshot = async () => { throw new Error('secondary screenshot') }
+  const context = new EventEmitter()
+  context.newPage = async () => page
+  context.close = async () => { order.push('context cleanup'); throw new Error('secondary context cleanup') }
+  await assert.rejects(runPointNodeGeometricShapeChecks({ browser: { newContext: async () => context }, origin: 'http://localhost',
+    artifactDir, observe: async () => {}, startGroup: async () => {},
+    record: async () => assert.fail('Failure cannot publish success'),
+    completeGroup: async () => assert.fail('Failure cannot complete group') }), (error) => error === primary)
+  assert.deepEqual(order, ['action failure', 'context cleanup'])
 })
 
 test('point cleanup preserves the primary assertion and rejects otherwise unowned cleanup failure', async () => {
@@ -208,4 +311,141 @@ test('native capture clears its owned deadline when evaluation finishes', async 
   const setup = { formCount: 0 }
   assert.equal(await captureNativePointSetup({ evaluate: async () => setup }), setup)
   assert.equal(timers.size, 0)
+})
+
+// The scoped owner clock exercises an absolute deadline without a global timer
+// mock or charging ordinary file I/O to a short fixture-construction timer.
+test('owned diagnostic checks its absolute deadline when timer delivery is delayed', async () => {
+  let clockMs = 100, scheduled, cancelled = 0, release
+  const gate = new Promise((resolve) => { release = resolve })
+  const schedule = (expire, timeoutMs, operation) => {
+    scheduled = { expire, timeoutMs, operation }
+    return () => { cancelled++ }
+  }
+  schedule.monotonicNow = () => clockMs
+  const writes = []
+  const outcome = boundedPointDiagnostic(async (operation) => {
+    operation.mark('ordinary-producer-entered')
+    await gate
+    operation.assertActive('next-report-checkpoint')
+    writes.push('running')
+  }, 'Geometric selection final evidence', 2000, schedule).then(
+    (value) => ({ value }), (error) => ({ error }))
+  await new Promise((resolve) => setImmediate(resolve))
+  assert.equal(scheduled.timeoutMs, 2000)
+  assert.equal(scheduled.operation.startMs, 100)
+  assert.equal(scheduled.operation.deadlineMs, 2100)
+  clockMs = 2100; release()
+  const { error } = await outcome
+  assert.match(error.message, /Timed out after 2000ms during Geometric selection final evidence/)
+  assert.equal(scheduled.operation.error, error)
+  assert.equal(scheduled.operation.state, 'expired')
+  assert.equal(scheduled.operation.generation, 1)
+  assert.deepEqual(writes, [])
+  assert.equal(cancelled, 1)
+  assert.ok(scheduled.operation.progress.some(({ stage }) => stage === 'operation-expired'))
+})
+
+for (const late of ['fulfillment', 'rejection']) test(`owned diagnostic consumes controlled late ${late} and forbids subsequent work`, async () => {
+  let expire, owned, release, reject, entered
+  const entry = new Promise((resolve) => { entered = resolve })
+  const gate = new Promise((resolve, fail) => { release = resolve; reject = fail })
+  const schedule = (trigger, timeoutMs, operation) => {
+    assert.equal(timeoutMs, 2000); expire = trigger; owned = operation
+    return () => {}
+  }
+  schedule.monotonicNow = () => 0
+  const order = [], unhandled = [], onUnhandled = (error) => unhandled.push(error)
+  process.on('unhandledRejection', onUnhandled)
+  try {
+    const outcome = boundedPointDiagnostic(async (operation) => {
+      entered(); await gate
+      operation.assertActive('pending-retain-after-caller')
+      order.push('late running report')
+    }, 'Geometric selection final evidence', 2000, schedule).then(
+      () => ({ ok: true }), (error) => ({ ok: false, error }))
+    await entry
+    expire()
+    const result = await outcome
+    assert.equal(result.ok, false)
+    assert.equal(owned.error, result.error)
+    if (late === 'fulfillment') release(); else reject(new Error('late ordinary writer rejection'))
+    await new Promise((resolve) => setImmediate(resolve))
+    assert.deepEqual(order, [])
+    assert.deepEqual(unhandled, [])
+    assert.equal(owned.error, result.error, 'Late settlement cannot replace the timeout Error')
+    assert.equal(owned.state, 'expired')
+    assert.ok(owned.progress.some(({ stage }) => stage === 'late-rejection-consumed'))
+  } finally {
+    release(); process.off('unhandledRejection', onUnhandled)
+  }
+})
+
+test('owned point diagnostics freeze the raw capture and await both publication and report checkpoints', async () => {
+  const operation = createPointDiagnosticOperation('complete composed evidence', 2000)
+  const source = { observation: { secondaryErrors: [], native: { source: '  $F$\t\n' } } }
+  const expected = structuredClone(source), order = []
+  const diagnose = createPointDiagnostics({ artifactPrefix: 'owned-point', publish: async (name, raw, options) => {
+    assert.equal(options.operation, operation)
+    assert.equal(name, 'owned-point-0001.json')
+    source.observation.secondaryErrors.push('later failure')
+    assert.deepEqual(raw.observation, expected.observation)
+    order.push('raw authority')
+  }, observe: async (_name, _details, options) => {
+    assert.equal(options.operation, operation); order.push('report checkpoint')
+  } })
+  const observed = await diagnose('group', 'scenario', source, { operation })
+  assert.deepEqual(observed.observation, expected.observation)
+  assert.equal(observed.result, 'observed')
+  assert.deepEqual(order, ['raw authority', 'report checkpoint'])
+  assert.ok(operation.progress.some(({ stage }) => stage === 'diagnostic-report-checkpoint-completed'))
+})
+
+test('owned point diagnostics cannot begin a report checkpoint after its raw publication expires', async () => {
+  let clockMs = 0
+  const operation = createPointDiagnosticOperation('composed publication', 2000, () => clockMs)
+  let reports = 0
+  const diagnose = createPointDiagnostics({ publish: async () => { clockMs = 2000 }, observe: async () => { reports++ } })
+  await assert.rejects(diagnose('group', 'scenario', { native: { errors: [] } }, { operation }),
+    (error) => error === operation.error && /Timed out after 2000ms/.test(error.message))
+  assert.equal(reports, 0)
+})
+
+for (const expired of [false, true]) test(`owned callback rejection ${expired ? 'after absolute expiry consumes its late error' : 'before deadline preserves the native Error'} without timer delivery`, async () => {
+  let clockMs = 0, owned, reject, entered, cancellations = 0
+  const entry = new Promise((resolve) => { entered = resolve })
+  const gate = new Promise((_resolve, fail) => { reject = fail })
+  const schedule = (_expire, timeoutMs, operation) => {
+    assert.equal(timeoutMs, 2000); owned = operation
+    // Deliberately leave timer delivery pending; the owner must enforce its
+    // registered absolute deadline when the gated callback rejects.
+    return () => { cancellations++ }
+  }
+  schedule.monotonicNow = () => clockMs
+  const native = new Error(expired ? 'late ordinary writer rejection' : 'original native assertion')
+  const outcome = boundedPointDiagnostic(async () => {
+    entered(); await gate
+  }, 'Geometric selection final evidence', 2000, schedule).then(
+    (value) => ({ value }), (error) => ({ error }))
+  try {
+    await Promise.race([entry, outcome.then(({ error }) => {
+      throw error ?? new Error('Diagnostic completed before its controlled callback entered')
+    })])
+    assert.equal(owned.deadlineMs, 2000)
+    clockMs = expired ? 2000 : 1999
+    reject(native)
+    const { error } = await outcome
+    assert.equal(owned.error, error)
+    if (expired) {
+      assert.notEqual(error, native)
+      assert.equal(error.message, 'Timed out after 2000ms during Geometric selection final evidence')
+      assert.equal(owned.state, 'expired')
+      assert.ok(owned.progress.some(({ stage }) => stage === 'late-rejection-consumed'))
+    } else {
+      assert.equal(error, native)
+      assert.equal(owned.state, 'rejected')
+    }
+    assert.equal(cancellations, 1)
+    assert.equal(Object.keys(native).length, 0, 'Ownership never mutates the original Error')
+  } finally { reject(native); await outcome }
 })

@@ -1,0 +1,426 @@
+[
+  {
+    "ambientDimension": 2,
+    "shape": "regular polygon",
+    "anchor": "corner 1",
+    "issues": {
+      "valid": true,
+      "errors": []
+    },
+    "layout": {
+      "innerXSep": -30,
+      "units": {
+        "innerXSep": {
+          "source": "-30pt",
+          "unit": "pt",
+          "texPoints": -30
+        },
+        "innerYSep": {
+          "source": "-30pt",
+          "unit": "pt",
+          "texPoints": -30
+        },
+        "minimumWidth": {
+          "source": "-20pt",
+          "unit": "pt",
+          "texPoints": -20
+        },
+        "minimumHeight": {
+          "source": "-20pt",
+          "unit": "pt",
+          "texPoints": -20
+        },
+        "outerXSep": {
+          "source": "3pt",
+          "unit": "pt",
+          "texPoints": 3
+        },
+        "outerYSep": {
+          "source": "3pt",
+          "unit": "pt",
+          "texPoints": 3
+        }
+      },
+      "innerYSep": -30,
+      "minimumWidth": -20,
+      "minimumHeight": -20,
+      "outerXSep": 3,
+      "outerYSep": 3,
+      "anchor": "corner 1"
+    },
+    "savedRoundTrip": true,
+    "path": "/private/tmp/stz-32d-geometry-review/2d-regular-polygon-standalone.tex",
+    "node": "\\node[\n            regular polygon,\n            fill=stzPointreviewnegativeregularpolygonFill,\n            draw=stzPointreviewnegativeregularpolygonStroke,\n            text=stzPointreviewnegativeregularpolygonText,\n            fill opacity=1,\n            draw opacity=1,\n            text opacity=1,\n            line width=0.4pt,\n            solid,\n            dash phase=0pt,\n            line cap=butt,\n            line join=miter,\n            inner sep=1.5pt,\n            inner xsep=-30pt,\n            inner ysep=-30pt,\n            outer xsep=3pt,\n            outer ysep=3pt,\n            minimum width=-20pt,\n            minimum height=-20pt,\n            anchor=corner 1\n        ] at (pointPoint0p0) {};"
+  },
+  {
+    "ambientDimension": 2,
+    "shape": "regular polygon",
+    "anchor": "corner 1",
+    "issues": {
+      "valid": true,
+      "errors": []
+    },
+    "layout": {
+      "innerXSep": -30,
+      "units": {
+        "innerXSep": {
+          "source": "-30pt",
+          "unit": "pt",
+          "texPoints": -30
+        },
+        "innerYSep": {
+          "source": "-30pt",
+          "unit": "pt",
+          "texPoints": -30
+        },
+        "minimumWidth": {
+          "source": "-20pt",
+          "unit": "pt",
+          "texPoints": -20
+        },
+        "minimumHeight": {
+          "source": "-20pt",
+          "unit": "pt",
+          "texPoints": -20
+        },
+        "outerXSep": {
+          "source": "3pt",
+          "unit": "pt",
+          "texPoints": 3
+        },
+        "outerYSep": {
+          "source": "3pt",
+          "unit": "pt",
+          "texPoints": 3
+        }
+      },
+      "innerYSep": -30,
+      "minimumWidth": -20,
+      "minimumHeight": -20,
+      "outerXSep": 3,
+      "outerYSep": 3,
+      "anchor": "corner 1"
+    },
+    "savedRoundTrip": true,
+    "path": "/private/tmp/stz-32d-geometry-review/2d-regular-polygon-inlineMath.tex",
+    "node": "\\node[\n            regular polygon,\n            fill=stzPointreviewnegativeregularpolygonFill,\n            draw=stzPointreviewnegativeregularpolygonStroke,\n            text=stzPointreviewnegativeregularpolygonText,\n            fill opacity=1,\n            draw opacity=1,\n            text opacity=1,\n            line width=0.4pt,\n            solid,\n            dash phase=0pt,\n            line cap=butt,\n            line join=miter,\n            inner sep=1.5pt,\n            inner xsep=-30pt,\n            inner ysep=-30pt,\n            outer xsep=3pt,\n            outer ysep=3pt,\n            minimum width=-20pt,\n            minimum height=-20pt,\n            anchor=corner 1\n        ] at (pointPoint0p0) {};"
+  },
+  {
+    "ambientDimension": 2,
+    "shape": "star",
+    "anchor": "outer point 1",
+    "issues": {
+      "valid": true,
+      "errors": []
+    },
+    "layout": {
+      "innerXSep": -30,
+      "units": {
+        "innerXSep": {
+          "source": "-30pt",
+          "unit": "pt",
+          "texPoints": -30
+        },
+        "innerYSep": {
+          "source": "-30pt",
+          "unit": "pt",
+          "texPoints": -30
+        },
+        "minimumWidth": {
+          "source": "-20pt",
+          "unit": "pt",
+          "texPoints": -20
+        },
+        "minimumHeight": {
+          "source": "-20pt",
+          "unit": "pt",
+          "texPoints": -20
+        },
+        "outerXSep": {
+          "source": "3pt",
+          "unit": "pt",
+          "texPoints": 3
+        },
+        "outerYSep": {
+          "source": "3pt",
+          "unit": "pt",
+          "texPoints": 3
+        }
+      },
+      "innerYSep": -30,
+      "minimumWidth": -20,
+      "minimumHeight": -20,
+      "outerXSep": 3,
+      "outerYSep": 3,
+      "anchor": "outer point 1"
+    },
+    "savedRoundTrip": true,
+    "path": "/private/tmp/stz-32d-geometry-review/2d-star-standalone.tex",
+    "node": "\\node[\n            star,\n            star points=5,\n            fill=stzPointreviewnegativestarFill,\n            draw=stzPointreviewnegativestarStroke,\n            text=stzPointreviewnegativestarText,\n            fill opacity=1,\n            draw opacity=1,\n            text opacity=1,\n            line width=0.4pt,\n            solid,\n            dash phase=0pt,\n            line cap=butt,\n            line join=miter,\n            inner sep=1.5pt,\n            inner xsep=-30pt,\n            inner ysep=-30pt,\n            outer xsep=3pt,\n            outer ysep=3pt,\n            minimum width=-20pt,\n            minimum height=-20pt,\n            anchor=outer point 1\n        ] at (pointPoint0p0) {};"
+  },
+  {
+    "ambientDimension": 2,
+    "shape": "star",
+    "anchor": "outer point 1",
+    "issues": {
+      "valid": true,
+      "errors": []
+    },
+    "layout": {
+      "innerXSep": -30,
+      "units": {
+        "innerXSep": {
+          "source": "-30pt",
+          "unit": "pt",
+          "texPoints": -30
+        },
+        "innerYSep": {
+          "source": "-30pt",
+          "unit": "pt",
+          "texPoints": -30
+        },
+        "minimumWidth": {
+          "source": "-20pt",
+          "unit": "pt",
+          "texPoints": -20
+        },
+        "minimumHeight": {
+          "source": "-20pt",
+          "unit": "pt",
+          "texPoints": -20
+        },
+        "outerXSep": {
+          "source": "3pt",
+          "unit": "pt",
+          "texPoints": 3
+        },
+        "outerYSep": {
+          "source": "3pt",
+          "unit": "pt",
+          "texPoints": 3
+        }
+      },
+      "innerYSep": -30,
+      "minimumWidth": -20,
+      "minimumHeight": -20,
+      "outerXSep": 3,
+      "outerYSep": 3,
+      "anchor": "outer point 1"
+    },
+    "savedRoundTrip": true,
+    "path": "/private/tmp/stz-32d-geometry-review/2d-star-inlineMath.tex",
+    "node": "\\node[\n            star,\n            star points=5,\n            fill=stzPointreviewnegativestarFill,\n            draw=stzPointreviewnegativestarStroke,\n            text=stzPointreviewnegativestarText,\n            fill opacity=1,\n            draw opacity=1,\n            text opacity=1,\n            line width=0.4pt,\n            solid,\n            dash phase=0pt,\n            line cap=butt,\n            line join=miter,\n            inner sep=1.5pt,\n            inner xsep=-30pt,\n            inner ysep=-30pt,\n            outer xsep=3pt,\n            outer ysep=3pt,\n            minimum width=-20pt,\n            minimum height=-20pt,\n            anchor=outer point 1\n        ] at (pointPoint0p0) {};"
+  },
+  {
+    "ambientDimension": 3,
+    "shape": "regular polygon",
+    "anchor": "corner 1",
+    "issues": {
+      "valid": true,
+      "errors": []
+    },
+    "layout": {
+      "innerXSep": -30,
+      "units": {
+        "innerXSep": {
+          "source": "-30pt",
+          "unit": "pt",
+          "texPoints": -30
+        },
+        "innerYSep": {
+          "source": "-30pt",
+          "unit": "pt",
+          "texPoints": -30
+        },
+        "minimumWidth": {
+          "source": "-20pt",
+          "unit": "pt",
+          "texPoints": -20
+        },
+        "minimumHeight": {
+          "source": "-20pt",
+          "unit": "pt",
+          "texPoints": -20
+        },
+        "outerXSep": {
+          "source": "3pt",
+          "unit": "pt",
+          "texPoints": 3
+        },
+        "outerYSep": {
+          "source": "3pt",
+          "unit": "pt",
+          "texPoints": 3
+        }
+      },
+      "innerYSep": -30,
+      "minimumWidth": -20,
+      "minimumHeight": -20,
+      "outerXSep": 3,
+      "outerYSep": 3,
+      "anchor": "corner 1"
+    },
+    "savedRoundTrip": true,
+    "path": "/private/tmp/stz-32d-geometry-review/3d-regular-polygon-standalone.tex",
+    "node": "\\node[\n            regular polygon,\n            fill=stzPointreviewnegativeregularpolygonFill,\n            draw=stzPointreviewnegativeregularpolygonStroke,\n            text=stzPointreviewnegativeregularpolygonText,\n            fill opacity=1,\n            draw opacity=1,\n            text opacity=1,\n            line width=0.4pt,\n            solid,\n            dash phase=0pt,\n            line cap=butt,\n            line join=miter,\n            inner sep=1.5pt,\n            inner xsep=-30pt,\n            inner ysep=-30pt,\n            outer xsep=3pt,\n            outer ysep=3pt,\n            minimum width=-20pt,\n            minimum height=-20pt,\n            anchor=corner 1\n        ] at (pointPoint0p0) {};"
+  },
+  {
+    "ambientDimension": 3,
+    "shape": "regular polygon",
+    "anchor": "corner 1",
+    "issues": {
+      "valid": true,
+      "errors": []
+    },
+    "layout": {
+      "innerXSep": -30,
+      "units": {
+        "innerXSep": {
+          "source": "-30pt",
+          "unit": "pt",
+          "texPoints": -30
+        },
+        "innerYSep": {
+          "source": "-30pt",
+          "unit": "pt",
+          "texPoints": -30
+        },
+        "minimumWidth": {
+          "source": "-20pt",
+          "unit": "pt",
+          "texPoints": -20
+        },
+        "minimumHeight": {
+          "source": "-20pt",
+          "unit": "pt",
+          "texPoints": -20
+        },
+        "outerXSep": {
+          "source": "3pt",
+          "unit": "pt",
+          "texPoints": 3
+        },
+        "outerYSep": {
+          "source": "3pt",
+          "unit": "pt",
+          "texPoints": 3
+        }
+      },
+      "innerYSep": -30,
+      "minimumWidth": -20,
+      "minimumHeight": -20,
+      "outerXSep": 3,
+      "outerYSep": 3,
+      "anchor": "corner 1"
+    },
+    "savedRoundTrip": true,
+    "path": "/private/tmp/stz-32d-geometry-review/3d-regular-polygon-inlineMath.tex",
+    "node": "\\node[\n                regular polygon,\n                fill=stzPointreviewnegativeregularpolygonFill,\n                draw=stzPointreviewnegativeregularpolygonStroke,\n                text=stzPointreviewnegativeregularpolygonText,\n                fill opacity=1,\n                draw opacity=1,\n                text opacity=1,\n                line width=0.4pt,\n                solid,\n                dash phase=0pt,\n                line cap=butt,\n                line join=miter,\n                inner sep=1.5pt,\n                inner xsep=-30pt,\n                inner ysep=-30pt,\n                outer xsep=3pt,\n                outer ysep=3pt,\n                minimum width=-20pt,\n                minimum height=-20pt,\n                anchor=corner 1\n            ] at (pointPoint0p0) {};"
+  },
+  {
+    "ambientDimension": 3,
+    "shape": "star",
+    "anchor": "outer point 1",
+    "issues": {
+      "valid": true,
+      "errors": []
+    },
+    "layout": {
+      "innerXSep": -30,
+      "units": {
+        "innerXSep": {
+          "source": "-30pt",
+          "unit": "pt",
+          "texPoints": -30
+        },
+        "innerYSep": {
+          "source": "-30pt",
+          "unit": "pt",
+          "texPoints": -30
+        },
+        "minimumWidth": {
+          "source": "-20pt",
+          "unit": "pt",
+          "texPoints": -20
+        },
+        "minimumHeight": {
+          "source": "-20pt",
+          "unit": "pt",
+          "texPoints": -20
+        },
+        "outerXSep": {
+          "source": "3pt",
+          "unit": "pt",
+          "texPoints": 3
+        },
+        "outerYSep": {
+          "source": "3pt",
+          "unit": "pt",
+          "texPoints": 3
+        }
+      },
+      "innerYSep": -30,
+      "minimumWidth": -20,
+      "minimumHeight": -20,
+      "outerXSep": 3,
+      "outerYSep": 3,
+      "anchor": "outer point 1"
+    },
+    "savedRoundTrip": true,
+    "path": "/private/tmp/stz-32d-geometry-review/3d-star-standalone.tex",
+    "node": "\\node[\n            star,\n            star points=5,\n            fill=stzPointreviewnegativestarFill,\n            draw=stzPointreviewnegativestarStroke,\n            text=stzPointreviewnegativestarText,\n            fill opacity=1,\n            draw opacity=1,\n            text opacity=1,\n            line width=0.4pt,\n            solid,\n            dash phase=0pt,\n            line cap=butt,\n            line join=miter,\n            inner sep=1.5pt,\n            inner xsep=-30pt,\n            inner ysep=-30pt,\n            outer xsep=3pt,\n            outer ysep=3pt,\n            minimum width=-20pt,\n            minimum height=-20pt,\n            anchor=outer point 1\n        ] at (pointPoint0p0) {};"
+  },
+  {
+    "ambientDimension": 3,
+    "shape": "star",
+    "anchor": "outer point 1",
+    "issues": {
+      "valid": true,
+      "errors": []
+    },
+    "layout": {
+      "innerXSep": -30,
+      "units": {
+        "innerXSep": {
+          "source": "-30pt",
+          "unit": "pt",
+          "texPoints": -30
+        },
+        "innerYSep": {
+          "source": "-30pt",
+          "unit": "pt",
+          "texPoints": -30
+        },
+        "minimumWidth": {
+          "source": "-20pt",
+          "unit": "pt",
+          "texPoints": -20
+        },
+        "minimumHeight": {
+          "source": "-20pt",
+          "unit": "pt",
+          "texPoints": -20
+        },
+        "outerXSep": {
+          "source": "3pt",
+          "unit": "pt",
+          "texPoints": 3
+        },
+        "outerYSep": {
+          "source": "3pt",
+          "unit": "pt",
+          "texPoints": 3
+        }
+      },
+      "innerYSep": -30,
+      "minimumWidth": -20,
+      "minimumHeight": -20,
+      "outerXSep": 3,
+      "outerYSep": 3,
+      "anchor": "outer point 1"
+    },
+    "savedRoundTrip": true,
+    "path": "/private/tmp/stz-32d-geometry-review/3d-star-inlineMath.tex",
+    "node": "\\node[\n                star,\n                star points=5,\n                fill=stzPointreviewnegativestarFill,\n                draw=stzPointreviewnegativestarStroke,\n                text=stzPointreviewnegativestarText,\n                fill opacity=1,\n                draw opacity=1,\n                text opacity=1,\n                line width=0.4pt,\n                solid,\n                dash phase=0pt,\n                line cap=butt,\n                line join=miter,\n                inner sep=1.5pt,\n                inner xsep=-30pt,\n                inner ysep=-30pt,\n                outer xsep=3pt,\n                outer ysep=3pt,\n                minimum width=-20pt,\n                minimum height=-20pt,\n                anchor=outer point 1\n            ] at (pointPoint0p0) {};"
+  }
+]

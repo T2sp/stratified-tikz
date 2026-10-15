@@ -1,0 +1,39 @@
+CASE incircle
+FONT 10.00002pt,4.30554pt
+STAGE innerXSp; -1966080
+STAGE innerYSp; 327680
+STAGE initialXSp; -1966080
+STAGE initialYSp; 327680
+STAGE fittedXSp; 463410
+STAGE fittedYSp; 463410
+STAGE transverseInnerSepSp; 327680
+STAGE minimumWidthSp; 65536
+STAGE divisorSp; 463410
+STAGE bodyWidthHalfSp; 0
+STAGE bodyHeightHalfSp; 0
+STAGE bodyDepthHalfSp; 0
+STAGE minimumWidthHalfSp; 32768
+PAINT stroke; PATH macro:->\pgfsyssoftpath@movetotoken {-4.50336pt}{5.46053pt}\pgfsyssoftpath@curvetosupportatoken {-7.62228pt}{3.11024pt}\pgfsyssoftpath@curvetosupportbtoken {-8.24539pt}{-1.32335pt}\pgfsyssoftpath@curvetotoken {-5.89511pt}{-4.44228pt}\pgfsyssoftpath@curvetosupportatoken {-3.54483pt}{-7.5612pt}\pgfsyssoftpath@curvetosupportbtoken {0.88876pt}{-8.18431pt}\pgfsyssoftpath@curvetotoken {4.00769pt}{-5.83403pt}\pgfsyssoftpath@linetotoken {15.70981pt}{2.98413pt}\pgfsyssoftpath@curvetosupportatoken {18.82874pt}{5.33441pt}\pgfsyssoftpath@curvetosupportbtoken {19.45184pt}{9.768pt}\pgfsyssoftpath@curvetotoken {17.10156pt}{12.88693pt}\pgfsyssoftpath@curvetosupportatoken {14.75128pt}{16.00586pt}\pgfsyssoftpath@curvetosupportbtoken {10.31769pt}{16.62897pt}\pgfsyssoftpath@curvetotoken {7.19876pt}{14.27869pt}\pgfsyssoftpath@closepathtoken {-4.50336pt}{5.46053pt}\pgfsyssoftpath@movetotoken {7.19876pt}{14.27869pt}\pgfsyssoftpath@curvetosupportatoken {4.07983pt}{11.9284pt}\pgfsyssoftpath@curvetosupportbtoken {3.45673pt}{7.49481pt}\pgfsyssoftpath@curvetotoken {5.807pt}{4.37589pt}\pgfsyssoftpath@curvetosupportatoken {8.15729pt}{1.25696pt}\pgfsyssoftpath@curvetosupportbtoken {12.59088pt}{0.63385pt}\pgfsyssoftpath@curvetotoken {15.70981pt}{2.98413pt}
+ANCHOR center; 0.0pt,0.0pt
+ANCHOR text; 0.0pt,0.0pt
+ANCHOR base; 0.0pt,0.0pt
+ANCHOR mid; 0.0pt,2.15277pt
+ANCHOR east; 11.74979pt,0.0pt
+ANCHOR north east; 14.83896pt,14.83942pt
+ANCHOR north; 0.0pt,8.8545pt
+ANCHOR north west; -5.02559pt,5.02551pt
+ANCHOR west; -7.316pt,-0.00005pt
+ANCHOR south west; -5.21693pt,-5.2171pt
+ANCHOR south; -0.00003pt,-7.25336pt
+ANCHOR south east; 5.04956pt,-5.04956pt
+ANCHOR base east; 11.74979pt,0.0pt
+ANCHOR base west; -7.316pt,-0.00005pt
+ANCHOR mid east; 15.70973pt,2.98424pt
+ANCHOR mid west; -6.92027pt,2.15283pt
+ANCHOR shape center; 5.60321pt,4.22232pt
+ANCHOR before top; 7.19876pt,14.27869pt
+ANCHOR top; 17.10156pt,12.88693pt
+ANCHOR after top; 15.70981pt,2.98413pt
+ANCHOR before bottom; 4.00769pt,-5.83403pt
+ANCHOR bottom; -5.89511pt,-4.44228pt
+ANCHOR after bottom; -4.50336pt,5.46053pt

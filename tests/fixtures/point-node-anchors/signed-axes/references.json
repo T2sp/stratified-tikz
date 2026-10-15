@@ -1,0 +1,1577 @@
+{
+  "schema": "stz-pgf-signed-basic-axes-v1",
+  "pgfVersion": "3.1.11a",
+  "engine": "pdfTeX 3.141592653-2.6-1.40.29 (TeX Live 2026)",
+  "command": [
+    "/Library/TeX/texbin/pdflatex",
+    "-no-shell-escape",
+    "-interaction=nonstopmode",
+    "-halt-on-error",
+    "fixed-box.tex"
+  ],
+  "exitCode": 0,
+  "sourceHashes": {
+    "/usr/local/texlive/2026/texmf-dist/tex/generic/pgf/libraries/shapes/pgflibraryshapes.geometric.code.tex": "bbd6abe9df51153e2f4f61cca3ad669de34a6648cf37795df44da931402b69ee",
+    "/usr/local/texlive/2026/texmf-dist/tex/generic/pgf/modules/pgfmoduleshapes.code.tex": "01dd81e3f2c56a8db7864916ada1a5036964aff2e8176aafd4773244e236bb27",
+    "/usr/local/texlive/2026/texmf-dist/tex/generic/pgf/basiclayer/pgfcorepoints.code.tex": "7533dd80c95a5124726b0a617a5f458226d4a7490bcd209e3fd7e717e24dc127",
+    "/usr/local/texlive/2026/texmf-dist/tex/generic/pgf/math/pgfmathcalc.code.tex": "58fcc94547646458470315a6d10953a9729e7962e3def5273633b06fb444a5aa",
+    "/usr/local/texlive/2026/texmf-dist/tex/generic/pgf/math/pgfmathfunctions.trigonometric.code.tex": "1c8834abe00807467a52d31ef96032d5084b2560eea45995018084d13a3cde3c",
+    "/usr/local/texlive/2026/texmf-dist/tex/generic/pgf/math/pgfmathfunctions.basic.code.tex": "c94abbd89ad0556546d9e5053af16b58ce7f38d19c379b27309e5fefd23908f8",
+    "/usr/local/texlive/2026/texmf-dist/tex/generic/pgf/basiclayer/pgfcoretransformations.code.tex": "bdea875774b4ad7a1e12debc67c46286245031f5c2e287c9e192f3ca4b6193b6"
+  },
+  "units": "TeX pt; parsed observations reverse PGF positive-Y-up once to SVG positive-Y-down; production uses 1.2 SVG units/TeX pt",
+  "sourceTexSha256": "9aca4aa5a4e6be97ca4c735e6360cb5cdd675aab04de85b245339d35cb297399",
+  "geometrySha256": "bc5d45d0d57d700707c964764fc1119ad83629761f41dd3c20ad772ae3e6fb20",
+  "compilationSha256": "29ec5207959547d0a1cada0895fc6e9bda49d820acdda68d49190162a1a09f05",
+  "generatorSha256": "67f81c42d71c4215acbc48b826005d8f3396b5636110a320b3c2d9abe4a21e65",
+  "cases": [
+    {
+      "id": "ellipse-empty-strong",
+      "shape": "ellipse",
+      "body": {
+        "width": 0,
+        "height": 0,
+        "depth": 0
+      },
+      "innerXSep": -100,
+      "innerYSep": -100,
+      "outerXSep": 0,
+      "outerYSep": 0,
+      "minimumWidth": -160,
+      "minimumHeight": -160,
+      "lineWidth": 0.4,
+      "anchors": [
+        "text",
+        "center",
+        "base",
+        "mid",
+        "east",
+        "west",
+        "north",
+        "south",
+        "north east",
+        "north west",
+        "south east",
+        "south west",
+        "base east",
+        "base west",
+        "mid east",
+        "mid west",
+        "0",
+        "13",
+        "45",
+        "90",
+        "181",
+        "270",
+        "315",
+        "-30"
+      ],
+      "paints": [
+        {
+          "action": "stroke",
+          "tokens": [
+            {
+              "kind": "movetotoken",
+              "x": -80,
+              "y": 0
+            },
+            {
+              "kind": "curvetosupportatoken",
+              "x": -80,
+              "y": 44.18335
+            },
+            {
+              "kind": "curvetosupportbtoken",
+              "x": -44.18335,
+              "y": 80
+            },
+            {
+              "kind": "curvetotoken",
+              "x": 0,
+              "y": 80
+            },
+            {
+              "kind": "curvetosupportatoken",
+              "x": 44.18335,
+              "y": 80
+            },
+            {
+              "kind": "curvetosupportbtoken",
+              "x": 80,
+              "y": 44.18335
+            },
+            {
+              "kind": "curvetotoken",
+              "x": 80,
+              "y": 0
+            },
+            {
+              "kind": "curvetosupportatoken",
+              "x": 80,
+              "y": -44.18335
+            },
+            {
+              "kind": "curvetosupportbtoken",
+              "x": 44.18335,
+              "y": -80
+            },
+            {
+              "kind": "curvetotoken",
+              "x": 0,
+              "y": -80
+            },
+            {
+              "kind": "curvetosupportatoken",
+              "x": -44.18335,
+              "y": -80
+            },
+            {
+              "kind": "curvetosupportbtoken",
+              "x": -80,
+              "y": -44.18335
+            },
+            {
+              "kind": "curvetotoken",
+              "x": -80,
+              "y": 0
+            },
+            {
+              "kind": "closepathtoken",
+              "x": -80,
+              "y": 0
+            },
+            {
+              "kind": "movetotoken",
+              "x": 0,
+              "y": 0
+            }
+          ]
+        }
+      ],
+      "expectedAnchors": {
+        "0": {
+          "x": -80,
+          "y": 0
+        },
+        "13": {
+          "x": -77.948,
+          "y": 17.99316
+        },
+        "45": {
+          "x": -56.5686,
+          "y": 56.5686
+        },
+        "90": {
+          "x": 0,
+          "y": 80
+        },
+        "181": {
+          "x": 79.98657,
+          "y": -1.39526
+        },
+        "270": {
+          "x": 0,
+          "y": -80
+        },
+        "315": {
+          "x": -56.5686,
+          "y": -56.5686
+        },
+        "text": {
+          "x": 0,
+          "y": 0
+        },
+        "center": {
+          "x": 0,
+          "y": 0
+        },
+        "base": {
+          "x": 0,
+          "y": 0
+        },
+        "mid": {
+          "x": 0,
+          "y": -2.15277
+        },
+        "east": {
+          "x": -80,
+          "y": 0
+        },
+        "west": {
+          "x": 80,
+          "y": 0
+        },
+        "north": {
+          "x": 0,
+          "y": 80
+        },
+        "south": {
+          "x": 0,
+          "y": -80
+        },
+        "north east": {
+          "x": -56.5686,
+          "y": 56.5686
+        },
+        "north west": {
+          "x": 56.5686,
+          "y": 56.5686
+        },
+        "south east": {
+          "x": -56.5686,
+          "y": -56.5686
+        },
+        "south west": {
+          "x": 56.5686,
+          "y": -56.5686
+        },
+        "base east": {
+          "x": -80,
+          "y": 0
+        },
+        "base west": {
+          "x": 80,
+          "y": 0
+        },
+        "mid east": {
+          "x": -80,
+          "y": -2.15277
+        },
+        "mid west": {
+          "x": 80,
+          "y": -2.15277
+        },
+        "-30": {
+          "x": -69.28223,
+          "y": -39.99756
+        }
+      },
+      "fontContext": {
+        "em": 10.00002,
+        "ex": 4.30554
+      }
+    },
+    {
+      "id": "ellipse-small-minima",
+      "shape": "ellipse",
+      "body": {
+        "width": 20,
+        "height": 8,
+        "depth": 3
+      },
+      "innerXSep": -30,
+      "innerYSep": -30,
+      "outerXSep": 0,
+      "outerYSep": 0,
+      "minimumWidth": -2,
+      "minimumHeight": -5,
+      "lineWidth": 0.4,
+      "anchors": [
+        "text",
+        "center",
+        "base",
+        "mid",
+        "east",
+        "west",
+        "north",
+        "south",
+        "north east",
+        "north west",
+        "south east",
+        "south west",
+        "base east",
+        "base west",
+        "mid east",
+        "mid west",
+        "0",
+        "13",
+        "45",
+        "90",
+        "181",
+        "270",
+        "315",
+        "-30"
+      ],
+      "paints": [
+        {
+          "action": "stroke",
+          "tokens": [
+            {
+              "kind": "movetotoken",
+              "x": -1,
+              "y": 0
+            },
+            {
+              "kind": "curvetosupportatoken",
+              "x": -1,
+              "y": 1.38072
+            },
+            {
+              "kind": "curvetosupportbtoken",
+              "x": -0.55229,
+              "y": 2.5
+            },
+            {
+              "kind": "curvetotoken",
+              "x": 0,
+              "y": 2.5
+            },
+            {
+              "kind": "curvetosupportatoken",
+              "x": 0.55229,
+              "y": 2.5
+            },
+            {
+              "kind": "curvetosupportbtoken",
+              "x": 1,
+              "y": 1.38072
+            },
+            {
+              "kind": "curvetotoken",
+              "x": 1,
+              "y": 0
+            },
+            {
+              "kind": "curvetosupportatoken",
+              "x": 1,
+              "y": -1.38072
+            },
+            {
+              "kind": "curvetosupportbtoken",
+              "x": 0.55229,
+              "y": -2.5
+            },
+            {
+              "kind": "curvetotoken",
+              "x": 0,
+              "y": -2.5
+            },
+            {
+              "kind": "curvetosupportatoken",
+              "x": -0.55229,
+              "y": -2.5
+            },
+            {
+              "kind": "curvetosupportbtoken",
+              "x": -1,
+              "y": -1.38072
+            },
+            {
+              "kind": "curvetotoken",
+              "x": -1,
+              "y": 0
+            },
+            {
+              "kind": "closepathtoken",
+              "x": -1,
+              "y": 0
+            },
+            {
+              "kind": "movetotoken",
+              "x": 0,
+              "y": 0
+            }
+          ]
+        }
+      ],
+      "expectedAnchors": {
+        "0": {
+          "x": -1,
+          "y": 0
+        },
+        "13": {
+          "x": -0.99571,
+          "y": 0.22983
+        },
+        "45": {
+          "x": -0.92844,
+          "y": 0.92842
+        },
+        "90": {
+          "x": 0,
+          "y": 2.5
+        },
+        "181": {
+          "x": 0.99992,
+          "y": -0.01747
+        },
+        "270": {
+          "x": 0,
+          "y": -2.5
+        },
+        "315": {
+          "x": -0.92844,
+          "y": -0.92842
+        },
+        "text": {
+          "x": -10,
+          "y": 2.5
+        },
+        "center": {
+          "x": 0,
+          "y": 0
+        },
+        "base": {
+          "x": 0,
+          "y": 2.5
+        },
+        "mid": {
+          "x": 0,
+          "y": 0.34723
+        },
+        "east": {
+          "x": -1,
+          "y": 0
+        },
+        "west": {
+          "x": 1,
+          "y": 0
+        },
+        "north": {
+          "x": 0,
+          "y": 2.5
+        },
+        "south": {
+          "x": 0,
+          "y": -2.5
+        },
+        "north east": {
+          "x": -0.7071,
+          "y": 1.76776
+        },
+        "north west": {
+          "x": 0.7071,
+          "y": 1.76776
+        },
+        "south east": {
+          "x": -0.7071,
+          "y": -1.76776
+        },
+        "south west": {
+          "x": 0.7071,
+          "y": -1.76776
+        },
+        "base east": {
+          "x": -1,
+          "y": 2.5
+        },
+        "base west": {
+          "x": 1,
+          "y": 2.5
+        },
+        "mid east": {
+          "x": -1,
+          "y": 0.34723
+        },
+        "mid west": {
+          "x": 1,
+          "y": 0.34723
+        },
+        "-30": {
+          "x": -0.97433,
+          "y": -0.5624
+        }
+      },
+      "fontContext": {
+        "em": 10.00002,
+        "ex": 4.30554
+      }
+    },
+    {
+      "id": "ellipse-mixed-axes",
+      "shape": "ellipse",
+      "body": {
+        "width": 20,
+        "height": 8,
+        "depth": 3
+      },
+      "innerXSep": -30,
+      "innerYSep": 2,
+      "outerXSep": 0,
+      "outerYSep": 0,
+      "minimumWidth": -2,
+      "minimumHeight": -5,
+      "lineWidth": 0.4,
+      "anchors": [
+        "text",
+        "center",
+        "base",
+        "mid",
+        "east",
+        "west",
+        "north",
+        "south",
+        "north east",
+        "north west",
+        "south east",
+        "south west",
+        "base east",
+        "base west",
+        "mid east",
+        "mid west",
+        "0",
+        "13",
+        "45",
+        "90",
+        "181",
+        "270",
+        "315",
+        "-30"
+      ],
+      "paints": [
+        {
+          "action": "stroke",
+          "tokens": [
+            {
+              "kind": "movetotoken",
+              "x": -1,
+              "y": 0
+            },
+            {
+              "kind": "curvetosupportatoken",
+              "x": -1,
+              "y": -5.85794
+            },
+            {
+              "kind": "curvetosupportbtoken",
+              "x": -0.55229,
+              "y": -10.60661
+            },
+            {
+              "kind": "curvetotoken",
+              "x": 0,
+              "y": -10.60661
+            },
+            {
+              "kind": "curvetosupportatoken",
+              "x": 0.55229,
+              "y": -10.60661
+            },
+            {
+              "kind": "curvetosupportbtoken",
+              "x": 1,
+              "y": -5.85794
+            },
+            {
+              "kind": "curvetotoken",
+              "x": 1,
+              "y": 0
+            },
+            {
+              "kind": "curvetosupportatoken",
+              "x": 1,
+              "y": 5.85794
+            },
+            {
+              "kind": "curvetosupportbtoken",
+              "x": 0.55229,
+              "y": 10.60661
+            },
+            {
+              "kind": "curvetotoken",
+              "x": 0,
+              "y": 10.60661
+            },
+            {
+              "kind": "curvetosupportatoken",
+              "x": -0.55229,
+              "y": 10.60661
+            },
+            {
+              "kind": "curvetosupportbtoken",
+              "x": -1,
+              "y": 5.85794
+            },
+            {
+              "kind": "curvetotoken",
+              "x": -1,
+              "y": 0
+            },
+            {
+              "kind": "closepathtoken",
+              "x": -1,
+              "y": 0
+            },
+            {
+              "kind": "movetotoken",
+              "x": 0,
+              "y": 0
+            }
+          ]
+        }
+      ],
+      "expectedAnchors": {
+        "0": {
+          "x": -1,
+          "y": 0
+        },
+        "13": {
+          "x": -0.99973,
+          "y": 0.23045
+        },
+        "45": {
+          "x": -0.99553,
+          "y": 0.99533
+        },
+        "90": {
+          "x": 0,
+          "y": 10.60661
+        },
+        "181": {
+          "x": 0.99998,
+          "y": -0.01715
+        },
+        "270": {
+          "x": 0,
+          "y": -10.60661
+        },
+        "315": {
+          "x": -0.99553,
+          "y": -0.99533
+        },
+        "text": {
+          "x": -10,
+          "y": 2.5
+        },
+        "center": {
+          "x": 0,
+          "y": 0
+        },
+        "base": {
+          "x": 0,
+          "y": 2.5
+        },
+        "mid": {
+          "x": 0,
+          "y": 0.34723
+        },
+        "east": {
+          "x": -1,
+          "y": 0
+        },
+        "west": {
+          "x": 1,
+          "y": 0
+        },
+        "north": {
+          "x": 0,
+          "y": -10.60661
+        },
+        "south": {
+          "x": 0,
+          "y": 10.60661
+        },
+        "north east": {
+          "x": -0.7071,
+          "y": -7.50002
+        },
+        "north west": {
+          "x": 0.7071,
+          "y": -7.50002
+        },
+        "south east": {
+          "x": -0.7071,
+          "y": 7.50002
+        },
+        "south west": {
+          "x": 0.7071,
+          "y": 7.50002
+        },
+        "base east": {
+          "x": -1,
+          "y": 2.5
+        },
+        "base west": {
+          "x": 1,
+          "y": 2.5
+        },
+        "mid east": {
+          "x": -1,
+          "y": 0.34723
+        },
+        "mid west": {
+          "x": 1,
+          "y": 0.34723
+        },
+        "-30": {
+          "x": -0.99849,
+          "y": -0.57599
+        }
+      },
+      "fontContext": {
+        "em": 10.00002,
+        "ex": 4.30554
+      }
+    },
+    {
+      "id": "ellipse-outer-crossing",
+      "shape": "ellipse",
+      "body": {
+        "width": 20,
+        "height": 8,
+        "depth": 3
+      },
+      "innerXSep": -30,
+      "innerYSep": 2,
+      "outerXSep": 2,
+      "outerYSep": -20,
+      "minimumWidth": -2,
+      "minimumHeight": -5,
+      "lineWidth": 0.4,
+      "anchors": [
+        "text",
+        "center",
+        "base",
+        "mid",
+        "east",
+        "west",
+        "north",
+        "south",
+        "north east",
+        "north west",
+        "south east",
+        "south west",
+        "base east",
+        "base west",
+        "mid east",
+        "mid west",
+        "0",
+        "13",
+        "45",
+        "90",
+        "181",
+        "270",
+        "315",
+        "-30"
+      ],
+      "paints": [
+        {
+          "action": "stroke",
+          "tokens": [
+            {
+              "kind": "movetotoken",
+              "x": -1,
+              "y": 0
+            },
+            {
+              "kind": "curvetosupportatoken",
+              "x": -1,
+              "y": -5.85794
+            },
+            {
+              "kind": "curvetosupportbtoken",
+              "x": -0.55229,
+              "y": -10.60661
+            },
+            {
+              "kind": "curvetotoken",
+              "x": 0,
+              "y": -10.60661
+            },
+            {
+              "kind": "curvetosupportatoken",
+              "x": 0.55229,
+              "y": -10.60661
+            },
+            {
+              "kind": "curvetosupportbtoken",
+              "x": 1,
+              "y": -5.85794
+            },
+            {
+              "kind": "curvetotoken",
+              "x": 1,
+              "y": 0
+            },
+            {
+              "kind": "curvetosupportatoken",
+              "x": 1,
+              "y": 5.85794
+            },
+            {
+              "kind": "curvetosupportbtoken",
+              "x": 0.55229,
+              "y": 10.60661
+            },
+            {
+              "kind": "curvetotoken",
+              "x": 0,
+              "y": 10.60661
+            },
+            {
+              "kind": "curvetosupportatoken",
+              "x": -0.55229,
+              "y": 10.60661
+            },
+            {
+              "kind": "curvetosupportbtoken",
+              "x": -1,
+              "y": 5.85794
+            },
+            {
+              "kind": "curvetotoken",
+              "x": -1,
+              "y": 0
+            },
+            {
+              "kind": "closepathtoken",
+              "x": -1,
+              "y": 0
+            },
+            {
+              "kind": "movetotoken",
+              "x": 0,
+              "y": 0
+            }
+          ]
+        }
+      ],
+      "expectedAnchors": {
+        "0": {
+          "x": -1,
+          "y": 0
+        },
+        "13": {
+          "x": -0.99965,
+          "y": 0.23047
+        },
+        "45": {
+          "x": -0.99435,
+          "y": 0.99414
+        },
+        "90": {
+          "x": 0,
+          "y": 9.39339
+        },
+        "181": {
+          "x": 0.99997,
+          "y": -0.01733
+        },
+        "270": {
+          "x": 0,
+          "y": -9.39339
+        },
+        "315": {
+          "x": -0.99435,
+          "y": -0.99414
+        },
+        "text": {
+          "x": -10,
+          "y": 2.5
+        },
+        "center": {
+          "x": 0,
+          "y": 0
+        },
+        "base": {
+          "x": 0,
+          "y": 2.5
+        },
+        "mid": {
+          "x": 0,
+          "y": 0.34723
+        },
+        "east": {
+          "x": 1,
+          "y": 0
+        },
+        "west": {
+          "x": -1,
+          "y": 0
+        },
+        "north": {
+          "x": 0,
+          "y": 9.39339
+        },
+        "south": {
+          "x": 0,
+          "y": -9.39339
+        },
+        "north east": {
+          "x": 0.7071,
+          "y": 6.64212
+        },
+        "north west": {
+          "x": -0.7071,
+          "y": 6.64212
+        },
+        "south east": {
+          "x": 0.7071,
+          "y": -6.64212
+        },
+        "south west": {
+          "x": -0.7071,
+          "y": -6.64212
+        },
+        "base east": {
+          "x": 1,
+          "y": 2.5
+        },
+        "base west": {
+          "x": -1,
+          "y": 2.5
+        },
+        "mid east": {
+          "x": 1,
+          "y": 0.34723
+        },
+        "mid west": {
+          "x": -1,
+          "y": 0.34723
+        },
+        "-30": {
+          "x": -0.99806,
+          "y": -0.57605
+        }
+      },
+      "fontContext": {
+        "em": 10.00002,
+        "ex": 4.30554
+      }
+    },
+    {
+      "id": "rectangle-empty-strong",
+      "shape": "rectangle",
+      "body": {
+        "width": 0,
+        "height": 0,
+        "depth": 0
+      },
+      "innerXSep": -100,
+      "innerYSep": -100,
+      "outerXSep": 0,
+      "outerYSep": 0,
+      "minimumWidth": -160,
+      "minimumHeight": -160,
+      "lineWidth": 0.4,
+      "anchors": [
+        "text",
+        "center",
+        "base",
+        "mid",
+        "east",
+        "west",
+        "north",
+        "south",
+        "north east",
+        "north west",
+        "south east",
+        "south west",
+        "base east",
+        "base west",
+        "mid east",
+        "mid west",
+        "0",
+        "13",
+        "45",
+        "90",
+        "181",
+        "270",
+        "315",
+        "-30"
+      ],
+      "paints": [
+        {
+          "action": "stroke",
+          "tokens": [
+            {
+              "kind": "rectcornertoken",
+              "x": 80,
+              "y": -80
+            },
+            {
+              "kind": "rectsizetoken",
+              "x": -160,
+              "y": 160
+            }
+          ]
+        }
+      ],
+      "expectedAnchors": {
+        "0": {
+          "x": -80,
+          "y": 0
+        },
+        "13": {
+          "x": -346.66504,
+          "y": 80
+        },
+        "45": {
+          "x": -80.00732,
+          "y": 80
+        },
+        "90": {
+          "x": 0,
+          "y": 80
+        },
+        "181": {
+          "x": 80,
+          "y": 0
+        },
+        "270": {
+          "x": 0,
+          "y": -80
+        },
+        "315": {
+          "x": -80.00732,
+          "y": -80
+        },
+        "text": {
+          "x": 0,
+          "y": 0
+        },
+        "center": {
+          "x": 0,
+          "y": 0
+        },
+        "base": {
+          "x": 0,
+          "y": 0
+        },
+        "mid": {
+          "x": 0,
+          "y": -2.15277
+        },
+        "east": {
+          "x": -80,
+          "y": 0
+        },
+        "west": {
+          "x": 80,
+          "y": 0
+        },
+        "north": {
+          "x": 0,
+          "y": 80
+        },
+        "south": {
+          "x": 0,
+          "y": -80
+        },
+        "north east": {
+          "x": -80,
+          "y": 80
+        },
+        "north west": {
+          "x": 80,
+          "y": 80
+        },
+        "south east": {
+          "x": -80,
+          "y": -80
+        },
+        "south west": {
+          "x": 80,
+          "y": -80
+        },
+        "base east": {
+          "x": -80,
+          "y": 0
+        },
+        "base west": {
+          "x": 80,
+          "y": 0
+        },
+        "mid east": {
+          "x": -80,
+          "y": -2.15277
+        },
+        "mid west": {
+          "x": 80,
+          "y": -2.15277
+        },
+        "-30": {
+          "x": -138.56445,
+          "y": -80
+        }
+      },
+      "fontContext": {
+        "em": 10.00002,
+        "ex": 4.30554
+      }
+    },
+    {
+      "id": "rectangle-small-minima",
+      "shape": "rectangle",
+      "body": {
+        "width": 20,
+        "height": 8,
+        "depth": 3
+      },
+      "innerXSep": -30,
+      "innerYSep": -30,
+      "outerXSep": 0,
+      "outerYSep": 0,
+      "minimumWidth": -2,
+      "minimumHeight": -5,
+      "lineWidth": 0.4,
+      "anchors": [
+        "text",
+        "center",
+        "base",
+        "mid",
+        "east",
+        "west",
+        "north",
+        "south",
+        "north east",
+        "north west",
+        "south east",
+        "south west",
+        "base east",
+        "base west",
+        "mid east",
+        "mid west",
+        "0",
+        "13",
+        "45",
+        "90",
+        "181",
+        "270",
+        "315",
+        "-30"
+      ],
+      "paints": [
+        {
+          "action": "stroke",
+          "tokens": [
+            {
+              "kind": "rectcornertoken",
+              "x": 1,
+              "y": -2.5
+            },
+            {
+              "kind": "rectsizetoken",
+              "x": -2,
+              "y": 5
+            }
+          ]
+        }
+      ],
+      "expectedAnchors": {
+        "0": {
+          "x": -1,
+          "y": 0
+        },
+        "13": {
+          "x": -10.83328,
+          "y": 2.5
+        },
+        "45": {
+          "x": -2.50023,
+          "y": 2.5
+        },
+        "90": {
+          "x": 0,
+          "y": 2.5
+        },
+        "181": {
+          "x": 1,
+          "y": 0
+        },
+        "270": {
+          "x": 0,
+          "y": -2.5
+        },
+        "315": {
+          "x": -2.50023,
+          "y": -2.5
+        },
+        "text": {
+          "x": -10,
+          "y": 2.5
+        },
+        "center": {
+          "x": 0,
+          "y": 0
+        },
+        "base": {
+          "x": 0,
+          "y": 2.5
+        },
+        "mid": {
+          "x": 0,
+          "y": 0.34723
+        },
+        "east": {
+          "x": -1,
+          "y": 0
+        },
+        "west": {
+          "x": 1,
+          "y": 0
+        },
+        "north": {
+          "x": 0,
+          "y": 2.5
+        },
+        "south": {
+          "x": 0,
+          "y": -2.5
+        },
+        "north east": {
+          "x": -1,
+          "y": 2.5
+        },
+        "north west": {
+          "x": 1,
+          "y": 2.5
+        },
+        "south east": {
+          "x": -1,
+          "y": -2.5
+        },
+        "south west": {
+          "x": 1,
+          "y": -2.5
+        },
+        "base east": {
+          "x": -1,
+          "y": 2.5
+        },
+        "base west": {
+          "x": 1,
+          "y": 2.5
+        },
+        "mid east": {
+          "x": -1,
+          "y": 0.34723
+        },
+        "mid west": {
+          "x": 1,
+          "y": 0.34723
+        },
+        "-30": {
+          "x": -4.33014,
+          "y": -2.5
+        }
+      },
+      "fontContext": {
+        "em": 10.00002,
+        "ex": 4.30554
+      }
+    },
+    {
+      "id": "rectangle-mixed-axes",
+      "shape": "rectangle",
+      "body": {
+        "width": 20,
+        "height": 8,
+        "depth": 3
+      },
+      "innerXSep": -30,
+      "innerYSep": 2,
+      "outerXSep": 0,
+      "outerYSep": 0,
+      "minimumWidth": -2,
+      "minimumHeight": -5,
+      "lineWidth": 0.4,
+      "anchors": [
+        "text",
+        "center",
+        "base",
+        "mid",
+        "east",
+        "west",
+        "north",
+        "south",
+        "north east",
+        "north west",
+        "south east",
+        "south west",
+        "base east",
+        "base west",
+        "mid east",
+        "mid west",
+        "0",
+        "13",
+        "45",
+        "90",
+        "181",
+        "270",
+        "315",
+        "-30"
+      ],
+      "paints": [
+        {
+          "action": "stroke",
+          "tokens": [
+            {
+              "kind": "rectcornertoken",
+              "x": 1,
+              "y": 7.5
+            },
+            {
+              "kind": "rectsizetoken",
+              "x": -2,
+              "y": -15
+            }
+          ]
+        }
+      ],
+      "expectedAnchors": {
+        "0": {
+          "x": -1,
+          "y": 0
+        },
+        "13": {
+          "x": -1,
+          "y": 0.23085
+        },
+        "45": {
+          "x": -1,
+          "y": 1.00009
+        },
+        "90": {
+          "x": 0,
+          "y": -7.5
+        },
+        "181": {
+          "x": 1,
+          "y": -0.01746
+        },
+        "270": {
+          "x": 0,
+          "y": 7.5
+        },
+        "315": {
+          "x": -1,
+          "y": -1.00009
+        },
+        "text": {
+          "x": -10,
+          "y": 2.5
+        },
+        "center": {
+          "x": 0,
+          "y": 0
+        },
+        "base": {
+          "x": 0,
+          "y": 2.5
+        },
+        "mid": {
+          "x": 0,
+          "y": 0.34723
+        },
+        "east": {
+          "x": -1,
+          "y": 0
+        },
+        "west": {
+          "x": 1,
+          "y": 0
+        },
+        "north": {
+          "x": 0,
+          "y": -7.5
+        },
+        "south": {
+          "x": 0,
+          "y": 7.5
+        },
+        "north east": {
+          "x": -1,
+          "y": -7.5
+        },
+        "north west": {
+          "x": 1,
+          "y": -7.5
+        },
+        "south east": {
+          "x": -1,
+          "y": 7.5
+        },
+        "south west": {
+          "x": 1,
+          "y": 7.5
+        },
+        "base east": {
+          "x": -1,
+          "y": 2.5
+        },
+        "base west": {
+          "x": 1,
+          "y": 2.5
+        },
+        "mid east": {
+          "x": -1,
+          "y": 0.34723
+        },
+        "mid west": {
+          "x": 1,
+          "y": 0.34723
+        },
+        "-30": {
+          "x": -1,
+          "y": -0.57738
+        }
+      },
+      "fontContext": {
+        "em": 10.00002,
+        "ex": 4.30554
+      }
+    },
+    {
+      "id": "rectangle-outer-crossing",
+      "shape": "rectangle",
+      "body": {
+        "width": 20,
+        "height": 8,
+        "depth": 3
+      },
+      "innerXSep": -30,
+      "innerYSep": 2,
+      "outerXSep": 2,
+      "outerYSep": -20,
+      "minimumWidth": -2,
+      "minimumHeight": -5,
+      "lineWidth": 0.4,
+      "anchors": [
+        "text",
+        "center",
+        "base",
+        "mid",
+        "east",
+        "west",
+        "north",
+        "south",
+        "north east",
+        "north west",
+        "south east",
+        "south west",
+        "base east",
+        "base west",
+        "mid east",
+        "mid west",
+        "0",
+        "13",
+        "45",
+        "90",
+        "181",
+        "270",
+        "315",
+        "-30"
+      ],
+      "paints": [
+        {
+          "action": "stroke",
+          "tokens": [
+            {
+              "kind": "rectcornertoken",
+              "x": 1,
+              "y": 7.5
+            },
+            {
+              "kind": "rectsizetoken",
+              "x": -2,
+              "y": -15
+            }
+          ]
+        }
+      ],
+      "expectedAnchors": {
+        "0": {
+          "x": 1,
+          "y": 0
+        },
+        "13": {
+          "x": -54.16641,
+          "y": 12.5
+        },
+        "45": {
+          "x": -12.50114,
+          "y": 12.5
+        },
+        "90": {
+          "x": 0,
+          "y": 12.5
+        },
+        "181": {
+          "x": -1,
+          "y": 0
+        },
+        "270": {
+          "x": 0,
+          "y": -12.5
+        },
+        "315": {
+          "x": -12.50114,
+          "y": -12.5
+        },
+        "text": {
+          "x": -10,
+          "y": 2.5
+        },
+        "center": {
+          "x": 0,
+          "y": 0
+        },
+        "base": {
+          "x": 0,
+          "y": 2.5
+        },
+        "mid": {
+          "x": 0,
+          "y": 0.34723
+        },
+        "east": {
+          "x": 1,
+          "y": 0
+        },
+        "west": {
+          "x": -1,
+          "y": 0
+        },
+        "north": {
+          "x": 0,
+          "y": 12.5
+        },
+        "south": {
+          "x": 0,
+          "y": -12.5
+        },
+        "north east": {
+          "x": 1,
+          "y": 12.5
+        },
+        "north west": {
+          "x": -1,
+          "y": 12.5
+        },
+        "south east": {
+          "x": 1,
+          "y": -12.5
+        },
+        "south west": {
+          "x": -1,
+          "y": -12.5
+        },
+        "base east": {
+          "x": 1,
+          "y": 2.5
+        },
+        "base west": {
+          "x": -1,
+          "y": 2.5
+        },
+        "mid east": {
+          "x": 1,
+          "y": 0.34723
+        },
+        "mid west": {
+          "x": -1,
+          "y": 0.34723
+        },
+        "-30": {
+          "x": -21.6507,
+          "y": -12.5
+        }
+      },
+      "fontContext": {
+        "em": 10.00002,
+        "ex": 4.30554
+      }
+    }
+  ]
+}

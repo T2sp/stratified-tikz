@@ -1457,5 +1457,77 @@ Main's later completed 32B takes precedence; those deferrals describe the
 historical branch rather than current 32B acceptance. Default strict verification
 stays unchanged. Fresh acceptance of the combined 32C checkout requires all
 earlier strict checks, final settled SVG and the new geometric manifest.
-Unexecuted/missing native or PGF evidence is a blocker. 32D layout/anchors and
-commit/push are outside this fix.
+Unexecuted/missing native or PGF evidence is a blocker. The 32C implementation
+did not complete configurable 32D layout/anchors.
+
+## Phase 32D point layout and placement contract
+
+`PointStyle.layout` stores optional explicit TeX-point inner/outer x/y
+separations, minimum width/height, and a literal anchor. Optional `units` records
+the original dimension text, unit, resolved TeX points and optional per-axis
+`fontContext`. An axis's conversion context overrides the legacy shared
+`layout.fontContext`; merges copy inherited contexts onto their axes before
+applying local overrides. This is additive to saved envelope version 2.
+Historical documents/presets omit layout and retain Size / 2 inner padding,
+half-line-width outer padding, 1pt minima, and center placement. Each explicit
+inner axis overrides that axis only; editing legacy Size clears both axes.
+No generated layout, contour, font request, cache, or MathJax SVG enters history.
+
+Imported shorthand expands at its position in the bounded option stream:
+`inner sep`, `outer sep`, and `minimum size` set both relevant axes; later
+axis-specific keys replace only their axis. Local `importedLayout` override
+provenance follows the existing paint/shape import model. Clearing an imported
+reference removes its provenance while preserving explicit current layout.
+Dimension parsing accepts signed finite decimal literals with optional
+pt/mm/cm/in/bp/em/ex units, bounded to ±10000 TeX pt. Shape counts and angles
+retain their separate scalar grammars. One inch is 72.27 TeX pt. Contextual
+dimensions use the recorded font context rather than guessing from CSS ink.
+The context converts dimensions only; it does not change typography or text/mid
+anchor font metrics. Numeric border directions follow PGF's integer truncation
+toward zero before anchor resolution. Numeric anchor magnitudes must stay below
+16,384; unsigned and leading-plus literals truncate first, while negative literals use PGF's
+scaled-point parser and may overflow by rounding near the boundary. Unsigned or
+leading-plus fractions require an integer prefix, so `.5` and `+.5` are diagnosed.
+Unsupported
+source values remain saved with a diagnostic. A selected anchor outside PGF's
+TeX coordinate range is also diagnosed.
+
+The pure shape solver supplies text baseline/depth, body origin, text center,
+shape center, actual contours, and a declared anchor map. Each minimum is solved
+inside its shape; polygon/star minima constrain circumdiameter and coupled
+triangle/trapezium/cylinder sizing retains its PGF rules. Outer separation
+supplies shape-specific anchor clearance independently of painted bounds and
+the hit/selection region. Valid negative inner separation can expose body ink
+outside the painted contour: picking unions actual body bounds with the painted
+contour/stroke region, and the selection ring encloses both without adding anchor
+clearance. Painted and body bounds remain independently inspectable.
+PGF's diamond background additionally uses the recorded
+`fitted radius + (1 - 1.414213) * outer axis separation` rule; the cumulative
+native matrix must measure that exact shrink rather than waive its comparison.
+Undefined constructions and unsupported names produce diagnostics.
+The hidden requested contour of a diagnostic node contributes no painted bounds,
+hit region or selection radius. Exact body ink and the explicit small SVG warning
+remain pickable; selection encloses those visible bounds only. Requested shape
+and anchor-clearance bounds remain separately inspectable metadata.
+The [support table and finite limits](PHASE_32D_IMPLEMENTATION.md) are normative
+for this bounded preview; arbitrary PGF programs are not executed.
+
+Rendering translates body and contour by the negative selected-anchor offset;
+the model position and established coordinate-reference semantics stay intact.
+Committed picking and selection use the same revision and placement offset.
+Settled SVG uses the same pure view with immutable click-time source, dimensions,
+font context, anchor, shape parameters, paint, and projection. Anchor/paint/view
+edits reuse body conversion where source and font identity are unchanged.
+`text height`/`text depth` are visibly unsupported, and paragraph wrapping/font
+execution remains outside this series. Imported node `rotate`/`transform shape`
+options remain unsupported with visible diagnostics and preserved external
+source. They are not resolved as `shape border rotate`, which has its own
+supported contour and anchor semantics.
+
+Strict 32D acceptance requires all twelve 31F groups, three 32A groups, the 32B
+paint group, the 32C geometric group, and
+`point-node-layout-anchors-combined`: eighteen groups with explicit terminal
+scenario identities, no page errors, retained artifacts, and matching tracked
+and untracked checkout identity. Historical or scoped 32C evidence cannot close
+the final Phase 32 gate. The [combined audit](PHASE_32D_IMPLEMENTATION.md#combined-acceptance-audit)
+records implementation paths separately from executed/pending evidence.

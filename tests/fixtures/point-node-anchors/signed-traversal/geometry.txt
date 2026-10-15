@@ -1,0 +1,84 @@
+CASE positive-x-positive-y-full-forward
+PAINT stroke; PATH macro:->\pgfsyssoftpath@movetotoken {14.0pt}{-5.0pt}\pgfsyssoftpath@curvetosupportatoken {14.0pt}{-1.13396pt}\pgfsyssoftpath@curvetosupportbtoken {9.07521pt}{2.0pt}\pgfsyssoftpath@curvetotoken {3.0pt}{2.0pt}\pgfsyssoftpath@curvetosupportatoken {-3.07521pt}{2.0pt}\pgfsyssoftpath@curvetosupportbtoken {-8.0pt}{-1.13396pt}\pgfsyssoftpath@curvetotoken {-8.0pt}{-5.0pt}\pgfsyssoftpath@curvetosupportatoken {-8.0pt}{-8.86604pt}\pgfsyssoftpath@curvetosupportbtoken {-3.07521pt}{-12.0pt}\pgfsyssoftpath@curvetotoken {3.0pt}{-12.0pt}\pgfsyssoftpath@curvetosupportatoken {9.07521pt}{-12.0pt}\pgfsyssoftpath@curvetosupportbtoken {14.0pt}{-8.86604pt}\pgfsyssoftpath@curvetotoken {14.0pt}{-5.0pt}\pgfsyssoftpath@closepathtoken {14.0pt}{-5.0pt}
+CASE positive-x-positive-y-full-reverse
+PAINT stroke; PATH macro:->\pgfsyssoftpath@movetotoken {10.93336pt}{-10.07275pt}\pgfsyssoftpath@curvetosupportatoken {9.42279pt}{-13.63144pt}\pgfsyssoftpath@curvetosupportbtoken {3.66496pt}{-14.59198pt}\pgfsyssoftpath@curvetotoken {-1.92728pt}{-12.21822pt}\pgfsyssoftpath@curvetosupportatoken {-7.51952pt}{-9.84445pt}\pgfsyssoftpath@curvetosupportbtoken {-10.82825pt}{-5.03534pt}\pgfsyssoftpath@curvetotoken {-9.31767pt}{-1.47665pt}\pgfsyssoftpath@curvetosupportatoken {-7.8071pt}{2.08203pt}\pgfsyssoftpath@curvetosupportbtoken {-2.04927pt}{3.04257pt}\pgfsyssoftpath@curvetotoken {3.54297pt}{0.66881pt}\pgfsyssoftpath@curvetosupportatoken {9.13521pt}{-1.70496pt}\pgfsyssoftpath@curvetosupportbtoken {12.44394pt}{-6.51407pt}\pgfsyssoftpath@curvetotoken {10.93336pt}{-10.07275pt}\pgfsyssoftpath@closepathtoken {10.93336pt}{-10.07275pt}
+CASE positive-x-positive-y-partial-forward
+PAINT stroke; PATH macro:->\pgfsyssoftpath@movetotoken {10.90678pt}{6.34064pt}\pgfsyssoftpath@curvetosupportatoken {6.46588pt}{7.1865pt}\pgfsyssoftpath@curvetosupportbtoken {0.40268pt}{4.0539pt}\pgfsyssoftpath@curvetotoken {-2.63588pt}{-0.65623pt}\pgfsyssoftpath@curvetosupportatoken {-5.67444pt}{-5.36636pt}\pgfsyssoftpath@curvetosupportbtoken {-4.53763pt}{-9.8703pt}\pgfsyssoftpath@curvetotoken {-0.09673pt}{-10.71616pt}
+CASE positive-x-positive-y-partial-reverse
+PAINT stroke; PATH macro:->\pgfsyssoftpath@movetotoken {-0.09671pt}{-10.71616pt}\pgfsyssoftpath@curvetosupportatoken {-4.53761pt}{-9.8703pt}\pgfsyssoftpath@curvetosupportbtoken {-5.67442pt}{-5.36636pt}\pgfsyssoftpath@curvetotoken {-2.63586pt}{-0.65623pt}\pgfsyssoftpath@curvetosupportatoken {0.4027pt}{4.0539pt}\pgfsyssoftpath@curvetosupportbtoken {6.4659pt}{7.1865pt}\pgfsyssoftpath@curvetotoken {10.9068pt}{6.34064pt}
+CASE negative-x-positive-y-full-forward
+PAINT stroke; PATH macro:->\pgfsyssoftpath@movetotoken {-8.0pt}{-5.0pt}\pgfsyssoftpath@curvetosupportatoken {-8.0pt}{-1.13396pt}\pgfsyssoftpath@curvetosupportbtoken {-3.07521pt}{2.0pt}\pgfsyssoftpath@curvetotoken {3.0pt}{2.0pt}\pgfsyssoftpath@curvetosupportatoken {9.07521pt}{2.0pt}\pgfsyssoftpath@curvetosupportbtoken {14.0pt}{-1.13396pt}\pgfsyssoftpath@curvetotoken {14.0pt}{-5.0pt}\pgfsyssoftpath@curvetosupportatoken {14.0pt}{-8.86604pt}\pgfsyssoftpath@curvetosupportbtoken {9.07521pt}{-12.0pt}\pgfsyssoftpath@curvetotoken {3.0pt}{-12.0pt}\pgfsyssoftpath@curvetosupportatoken {-3.07521pt}{-12.0pt}\pgfsyssoftpath@curvetosupportbtoken {-8.0pt}{-8.86604pt}\pgfsyssoftpath@curvetotoken {-8.0pt}{-5.0pt}\pgfsyssoftpath@closepathtoken {-8.0pt}{-5.0pt}
+CASE negative-x-positive-y-full-reverse
+PAINT stroke; PATH macro:->\pgfsyssoftpath@movetotoken {-9.31767pt}{-1.47665pt}\pgfsyssoftpath@curvetosupportatoken {-10.82825pt}{-5.03534pt}\pgfsyssoftpath@curvetosupportbtoken {-7.51952pt}{-9.84445pt}\pgfsyssoftpath@curvetotoken {-1.92728pt}{-12.21822pt}\pgfsyssoftpath@curvetosupportatoken {3.66496pt}{-14.59198pt}\pgfsyssoftpath@curvetosupportbtoken {9.42279pt}{-13.63144pt}\pgfsyssoftpath@curvetotoken {10.93336pt}{-10.07275pt}\pgfsyssoftpath@curvetosupportatoken {12.44394pt}{-6.51407pt}\pgfsyssoftpath@curvetosupportbtoken {9.13521pt}{-1.70496pt}\pgfsyssoftpath@curvetotoken {3.54297pt}{0.66881pt}\pgfsyssoftpath@curvetosupportatoken {-2.04927pt}{3.04257pt}\pgfsyssoftpath@curvetosupportbtoken {-7.8071pt}{2.08203pt}\pgfsyssoftpath@curvetotoken {-9.31767pt}{-1.47665pt}\pgfsyssoftpath@closepathtoken {-9.31767pt}{-1.47665pt}
+CASE negative-x-positive-y-partial-forward
+PAINT stroke; PATH macro:->\pgfsyssoftpath@movetotoken {-4.30946pt}{-5.12564pt}\pgfsyssoftpath@curvetosupportatoken {-3.89847pt}{-0.62363pt}\pgfsyssoftpath@curvetosupportbtoken {0.784pt}{4.34122pt}\pgfsyssoftpath@curvetotoken {6.14922pt}{5.96379pt}\pgfsyssoftpath@curvetosupportatoken {11.51443pt}{7.58636pt}\pgfsyssoftpath@curvetosupportbtoken {15.53052pt}{5.25214pt}\pgfsyssoftpath@curvetotoken {15.11952pt}{0.75012pt}
+CASE negative-x-positive-y-partial-reverse
+PAINT stroke; PATH macro:->\pgfsyssoftpath@movetotoken {15.11954pt}{0.75012pt}\pgfsyssoftpath@curvetosupportatoken {15.53053pt}{5.25214pt}\pgfsyssoftpath@curvetosupportbtoken {11.51445pt}{7.58636pt}\pgfsyssoftpath@curvetotoken {6.14923pt}{5.96379pt}\pgfsyssoftpath@curvetosupportatoken {0.78401pt}{4.34122pt}\pgfsyssoftpath@curvetosupportbtoken {-3.89845pt}{-0.62363pt}\pgfsyssoftpath@curvetotoken {-4.30945pt}{-5.12564pt}
+CASE positive-x-negative-y-full-forward
+PAINT stroke; PATH macro:->\pgfsyssoftpath@movetotoken {14.0pt}{-5.0pt}\pgfsyssoftpath@curvetosupportatoken {14.0pt}{-8.86604pt}\pgfsyssoftpath@curvetosupportbtoken {9.07521pt}{-12.0pt}\pgfsyssoftpath@curvetotoken {3.0pt}{-12.0pt}\pgfsyssoftpath@curvetosupportatoken {-3.07521pt}{-12.0pt}\pgfsyssoftpath@curvetosupportbtoken {-8.0pt}{-8.86604pt}\pgfsyssoftpath@curvetotoken {-8.0pt}{-5.0pt}\pgfsyssoftpath@curvetosupportatoken {-8.0pt}{-1.13396pt}\pgfsyssoftpath@curvetosupportbtoken {-3.07521pt}{2.0pt}\pgfsyssoftpath@curvetotoken {3.0pt}{2.0pt}\pgfsyssoftpath@curvetosupportatoken {9.07521pt}{2.0pt}\pgfsyssoftpath@curvetosupportbtoken {14.0pt}{-1.13396pt}\pgfsyssoftpath@curvetotoken {14.0pt}{-5.0pt}\pgfsyssoftpath@closepathtoken {14.0pt}{-5.0pt}
+CASE positive-x-negative-y-full-reverse
+PAINT stroke; PATH macro:->\pgfsyssoftpath@movetotoken {10.93336pt}{-10.07275pt}\pgfsyssoftpath@curvetosupportatoken {12.44394pt}{-6.51407pt}\pgfsyssoftpath@curvetosupportbtoken {9.13521pt}{-1.70496pt}\pgfsyssoftpath@curvetotoken {3.54297pt}{0.66881pt}\pgfsyssoftpath@curvetosupportatoken {-2.04927pt}{3.04257pt}\pgfsyssoftpath@curvetosupportbtoken {-7.8071pt}{2.08203pt}\pgfsyssoftpath@curvetotoken {-9.31767pt}{-1.47665pt}\pgfsyssoftpath@curvetosupportatoken {-10.82825pt}{-5.03534pt}\pgfsyssoftpath@curvetosupportbtoken {-7.51952pt}{-9.84445pt}\pgfsyssoftpath@curvetotoken {-1.92728pt}{-12.21822pt}\pgfsyssoftpath@curvetosupportatoken {3.66496pt}{-14.59198pt}\pgfsyssoftpath@curvetosupportbtoken {9.42279pt}{-13.63144pt}\pgfsyssoftpath@curvetotoken {10.93336pt}{-10.07275pt}\pgfsyssoftpath@closepathtoken {10.93336pt}{-10.07275pt}
+CASE positive-x-negative-y-partial-forward
+PAINT stroke; PATH macro:->\pgfsyssoftpath@movetotoken {15.11954pt}{0.75012pt}\pgfsyssoftpath@curvetosupportatoken {14.70854pt}{-3.75189pt}\pgfsyssoftpath@curvetosupportbtoken {10.02608pt}{-8.71674pt}\pgfsyssoftpath@curvetotoken {4.66086pt}{-10.33931pt}\pgfsyssoftpath@curvetosupportatoken {-0.70436pt}{-11.96188pt}\pgfsyssoftpath@curvetosupportbtoken {-4.72044pt}{-9.62766pt}\pgfsyssoftpath@curvetotoken {-4.30945pt}{-5.12564pt}
+CASE positive-x-negative-y-partial-reverse
+PAINT stroke; PATH macro:->\pgfsyssoftpath@movetotoken {-4.30946pt}{-5.12564pt}\pgfsyssoftpath@curvetosupportatoken {-4.72046pt}{-9.62766pt}\pgfsyssoftpath@curvetosupportbtoken {-0.70438pt}{-11.96188pt}\pgfsyssoftpath@curvetotoken {4.66084pt}{-10.33931pt}\pgfsyssoftpath@curvetosupportatoken {10.02606pt}{-8.71674pt}\pgfsyssoftpath@curvetosupportbtoken {14.70853pt}{-3.75189pt}\pgfsyssoftpath@curvetotoken {15.11952pt}{0.75012pt}
+CASE negative-x-negative-y-full-forward
+PAINT stroke; PATH macro:->\pgfsyssoftpath@movetotoken {-8.0pt}{-5.0pt}\pgfsyssoftpath@curvetosupportatoken {-8.0pt}{-8.86604pt}\pgfsyssoftpath@curvetosupportbtoken {-3.07521pt}{-12.0pt}\pgfsyssoftpath@curvetotoken {3.0pt}{-12.0pt}\pgfsyssoftpath@curvetosupportatoken {9.07521pt}{-12.0pt}\pgfsyssoftpath@curvetosupportbtoken {14.0pt}{-8.86604pt}\pgfsyssoftpath@curvetotoken {14.0pt}{-5.0pt}\pgfsyssoftpath@curvetosupportatoken {14.0pt}{-1.13396pt}\pgfsyssoftpath@curvetosupportbtoken {9.07521pt}{2.0pt}\pgfsyssoftpath@curvetotoken {3.0pt}{2.0pt}\pgfsyssoftpath@curvetosupportatoken {-3.07521pt}{2.0pt}\pgfsyssoftpath@curvetosupportbtoken {-8.0pt}{-1.13396pt}\pgfsyssoftpath@curvetotoken {-8.0pt}{-5.0pt}\pgfsyssoftpath@closepathtoken {-8.0pt}{-5.0pt}
+CASE negative-x-negative-y-full-reverse
+PAINT stroke; PATH macro:->\pgfsyssoftpath@movetotoken {-9.31767pt}{-1.47665pt}\pgfsyssoftpath@curvetosupportatoken {-7.8071pt}{2.08203pt}\pgfsyssoftpath@curvetosupportbtoken {-2.04927pt}{3.04257pt}\pgfsyssoftpath@curvetotoken {3.54297pt}{0.66881pt}\pgfsyssoftpath@curvetosupportatoken {9.13521pt}{-1.70496pt}\pgfsyssoftpath@curvetosupportbtoken {12.44394pt}{-6.51407pt}\pgfsyssoftpath@curvetotoken {10.93336pt}{-10.07275pt}\pgfsyssoftpath@curvetosupportatoken {9.42279pt}{-13.63144pt}\pgfsyssoftpath@curvetosupportbtoken {3.66496pt}{-14.59198pt}\pgfsyssoftpath@curvetotoken {-1.92728pt}{-12.21822pt}\pgfsyssoftpath@curvetosupportatoken {-7.51952pt}{-9.84445pt}\pgfsyssoftpath@curvetosupportbtoken {-10.82825pt}{-5.03534pt}\pgfsyssoftpath@curvetotoken {-9.31767pt}{-1.47665pt}\pgfsyssoftpath@closepathtoken {-9.31767pt}{-1.47665pt}
+CASE negative-x-negative-y-partial-forward
+PAINT stroke; PATH macro:->\pgfsyssoftpath@movetotoken {-0.09671pt}{-10.71616pt}\pgfsyssoftpath@curvetosupportatoken {4.3442pt}{-11.56201pt}\pgfsyssoftpath@curvetosupportbtoken {10.4074pt}{-8.42941pt}\pgfsyssoftpath@curvetotoken {13.44595pt}{-3.71928pt}\pgfsyssoftpath@curvetosupportatoken {16.48451pt}{0.99084pt}\pgfsyssoftpath@curvetosupportbtoken {15.3477pt}{5.49478pt}\pgfsyssoftpath@curvetotoken {10.9068pt}{6.34064pt}
+CASE negative-x-negative-y-partial-reverse
+PAINT stroke; PATH macro:->\pgfsyssoftpath@movetotoken {10.90678pt}{6.34064pt}\pgfsyssoftpath@curvetosupportatoken {15.34769pt}{5.49478pt}\pgfsyssoftpath@curvetosupportbtoken {16.4845pt}{0.99084pt}\pgfsyssoftpath@curvetotoken {13.44594pt}{-3.71928pt}\pgfsyssoftpath@curvetosupportatoken {10.40738pt}{-8.42941pt}\pgfsyssoftpath@curvetosupportbtoken {4.34418pt}{-11.56201pt}\pgfsyssoftpath@curvetotoken {-0.09673pt}{-10.71616pt}
+CASE review-mixed-axes
+PAINT stroke; PATH macro:->\pgfsyssoftpath@movetotoken {-1.0pt}{0.0pt}\pgfsyssoftpath@curvetosupportatoken {-1.0pt}{5.85794pt}\pgfsyssoftpath@curvetosupportbtoken {-0.55229pt}{10.60661pt}\pgfsyssoftpath@curvetotoken {0.0pt}{10.60661pt}\pgfsyssoftpath@curvetosupportatoken {0.55229pt}{10.60661pt}\pgfsyssoftpath@curvetosupportbtoken {1.0pt}{5.85794pt}\pgfsyssoftpath@curvetotoken {1.0pt}{0.0pt}\pgfsyssoftpath@curvetosupportatoken {1.0pt}{-5.85794pt}\pgfsyssoftpath@curvetosupportbtoken {0.55229pt}{-10.60661pt}\pgfsyssoftpath@curvetotoken {0.0pt}{-10.60661pt}\pgfsyssoftpath@curvetosupportatoken {-0.55229pt}{-10.60661pt}\pgfsyssoftpath@curvetosupportbtoken {-1.0pt}{-5.85794pt}\pgfsyssoftpath@curvetotoken {-1.0pt}{0.0pt}\pgfsyssoftpath@closepathtoken {-1.0pt}{0.0pt}\pgfsyssoftpath@movetotoken {0.0pt}{0.0pt}
+ANCHOR text; -10.0pt,-2.5pt
+ANCHOR center; 0.0pt,0.0pt
+ANCHOR base; 0.0pt,-2.5pt
+ANCHOR mid; 0.0pt,-0.34723pt
+ANCHOR east; -1.0pt,0.0pt
+ANCHOR west; 1.0pt,0.0pt
+ANCHOR north; 0.0pt,10.60661pt
+ANCHOR south; 0.0pt,-10.60661pt
+ANCHOR north east; -0.7071pt,7.50002pt
+ANCHOR north west; 0.7071pt,7.50002pt
+ANCHOR south east; -0.7071pt,-7.50002pt
+ANCHOR south west; 0.7071pt,-7.50002pt
+ANCHOR base east; -1.0pt,-2.5pt
+ANCHOR base west; 1.0pt,-2.5pt
+ANCHOR mid east; -1.0pt,-0.34723pt
+ANCHOR mid west; 1.0pt,-0.34723pt
+ANCHOR 0; -1.0pt,0.0pt
+ANCHOR 13; -0.99973pt,-0.23045pt
+ANCHOR 45; -0.99553pt,-0.99533pt
+ANCHOR 90; 0.0pt,-10.60661pt
+ANCHOR 181; 0.99998pt,0.01715pt
+ANCHOR 270; 0.0pt,10.60661pt
+ANCHOR 315; -0.99553pt,0.99533pt
+ANCHOR -30; -0.99849pt,0.57599pt
+CASE native-empty-mixed-axes
+PAINT stroke; PATH macro:->\pgfsyssoftpath@movetotoken {-1.0pt}{0.0pt}\pgfsyssoftpath@curvetosupportatoken {-1.0pt}{5.85794pt}\pgfsyssoftpath@curvetosupportbtoken {-0.55229pt}{10.60661pt}\pgfsyssoftpath@curvetotoken {0.0pt}{10.60661pt}\pgfsyssoftpath@curvetosupportatoken {0.55229pt}{10.60661pt}\pgfsyssoftpath@curvetosupportbtoken {1.0pt}{5.85794pt}\pgfsyssoftpath@curvetotoken {1.0pt}{0.0pt}\pgfsyssoftpath@curvetosupportatoken {1.0pt}{-5.85794pt}\pgfsyssoftpath@curvetosupportbtoken {0.55229pt}{-10.60661pt}\pgfsyssoftpath@curvetotoken {0.0pt}{-10.60661pt}\pgfsyssoftpath@curvetosupportatoken {-0.55229pt}{-10.60661pt}\pgfsyssoftpath@curvetosupportbtoken {-1.0pt}{-5.85794pt}\pgfsyssoftpath@curvetotoken {-1.0pt}{0.0pt}\pgfsyssoftpath@closepathtoken {-1.0pt}{0.0pt}\pgfsyssoftpath@movetotoken {0.0pt}{0.0pt}
+ANCHOR text; 0.0pt,0.0pt
+ANCHOR center; 0.0pt,0.0pt
+ANCHOR base; 0.0pt,0.0pt
+ANCHOR mid; 0.0pt,2.15277pt
+ANCHOR east; -1.0pt,0.0pt
+ANCHOR west; 1.0pt,0.0pt
+ANCHOR north; 0.0pt,10.60661pt
+ANCHOR south; 0.0pt,-10.60661pt
+ANCHOR north east; -0.7071pt,7.50002pt
+ANCHOR north west; 0.7071pt,7.50002pt
+ANCHOR south east; -0.7071pt,-7.50002pt
+ANCHOR south west; 0.7071pt,-7.50002pt
+ANCHOR base east; -1.0pt,0.0pt
+ANCHOR base west; 1.0pt,0.0pt
+ANCHOR mid east; -1.0pt,2.15277pt
+ANCHOR mid west; 1.0pt,2.15277pt
+ANCHOR 0; -1.0pt,0.0pt
+ANCHOR 13; -0.99973pt,-0.23045pt
+ANCHOR 45; -0.99553pt,-0.99533pt
+ANCHOR 90; 0.0pt,-10.60661pt
+ANCHOR 181; 0.99998pt,0.01715pt
+ANCHOR 270; 0.0pt,10.60661pt
+ANCHOR 315; -0.99553pt,0.99533pt
+ANCHOR -30; -0.99849pt,0.57599pt

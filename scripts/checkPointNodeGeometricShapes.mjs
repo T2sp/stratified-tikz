@@ -3,12 +3,15 @@ import { readFile, writeFile } from 'node:fs/promises'
 import { resolve } from 'node:path'
 import { pathToFileURL } from 'node:url'
 import { geometricShapeGroup as group, geometricShapeManifest, geometricBodyVariants,
-  geometricShapeArtifacts, assertGeometricShapeEvidence } from './pointGeometricShapesContract.mjs'
+  geometricShapeArtifacts, assertGeometricShapeEvidence, assertVisibilityCameraPreparation } from './pointGeometricShapesContract.mjs'
 import { createOwnedAppPage } from './ownedAppPage.mjs'
 import { ownPageEvent } from './ownedPageEvent.mjs'
 import { resolvePointInspectorField } from './pointInspectorFields.mjs'
-import { createPointDiagnostics } from './pointCheckDiagnostics.mjs'
+import { boundedPointDiagnostic, createPointDiagnostics, captureObservedPointCheck } from './pointCheckDiagnostics.mjs'
 import { selectGeometricPoint } from './pointGeometricSelection.mjs'
+import { dragSelectedPoint } from './pointNativeDrag.mjs'
+import { selectHiddenPointVisibility, inspectSourceHiddenPoints } from './pointSourceVisibility.mjs'
+import { captureStandaloneSvg } from './standaloneSvgCapture.mjs'
 
 const paint = { text: { color: '#000000', opacity: 1 }, fill: { enabled: true, color: '#e0f0ff', opacity: 1 },
   stroke: { enabled: true, color: '#203040', opacity: 1, width: .4, lineStyle: 'solid', dashPhase: 0, lineCap: 'butt', lineJoin: 'miter' } }
@@ -31,6 +34,12 @@ export async function observeGeometricPoint(page, id) {
     const bounds = contour.getBBox(), ink = body.getBBox(), matrix = contour.getScreenCTM(), local = node.getCTM().inverse().multiply(body.getCTM())
     const at = contour.getPointAtLength(contour.getTotalLength() * .23).matrixTransform(matrix)
     const center = new DOMPoint().matrixTransform(node.getScreenCTM())
+    const opacityAncestors = []
+    for (let element = contour; element; element = element.parentElement) {
+      opacityAncestors.push({ tag: element.localName, opacity: getComputedStyle(element).opacity,
+        attributeOpacity: element.getAttribute('opacity'), isPointOwner: element === outer,
+        pointId: element.getAttribute('data-point-id'), connected: element.isConnected })
+    }
     const clean = (element) => ({ tag: element.localName, attributes: Object.fromEntries([...element.attributes]
       .filter(({ name }) => !name.startsWith('data-') && name !== 'pointer-events').map(({ name, value }) => [name, value])) })
     const contained = []
@@ -38,15 +47,111 @@ export async function observeGeometricPoint(page, id) {
       const point = new DOMPoint(x, y).matrixTransform(local)
       contained.push({ x: point.x, y: point.y, inside: contour.isPointInFill(point) || contour.isPointInStroke(point) })
     }
-    return { source: body.getAttribute('data-label-source'), state: body.getAttribute('data-label-state'),
+    return { id: outer.getAttribute('data-point-id'), pointVisibility: outer.getAttribute('data-point-visibility'),
+      occludingSurfaceId: outer.getAttribute('data-occluding-surface-id'),
+      source: body.getAttribute('data-label-source'), state: body.getAttribute('data-label-state'),
       shape: node.getAttribute('data-point-shape'), parameters: JSON.parse(node.getAttribute('data-point-shape-parameters')),
       bounds: { x: bounds.x, y: bounds.y, width: bounds.width, height: bounds.height },
       contourLength: contour.getTotalLength(), contour: clean(contour),
       paintRegions: [...node.querySelectorAll('[data-point-paint-region]')].map((element) => ({ role: element.getAttribute('data-point-paint-region'), ...clean(element) })),
       math: body.querySelectorAll('[data-label-math]').length, bodyUpright: Math.abs(local.b) < 1e-10 && Math.abs(local.c) < 1e-10,
       bodyCorners: contained, center: { x: center.x, y: center.y }, boundary: { x: at.x, y: at.y }, outerOpacity: outer.getAttribute('opacity'),
-      effectiveFillOpacity: Number(getComputedStyle(contour).fillOpacity), request: node.getAttribute('data-point-request') }
+      effectiveFillOpacity: Number(getComputedStyle(contour).fillOpacity), opacityAncestors,
+      effectiveOpacity: Number(getComputedStyle(contour).fillOpacity)
+        * opacityAncestors.reduce((product, { opacity }) => product * Number(opacity), 1),
+      request: node.getAttribute('data-point-request') }
   }, id)
+}
+
+/** Reopen the actual download and retain its raw candidate before assertions or
+ * image work. The shared capture helper owns the one complete-root PNG attempt. */
+export async function captureGeometricStandalone({ standalone, svgPath, artifactDir, scenario,
+  background, pageErrors, expected, click, observe }) {
+  const fileUrl = pathToFileURL(svgPath).href, requests = [], standaloneErrors = []
+  const artifact = `${scenario}-standalone.json`
+  const details = { scenario, group, result: 'observed', background, svgPath, fileUrl,
+    requests, pageErrors, standaloneErrors, expected, click, cleanupErrors: [] }
+  const request = (event) => requests.push(event.url())
+  const pageerror = (error) => standaloneErrors.push(error.message)
+  const crash = () => standaloneErrors.push('Standalone SVG page crashed')
+  const persist = async (capture = details.capture) => {
+    details.capture = capture
+    await boundedPointDiagnostic(() => writeFile(resolve(artifactDir, artifact),
+      JSON.stringify(details, null, 2) + '\n'), 'Geometric standalone evidence', 5000)
+  }
+  let primary
+  try {
+    standalone.on('request', request); standalone.on('pageerror', pageerror); standalone.on('crash', crash)
+    await standalone.goto(fileUrl)
+    const raw = await boundedPointDiagnostic(() => standalone.evaluate(function observeGeometricStandaloneDocument(expected) {
+      const clean = (element) => ({ tag: element.localName, attributes: Object.fromEntries([...element.attributes]
+        .filter(({ name }) => !name.startsWith('data-') && name !== 'pointer-events').map(({ name, value }) => [name, value])) })
+      const root = document.documentElement
+      return {
+        document: { root: { localName: root.localName, namespace: root.namespaceURI,
+          width: root.getAttribute('width'), height: root.getAttribute('height'), viewBox: root.getAttribute('viewBox') },
+        forbiddenCount: document.querySelectorAll('parsererror,foreignObject,image,script').length,
+        externalReferences: [...document.querySelectorAll('[href]')].map((element) => element.getAttribute('href'))
+          .filter((href) => !href.startsWith('#') || !document.getElementById(href.slice(1))),
+        backgroundCount: [...root.children].filter((element) => element.localName === 'rect' && element.getAttribute('fill') === '#ffffff').length },
+        reopened: expected.map(({ source, shape }) => {
+          const title = [...document.querySelectorAll('title')].find((element) => element.textContent === source)
+          if (!title) return { source, missing: true }
+          const body = title.parentElement, node = body.parentElement
+          const shapes = [...node.children].filter((element) => ['path', 'polygon', 'circle', 'ellipse', 'rect'].includes(element.localName))
+          const border = shapes.find((element) => element.getAttribute('stroke') !== 'none' && element.hasAttribute('stroke'))
+          return { source: title.textContent, shape, contour: border && clean(border),
+            regions: shapes.filter((element) => element.getAttribute('stroke') === 'none').map(clean),
+            glyphs: body.querySelectorAll('path,use').length, errors: document.querySelectorAll('parsererror,foreignObject,image,script').length }
+        }),
+      }
+    }, expected), 'Geometric standalone reopening observations', 5000)
+    Object.assign(details, raw)
+    await persist()
+    await boundedPointDiagnostic(() => observe(`${scenario}-observed`, { group, artifact, result: 'observed' }),
+      'Geometric standalone observed candidate', 5000)
+    for (const [index, actual] of details.reopened.entries()) {
+      assert.equal(actual.missing, undefined); assert.equal(actual.errors, 0); assert.ok(actual.glyphs > 0)
+      assert.deepEqual(actual.contour, expected[index].rendered.contour)
+    }
+    const cylinder = details.reopened.find(({ shape }) => shape === 'cylinder')
+    assert.equal(cylinder.regions.length, 2)
+    assert.deepEqual(cylinder.regions.map(({ attributes }) => attributes.fill).sort(), ['#99ddff', '#ffcc66'])
+    assert.equal(details.document.forbiddenCount, 0)
+    assert.deepEqual(details.document.externalReferences, [])
+    assert.equal(details.document.backgroundCount, background === 'white' ? 1 : 0)
+    assert.deepEqual(requests.filter((request) => !request.startsWith('file:')), [])
+    assert.deepEqual(requests, [fileUrl], 'Standalone opens only the actual saved download')
+    assert.deepEqual(standaloneErrors, [])
+    await captureStandaloneSvg(standalone, resolve(artifactDir, `${scenario}.png`), persist)
+    assert.deepEqual(standaloneErrors, [])
+  } catch (error) {
+    primary = error
+    details.error = { message: error.message, stack: error.stack }
+    try { await persist() } catch (secondary) { pageErrors.push(`Geometric standalone failure evidence: ${secondary.message}`) }
+  }
+  // Cleanup occurs before this caller may publish a terminal scenario. A close
+  // or listener failure still fails an otherwise successful download.
+  for (const [name, cleanup] of [
+    ['page cleanup', () => standalone.close()],
+    ['request listener cleanup', () => standalone.off('request', request)],
+    ['pageerror listener cleanup', () => standalone.off('pageerror', pageerror)],
+    ['crash listener cleanup', () => standalone.off('crash', crash)],
+  ]) {
+    try { await boundedPointDiagnostic(cleanup, `Geometric standalone ${name}`, 5000) }
+    catch (error) {
+      primary ??= error
+      pageErrors.push(`Geometric standalone ${name}: ${error.message}`)
+      details.cleanupErrors.push({ message: error.message, stack: error.stack })
+      try { await persist() } catch (secondary) { pageErrors.push(`Geometric standalone cleanup evidence: ${secondary.message}`) }
+    }
+  }
+  if (!primary) {
+    try { await persist(); assert.deepEqual(standaloneErrors, []) }
+    catch (error) { primary = error }
+  }
+  if (primary) throw primary
+  return details
 }
 
 export async function runPointNodeGeometricShapeChecks({ browser, origin, artifactDir, record, observe, startGroup, completeGroup, setStage }) {
@@ -60,6 +165,8 @@ export async function runPointNodeGeometricShapeChecks({ browser, origin, artifa
   let scenario = 'point-geometric-ellipse', primary
   let selectionSequence = 0
   const selectionDiagnostic = createPointDiagnostics({ artifactDir, observe, artifactPrefix: 'point-geometric-selection' })
+  const dragDiagnostic = createPointDiagnostics({ artifactDir, observe, artifactPrefix: 'point-geometric-drag' })
+  const visibilityDiagnostic = createPointDiagnostics({ artifactDir, observe, artifactPrefix: 'point-geometric-visibility-control' })
   const waits = [], held = new Set()
   const state = () => app.readState()
   const settle = () => page.waitForFunction(() => !document.querySelector('[data-label-state="pending"]'), undefined, { timeout: 30_000 })
@@ -82,12 +189,19 @@ export async function runPointNodeGeometricShapeChecks({ browser, origin, artifa
   }
   async function select(id = 'app-point', boundary = false) {
     const rendered = await selectGeometricPoint({ page, readState: state, observePoint: observeGeometricPoint,
-      diagnose: (details) => selectionDiagnostic(group, scenario, details), secondaryErrors: pageErrors,
-      scenario, sequence: ++selectionSequence, id, boundary })
+      diagnose: (details, options) => selectionDiagnostic(group, scenario, details, options), secondaryErrors: pageErrors,
+      scenario, sequence: ++selectionSequence, id, boundary, requireUnselected: !boundary })
+    const beforeInspector = await state()
     const open = page.getByRole('button', { name: 'Open inspector drawer', exact: true })
     if (await open.count()) await open.click()
     const expand = page.locator('#preview-inspector-drawer').getByRole('button', { name: 'Expand', exact: true })
     if (await expand.count()) await expand.click()
+    const afterInspector = await state()
+    await boundedPointDiagnostic(() => selectionDiagnostic(group, scenario, { boundary: 'inspector-reopened',
+      sequence: selectionSequence, beforeInspector, afterInspector }), 'Geometric Inspector reopening evidence')
+    for (const field of ['json', 'runtimeDiagramJson', 'history', 'labelDocumentRevision']) {
+      assert.equal(afterInspector[field], beforeInspector[field], `Native Inspector reopening preserves ${field}`)
+    }
     return rendered
   }
   async function colorParameter(key, value, label) {
@@ -205,26 +319,15 @@ export async function runPointNodeGeometricShapeChecks({ browser, origin, artifa
     for (const ambientDimension of [2, 3]) for (const shape of ['diamond', 'star', 'semicircle', 'dart']) {
       const spec = geometricShapeManifest.find((entry) => entry.shape === shape)
       await load(JSON.stringify(await document(spec, 'drag $x_i$', ambientDimension, true))); await settle()
-      await page.evaluate(() => {
-        window.__stzGeometricPointer = []
-        window.__stzGeometricListener = (event) => window.__stzGeometricPointer.push({ type: event.type, trusted: event.isTrusted })
-        for (const type of ['pointerdown', 'pointermove']) document.addEventListener(type, window.__stzGeometricListener, true)
-      })
       const observed = await select('app-point', true), before = (await model()).strata[0]
-      const handle = await page.locator('[aria-label="Selected point drag handles"] circle').first().boundingBox()
-      assert.ok(handle, 'Native point drag handle exists')
-      const x = handle.x + handle.width / 2, y = handle.y + handle.height / 2
-      await page.mouse.move(x, y); await page.mouse.down(); await page.mouse.move(x + 28, y - 16, { steps: 4 }); await page.mouse.up()
+      const nativeDrag = await dragSelectedPoint({ page, readState: state,
+        diagnose: (details) => dragDiagnostic(group, scenario, details), secondaryErrors: pageErrors,
+        scenario, sequence: selectionSequence, id: 'app-point', displacement: { x: 28, y: -16 }, steps: 4 })
       const after = (await model()).strata[0]
-      assert.notDeepEqual(after.position, before.position)
-      await page.getByRole('button', { name: 'Undo last diagram change', exact: true }).click()
-      const undoRestored = JSON.stringify((await model()).strata[0].position) === JSON.stringify(before.position)
-      await page.getByRole('button', { name: 'Redo last undone diagram change', exact: true }).click()
-      const redoRestored = JSON.stringify((await model()).strata[0].position) === JSON.stringify(after.position)
-      const events = await page.evaluate(() => { for (const type of ['pointerdown', 'pointermove']) document.removeEventListener(type, window.__stzGeometricListener, true); return window.__stzGeometricPointer })
-      interactions.push({ ambientDimension, shape, codim: before.codim, selected: true, observed, before, after, events,
+      const events = nativeDrag.afterAction.observation.events.filter(({ phase }) => phase === 'drag')
+      interactions.push({ ambientDimension, shape, codim: before.codim, selected: true, observed, before, after, events, nativeDrag,
         trustedDown: events.some(({ type, trusted }) => type === 'pointerdown' && trusted), trustedMove: events.some(({ type, trusted }) => type === 'pointermove' && trusted),
-        dragged: true, undoRestored, redoRestored })
+        dragged: true, undoRestored: true, redoRestored: true })
     }
     await save({ cases: interactions })
 
@@ -232,12 +335,29 @@ export async function runPointNodeGeometricShapeChecks({ browser, origin, artifa
     const visibilityDoc = await document(geometricShapeManifest.find(({ shape }) => shape === 'dart'), '$locked$')
     visibilityDoc.diagram.layers = [{ value: 0, name: 'locked', visible: true, locked: true }]
     await load(JSON.stringify(visibilityDoc)); await settle()
-    const locked = await observeGeometricPoint(page, 'app-point'), beforeLocked = await state()
-    await page.getByRole('button', { name: 'Select', exact: true }).click(); await page.mouse.click(locked.boundary.x, locked.boundary.y)
-    const lockedState = await state()
+    const observeVisibilityStage = (phase, capture, details = {}, actionError) => captureObservedPointCheck({ capture,
+      diagnose: (observation) => visibilityDiagnostic(group, scenario, observation), details: { phase, ...details },
+      primary: actionError, secondaryErrors: pageErrors, name: `Geometric ${phase}` })
+    const visibilityStageState = async (observation, stateField = 'state', renderField = 'rendered') => {
+      observation[stateField] = await state()
+      observation[renderField] = await observeGeometricPoint(page, 'app-point')
+      return { [stateField]: observation[stateField], [renderField]: observation[renderField] }
+    }
+    const lockedBefore = await observeVisibilityStage('visibility-locked-before', visibilityStageState)
+    const locked = lockedBefore.rendered, beforeLocked = lockedBefore.state
+    let lockedError
+    try {
+      await page.getByRole('button', { name: 'Select', exact: true }).click({ timeout: 5000 })
+      await page.mouse.click(locked.boundary.x, locked.boundary.y)
+    } catch (error) { lockedError = error }
+    const lockedAfter = await observeVisibilityStage('visibility-locked-after',
+      (observation) => visibilityStageState(observation, 'stateAfter', 'renderedAfter'),
+    { before: beforeLocked, rendered: locked }, lockedError)
+    const lockedState = lockedAfter.stateAfter
     visibilityDoc.diagram.layers[0] = { value: 0, name: 'hidden', visible: false }
     await load(JSON.stringify(visibilityDoc)); await settle()
-    const hiddenAbsent = await observeGeometricPoint(page, 'app-point') === null
+    const hidden = await observeVisibilityStage('visibility-hidden', visibilityStageState)
+    const hiddenAbsent = hidden.rendered === null
     const dim = await document(geometricShapeManifest.find(({ shape }) => shape === 'semicircle'), '$dimmed$', 3)
     dim.diagram.strata[0].position = { x: 0, y: -1, z: 0 }
     dim.diagram.camera = { mode: '3d', kind: 'orthographic', thetaDeg: 90, phiDeg: 0, zoom: 100, pan: { x: 450, y: 350 } }
@@ -245,12 +365,117 @@ export async function runPointNodeGeometricShapeChecks({ browser, origin, artifa
       corners: [{ x: -2, y: 0, z: -2 }, { x: 2, y: 0, z: -2 }, { x: 2, y: 0, z: 2 }, { x: -2, y: 0, z: 2 }],
       style: { kind: 'sheetStyle', fillColor: '#4D9DE0', fillOpacity: .35, strokeColor: '#4D9DE0', strokeOpacity: 1 } })
     await load(JSON.stringify(dim)); await settle()
-    await page.getByLabel('Enable approximate 3D visibility', { exact: true }).check()
-    await page.getByLabel('Hidden points:', { exact: true }).selectOption('dimHidden')
-    const dimmed = await observeGeometricPoint(page, 'app-point')
-    await save({ hiddenAbsent, lockedUnchanged: beforeLocked.json === lockedState.json,
+    const cameraFields = [['theta value', '90'], ['phi value', '0']]
+    const cameraObservation = async (label) => {
+      const locator = page.locator('.camera-panel').getByRole('spinbutton', { name: label, exact: true })
+      const controls = await locator.evaluateAll((elements) => elements.map((element) => {
+        const bounds = element.getBoundingClientRect(), style = getComputedStyle(element)
+        return { tag: element.localName, type: element.type, value: element.value, connected: element.isConnected,
+          visible: bounds.width > 0 && bounds.height > 0 && style.display !== 'none' && style.visibility !== 'hidden',
+          enabled: !element.matches(':disabled') && element.getAttribute('aria-disabled') !== 'true',
+          ariaLabel: element.getAttribute('aria-label'), scope: element.closest('.camera-panel') ? '.camera-panel' : null }
+      }))
+      return { label, count: await locator.count(), ...controls[0], controls }
+    }
+    // Saved view.camera3d takes precedence over diagram.camera during native
+    // load. Apply the intended occlusion orientation through actual controls.
+    const cameraPreparation = { before: await state(),
+      controlsBefore: await Promise.all(cameraFields.map(([label]) => cameraObservation(label))),
+      renderedBefore: await observeGeometricPoint(page, 'app-point'), actions: [] }
+    await visibilityDiagnostic(group, scenario, { phase: 'visibility-camera-before', cameraPreparation })
+    if (cameraPreparation.controlsBefore.some(({ count }) => count === 0)) {
+      const toggle = page.locator('.camera-panel .camera-summary-toggle')
+      const expansion = { before: await state(), count: await toggle.count(), expandedBefore: await toggle.getAttribute('aria-expanded') }
+      cameraPreparation.expansion = expansion
+      assert.equal(expansion.count, 1, 'One camera details toggle')
+      assert.equal(expansion.expandedBefore, 'false', 'Absent camera fields belong to collapsed details')
+      await toggle.click({ timeout: 5000 })
+      expansion.stateAfter = await state(); expansion.expandedAfter = await toggle.getAttribute('aria-expanded')
+      await visibilityDiagnostic(group, scenario, { phase: 'visibility-camera-expanded', expansion })
+      assert.equal(expansion.expandedAfter, 'true', 'Native camera details opened')
+    }
+    for (const [label, value] of cameraFields) {
+      const action = { label, value, before: { state: await state(), control: await cameraObservation(label) } }
+      await visibilityDiagnostic(group, scenario, { phase: 'visibility-camera-field-before', action })
+      assert.equal(action.before.control.count, 1, `One native ${label}`)
+      for (const key of ['connected', 'visible', 'enabled']) assert.equal(action.before.control[key], true, `Usable ${label}: ${key}`)
+      let cameraError
+      try { await page.locator('.camera-panel').getByRole('spinbutton', { name: label, exact: true }).fill(value, { timeout: 5000 }) }
+      catch (error) { cameraError = error }
+      try {
+        action.after = { state: await boundedPointDiagnostic(state, 'Visibility camera authoritative state'),
+          control: await boundedPointDiagnostic(() => cameraObservation(label), 'Visibility camera native field') }
+        await boundedPointDiagnostic(() => visibilityDiagnostic(group, scenario, { phase: 'visibility-camera-field-after', action,
+          ...(cameraError ? { actionError: { message: cameraError.message, stack: cameraError.stack } } : {}) }),
+        'Visibility camera after-action evidence')
+      } catch (error) {
+        if (cameraError) pageErrors.push(`Visibility camera observation after primary failure: ${error.message}`)
+        throw cameraError ?? error
+      }
+      if (cameraError) throw cameraError
+      assert.equal(action.after.control.value, value, `Actual native ${label} value`)
+      cameraPreparation.actions.push(action)
+    }
+    cameraPreparation.after = await state()
+    cameraPreparation.controlsAfter = await Promise.all(cameraFields.map(([label]) => cameraObservation(label)))
+    cameraPreparation.renderedAfter = await observeGeometricPoint(page, 'app-point')
+    await visibilityDiagnostic(group, scenario, { phase: 'visibility-camera-after', cameraPreparation })
+    assertVisibilityCameraPreparation(cameraPreparation)
+    const actualCamera = JSON.parse(cameraPreparation.after.uiSettings).camera3d
+    assert.equal(actualCamera.thetaDeg, 90, 'Authoritative front-view theta')
+    assert.equal(actualCamera.phiDeg, 0, 'Authoritative front-view phi')
+    const approximate = page.locator('.source-panel').getByLabel('Enable approximate 3D visibility', { exact: true })
+    const checkboxObservation = async () => {
+      const controls = await approximate.evaluateAll((elements) => elements.map((element) => ({
+        tag: element.localName, type: element.type, checked: element.checked, connected: element.isConnected,
+        enabled: !element.matches(':disabled') && element.getAttribute('aria-disabled') !== 'true',
+        scope: element.closest('.source-panel') ? '.source-panel' : null,
+        labels: Array.from(element.labels ?? [], (label) => ({ text: label.textContent, outerHTML: label.outerHTML })),
+      })))
+      return { count: await approximate.count(), ...controls[0], controls }
+    }
+    const enable = { before: await state(), checkboxBefore: await checkboxObservation(),
+      controlBefore: await inspectSourceHiddenPoints(page) }
+    await visibilityDiagnostic(group, scenario, { phase: 'approximate-visibility-before', enable })
+    assert.equal(JSON.parse(enable.before.runtimeDiagramJson).ambientDimension, 3, 'Approximate visibility requires 3D')
+    assert.equal(enable.checkboxBefore.count, 1, 'One source-panel approximate visibility checkbox')
+    assert.equal(enable.checkboxBefore.connected, true, 'Connected approximate visibility checkbox')
+    assert.equal(enable.checkboxBefore.enabled, true, 'Enabled approximate visibility checkbox')
+    let enableError
+    try { await approximate.check({ timeout: 5000 }) } catch (error) { enableError = error }
+    try {
+      enable.after = await boundedPointDiagnostic(state, 'Visibility enabled authoritative state')
+      enable.checkbox = await boundedPointDiagnostic(checkboxObservation, 'Visibility enabled checkbox')
+      enable.controlAfter = await boundedPointDiagnostic(() => inspectSourceHiddenPoints(page), 'Visibility enabled native control')
+      await boundedPointDiagnostic(() => visibilityDiagnostic(group, scenario,
+        { phase: 'approximate-visibility-after', enable,
+          ...(enableError ? { actionError: { message: enableError.message, stack: enableError.stack } } : {}) }),
+      'Approximate visibility after-action evidence')
+    } catch (error) {
+      if (enableError) pageErrors.push(`Visibility enabled observation after primary failure: ${error.message}`)
+      throw enableError ?? error
+    }
+    if (enableError) throw enableError
+    assert.equal(enable.checkbox.checked, true, 'Real approximate visibility checkbox is checked')
+    assert.equal(JSON.parse(enable.after.uiSettings).visibility.enabled, true, 'Authoritative approximate visibility is enabled')
+    const actions = []
+    // The initial dimHidden selection may be a no-op. Exercise both values
+    // through the same native field, retaining each actual state and render.
+    for (const [index, value] of ['dimHidden', 'hideHidden', 'dimHidden'].entries()) {
+      actions.push(await selectHiddenPointVisibility({ page, readState: state, observePoint: observeGeometricPoint,
+        diagnose: (details) => visibilityDiagnostic(group, scenario, details), secondaryErrors: pageErrors,
+        scenario, sequence: index + 1, value, id: 'app-point' }))
+    }
+    const dimmed = actions.at(-1).afterAction.rendered
+    const visibilityCandidate = { hiddenAbsent, lockedUnchanged: beforeLocked.json === lockedState.json,
       lockedNotSelected: lockedState.selection?.id !== 'app-point', dimmedVisible: !!dimmed,
-      dimmedOpacity: dimmed?.effectiveFillOpacity > 0 && dimmed.effectiveFillOpacity < 1, locked, dimmed })
+      dimmedOpacity: dimmed?.effectiveFillOpacity > 0 && dimmed.effectiveFillOpacity < 1
+        && dimmed.effectiveOpacity > 0 && dimmed.effectiveOpacity < 1, locked, dimmed,
+      visibility: { locked: { before: beforeLocked, stateAfter: lockedState, rendered: locked,
+        renderedAfter: lockedAfter.renderedAfter }, hidden, cameraPreparation, enable, actions } }
+    await observeVisibilityStage('visibility-candidate', async () => ({
+      candidate: { scenario, group, result: 'observed', pageErrors: [...pageErrors], ...visibilityCandidate } }))
+    await save(visibilityCandidate)
 
     for (const background of ['transparent', 'white']) {
       scenario = `point-geometric-download-${background}`
@@ -287,58 +512,51 @@ export async function runPointNodeGeometricShapeChecks({ browser, origin, artifa
       const expected = []
       for (const point of input.diagram.strata) expected.push({ id: point.id, source: point.text, shape: point.style.shape,
         rendered: await observeGeometricPoint(page, point.id) })
-      const standalone = await ownedContext.newPage(), requests = []
-      standalone.on('request', (request) => requests.push(request.url()))
-      let reopened, standaloneFailure
-      try {
-        await standalone.goto(pathToFileURL(svgPath).href)
-        reopened = await standalone.evaluate((expected) => {
-          const clean = (element) => ({ tag: element.localName, attributes: Object.fromEntries([...element.attributes]
-            .filter(({ name }) => !name.startsWith('data-') && name !== 'pointer-events').map(({ name, value }) => [name, value])) })
-          return expected.map(({ source, shape }) => {
-            const title = [...document.querySelectorAll('title')].find((element) => element.textContent === source)
-            if (!title) return { source, missing: true }
-            const body = title.parentElement, node = body.parentElement
-            const shapes = [...node.children].filter((element) => ['path', 'polygon', 'circle', 'ellipse', 'rect'].includes(element.localName))
-            const border = shapes.find((element) => element.getAttribute('stroke') !== 'none' && element.hasAttribute('stroke'))
-            return { source, shape, contour: border && clean(border),
-              regions: shapes.filter((element) => element.getAttribute('stroke') === 'none').map(clean),
-              glyphs: body.querySelectorAll('path,use').length, errors: document.querySelectorAll('parsererror,foreignObject,image,script').length }
-          })
-        }, expected)
-        for (const [index, actual] of reopened.entries()) {
-          assert.equal(actual.missing, undefined); assert.equal(actual.errors, 0); assert.ok(actual.glyphs > 0)
-          assert.deepEqual(actual.contour, expected[index].rendered.contour)
-        }
-        const cylinder = reopened.find(({ shape }) => shape === 'cylinder')
-        assert.equal(cylinder.regions.length, 2)
-        assert.deepEqual(cylinder.regions.map(({ attributes }) => attributes.fill).sort(), ['#99ddff', '#ffcc66'])
-        assert.deepEqual(requests.filter((request) => !request.startsWith('file:')), [])
-        await standalone.screenshot({ path: resolve(artifactDir, `${scenario}.png`), fullPage: true })
-        await writeFile(resolve(artifactDir, `${scenario}-standalone.json`), JSON.stringify({ reopened, requests, pageErrors, expected, click }, null, 2) + '\n')
-      } catch (error) { standaloneFailure = error; throw error }
-      finally { try { await standalone.close() } catch (error) { if (!standaloneFailure) throw error; pageErrors.push(`Standalone cleanup: ${error.message}`) } }
+      const standalone = await ownedContext.newPage()
+      const standaloneEvidence = await captureGeometricStandalone({ standalone, svgPath, artifactDir, scenario, background, pageErrors, expected, click, observe })
       const captured = click.snapshot.points
       for (const [index, entry] of captured.entries()) assert.deepEqual(entry.style.shapeParameters, input.diagram.strata[index].style.shapeParameters)
       await save({ background, shapes: geometricShapeManifest.map(({ shape }) => shape), reopened: true, immutableSource: true,
-        immutableParameters: true, separateCylinderPaints: true, noExternalAssets: true, actualDownload: true, click, expected })
+        immutableParameters: true, separateCylinderPaints: true, noExternalAssets: true, actualDownload: true,
+        click, expected, capture: standaloneEvidence.capture })
     }
     assert.deepEqual(pageErrors, []); await completeGroup(group)
   } catch (error) {
     primary = error
-    await writeFile(resolve(artifactDir, 'point-geometric-failure.json'), JSON.stringify({ scenario, result: 'failed', pageErrors,
-      error: { message: error.message, stack: error.stack } }, null, 2) + '\n')
-    try { await app.failure(error, { scenario, pageErrors }) } catch (diagnosticError) {
-      await writeFile(resolve(artifactDir, 'point-geometric-diagnostic-failure.json'), JSON.stringify({ primary: error.message, diagnostic: diagnosticError.message }, null, 2) + '\n')
+    try {
+      await boundedPointDiagnostic(() => writeFile(resolve(artifactDir, 'point-geometric-failure.json'),
+        JSON.stringify({ scenario, result: 'failed', pageErrors, error: { message: error.message, stack: error.stack } }, null, 2) + '\n'),
+      'Geometric primary failure evidence')
+    } catch (diagnosticError) { pageErrors.push(`Geometric primary failure evidence: ${diagnosticError.message}`) }
+    try { await boundedPointDiagnostic(() => app.failure(error, { scenario, pageErrors },
+      { captureScreenshot: !scenario.startsWith('point-geometric-download-') }), 'Geometric App failure evidence') }
+    catch (diagnosticError) {
+      pageErrors.push(`Geometric App failure evidence: ${diagnosticError.message}`)
+      try {
+        await boundedPointDiagnostic(() => writeFile(resolve(artifactDir, 'point-geometric-diagnostic-failure.json'),
+          JSON.stringify({ primary: error.message, diagnostic: diagnosticError.message }, null, 2) + '\n'),
+        'Geometric secondary diagnostic failure evidence')
+      } catch (secondaryError) { pageErrors.push(`Geometric secondary diagnostic failure evidence: ${secondaryError.message}`) }
     }
     throw error
   } finally {
     let cleanupFailure
-    for (const wait of waits) wait.dispose()
-    for (const source of held) { try { await page.evaluate((source) => window.stzAppLabels.release(source), source) } catch (error) { cleanupFailure ??= error; pageErrors.push(`Held conversion cleanup: ${error.message}`) } }
-    try { await ownedContext.close() } catch (error) {
-      if (!primary) throw error
-      await writeFile(resolve(artifactDir, 'point-geometric-secondary-failure.json'), JSON.stringify({ primary: primary.message, cleanup: error.message, pageErrors }, null, 2) + '\n')
+    for (const wait of waits) {
+      try { wait.dispose() } catch (error) { cleanupFailure ??= error; pageErrors.push(`Geometric event listener cleanup: ${error.message}`) }
+    }
+    for (const source of held) {
+      try { await boundedPointDiagnostic(() => page.evaluate((source) => window.stzAppLabels.release(source), source), 'Geometric held conversion cleanup') }
+      catch (error) { cleanupFailure ??= error; pageErrors.push(`Held conversion cleanup: ${error.message}`) }
+    }
+    try { await boundedPointDiagnostic(() => ownedContext.close(), 'Geometric owned context cleanup') } catch (error) {
+      cleanupFailure ??= error; pageErrors.push(`Geometric owned context cleanup: ${error.message}`)
+      if (primary) {
+        try {
+          await boundedPointDiagnostic(() => writeFile(resolve(artifactDir, 'point-geometric-secondary-failure.json'),
+            JSON.stringify({ primary: primary.message, cleanup: error.message, pageErrors }, null, 2) + '\n'),
+          'Geometric secondary cleanup failure evidence')
+        } catch (secondaryError) { pageErrors.push(`Geometric secondary cleanup failure evidence: ${secondaryError.message}`) }
+      }
     }
     if (!primary && cleanupFailure) throw cleanupFailure
   }

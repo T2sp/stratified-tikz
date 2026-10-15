@@ -1,4 +1,6 @@
 import { PointShapeFields } from './PointShapeFields.tsx'
+import { PointLayoutFields } from './PointLayoutFields.tsx'
+import { updateLegacyPointSize } from '../../model/pointNodeLayout.ts'
 import { markPointShapeOverrides } from '../../model/pointShapeParameters.ts'
 import { PointPaintFields } from './PointPaintFields.tsx'
 import { pointFills, pointShapes, pointPaintFields } from '../../model/types.ts'
@@ -108,7 +110,7 @@ export function PointStyleEditor({
           onChange={(size) =>
             onDiagramChange((diagram) =>
               updateStratumStyleById(diagram, point.id, (style) =>
-                style.kind === 'pointStyle' ? { ...style, size } : style,
+                style.kind === 'pointStyle' ? updateLegacyPointSize(style, size) : style,
               ),
             )
           }
@@ -126,6 +128,7 @@ export function PointStyleEditor({
           }
         />
         <PointShapeFields style={point.style} onChange={(style) => onDiagramChange((diagram) => updateStratumStyleById(diagram, point.id, () => style))} />
+        <PointLayoutFields style={point.style} onChange={(style) => onDiagramChange((diagram) => updateStratumStyleById(diagram, point.id, () => style))} />
         <EditableSelectField<PointFill>
           label="Fill"
           value={point.style.fill}

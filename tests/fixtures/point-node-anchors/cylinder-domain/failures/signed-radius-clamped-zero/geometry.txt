@@ -1,0 +1,2 @@
+CASE signed-radius-clamped-zero
+FONT 10.00002pt,4.30554pt

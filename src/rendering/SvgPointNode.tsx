@@ -7,16 +7,20 @@ import { svgPointNodeLayout, type SvgPointNodeCommit } from './svgPointNodeLayou
 import { svgPointNodeTextFontFamily, svgPointNodeTextFontSize } from './svgPointNodeText.ts'
 import { SvgPointNodeView } from './svgPointNodeView.ts'
 import { getPointPaint } from '../model/styles.ts'
+import type { CylinderDomainContext } from '../geometry/pointNodeShapes/cylinderDomain.ts'
 
-export function SvgPointNode({ runtime, source, position, style, ownerIdentity, selected, onLayout }: {
+export function SvgPointNode({ runtime, source, position, style, ownerIdentity, selected, onLayout, cylinderDomainContext }: {
   runtime: SvgLabelRuntime; source: string; position: Vec2; style: PointStyle; ownerIdentity: string
   selected: boolean; onLayout: (snapshot: SvgPointNodeCommit | null) => void
+  cylinderDomainContext?: CylinderDomainContext
 }) {
+  const domainIdentity = cylinderDomainContext === undefined ? undefined : JSON.stringify(cylinderDomainContext)
+  const domainContext = useMemo(() => domainIdentity === undefined ? undefined : JSON.parse(domainIdentity) as CylinderDomainContext, [domainIdentity])
   const { state, settings, fontGeneration } = useSvgLabelState(runtime, source,
     svgPointNodeTextFontSize, svgPointNodeTextFontFamily, ownerIdentity)
   const snapshot = useMemo(() => Object.freeze({ source, ownerIdentity, fontGeneration,
     shape: style.shape, size: style.size, requestIdentity: state.requestIdentity,
-    layout: svgPointNodeLayout(style, state) }), [source, ownerIdentity, fontGeneration, style, state])
+    layout: svgPointNodeLayout(style, state, domainContext) }), [source, ownerIdentity, fontGeneration, style, state, domainContext])
   useLayoutEffect(() => {
     onLayout(snapshot)
     return () => onLayout(null)
@@ -25,8 +29,8 @@ export function SvgPointNode({ runtime, source, position, style, ownerIdentity, 
   const capture = useMemo(() => captureSvgLabelExport({ runtime, source, position,
     fontSize: svgPointNodeTextFontSize, fontFamily: svgPointNodeTextFontFamily,
     color: textPaint.color, opacity: style.opacity * textPaint.opacity, anchor: 'center', ownerIdentity,
-    boundsTarget: false, settings, pointStyle: style }), [runtime, source, position, style, textPaint.color, textPaint.opacity, ownerIdentity, settings])
+    boundsTarget: false, settings, pointStyle: style, pointCylinderDomainContext: domainContext }), [runtime, source, position, style, textPaint.color, textPaint.opacity, ownerIdentity, settings, domainContext])
   const elementRef = useCallback((node: SVGGElement | null) => node === null
     ? undefined : registerSvgLabelExportCapture(node, capture), [capture])
-  return createElement(SvgPointNodeView, { capture, state, selected, elementRef })
+  return createElement(SvgPointNodeView, { capture, state, selected, elementRef, previewBodyTarget: true })
 }

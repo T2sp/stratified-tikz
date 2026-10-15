@@ -1,0 +1,68 @@
+\begin{tikzpicture}[baseline={([yshift=-.5ex]current bounding box.center)}, line cap=round, line join=round]
+    %----------------------------------------
+    % Styles and colors
+    %----------------------------------------
+    % TikZ export mode: inline math. Setup is local to this tikzpicture.
+    %----------------------------------------
+    % Package requirements
+    %----------------------------------------
+    % Requires \usepackage{tikz-3dplot}
+    % Required TikZ libraries for non-circular point shapes:
+    % \usetikzlibrary{shapes.geometric,shapes.symbols}
+    %----------------------------------------
+    % Local colors
+    %----------------------------------------
+    \definecolor{stzPointreviewnegativestarFill}{HTML}{000000}
+    \definecolor{stzPointreviewnegativestarStroke}{HTML}{000000}
+    \definecolor{stzPointreviewnegativestarText}{HTML}{000000}
+    %----------------------------------------
+    % TikZ layers
+    %----------------------------------------
+    \pgfdeclarelayer{stratifiedLayer0}
+    \pgfsetlayers{stratifiedLayer0,main}
+    %----------------------------------------
+    % Camera setup
+    %----------------------------------------
+    \tdplotsetmaincoords{13}{-23}
+    \begin{scope}[tdplot_main_coords]
+        %----------------------------------------
+        % Coordinates
+        %----------------------------------------
+        \coordinate (pointPoint0p0) at (1,2,3);
+        %----------------------------------------
+        % Layered drawing commands
+        %----------------------------------------
+        % Layer 0: stratifiedLayer0
+        \begin{pgfonlayer}{stratifiedLayer0}
+            %----------------------------------------
+            % Codimension 3 strata: points
+            %----------------------------------------
+            \node[
+                star,
+                star points=5,
+                fill=stzPointreviewnegativestarFill,
+                draw=stzPointreviewnegativestarStroke,
+                text=stzPointreviewnegativestarText,
+                fill opacity=1,
+                draw opacity=1,
+                text opacity=1,
+                line width=0.4pt,
+                solid,
+                dash phase=0pt,
+                line cap=butt,
+                line join=miter,
+                inner sep=1.5pt,
+                inner xsep=-30pt,
+                inner ysep=-30pt,
+                outer xsep=3pt,
+                outer ysep=3pt,
+                minimum width=-20pt,
+                minimum height=-20pt,
+                anchor=outer point 1
+            ] at (pointPoint0p0) {};
+        \end{pgfonlayer}
+        % Codimension 1 strata: sheets
+        % Codimension 2 strata: curves
+        % Labels
+    \end{scope}
+\end{tikzpicture}

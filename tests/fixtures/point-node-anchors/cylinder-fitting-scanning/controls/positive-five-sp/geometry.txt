@@ -1,0 +1,24 @@
+CASE positive-five-sp
+FONT 10.00002pt,4.30554pt
+STAGE innerXSp; 0
+STAGE innerYSp; 5
+STAGE initialXSp; 0
+STAGE initialYSp; 5
+STAGE fittedXSp; 0
+STAGE fittedYSp; 5
+STAGE transverseInnerSepSp; 5
+STAGE minimumWidthSp; 0
+STAGE divisorSp; 5
+STAGE bodyWidthHalfSp; 0
+STAGE bodyHeightHalfSp; 0
+STAGE bodyDepthHalfSp; 0
+STAGE minimumWidthHalfSp; 0
+PAINT stroke; PATH macro:->\pgfsyssoftpath@movetotoken {0.00008pt}{0.00008pt}\pgfsyssoftpath@curvetosupportatoken {0.00005pt}{0.00008pt}\pgfsyssoftpath@curvetosupportbtoken {0.0pt}{0.00003pt}\pgfsyssoftpath@curvetotoken {0.0pt}{0.0pt}\pgfsyssoftpath@curvetosupportatoken {0.0pt}{-0.00003pt}\pgfsyssoftpath@curvetosupportbtoken {0.00005pt}{-0.00008pt}\pgfsyssoftpath@curvetotoken {0.00008pt}{-0.00008pt}\pgfsyssoftpath@linetotoken {0.20007pt}{-0.00008pt}\pgfsyssoftpath@curvetosupportatoken {0.2001pt}{-0.00008pt}\pgfsyssoftpath@curvetosupportbtoken {0.20015pt}{-0.00003pt}\pgfsyssoftpath@curvetotoken {0.20015pt}{0.0pt}\pgfsyssoftpath@curvetosupportatoken {0.20015pt}{0.00003pt}\pgfsyssoftpath@curvetosupportbtoken {0.2001pt}{0.00008pt}\pgfsyssoftpath@curvetotoken {0.20007pt}{0.00008pt}\pgfsyssoftpath@closepathtoken {0.00008pt}{0.00008pt}\pgfsyssoftpath@movetotoken {0.20007pt}{0.00008pt}\pgfsyssoftpath@curvetosupportatoken {0.20004pt}{0.00008pt}\pgfsyssoftpath@curvetosupportbtoken {0.2pt}{0.00003pt}\pgfsyssoftpath@curvetotoken {0.2pt}{0.0pt}\pgfsyssoftpath@curvetosupportatoken {0.2pt}{-0.00003pt}\pgfsyssoftpath@curvetosupportbtoken {0.20004pt}{-0.00008pt}\pgfsyssoftpath@curvetotoken {0.20007pt}{-0.00008pt}
+ANCHOR center; 0.0pt,0.0pt
+ANCHOR text; 0.0pt,0.0pt
+ANCHOR base; 0.0pt,0.0pt
+ANCHOR mid; 0.0pt,2.15277pt
+ANCHOR shape center; 0.10007pt,0.0pt
+ANCHOR top; 0.20015pt,0.0pt
+ANCHOR bottom; 0.0pt,0.0pt
+ANCHOR west; 0.20012pt,-0.00005pt

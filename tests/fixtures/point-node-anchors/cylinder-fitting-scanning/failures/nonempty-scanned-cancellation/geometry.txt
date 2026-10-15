@@ -1,0 +1,15 @@
+CASE nonempty-scanned-cancellation
+FONT 10.00002pt,4.30554pt
+STAGE innerXSp; 0
+STAGE innerYSp; -327680
+STAGE initialXSp; 655360
+STAGE initialYSp; 0
+STAGE fittedXSp; 655360
+STAGE fittedYSp; 0
+STAGE transverseInnerSepSp; -327680
+STAGE minimumWidthSp; 0
+STAGE divisorSp; 0
+STAGE bodyWidthHalfSp; 655360
+STAGE bodyHeightHalfSp; 262144
+STAGE bodyDepthHalfSp; 65536
+STAGE minimumWidthHalfSp; 0

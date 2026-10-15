@@ -1,5 +1,7 @@
 import { phase32cProfile, phase32cDeferrals, phase32cAuthorization, resolveVerificationProfile, deferredMechanismKey, mechanismNotRun, assertScopedMechanismEvidence, assertNamedStrict32BFailure } from './phase32c-profile.mjs';
-import { geometricShapeGroup, geometricShapeScenarios, geometricShapeArtifacts, assertGeometricShapeEvidence } from '../pointGeometricShapesContract.mjs';
+import { geometricShapeGroup, geometricShapeScenarios, geometricShapeArtifacts, assertGeometricShapeEvidence, assertGeometricStandaloneEvidence } from '../pointGeometricShapesContract.mjs';
+import { layoutAnchorGroup, layoutAnchorScenarios, layoutAnchorArtifacts, assertLayoutAnchorEvidence, assertLayoutStandaloneEvidence,
+  assertLayoutPostClickViewDiagnostic, signedPolygonalScenario, assertSignedPolygonalStandaloneEvidence } from '../pointLayoutAnchorsContract.mjs';
 import {
   closeSync,
   existsSync,
@@ -21,6 +23,10 @@ import { observePostExternalPointPaint, assertPostExternalPointPaint, observeLit
 
 import { dashCapMechanismStem, dashCapMechanismArtifacts, assertDashCapMechanismEvidence } from "../pointDashCapMechanismContract.mjs";
 import { dashCapScenario, dashCapArtifacts, assertDashCapEvidence } from "../pointDashCapContract.mjs";
+import { readEvidenceDocumentSync } from "../evidencePublication.mjs";
+import { cylinderDiagnosticScenarios, assertSingularCylinderStandaloneEvidence } from "../singularCylinderDiagnosticContract.mjs";
+import { foldedCylinderScenario, assertFoldedCylinderStandaloneEvidence } from "../foldedCylinderContract.mjs";
+import { assertConformanceEvidence } from '../pointConformanceContract.mjs';
 
 import { polygonJoinScenario, polygonJoinArtifacts, assertPolygonJoinEvidence } from "../pointPolygonJoinContract.mjs";
 import { inspectConnectedLivePaintPng } from "../connectedLivePaintOracle.mjs";
@@ -72,8 +78,10 @@ export const pointNodeScenarios = {
     "point-paint-mutation-directory-uncertainty", "point-paint-app-continuity", polygonJoinScenario, dashCapScenario,
   ],
 };
-export const allPointNodeScenarios = { ...pointNodeScenarios, [geometricShapeGroup]: geometricShapeScenarios };
+export const allPointNodeScenarios = { ...pointNodeScenarios, [geometricShapeGroup]: geometricShapeScenarios,
+  [layoutAnchorGroup]: layoutAnchorScenarios };
 export function pointNodeScenarioArtifacts(name, profile = "strict") {
+  if (layoutAnchorScenarios.includes(name)) return layoutAnchorArtifacts(name);
   if (geometricShapeScenarios.includes(name)) return geometricShapeArtifacts(name);
   if (name === dashCapScenario) return [...dashCapArtifacts(), ...dashCapMechanismArtifacts().filter((file) => profile !== phase32cProfile || !file.startsWith(`${dashCapMechanismStem}-${deferredMechanismKey}.`))];
   if (name === polygonJoinScenario) return polygonJoinArtifacts();
@@ -132,7 +140,7 @@ export function pointNodeScenarioArtifacts(name, profile = "strict") {
 const pointNodeGroups = [...combinedLabelGroups, ...Object.keys(pointNodeScenarios)];
 const pointNodeMathGroups = pointNodeGroups.filter((group) => group !== "point-node-paint-import-persistence");
 const phase32Groups = { "32A": pointNodeMathGroups, "32B": pointNodeGroups,
-  "32C": [...pointNodeGroups, geometricShapeGroup], "32D": [...pointNodeGroups, geometricShapeGroup] };
+  "32C": [...pointNodeGroups, geometricShapeGroup], "32D": [...pointNodeGroups, geometricShapeGroup, layoutAnchorGroup] };
 
 export function browserChecksForPhase(phase) {
   const normalized = String(phase).toUpperCase();
@@ -214,8 +222,8 @@ function browserEnvironment(cwd, env) {
   return result;
 }
 
-function evidenceObject(artifactDir, name) {
-  const evidence = JSON.parse(readFileSync(join(artifactDir, name), "utf8"));
+function evidenceObject(artifactDir, name, checkout) {
+  const evidence = readEvidenceDocumentSync(artifactDir, name, { checkout });
   if (!evidence || typeof evidence !== "object" || Array.isArray(evidence)) {
     throw new Error(`${name} must contain a JSON object`);
   }
@@ -277,12 +285,57 @@ function validateDashLivePaintFiles(artifactDir, live) {
   }
 }
 
-function validateTargetedPaintEvidence(artifactDir, name, group, profile = "strict") {
+function validateTargetedPaintEvidence(artifactDir, name, group, profile = "strict", checkout) {
+  if (group === layoutAnchorGroup) {
+    const evidence = evidenceObject(artifactDir, `${name}.json`, checkout);
+    assertLayoutAnchorEvidence(evidence, name);
+    if (name === signedPolygonalScenario) for (const ambientDimension of [2, 3]) {
+      const raw = evidenceObject(artifactDir, `${name}-${ambientDimension}d-standalone.json`, checkout);
+      assertSignedPolygonalStandaloneEvidence(evidence, raw, artifactDir, ambientDimension, { checkout });
+    }
+    if (name === signedPolygonalScenario) return assertConformanceEvidence(evidence, artifactDir, { checkout });
+    if (cylinderDiagnosticScenarios.includes(name)) {
+      return [2, 3].map((ambientDimension) => {
+        const raw = evidenceObject(artifactDir, `${name}-${ambientDimension}d-standalone.json`, checkout);
+        return assertSingularCylinderStandaloneEvidence(evidence, raw, artifactDir, ambientDimension, { checkout });
+      });
+    }
+    if (name === foldedCylinderScenario) return [2, 3].map((ambientDimension) => {
+      const raw = evidenceObject(artifactDir, `${name}-${ambientDimension}d-standalone.json`, checkout);
+      return assertFoldedCylinderStandaloneEvidence(evidence, raw, artifactDir, ambientDimension, { checkout });
+    });
+    if (name.startsWith('point-layout-pending-')) {
+      const standalone = evidenceObject(artifactDir, `${name}-standalone.json`, checkout);
+      assertLayoutStandaloneEvidence(evidence, standalone, artifactDir, { checkout });
+      assert.deepEqual(standalone.pageErrors, []);
+      assert.deepEqual(standalone.expected, evidence.expected); assert.deepEqual(standalone.click, evidence.click);
+      assert.equal(standalone.reopened.length, evidence.expected.length);
+      assert.ok(standalone.requests.length > 0 && standalone.requests.every((url) => url.startsWith('file:')));
+      const svg = readFileSync(join(artifactDir, `${name}.svg`), 'utf8');
+      const escape = (value) => String(value).replaceAll('&', '&amp;').replaceAll('<', '&lt;').replaceAll('>', '&gt;').replaceAll('"', '&quot;');
+      for (const [index, expected] of evidence.expected.entries()) {
+        const actual = standalone.reopened[index], captured = evidence.click.snapshot.points.find(({ id }) => id === expected.id);
+        assert.ok(captured); assert.equal(captured.source, expected.source); assert.equal(captured.style.shape, expected.shape);
+        assert.deepEqual(captured.style.layout, expected.layout);
+        assert.equal(actual.source, expected.source); assert.equal(actual.errors, 0); assert.ok(actual.glyphs > 0);
+        assert.deepEqual(actual.contour, expected.rendered.contour);
+        assert.equal(actual.nodeTransform, expected.rendered.nodeTransform); assert.equal(actual.nodeTransform, captured.nodeTransform);
+        assert.equal(actual.bodyTransform, expected.rendered.bodyTransform);
+        assert.ok(svg.includes(`<title>${escape(expected.source)}</title>`));
+        for (const [key, value] of Object.entries(actual.contour.attributes)) assert.ok(svg.includes(`${key}="${escape(value)}"`));
+      }
+      assert.notDeepEqual(standalone.pending.contour, evidence.expected[0].rendered.contour,
+        'Captured pending contour is rebuilt after real MathJax settlement');
+      assert.equal(svg.includes('data-stratified-tikz-export-background="white"'), evidence.background === 'white');
+    }
+    return;
+  }
   if (group === geometricShapeGroup) {
-    const evidence = evidenceObject(artifactDir, `${name}.json`);
+    const evidence = evidenceObject(artifactDir, `${name}.json`, checkout);
     assertGeometricShapeEvidence(evidence, name);
     if (name.startsWith('point-geometric-download-')) {
-      const standalone = evidenceObject(artifactDir, `${name}-standalone.json`);
+      const standalone = evidenceObject(artifactDir, `${name}-standalone.json`, checkout);
+      assertGeometricStandaloneEvidence(evidence, standalone, artifactDir);
       assert.deepEqual(standalone.pageErrors, []);
       assert.deepEqual(standalone.expected, evidence.expected); assert.deepEqual(standalone.click, evidence.click);
       assert.equal(standalone.reopened.length, evidence.expected.length);
@@ -305,11 +358,11 @@ function validateTargetedPaintEvidence(artifactDir, name, group, profile = "stri
     return;
   }
   if (name === dashCapScenario) {
-    const evidence = evidenceObject(artifactDir, `${name}.json`);
+    const evidence = evidenceObject(artifactDir, `${name}.json`, checkout);
     assertDashCapEvidence(evidence);
     for (const entry of evidence.cases) if (entry.specification.audit) {
       const stem = `${name}-${entry.key}-scale-${entry.scale}`;
-      assert.deepEqual(evidenceObject(artifactDir, `${stem}-engine-audit.json`),
+      assert.deepEqual(evidenceObject(artifactDir, `${stem}-engine-audit.json`, checkout),
         entry.observation.engineAudit, "Retained independent audit artifact matches the recorded native case");
       for (const suffix of [".input.svg", "-solid.input.svg"]) {
         const source = readFileSync(join(artifactDir, `${stem}${suffix}`), "utf8");
@@ -320,13 +373,13 @@ function validateTargetedPaintEvidence(artifactDir, name, group, profile = "stri
         validateDashLivePaintFiles(artifactDir, { captures: entry.probes.map(({ liveCapture }) => liveCapture) });
       }
     }
-    const mechanism = evidenceObject(artifactDir, `${dashCapMechanismStem}.json`);
+    const mechanism = evidenceObject(artifactDir, `${dashCapMechanismStem}.json`, checkout);
     if (profile === phase32cProfile) assertScopedMechanismEvidence(mechanism);
     else assertDashCapMechanismEvidence(mechanism);
     for (const entry of mechanism.cases) {
       if (profile === phase32cProfile && entry.key === deferredMechanismKey) continue;
       const stem = `${dashCapMechanismStem}-${entry.key}`;
-      assert.deepEqual(evidenceObject(artifactDir, `${stem}.json`), entry,
+      assert.deepEqual(evidenceObject(artifactDir, `${stem}.json`, checkout), entry,
         "Retained mechanism entry matches the complete matrix");
       validateDashLivePaintFiles(artifactDir, entry.livePaint);
       for (const suffix of ["input.svg", "solid.input.svg", "live.svg"]) {
@@ -344,23 +397,23 @@ function validateTargetedPaintEvidence(artifactDir, name, group, profile = "stri
     return;
   }
   if (name === polygonJoinScenario) {
-    assertPolygonJoinEvidence(evidenceObject(artifactDir, `${name}.json`));
+    assertPolygonJoinEvidence(evidenceObject(artifactDir, `${name}.json`, checkout));
     return;
   }
   if (name === "point-paint-app-continuity") {
-    validateAppContinuityEvidence(artifactDir, name, group);
+    validateAppContinuityEvidence(artifactDir, name, group, checkout);
     return;
   }
   if (name === "point-paint-clear-imported-style") {
-    validateDetachedPaintEvidence(artifactDir, name, group);
+    validateDetachedPaintEvidence(artifactDir, name, group, checkout);
     return;
   }
   if (["point-paint-local-override-intent", "point-paint-cross-file-resolution", "point-paint-unsupported-color-bindings", "point-paint-unsupported-mutations", "point-paint-mutation-directory-uncertainty"].includes(name)) {
-    validateImportedPaintEvidence(artifactDir, name, group);
+    validateImportedPaintEvidence(artifactDir, name, group, checkout);
     return;
   }
   if (name !== "point-paint-namespace-aliases" && !name.startsWith("point-paint-responsive-")) return;
-  const evidence = evidenceObject(artifactDir, `${name}.json`);
+  const evidence = evidenceObject(artifactDir, `${name}.json`, checkout);
   if (evidence.scenario !== name || evidence.group !== group || evidence.result !== "passed") {
     throw new Error(`Targeted point paint scenario did not complete: ${name}`);
   }
@@ -426,8 +479,8 @@ function validateTargetedPaintEvidence(artifactDir, name, group, profile = "stri
   }
 }
 
-function validateAppContinuityEvidence(artifactDir, name, group) {
-  const evidence = evidenceObject(artifactDir, `${name}.json`);
+function validateAppContinuityEvidence(artifactDir, name, group, checkout) {
+  const evidence = evidenceObject(artifactDir, `${name}.json`, checkout);
   assert.equal(evidence.scenario, name); assert.equal(evidence.group, group); assert.equal(evidence.result, "passed");
   assert.equal(evidence.schema, 1);
   const initial = evidence.startup;
@@ -475,15 +528,15 @@ function validateAppContinuityEvidence(artifactDir, name, group) {
   assert.deepEqual(evidence.beforeNextLoad.state, evidence.helperReturn.state);
   assert.equal(evidence.afterControls.boundary, "after-native-continuity-controls");
   assert.deepEqual(evidence.afterControls.state, evidence.beforeNextLoad.state);
-  const transitions = evidenceObject(artifactDir, "point-paint-app-transitions.json");
+  const transitions = evidenceObject(artifactDir, "point-paint-app-transitions.json", checkout);
   assert.deepEqual(transitions.transitions, evidence.transitions);
-  const lifecycle = evidenceObject(artifactDir, "point-paint-app-lifecycle.json");
+  const lifecycle = evidenceObject(artifactDir, "point-paint-app-lifecycle.json", checkout);
   assert.equal(lifecycle.schema, 1); assert.equal(lifecycle.pageId, initial.pageId);
   assert.equal(lifecycle.expectedUrl, initial.expectedUrl);
   assert.equal(lifecycle.expected?.generation, initial.document.generation);
   assert.ok(Array.isArray(lifecycle.events) && lifecycle.events.length > 0 && lifecycle.events.length <= 256);
   assert.ok(lifecycle.events.some((entry) => entry.event === "document-observation" && entry.boundary === "import-helper-return"));
-  const controls = evidenceObject(artifactDir, "point-paint-app-controls.json");
+  const controls = evidenceObject(artifactDir, "point-paint-app-controls.json", checkout);
   assert.equal(controls.schema, 1); assert.deepEqual(controls.controls, evidence.controls);
   assert.equal(evidence.controls?.length, 3);
   for (const fault of ["missing-api", "wrong-api", "same-url-reload"]) {
@@ -491,7 +544,7 @@ function validateAppContinuityEvidence(artifactDir, name, group) {
     assert.equal(matches.length, 1); const control = matches[0];
     assert.equal(control.result, "passed"); assert.notEqual(control.before.pageId, initial.pageId);
     const prefix = `point-paint-app-control-${fault}`;
-    const failure = evidenceObject(artifactDir, `${prefix}-failure.json`);
+    const failure = evidenceObject(artifactDir, `${prefix}-failure.json`, checkout);
     assert.deepEqual(failure, control.evidence);
     assert.equal(failure.pageId, control.before.pageId); assert.equal(failure.snapshot?.pageId, control.before.pageId);
     assert.equal(failure.expectedUrl, initial.expectedUrl); assert.equal(failure.snapshot.document.url, initial.expectedUrl);
@@ -505,14 +558,14 @@ function validateAppContinuityEvidence(artifactDir, name, group) {
     else assert.equal(failure.snapshot.document.generation, control.before.document.generation);
     if (fault === "missing-api") assert.equal(failure.snapshot.document.api.type, "undefined");
     if (fault === "wrong-api") assert.equal(failure.snapshot.document.api.sameInstance, false);
-    const owned = evidenceObject(artifactDir, `${prefix}-lifecycle.json`);
+    const owned = evidenceObject(artifactDir, `${prefix}-lifecycle.json`, checkout);
     assert.equal(owned.pageId, control.before.pageId); assert.equal(owned.expectedUrl, initial.expectedUrl);
     assert.ok(owned.events.some((entry) => entry.event === "document-observation" && entry.boundary === "failure"));
   }
 }
 
-function validateImportedPaintEvidence(artifactDir, name, group) {
-  const evidence = evidenceObject(artifactDir, `${name}.json`);
+function validateImportedPaintEvidence(artifactDir, name, group, checkout) {
+  const evidence = evidenceObject(artifactDir, `${name}.json`, checkout);
   const persistence = (entry, boundary) => entry?.boundary === boundary
     && Array.isArray(entry.differencePaths) && entry.differencePaths.length === 0;
   if (evidence.scenario !== name || evidence.group !== group || evidence.result !== "passed"
@@ -657,8 +710,8 @@ function validateImportedPaintEvidence(artifactDir, name, group) {
 
 /** Deliberately separate from imported-state checks: a detached point requires
  * BOTH the external association and importer provenance to be absent. */
-function validateDetachedPaintEvidence(artifactDir, name, group) {
-  const evidence = evidenceObject(artifactDir, `${name}.json`);
+function validateDetachedPaintEvidence(artifactDir, name, group, checkout) {
+  const evidence = evidenceObject(artifactDir, `${name}.json`, checkout);
   assert.equal(evidence.scenario, name); assert.equal(evidence.group, group); assert.equal(evidence.result, "passed");
   const observed = (entry) => {
     assert.equal(entry?.modelDiagnostics?.validation?.valid, true, "Clear model is immediately valid");
@@ -684,10 +737,13 @@ function validateDetachedPaintEvidence(artifactDir, name, group) {
         const expected = structuredClone(prior.current), actual = after.points.find((point) => point.current.id === expected.id);
         if (ids.includes(expected.id)) {
           const key = entry.before.diagram.importedTikzStyleReferences.find((ref) => ref.id === expected.importedTikzStyleReferenceId).key;
-          delete expected.stylePresetId; delete expected.importedTikzStyleReferenceId; delete expected.style.importedPaint; delete expected.style.importedShape;
+          delete expected.stylePresetId; delete expected.importedTikzStyleReferenceId;
+          delete expected.style.importedPaint; delete expected.style.importedShape; delete expected.style.importedLayout;
           assert.equal(Object.hasOwn(actual.current, "stylePresetId"), false);
           assert.equal(Object.hasOwn(actual.current, "importedTikzStyleReferenceId"), false);
           assert.equal(Object.hasOwn(actual.current.style, "importedPaint"), false);
+          assert.equal(Object.hasOwn(actual.current.style, "importedShape"), false, "Clear removes imported shape provenance");
+          assert.equal(Object.hasOwn(actual.current.style, "importedLayout"), false, "Clear removes imported layout provenance");
           for (const code of Object.values(after.output)) {
             const paint = observeLiteralPointPaint(code, expected.text);
             assert.equal(paint.options.includes(key), false, "Target point external invocation is detached");
@@ -762,17 +818,17 @@ export function hasWholePointSvg(svg) {
 export function validateBrowserEvidence(name, artifactDir, phase, checkout, profile = "strict") {
   resolveVerificationProfile(profile, phase);
   if (name === "check:label-assets") {
-    const evidence = evidenceObject(artifactDir, "native-retry-evidence.json");
+    const evidence = evidenceObject(artifactDir, "native-retry-evidence.json", checkout);
     if (typeof evidence.browser !== "string" || evidence.browser.trim() === ""
       || evidence.affectedBrowserRecoveryVerified !== true
       || evidence.nativeFailureCaching?.cachesFailedNativeImports !== true) {
       throw new Error("Affected-browser native import recovery has not been verified");
     }
-    evidenceObject(artifactDir, "asset-graph-evidence.json");
-    evidenceObject(artifactDir, "containment-evidence.json");
+    evidenceObject(artifactDir, "asset-graph-evidence.json", checkout);
+    evidenceObject(artifactDir, "containment-evidence.json", checkout);
     return;
   }
-  const evidence = evidenceObject(artifactDir, "free-labels-evidence.json");
+  const evidence = evidenceObject(artifactDir, "free-labels-evidence.json", checkout);
   if (profile === phase32cProfile) { assert.equal(evidence.profile, profile, "Scoped browser profile mismatch"); assert.deepEqual(evidence.deferredScenarios, [mechanismNotRun()]); }
   else assert.ok(evidence.profile === undefined || evidence.profile === "strict", "Strict verification cannot accept scoped evidence");
   if (evidence.result !== "passed" || evidence.stage !== "complete"
@@ -789,9 +845,9 @@ export function validateBrowserEvidence(name, artifactDir, phase, checkout, prof
   const completed = evidence.completed;
   if (!Array.isArray(completed)
     || new Set(completed).size !== completed.length
-    || completed.some((group) => ![...pointNodeGroups, geometricShapeGroup].includes(group))
+    || completed.some((group) => ![...pointNodeGroups, geometricShapeGroup, layoutAnchorGroup].includes(group))
     || !requiredGroups.every((group) => completed.includes(group))
-    || ![freeLabelGroups, inlineCompleteGroups, allLabelGroups, combinedLabelGroups, pointNodeMathGroups, pointNodeGroups, phase32Groups["32C"]].some((groups) =>
+    || ![freeLabelGroups, inlineCompleteGroups, allLabelGroups, combinedLabelGroups, pointNodeMathGroups, pointNodeGroups, phase32Groups["32C"], phase32Groups["32D"]].some((groups) =>
       groups.length === completed.length && groups.every((group) => completed.includes(group)))) {
     throw new Error(`Phase ${phase} browser evidence must complete ${requiredGroups.length} required groups; only complete supported group sets are accepted`);
   }
@@ -816,6 +872,47 @@ export function validateBrowserEvidence(name, artifactDir, phase, checkout, prof
           || !pointNodeScenarioArtifacts(name, profile).every((file) => records[0].artifacts.includes(file))) {
           throw new Error(`Missing completed point-node scenario: ${name}`);
         }
+        // These seven empty-source points intentionally have no glyph paint.
+        // Authenticate BOTH exact downloads through the complete current-source,
+        // association, file-local SVG/PNG/TikZ and native/live replay first. Only
+        // that successful replay supplies their envelope classification; neither
+        // a filename nor a blank title grants an empty-body allowance.
+        const authenticatedEmptyPointSvgs = new Set();
+        const authenticatedDiagnosticPointSvgs = new Map();
+        if (group === layoutAnchorGroup && name === signedPolygonalScenario) {
+          const conformanceSvgs = validateTargetedPaintEvidence(artifactDir, name, group, profile, checkout);
+          for (const artifact of conformanceSvgs) authenticatedEmptyPointSvgs.add(artifact);
+          for (const ambientDimension of [2, 3]) {
+            authenticatedEmptyPointSvgs.add(`${signedPolygonalScenario}-${ambientDimension}d.svg`);
+          }
+        }
+        // Warning-only downloads require their own exact diagnostic context.
+        // Full model/native/click/file replay supplies eligibility before the
+        // legacy envelope is examined; the signed seven-owner route is separate.
+        if (group === layoutAnchorGroup && cylinderDiagnosticScenarios.includes(name)) {
+          const contexts = validateTargetedPaintEvidence(artifactDir, name, group, profile, checkout);
+          assert.equal(contexts.length, 2);
+          for (const context of contexts) {
+            assert.equal(context.schema, 'stz-singular-cylinder-diagnostic-artifact-v1');
+            assert.ok([2, 3].includes(context.ambientDimension));
+            const artifact = `${name}-${context.ambientDimension}d.svg`;
+            assert.equal(context.svgPath, resolve(artifactDir, artifact));
+            assert.equal(authenticatedDiagnosticPointSvgs.has(artifact), false);
+            authenticatedDiagnosticPointSvgs.set(artifact, context);
+          }
+        }
+        if (group === layoutAnchorGroup && name === foldedCylinderScenario) {
+          const contexts = validateTargetedPaintEvidence(artifactDir, name, group, profile, checkout);
+          assert.equal(contexts.length, 2);
+          for (const context of contexts) {
+            assert.equal(context.schema, 'stz-folded-cylinder-artifact-v1');
+            assert.ok([2, 3].includes(context.ambientDimension));
+            const artifact = `${name}-${context.ambientDimension}d.svg`;
+            assert.equal(context.svgPath, resolve(artifactDir, artifact));
+            assert.equal(authenticatedDiagnosticPointSvgs.has(artifact), false);
+            authenticatedDiagnosticPointSvgs.set(artifact, context);
+          }
+        }
         for (const artifact of records[0].artifacts) {
           if (typeof artifact !== "string" || !artifact || artifact.includes("..")
             || resolve(artifactDir, artifact) !== join(artifactDir, artifact)
@@ -824,15 +921,19 @@ export function validateBrowserEvidence(name, artifactDir, phase, checkout, prof
           }
           const bytes = readFileSync(join(artifactDir, artifact));
           if (artifact.endsWith(".json")) {
-            const value = JSON.parse(bytes.toString());
+            const value = readEvidenceDocumentSync(artifactDir, artifact, { checkout });
             if (!value || typeof value !== "object") throw new Error(`Invalid point-node JSON: ${artifact}`);
           } else if (artifact.endsWith(".svg")) {
             const svg = bytes.toString();
+            const diagnosticContext = authenticatedDiagnosticPointSvgs.get(artifact);
+            if (diagnosticContext) assert.equal(sha256(bytes), diagnosticContext.svgSha256,
+              'Diagnostic envelope belongs to the exact authenticated warning-only file');
             if ((artifact.startsWith(`${polygonJoinScenario}-`) || artifact.startsWith(`${dashCapScenario}-`) || artifact.startsWith(`${dashCapMechanismStem}-`))
               && (artifact.endsWith(".input.svg") || artifact.startsWith(`${dashCapMechanismStem}-`) && artifact.endsWith(".live.svg"))) {
               if (!/^<svg\s[^>]*><(polygon|circle)\s[^>]*><\/\1><\/svg>$/u.test(svg)
                 || /(?:href|onload|script|data-)=/u.test(svg)) throw new Error(`Invalid polygon stroke SVG input: ${artifact}`);
-            } else if (!hasWholePointSvg(svg)) {
+            } else if (!authenticatedEmptyPointSvgs.has(artifact)
+              && !authenticatedDiagnosticPointSvgs.has(artifact) && !hasWholePointSvg(svg)) {
               throw new Error(`Invalid whole-point SVG artifact: ${artifact}`);
             }
           } else if (artifact.endsWith(".png") && (bytes.length < 24
@@ -840,7 +941,12 @@ export function validateBrowserEvidence(name, artifactDir, phase, checkout, prof
             throw new Error(`Invalid point-node PNG artifact: ${artifact}`);
           }
         }
-        validateTargetedPaintEvidence(artifactDir, name, group, profile);
+        if (authenticatedEmptyPointSvgs.size === 0 && authenticatedDiagnosticPointSvgs.size === 0) {
+          validateTargetedPaintEvidence(artifactDir, name, group, profile, checkout);
+        }
+        if (name === 'point-layout-pending-transparent-edit') {
+          assertLayoutPostClickViewDiagnostic(evidenceObject(artifactDir, `${name}.json`, checkout), evidence.diagnostics);
+        }
       }
     }
   }
@@ -1002,7 +1108,7 @@ export function runPhaseVerification({ phase, cwd = process.cwd(), env = process
  * is never passed to run-phase's success/commit path. The second browser run
  * executes every non-deferred scenario, including final SVG and all new shapes. */
 function validateNamedStrict32CDiagnostic(check, checkout) {
-  const evidence = evidenceObject(check.artifactDir, 'free-labels-evidence.json');
+  const evidence = evidenceObject(check.artifactDir, 'free-labels-evidence.json', checkout);
   assert.equal(evidence.profile ?? 'strict', 'strict');
   assert.equal(evidence.checkout?.revision, checkout.revision);
   assert.equal(evidence.checkout?.trackedDiffSha256, checkout.trackedDiffSha256);
@@ -1011,8 +1117,8 @@ function validateNamedStrict32CDiagnostic(check, checkout) {
   assert.equal(evidence.completed.length, earlier.length);
   assert.ok(earlier.every((group) => evidence.completed.includes(group)));
   assert.ok(evidence.incompleteGroups.includes('settled-SVG-export-standalone') && evidence.incompleteGroups.includes('point-node-paint-import-persistence'));
-  const appDash = evidenceObject(check.artifactDir, `${dashCapScenario}.json`);
-  assertNamedStrict32BFailure(evidence, evidenceObject(check.artifactDir, `${dashCapMechanismStem}.json`), appDash);
+  const appDash = evidenceObject(check.artifactDir, `${dashCapScenario}.json`, checkout);
+  assertNamedStrict32BFailure(evidence, evidenceObject(check.artifactDir, `${dashCapMechanismStem}.json`, checkout), appDash);
   assertDashCapEvidence({ ...appDash, result: 'passed' });
 }
 

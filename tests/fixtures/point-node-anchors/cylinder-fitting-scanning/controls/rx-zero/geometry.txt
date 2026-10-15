@@ -1,0 +1,39 @@
+CASE rx-zero
+FONT 10.00002pt,4.30554pt
+STAGE innerXSp; 0
+STAGE innerYSp; 0
+STAGE initialXSp; 0
+STAGE initialYSp; 0
+STAGE fittedXSp; 0
+STAGE fittedYSp; 0
+STAGE transverseInnerSepSp; 0
+STAGE minimumWidthSp; 655360
+STAGE divisorSp; 327680
+STAGE bodyWidthHalfSp; 0
+STAGE bodyHeightHalfSp; 0
+STAGE bodyDepthHalfSp; 0
+STAGE minimumWidthHalfSp; 327680
+PAINT stroke; PATH macro:->\pgfsyssoftpath@movetotoken {-9.9pt}{5.0pt}\pgfsyssoftpath@curvetosupportatoken {-9.9pt}{5.0pt}\pgfsyssoftpath@curvetosupportbtoken {-9.9pt}{2.76146pt}\pgfsyssoftpath@curvetotoken {-9.9pt}{0.0pt}\pgfsyssoftpath@curvetosupportatoken {-9.9pt}{-2.76146pt}\pgfsyssoftpath@curvetosupportbtoken {-9.9pt}{-5.0pt}\pgfsyssoftpath@curvetotoken {-9.9pt}{-5.0pt}\pgfsyssoftpath@linetotoken {10.09999pt}{-5.0pt}\pgfsyssoftpath@curvetosupportatoken {10.09999pt}{-5.0pt}\pgfsyssoftpath@curvetosupportbtoken {10.09999pt}{-2.76146pt}\pgfsyssoftpath@curvetotoken {10.09999pt}{0.0pt}\pgfsyssoftpath@curvetosupportatoken {10.09999pt}{2.76146pt}\pgfsyssoftpath@curvetosupportbtoken {10.09999pt}{5.0pt}\pgfsyssoftpath@curvetotoken {10.09999pt}{5.0pt}\pgfsyssoftpath@closepathtoken {-9.9pt}{5.0pt}\pgfsyssoftpath@movetotoken {10.09999pt}{5.0pt}\pgfsyssoftpath@curvetosupportatoken {10.09999pt}{5.0pt}\pgfsyssoftpath@curvetosupportbtoken {10.09999pt}{2.76146pt}\pgfsyssoftpath@curvetotoken {10.09999pt}{0.0pt}\pgfsyssoftpath@curvetosupportatoken {10.09999pt}{-2.76146pt}\pgfsyssoftpath@curvetosupportbtoken {10.09999pt}{-5.0pt}\pgfsyssoftpath@curvetotoken {10.09999pt}{-5.0pt}
+ANCHOR center; 0.0pt,0.0pt
+ANCHOR text; 0.0pt,0.0pt
+ANCHOR base; 0.0pt,0.0pt
+ANCHOR mid; 0.0pt,2.15277pt
+ANCHOR east; 10.09999pt,0.00092pt
+ANCHOR north east; 5.00044pt,5.00044pt
+ANCHOR north; 0.0pt,5.00116pt
+ANCHOR north west; -5.00044pt,5.00044pt
+ANCHOR west; -9.9pt,0.0pt
+ANCHOR south west; -5.00044pt,-5.00044pt
+ANCHOR south; 0.0pt,-5.00116pt
+ANCHOR south east; 5.00044pt,-5.00044pt
+ANCHOR base east; 10.09999pt,0.00092pt
+ANCHOR base west; -9.9pt,0.0pt
+ANCHOR mid east; 10.09999pt,3.53554pt
+ANCHOR mid west; -9.9pt,2.15324pt
+ANCHOR shape center; 0.09999pt,0.0pt
+ANCHOR before top; 10.09999pt,5.0pt
+ANCHOR top; 10.09999pt,0.0pt
+ANCHOR after top; 10.09999pt,-5.0pt
+ANCHOR before bottom; -9.9pt,-5.0pt
+ANCHOR bottom; -9.9pt,0.0pt
+ANCHOR after bottom; -9.9pt,5.0pt

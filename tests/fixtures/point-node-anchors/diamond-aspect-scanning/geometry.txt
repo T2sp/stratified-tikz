@@ -1,0 +1,1042 @@
+CASE aspect-0.01
+FONT 10.00002pt,4.30554pt
+STAGE aspectSp; 655
+STAGE aspectEighthSp; 81
+STAGE inverseSp; 6628035
+STAGE initialXSp; 753664
+STAGE initialYSp; 458752
+STAGE aspectYSp; 4585
+STAGE inverseXSp; 76222402
+STAGE fittedXSp; 758249
+STAGE fittedYSp; 76681154
+STAGE minimumWidthHalfSp; 32768
+STAGE minimumHeightHalfSp; 32768
+STAGE limitedXSp; 758249
+STAGE limitedYSp; 76681154
+STAGE outerXSp; 0
+STAGE outerYSp; 0
+STAGE anchorXSp; 758249
+STAGE anchorYSp; 76681154
+STAGE paintedXSp; 758249
+STAGE paintedYSp; 76681154
+PAINT stroke; PATH macro:->\pgfsyssoftpath@movetotoken {11.56996pt}{0.0pt}\pgfsyssoftpath@linetotoken {0.0pt}{1170.06155pt}\pgfsyssoftpath@linetotoken {-11.56996pt}{0.0pt}\pgfsyssoftpath@linetotoken {0.0pt}{-1170.06155pt}\pgfsyssoftpath@closepathtoken {11.56996pt}{0.0pt}
+ANCHOR center; 0.0pt,0.0pt
+ANCHOR text; -10.0pt,-2.5pt
+ANCHOR base; 0.0pt,-2.5pt
+ANCHOR mid; 0.0pt,-0.34723pt
+ANCHOR east; 11.56996pt,0.0pt
+ANCHOR north east; 5.78497pt,585.03078pt
+ANCHOR north; 0.0pt,1170.06155pt
+ANCHOR north west; -5.78497pt,585.03078pt
+ANCHOR west; -11.56996pt,0.0pt
+ANCHOR south west; -5.78497pt,-585.03078pt
+ANCHOR south; 0.0pt,-1170.06155pt
+ANCHOR south east; 5.78497pt,-585.03078pt
+ANCHOR 0; 11.5693pt,0.0pt
+ANCHOR 37; 11.48483pt,8.65446pt
+ANCHOR 45; 11.45772pt,11.45772pt
+ANCHOR 90; 0.0pt,1169.6732pt
+ANCHOR 135; -11.45772pt,11.45772pt
+ANCHOR 180; -11.5693pt,0.0pt
+ANCHOR 225; -11.45772pt,-11.45772pt
+ANCHOR 270; 0.0pt,-1169.6732pt
+ANCHOR 315; 11.45772pt,-11.45772pt
+ANCHOR 450; 0.0pt,1169.6732pt
+ANCHOR 90.8; 0.0pt,1169.6732pt
+ANCHOR +45.7; 11.45772pt,11.45772pt
+ANCHOR -90.8; 0.0pt,-1169.6732pt
+ANCHOR -0.5; 11.5693pt,0.0pt
+CASE aspect-0.01001
+FONT 10.00002pt,4.30554pt
+STAGE aspectSp; 656
+STAGE aspectEighthSp; 82
+STAGE inverseSp; 6547206
+STAGE initialXSp; 753664
+STAGE initialYSp; 458752
+STAGE aspectYSp; 4592
+STAGE inverseXSp; 75292869
+STAGE fittedXSp; 758256
+STAGE fittedYSp; 75751621
+STAGE minimumWidthHalfSp; 32768
+STAGE minimumHeightHalfSp; 32768
+STAGE limitedXSp; 758256
+STAGE limitedYSp; 75751621
+STAGE outerXSp; 0
+STAGE outerYSp; 0
+STAGE anchorXSp; 758256
+STAGE anchorYSp; 75751621
+STAGE paintedXSp; 758256
+STAGE paintedYSp; 75751621
+PAINT stroke; PATH macro:->\pgfsyssoftpath@movetotoken {11.57007pt}{0.0pt}\pgfsyssoftpath@linetotoken {0.0pt}{1155.878pt}\pgfsyssoftpath@linetotoken {-11.57007pt}{0.0pt}\pgfsyssoftpath@linetotoken {0.0pt}{-1155.878pt}\pgfsyssoftpath@closepathtoken {11.57007pt}{0.0pt}
+ANCHOR center; 0.0pt,0.0pt
+ANCHOR text; -10.0pt,-2.5pt
+ANCHOR base; 0.0pt,-2.5pt
+ANCHOR mid; 0.0pt,-0.34723pt
+ANCHOR east; 11.57007pt,0.0pt
+ANCHOR north east; 5.78503pt,577.939pt
+ANCHOR north; 0.0pt,1155.878pt
+ANCHOR north west; -5.78503pt,577.939pt
+ANCHOR west; -11.57007pt,0.0pt
+ANCHOR south west; -5.78503pt,-577.939pt
+ANCHOR south; 0.0pt,-1155.878pt
+ANCHOR south east; 5.78503pt,-577.939pt
+ANCHOR 0; 11.5697pt,0.0pt
+ANCHOR 37; 11.48384pt,8.6537pt
+ANCHOR 45; 11.4562pt,11.4562pt
+ANCHOR 90; 0.0pt,1157.54715pt
+ANCHOR 135; -11.4562pt,11.4562pt
+ANCHOR 180; -11.5697pt,0.0pt
+ANCHOR 225; -11.4562pt,-11.4562pt
+ANCHOR 270; 0.0pt,-1157.54715pt
+ANCHOR 315; 11.4562pt,-11.4562pt
+ANCHOR 450; 0.0pt,1157.54715pt
+ANCHOR 90.8; 0.0pt,1157.54715pt
+ANCHOR +45.7; 11.4562pt,11.4562pt
+ANCHOR -90.8; 0.0pt,-1157.54715pt
+ANCHOR -0.5; 11.5697pt,0.0pt
+CASE aspect-0.0101
+FONT 10.00002pt,4.30554pt
+STAGE aspectSp; 662
+STAGE aspectEighthSp; 82
+STAGE inverseSp; 6547206
+STAGE initialXSp; 753664
+STAGE initialYSp; 458752
+STAGE aspectYSp; 4634
+STAGE inverseXSp; 75292869
+STAGE fittedXSp; 758298
+STAGE fittedYSp; 75751621
+STAGE minimumWidthHalfSp; 32768
+STAGE minimumHeightHalfSp; 32768
+STAGE limitedXSp; 758298
+STAGE limitedYSp; 75751621
+STAGE outerXSp; 0
+STAGE outerYSp; 0
+STAGE anchorXSp; 758298
+STAGE anchorYSp; 75751621
+STAGE paintedXSp; 758298
+STAGE paintedYSp; 75751621
+PAINT stroke; PATH macro:->\pgfsyssoftpath@movetotoken {11.57071pt}{0.0pt}\pgfsyssoftpath@linetotoken {0.0pt}{1155.878pt}\pgfsyssoftpath@linetotoken {-11.57071pt}{0.0pt}\pgfsyssoftpath@linetotoken {0.0pt}{-1155.878pt}\pgfsyssoftpath@closepathtoken {11.57071pt}{0.0pt}
+ANCHOR center; 0.0pt,0.0pt
+ANCHOR text; -10.0pt,-2.5pt
+ANCHOR base; 0.0pt,-2.5pt
+ANCHOR mid; 0.0pt,-0.34723pt
+ANCHOR east; 11.57071pt,0.0pt
+ANCHOR north east; 5.78535pt,577.939pt
+ANCHOR north; 0.0pt,1155.878pt
+ANCHOR north west; -5.78535pt,577.939pt
+ANCHOR west; -11.57071pt,0.0pt
+ANCHOR south west; -5.78535pt,-577.939pt
+ANCHOR south; 0.0pt,-1155.878pt
+ANCHOR south east; 5.78535pt,-577.939pt
+ANCHOR 0; 11.57034pt,0.0pt
+ANCHOR 37; 11.48448pt,8.65419pt
+ANCHOR 45; 11.45685pt,11.45685pt
+ANCHOR 90; 0.0pt,1157.61188pt
+ANCHOR 135; -11.45685pt,11.45685pt
+ANCHOR 180; -11.57034pt,0.0pt
+ANCHOR 225; -11.45685pt,-11.45685pt
+ANCHOR 270; 0.0pt,-1157.61188pt
+ANCHOR 315; 11.45685pt,-11.45685pt
+ANCHOR 450; 0.0pt,1157.61188pt
+ANCHOR 90.8; 0.0pt,1157.61188pt
+ANCHOR +45.7; 11.45685pt,11.45685pt
+ANCHOR -90.8; 0.0pt,-1157.61188pt
+ANCHOR -0.5; 11.57034pt,0.0pt
+CASE aspect-0.02999
+FONT 10.00002pt,4.30554pt
+STAGE aspectSp; 1965
+STAGE aspectEighthSp; 245
+STAGE inverseSp; 2191309
+STAGE initialXSp; 753664
+STAGE initialYSp; 458752
+STAGE aspectYSp; 13755
+STAGE inverseXSp; 25200053
+STAGE fittedXSp; 767419
+STAGE fittedYSp; 25658805
+STAGE minimumWidthHalfSp; 32768
+STAGE minimumHeightHalfSp; 32768
+STAGE limitedXSp; 767419
+STAGE limitedYSp; 25658805
+STAGE outerXSp; 0
+STAGE outerYSp; 0
+STAGE anchorXSp; 767419
+STAGE anchorYSp; 25658805
+STAGE paintedXSp; 767419
+STAGE paintedYSp; 25658805
+PAINT stroke; PATH macro:->\pgfsyssoftpath@movetotoken {11.70988pt}{0.0pt}\pgfsyssoftpath@linetotoken {0.0pt}{391.5223pt}\pgfsyssoftpath@linetotoken {-11.70988pt}{0.0pt}\pgfsyssoftpath@linetotoken {0.0pt}{-391.5223pt}\pgfsyssoftpath@closepathtoken {11.70988pt}{0.0pt}
+ANCHOR center; 0.0pt,0.0pt
+ANCHOR text; -10.0pt,-2.5pt
+ANCHOR base; 0.0pt,-2.5pt
+ANCHOR mid; 0.0pt,-0.34723pt
+ANCHOR east; 11.70988pt,0.0pt
+ANCHOR north east; 5.85493pt,195.76114pt
+ANCHOR north; 0.0pt,391.5223pt
+ANCHOR north west; -5.85493pt,195.76114pt
+ANCHOR west; -11.70988pt,0.0pt
+ANCHOR south west; -5.85493pt,-195.76114pt
+ANCHOR south; 0.0pt,-391.5223pt
+ANCHOR south east; 5.85493pt,-195.76114pt
+ANCHOR 0; 11.70956pt,0.0pt
+ANCHOR 37; 11.45197pt,8.6296pt
+ANCHOR 45; 11.37038pt,11.37038pt
+ANCHOR 90; 0.0pt,391.61134pt
+ANCHOR 135; -11.37038pt,11.37038pt
+ANCHOR 180; -11.70956pt,0.0pt
+ANCHOR 225; -11.37038pt,-11.37038pt
+ANCHOR 270; 0.0pt,-391.61134pt
+ANCHOR 315; 11.37038pt,-11.37038pt
+ANCHOR 450; 0.0pt,391.61134pt
+ANCHOR 90.8; 0.0pt,391.61134pt
+ANCHOR +45.7; 11.37038pt,11.37038pt
+ANCHOR -90.8; 0.0pt,-391.61134pt
+ANCHOR -0.5; 11.70956pt,0.0pt
+CASE aspect-0.03
+FONT 10.00002pt,4.30554pt
+STAGE aspectSp; 1966
+STAGE aspectEighthSp; 245
+STAGE inverseSp; 2191309
+STAGE initialXSp; 753664
+STAGE initialYSp; 458752
+STAGE aspectYSp; 13762
+STAGE inverseXSp; 25200053
+STAGE fittedXSp; 767426
+STAGE fittedYSp; 25658805
+STAGE minimumWidthHalfSp; 32768
+STAGE minimumHeightHalfSp; 32768
+STAGE limitedXSp; 767426
+STAGE limitedYSp; 25658805
+STAGE outerXSp; 0
+STAGE outerYSp; 0
+STAGE anchorXSp; 767426
+STAGE anchorYSp; 25658805
+STAGE paintedXSp; 767426
+STAGE paintedYSp; 25658805
+PAINT stroke; PATH macro:->\pgfsyssoftpath@movetotoken {11.70999pt}{0.0pt}\pgfsyssoftpath@linetotoken {0.0pt}{391.5223pt}\pgfsyssoftpath@linetotoken {-11.70999pt}{0.0pt}\pgfsyssoftpath@linetotoken {0.0pt}{-391.5223pt}\pgfsyssoftpath@closepathtoken {11.70999pt}{0.0pt}
+ANCHOR center; 0.0pt,0.0pt
+ANCHOR text; -10.0pt,-2.5pt
+ANCHOR base; 0.0pt,-2.5pt
+ANCHOR mid; 0.0pt,-0.34723pt
+ANCHOR east; 11.70999pt,0.0pt
+ANCHOR north east; 5.855pt,195.76114pt
+ANCHOR north; 0.0pt,391.5223pt
+ANCHOR north west; -5.855pt,195.76114pt
+ANCHOR west; -11.70999pt,0.0pt
+ANCHOR south west; -5.855pt,-195.76114pt
+ANCHOR south; 0.0pt,-391.5223pt
+ANCHOR south east; 5.855pt,-195.76114pt
+ANCHOR 0; 11.70967pt,0.0pt
+ANCHOR 37; 11.45207pt,8.62967pt
+ANCHOR 45; 11.37048pt,11.37048pt
+ANCHOR 90; 0.0pt,391.61502pt
+ANCHOR 135; -11.37048pt,11.37048pt
+ANCHOR 180; -11.70967pt,0.0pt
+ANCHOR 225; -11.37048pt,-11.37048pt
+ANCHOR 270; 0.0pt,-391.61502pt
+ANCHOR 315; 11.37048pt,-11.37048pt
+ANCHOR 450; 0.0pt,391.61502pt
+ANCHOR 90.8; 0.0pt,391.61502pt
+ANCHOR +45.7; 11.37048pt,11.37048pt
+ANCHOR -90.8; 0.0pt,-391.61502pt
+ANCHOR -0.5; 11.70967pt,0.0pt
+CASE aspect-0.03001
+FONT 10.00002pt,4.30554pt
+STAGE aspectSp; 1967
+STAGE aspectEighthSp; 245
+STAGE inverseSp; 2191309
+STAGE initialXSp; 753664
+STAGE initialYSp; 458752
+STAGE aspectYSp; 13769
+STAGE inverseXSp; 25200053
+STAGE fittedXSp; 767433
+STAGE fittedYSp; 25658805
+STAGE minimumWidthHalfSp; 32768
+STAGE minimumHeightHalfSp; 32768
+STAGE limitedXSp; 767433
+STAGE limitedYSp; 25658805
+STAGE outerXSp; 0
+STAGE outerYSp; 0
+STAGE anchorXSp; 767433
+STAGE anchorYSp; 25658805
+STAGE paintedXSp; 767433
+STAGE paintedYSp; 25658805
+PAINT stroke; PATH macro:->\pgfsyssoftpath@movetotoken {11.7101pt}{0.0pt}\pgfsyssoftpath@linetotoken {0.0pt}{391.5223pt}\pgfsyssoftpath@linetotoken {-11.7101pt}{0.0pt}\pgfsyssoftpath@linetotoken {0.0pt}{-391.5223pt}\pgfsyssoftpath@closepathtoken {11.7101pt}{0.0pt}
+ANCHOR center; 0.0pt,0.0pt
+ANCHOR text; -10.0pt,-2.5pt
+ANCHOR base; 0.0pt,-2.5pt
+ANCHOR mid; 0.0pt,-0.34723pt
+ANCHOR east; 11.7101pt,0.0pt
+ANCHOR north east; 5.85504pt,195.76114pt
+ANCHOR north; 0.0pt,391.5223pt
+ANCHOR north west; -5.85504pt,195.76114pt
+ANCHOR west; -11.7101pt,0.0pt
+ANCHOR south west; -5.85504pt,-195.76114pt
+ANCHOR south; 0.0pt,-391.5223pt
+ANCHOR south east; 5.85504pt,-195.76114pt
+ANCHOR 0; 11.70978pt,0.0pt
+ANCHOR 37; 11.45218pt,8.62975pt
+ANCHOR 45; 11.37059pt,11.37059pt
+ANCHOR 90; 0.0pt,391.6187pt
+ANCHOR 135; -11.37059pt,11.37059pt
+ANCHOR 180; -11.70978pt,0.0pt
+ANCHOR 225; -11.37059pt,-11.37059pt
+ANCHOR 270; 0.0pt,-391.6187pt
+ANCHOR 315; 11.37059pt,-11.37059pt
+ANCHOR 450; 0.0pt,391.6187pt
+ANCHOR 90.8; 0.0pt,391.6187pt
+ANCHOR +45.7; 11.37059pt,11.37059pt
+ANCHOR -90.8; 0.0pt,-391.6187pt
+ANCHOR -0.5; 11.70978pt,0.0pt
+CASE aspect-0.09999
+FONT 10.00002pt,4.30554pt
+STAGE aspectSp; 6553
+STAGE aspectEighthSp; 819
+STAGE inverseSp; 655520
+STAGE initialXSp; 753664
+STAGE initialYSp; 458752
+STAGE aspectYSp; 45871
+STAGE inverseXSp; 7538480
+STAGE fittedXSp; 799535
+STAGE fittedYSp; 7997232
+STAGE minimumWidthHalfSp; 32768
+STAGE minimumHeightHalfSp; 32768
+STAGE limitedXSp; 799535
+STAGE limitedYSp; 7997232
+STAGE outerXSp; 0
+STAGE outerYSp; 0
+STAGE anchorXSp; 799535
+STAGE anchorYSp; 7997232
+STAGE paintedXSp; 799535
+STAGE paintedYSp; 7997232
+PAINT stroke; PATH macro:->\pgfsyssoftpath@movetotoken {12.19994pt}{0.0pt}\pgfsyssoftpath@linetotoken {0.0pt}{122.02808pt}\pgfsyssoftpath@linetotoken {-12.19994pt}{0.0pt}\pgfsyssoftpath@linetotoken {0.0pt}{-122.02808pt}\pgfsyssoftpath@closepathtoken {12.19994pt}{0.0pt}
+ANCHOR center; 0.0pt,0.0pt
+ANCHOR text; -10.0pt,-2.5pt
+ANCHOR base; 0.0pt,-2.5pt
+ANCHOR mid; 0.0pt,-0.34723pt
+ANCHOR east; 12.19994pt,0.0pt
+ANCHOR north east; 6.09996pt,61.01404pt
+ANCHOR north; 0.0pt,122.02808pt
+ANCHOR north west; -6.09996pt,61.01404pt
+ANCHOR west; -12.19994pt,0.0pt
+ANCHOR south west; -6.09996pt,-61.01404pt
+ANCHOR south; 0.0pt,-122.02808pt
+ANCHOR south east; 6.09996pt,-61.01404pt
+ANCHOR 0; 12.19983pt,0.0pt
+ANCHOR 37; 11.3451pt,8.54916pt
+ANCHOR 45; 11.09149pt,11.09149pt
+ANCHOR 90; 0.0pt,122.0471pt
+ANCHOR 135; -11.09149pt,11.09149pt
+ANCHOR 180; -12.19983pt,0.0pt
+ANCHOR 225; -11.09149pt,-11.09149pt
+ANCHOR 270; 0.0pt,-122.0471pt
+ANCHOR 315; 11.09149pt,-11.09149pt
+ANCHOR 450; 0.0pt,122.0471pt
+ANCHOR 90.8; 0.0pt,122.0471pt
+ANCHOR +45.7; 11.09149pt,11.09149pt
+ANCHOR -90.8; 0.0pt,-122.0471pt
+ANCHOR -0.5; 12.19983pt,0.0pt
+CASE aspect-0.1
+FONT 10.00002pt,4.30554pt
+STAGE aspectSp; 6554
+STAGE aspectEighthSp; 819
+STAGE inverseSp; 655520
+STAGE initialXSp; 753664
+STAGE initialYSp; 458752
+STAGE aspectYSp; 45878
+STAGE inverseXSp; 7538480
+STAGE fittedXSp; 799542
+STAGE fittedYSp; 7997232
+STAGE minimumWidthHalfSp; 32768
+STAGE minimumHeightHalfSp; 32768
+STAGE limitedXSp; 799542
+STAGE limitedYSp; 7997232
+STAGE outerXSp; 0
+STAGE outerYSp; 0
+STAGE anchorXSp; 799542
+STAGE anchorYSp; 7997232
+STAGE paintedXSp; 799542
+STAGE paintedYSp; 7997232
+PAINT stroke; PATH macro:->\pgfsyssoftpath@movetotoken {12.20004pt}{0.0pt}\pgfsyssoftpath@linetotoken {0.0pt}{122.02808pt}\pgfsyssoftpath@linetotoken {-12.20004pt}{0.0pt}\pgfsyssoftpath@linetotoken {0.0pt}{-122.02808pt}\pgfsyssoftpath@closepathtoken {12.20004pt}{0.0pt}
+ANCHOR center; 0.0pt,0.0pt
+ANCHOR text; -10.0pt,-2.5pt
+ANCHOR base; 0.0pt,-2.5pt
+ANCHOR mid; 0.0pt,-0.34723pt
+ANCHOR east; 12.20004pt,0.0pt
+ANCHOR north east; 6.10002pt,61.01404pt
+ANCHOR north; 0.0pt,122.02808pt
+ANCHOR north west; -6.10002pt,61.01404pt
+ANCHOR west; -12.20004pt,0.0pt
+ANCHOR south west; -6.10002pt,-61.01404pt
+ANCHOR south; 0.0pt,-122.02808pt
+ANCHOR south east; 6.10002pt,-61.01404pt
+ANCHOR 0; 12.19992pt,0.0pt
+ANCHOR 37; 11.34518pt,8.54924pt
+ANCHOR 45; 11.09158pt,11.09158pt
+ANCHOR 90; 0.0pt,122.04811pt
+ANCHOR 135; -11.09158pt,11.09158pt
+ANCHOR 180; -12.19992pt,0.0pt
+ANCHOR 225; -11.09158pt,-11.09158pt
+ANCHOR 270; 0.0pt,-122.04811pt
+ANCHOR 315; 11.09158pt,-11.09158pt
+ANCHOR 450; 0.0pt,122.04811pt
+ANCHOR 90.8; 0.0pt,122.04811pt
+ANCHOR +45.7; 11.09158pt,11.09158pt
+ANCHOR -90.8; 0.0pt,-122.04811pt
+ANCHOR -0.5; 12.19992pt,0.0pt
+CASE aspect-0.10001
+FONT 10.00002pt,4.30554pt
+STAGE aspectSp; 6554
+STAGE aspectEighthSp; 819
+STAGE inverseSp; 655520
+STAGE initialXSp; 753664
+STAGE initialYSp; 458752
+STAGE aspectYSp; 45878
+STAGE inverseXSp; 7538480
+STAGE fittedXSp; 799542
+STAGE fittedYSp; 7997232
+STAGE minimumWidthHalfSp; 32768
+STAGE minimumHeightHalfSp; 32768
+STAGE limitedXSp; 799542
+STAGE limitedYSp; 7997232
+STAGE outerXSp; 0
+STAGE outerYSp; 0
+STAGE anchorXSp; 799542
+STAGE anchorYSp; 7997232
+STAGE paintedXSp; 799542
+STAGE paintedYSp; 7997232
+PAINT stroke; PATH macro:->\pgfsyssoftpath@movetotoken {12.20004pt}{0.0pt}\pgfsyssoftpath@linetotoken {0.0pt}{122.02808pt}\pgfsyssoftpath@linetotoken {-12.20004pt}{0.0pt}\pgfsyssoftpath@linetotoken {0.0pt}{-122.02808pt}\pgfsyssoftpath@closepathtoken {12.20004pt}{0.0pt}
+ANCHOR center; 0.0pt,0.0pt
+ANCHOR text; -10.0pt,-2.5pt
+ANCHOR base; 0.0pt,-2.5pt
+ANCHOR mid; 0.0pt,-0.34723pt
+ANCHOR east; 12.20004pt,0.0pt
+ANCHOR north east; 6.10002pt,61.01404pt
+ANCHOR north; 0.0pt,122.02808pt
+ANCHOR north west; -6.10002pt,61.01404pt
+ANCHOR west; -12.20004pt,0.0pt
+ANCHOR south west; -6.10002pt,-61.01404pt
+ANCHOR south; 0.0pt,-122.02808pt
+ANCHOR south east; 6.10002pt,-61.01404pt
+ANCHOR 0; 12.19992pt,0.0pt
+ANCHOR 37; 11.34518pt,8.54924pt
+ANCHOR 45; 11.09158pt,11.09158pt
+ANCHOR 90; 0.0pt,122.04811pt
+ANCHOR 135; -11.09158pt,11.09158pt
+ANCHOR 180; -12.19992pt,0.0pt
+ANCHOR 225; -11.09158pt,-11.09158pt
+ANCHOR 270; 0.0pt,-122.04811pt
+ANCHOR 315; 11.09158pt,-11.09158pt
+ANCHOR 450; 0.0pt,122.04811pt
+ANCHOR 90.8; 0.0pt,122.04811pt
+ANCHOR +45.7; 11.09158pt,11.09158pt
+ANCHOR -90.8; 0.0pt,-122.04811pt
+ANCHOR -0.5; 12.19992pt,0.0pt
+CASE aspect-0.2
+FONT 10.00002pt,4.30554pt
+STAGE aspectSp; 13107
+STAGE aspectEighthSp; 1638
+STAGE inverseSp; 327760
+STAGE initialXSp; 753664
+STAGE initialYSp; 458752
+STAGE aspectYSp; 91749
+STAGE inverseXSp; 3769240
+STAGE fittedXSp; 845413
+STAGE fittedYSp; 4227992
+STAGE minimumWidthHalfSp; 32768
+STAGE minimumHeightHalfSp; 32768
+STAGE limitedXSp; 845413
+STAGE limitedYSp; 4227992
+STAGE outerXSp; 0
+STAGE outerYSp; 0
+STAGE anchorXSp; 845413
+STAGE anchorYSp; 4227992
+STAGE paintedXSp; 845413
+STAGE paintedYSp; 4227992
+PAINT stroke; PATH macro:->\pgfsyssoftpath@movetotoken {12.89998pt}{0.0pt}\pgfsyssoftpath@linetotoken {0.0pt}{64.51404pt}\pgfsyssoftpath@linetotoken {-12.89998pt}{0.0pt}\pgfsyssoftpath@linetotoken {0.0pt}{-64.51404pt}\pgfsyssoftpath@closepathtoken {12.89998pt}{0.0pt}
+ANCHOR center; 0.0pt,0.0pt
+ANCHOR text; -10.0pt,-2.5pt
+ANCHOR base; 0.0pt,-2.5pt
+ANCHOR mid; 0.0pt,-0.34723pt
+ANCHOR east; 12.89998pt,0.0pt
+ANCHOR north east; 6.44998pt,32.25702pt
+ANCHOR north; 0.0pt,64.51404pt
+ANCHOR north west; -6.44998pt,32.25702pt
+ANCHOR west; -12.89998pt,0.0pt
+ANCHOR south west; -6.44998pt,-32.25702pt
+ANCHOR south; 0.0pt,-64.51404pt
+ANCHOR south east; 6.44998pt,-32.25702pt
+ANCHOR 0; 12.89978pt,0.0pt
+ANCHOR 37; 11.21136pt,8.44835pt
+ANCHOR 45; 10.75108pt,10.75108pt
+ANCHOR 90; 0.0pt,64.51526pt
+ANCHOR 135; -10.75108pt,10.75108pt
+ANCHOR 180; -12.89978pt,0.0pt
+ANCHOR 225; -10.75108pt,-10.75108pt
+ANCHOR 270; 0.0pt,-64.51526pt
+ANCHOR 315; 10.75108pt,-10.75108pt
+ANCHOR 450; 0.0pt,64.51526pt
+ANCHOR 90.8; 0.0pt,64.51526pt
+ANCHOR +45.7; 10.75108pt,10.75108pt
+ANCHOR -90.8; 0.0pt,-64.51526pt
+ANCHOR -0.5; 12.89978pt,0.0pt
+CASE aspect-0.6
+FONT 10.00002pt,4.30554pt
+STAGE aspectSp; 39322
+STAGE aspectEighthSp; 4915
+STAGE inverseSp; 109231
+STAGE initialXSp; 753664
+STAGE initialYSp; 458752
+STAGE aspectYSp; 275254
+STAGE inverseXSp; 1256156
+STAGE fittedXSp; 1028918
+STAGE fittedYSp; 1714908
+STAGE minimumWidthHalfSp; 32768
+STAGE minimumHeightHalfSp; 32768
+STAGE limitedXSp; 1028918
+STAGE limitedYSp; 1714908
+STAGE outerXSp; 0
+STAGE outerYSp; 0
+STAGE anchorXSp; 1028918
+STAGE anchorYSp; 1714908
+STAGE paintedXSp; 1028918
+STAGE paintedYSp; 1714908
+PAINT stroke; PATH macro:->\pgfsyssoftpath@movetotoken {15.70004pt}{0.0pt}\pgfsyssoftpath@linetotoken {0.0pt}{26.16742pt}\pgfsyssoftpath@linetotoken {-15.70004pt}{0.0pt}\pgfsyssoftpath@linetotoken {0.0pt}{-26.16742pt}\pgfsyssoftpath@closepathtoken {15.70004pt}{0.0pt}
+ANCHOR center; 0.0pt,0.0pt
+ANCHOR text; -10.0pt,-2.5pt
+ANCHOR base; 0.0pt,-2.5pt
+ANCHOR mid; 0.0pt,-0.34723pt
+ANCHOR east; 15.70004pt,0.0pt
+ANCHOR north east; 7.85002pt,13.08371pt
+ANCHOR north; 0.0pt,26.16742pt
+ANCHOR north west; -7.85002pt,13.08371pt
+ANCHOR west; -15.70004pt,0.0pt
+ANCHOR south west; -7.85002pt,-13.08371pt
+ANCHOR south; 0.0pt,-26.16742pt
+ANCHOR south east; 7.85002pt,-13.08371pt
+ANCHOR 0; 15.70093pt,0.0pt
+ANCHOR 37; 10.81206pt,8.14738pt
+ANCHOR 45; 9.81303pt,9.81303pt
+ANCHOR 90; 0.0pt,26.16913pt
+ANCHOR 135; -9.81303pt,9.81303pt
+ANCHOR 180; -15.70093pt,0.0pt
+ANCHOR 225; -9.81303pt,-9.81303pt
+ANCHOR 270; 0.0pt,-26.16913pt
+ANCHOR 315; 9.81303pt,-9.81303pt
+ANCHOR 450; 0.0pt,26.16913pt
+ANCHOR 90.8; 0.0pt,26.16913pt
+ANCHOR +45.7; 9.81303pt,9.81303pt
+ANCHOR -90.8; 0.0pt,-26.16913pt
+ANCHOR -0.5; 15.70093pt,0.0pt
+CASE aspect-1.1
+FONT 10.00002pt,4.30554pt
+STAGE aspectSp; 72090
+STAGE aspectEighthSp; 9011
+STAGE inverseSp; 59579
+STAGE initialXSp; 753664
+STAGE initialYSp; 458752
+STAGE aspectYSp; 504630
+STAGE inverseXSp; 685158
+STAGE fittedXSp; 1258294
+STAGE fittedYSp; 1143910
+STAGE minimumWidthHalfSp; 32768
+STAGE minimumHeightHalfSp; 32768
+STAGE limitedXSp; 1258294
+STAGE limitedYSp; 1143910
+STAGE outerXSp; 0
+STAGE outerYSp; 0
+STAGE anchorXSp; 1258294
+STAGE anchorYSp; 1143910
+STAGE paintedXSp; 1258294
+STAGE paintedYSp; 1143910
+PAINT stroke; PATH macro:->\pgfsyssoftpath@movetotoken {19.20004pt}{0.0pt}\pgfsyssoftpath@linetotoken {0.0pt}{17.45468pt}\pgfsyssoftpath@linetotoken {-19.20004pt}{0.0pt}\pgfsyssoftpath@linetotoken {0.0pt}{-17.45468pt}\pgfsyssoftpath@closepathtoken {19.20004pt}{0.0pt}
+ANCHOR center; 0.0pt,0.0pt
+ANCHOR text; -10.0pt,-2.5pt
+ANCHOR base; 0.0pt,-2.5pt
+ANCHOR mid; 0.0pt,-0.34723pt
+ANCHOR east; 19.20004pt,0.0pt
+ANCHOR north east; 9.60002pt,8.72734pt
+ANCHOR north; 0.0pt,17.45468pt
+ANCHOR north west; -9.60002pt,8.72734pt
+ANCHOR west; -19.20004pt,0.0pt
+ANCHOR south west; -9.60002pt,-8.72734pt
+ANCHOR south; 0.0pt,-17.45468pt
+ANCHOR south east; 9.60002pt,-8.72734pt
+ANCHOR 0; 19.19916pt,0.0pt
+ANCHOR 37; 10.49901pt,7.91165pt
+ANCHOR 45; 9.1436pt,9.1436pt
+ANCHOR 90; 0.0pt,17.45654pt
+ANCHOR 135; -9.1436pt,9.1436pt
+ANCHOR 180; -19.19916pt,0.0pt
+ANCHOR 225; -9.1436pt,-9.1436pt
+ANCHOR 270; 0.0pt,-17.45654pt
+ANCHOR 315; 9.1436pt,-9.1436pt
+ANCHOR 450; 0.0pt,17.45654pt
+ANCHOR 90.8; 0.0pt,17.45654pt
+ANCHOR +45.7; 9.1436pt,9.1436pt
+ANCHOR -90.8; 0.0pt,-17.45654pt
+ANCHOR -0.5; 19.19916pt,0.0pt
+CASE aspect-100
+FONT 10.00002pt,4.30554pt
+STAGE aspectSp; 6553600
+STAGE aspectEighthSp; 819200
+STAGE inverseSp; 655
+STAGE initialXSp; 753664
+STAGE initialYSp; 458752
+STAGE aspectYSp; 45875200
+STAGE inverseXSp; 7532
+STAGE fittedXSp; 46628864
+STAGE fittedYSp; 466284
+STAGE minimumWidthHalfSp; 32768
+STAGE minimumHeightHalfSp; 32768
+STAGE limitedXSp; 46628864
+STAGE limitedYSp; 466284
+STAGE outerXSp; 0
+STAGE outerYSp; 0
+STAGE anchorXSp; 46628864
+STAGE anchorYSp; 466284
+STAGE paintedXSp; 46628864
+STAGE paintedYSp; 466284
+PAINT stroke; PATH macro:->\pgfsyssoftpath@movetotoken {711.5pt}{0.0pt}\pgfsyssoftpath@linetotoken {0.0pt}{7.11493pt}\pgfsyssoftpath@linetotoken {-711.5pt}{0.0pt}\pgfsyssoftpath@linetotoken {0.0pt}{-7.11493pt}\pgfsyssoftpath@closepathtoken {711.5pt}{0.0pt}
+ANCHOR center; 0.0pt,0.0pt
+ANCHOR text; -10.0pt,-2.5pt
+ANCHOR base; 0.0pt,-2.5pt
+ANCHOR mid; 0.0pt,-0.34723pt
+ANCHOR east; 711.5pt,0.0pt
+ANCHOR north east; 355.75pt,3.55746pt
+ANCHOR north; 0.0pt,7.11493pt
+ANCHOR north west; -355.75pt,3.55746pt
+ANCHOR west; -711.5pt,0.0pt
+ANCHOR south west; -355.75pt,-3.55746pt
+ANCHOR south; 0.0pt,-7.11493pt
+ANCHOR south east; 355.75pt,-3.55746pt
+ANCHOR 0; 711.71153pt,0.0pt
+ANCHOR 37; 9.31326pt,7.01799pt
+ANCHOR 45; 7.04024pt,7.04024pt
+ANCHOR 90; 0.0pt,7.11002pt
+ANCHOR 135; -7.04024pt,7.04024pt
+ANCHOR 180; -711.71153pt,0.0pt
+ANCHOR 225; -7.04024pt,-7.04024pt
+ANCHOR 270; 0.0pt,-7.11002pt
+ANCHOR 315; 7.04024pt,-7.04024pt
+ANCHOR 450; 0.0pt,7.11002pt
+ANCHOR 90.8; 0.0pt,7.11002pt
+ANCHOR +45.7; 7.04024pt,7.04024pt
+ANCHOR -90.8; 0.0pt,-7.11002pt
+ANCHOR -0.5; 711.71153pt,0.0pt
+CASE independent-width-minimum
+FONT 10.00002pt,4.30554pt
+STAGE aspectSp; 1966
+STAGE aspectEighthSp; 245
+STAGE inverseSp; 2191309
+STAGE initialXSp; 753664
+STAGE initialYSp; 458752
+STAGE aspectYSp; 13762
+STAGE inverseXSp; 25200053
+STAGE fittedXSp; 767426
+STAGE fittedYSp; 25658805
+STAGE minimumWidthHalfSp; 2949120
+STAGE minimumHeightHalfSp; 32768
+STAGE limitedXSp; 2949120
+STAGE limitedYSp; 25658805
+STAGE outerXSp; 0
+STAGE outerYSp; 0
+STAGE anchorXSp; 2949120
+STAGE anchorYSp; 25658805
+STAGE paintedXSp; 2949120
+STAGE paintedYSp; 25658805
+PAINT stroke; PATH macro:->\pgfsyssoftpath@movetotoken {45.0pt}{0.0pt}\pgfsyssoftpath@linetotoken {0.0pt}{391.5223pt}\pgfsyssoftpath@linetotoken {-45.0pt}{0.0pt}\pgfsyssoftpath@linetotoken {0.0pt}{-391.5223pt}\pgfsyssoftpath@closepathtoken {45.0pt}{0.0pt}
+ANCHOR center; 0.0pt,0.0pt
+ANCHOR text; -10.0pt,-2.5pt
+ANCHOR base; 0.0pt,-2.5pt
+ANCHOR mid; 0.0pt,-0.34723pt
+ANCHOR east; 45.0pt,0.0pt
+ANCHOR north east; 22.5pt,195.76114pt
+ANCHOR north; 0.0pt,391.5223pt
+ANCHOR north west; -22.5pt,195.76114pt
+ANCHOR west; -45.0pt,0.0pt
+ANCHOR south west; -22.5pt,-195.76114pt
+ANCHOR south; 0.0pt,-391.5223pt
+ANCHOR south east; 22.5pt,-195.76114pt
+ANCHOR 0; 45.00024pt,0.0pt
+ANCHOR 37; 41.41412pt,31.20766pt
+ANCHOR 45; 40.36284pt,40.36284pt
+ANCHOR 90; 0.0pt,391.52592pt
+ANCHOR 135; -40.36284pt,40.36284pt
+ANCHOR 180; -45.00024pt,0.0pt
+ANCHOR 225; -40.36284pt,-40.36284pt
+ANCHOR 270; 0.0pt,-391.52592pt
+ANCHOR 315; 40.36284pt,-40.36284pt
+ANCHOR 450; 0.0pt,391.52592pt
+ANCHOR 90.8; 0.0pt,391.52592pt
+ANCHOR +45.7; 40.36284pt,40.36284pt
+ANCHOR -90.8; 0.0pt,-391.52592pt
+ANCHOR -0.5; 45.00024pt,0.0pt
+CASE independent-height-minimum
+FONT 10.00002pt,4.30554pt
+STAGE aspectSp; 39322
+STAGE aspectEighthSp; 4915
+STAGE inverseSp; 109231
+STAGE initialXSp; 753664
+STAGE initialYSp; 458752
+STAGE aspectYSp; 275254
+STAGE inverseXSp; 1256156
+STAGE fittedXSp; 1028918
+STAGE fittedYSp; 1714908
+STAGE minimumWidthHalfSp; 32768
+STAGE minimumHeightHalfSp; 2949120
+STAGE limitedXSp; 1028918
+STAGE limitedYSp; 2949120
+STAGE outerXSp; 0
+STAGE outerYSp; 0
+STAGE anchorXSp; 1028918
+STAGE anchorYSp; 2949120
+STAGE paintedXSp; 1028918
+STAGE paintedYSp; 2949120
+PAINT stroke; PATH macro:->\pgfsyssoftpath@movetotoken {15.70004pt}{0.0pt}\pgfsyssoftpath@linetotoken {0.0pt}{45.0pt}\pgfsyssoftpath@linetotoken {-15.70004pt}{0.0pt}\pgfsyssoftpath@linetotoken {0.0pt}{-45.0pt}\pgfsyssoftpath@closepathtoken {15.70004pt}{0.0pt}
+ANCHOR center; 0.0pt,0.0pt
+ANCHOR text; -10.0pt,-2.5pt
+ANCHOR base; 0.0pt,-2.5pt
+ANCHOR mid; 0.0pt,-0.34723pt
+ANCHOR east; 15.70004pt,0.0pt
+ANCHOR north east; 7.85002pt,22.5pt
+ANCHOR north; 0.0pt,45.0pt
+ANCHOR north west; -7.85002pt,22.5pt
+ANCHOR west; -15.70004pt,0.0pt
+ANCHOR south west; -7.85002pt,-22.5pt
+ANCHOR south; 0.0pt,-45.0pt
+ANCHOR south east; 7.85002pt,-22.5pt
+ANCHOR 0; 15.7005pt,0.0pt
+ANCHOR 37; 12.4319pt,9.36812pt
+ANCHOR 45; 11.63991pt,11.63991pt
+ANCHOR 90; 0.0pt,45.00278pt
+ANCHOR 135; -11.63991pt,11.63991pt
+ANCHOR 180; -15.7005pt,0.0pt
+ANCHOR 225; -11.63991pt,-11.63991pt
+ANCHOR 270; 0.0pt,-45.00278pt
+ANCHOR 315; 11.63991pt,-11.63991pt
+ANCHOR 450; 0.0pt,45.00278pt
+ANCHOR 90.8; 0.0pt,45.00278pt
+ANCHOR +45.7; 11.63991pt,11.63991pt
+ANCHOR -90.8; 0.0pt,-45.00278pt
+ANCHOR -0.5; 15.7005pt,0.0pt
+CASE asymmetric-signed-separation
+FONT 10.00002pt,4.30554pt
+STAGE aspectSp; 1966
+STAGE aspectEighthSp; 245
+STAGE inverseSp; 2191309
+STAGE initialXSp; 122880
+STAGE initialYSp; 638976
+STAGE aspectYSp; 19168
+STAGE inverseXSp; 4108704
+STAGE fittedXSp; 142048
+STAGE fittedYSp; 4747680
+STAGE minimumWidthHalfSp; 32768
+STAGE minimumHeightHalfSp; 32768
+STAGE limitedXSp; 142048
+STAGE limitedYSp; 4747680
+STAGE outerXSp; -114688
+STAGE outerYSp; 139264
+STAGE anchorXSp; 27360
+STAGE anchorYSp; 4886944
+STAGE paintedXSp; 189553
+STAGE paintedYSp; 4689995
+PAINT stroke; PATH macro:->\pgfsyssoftpath@movetotoken {2.89235pt}{0.0pt}\pgfsyssoftpath@linetotoken {0.0pt}{71.56364pt}\pgfsyssoftpath@linetotoken {-2.89235pt}{0.0pt}\pgfsyssoftpath@linetotoken {0.0pt}{-71.56364pt}\pgfsyssoftpath@closepathtoken {2.89235pt}{0.0pt}
+ANCHOR center; 0.0pt,0.0pt
+ANCHOR text; -10.0pt,-2.5pt
+ANCHOR base; 0.0pt,-2.5pt
+ANCHOR mid; 0.0pt,-0.34723pt
+ANCHOR east; 0.41748pt,0.0pt
+ANCHOR north east; 0.20874pt,37.28442pt
+ANCHOR north; 0.0pt,74.56885pt
+ANCHOR north west; -0.20874pt,37.28442pt
+ANCHOR west; -0.41748pt,0.0pt
+ANCHOR south west; -0.20874pt,-37.28442pt
+ANCHOR south; 0.0pt,-74.56885pt
+ANCHOR south east; 0.20874pt,-37.28442pt
+ANCHOR 0; 0.41753pt,0.0pt
+ANCHOR 37; 0.4157pt,0.31325pt
+ANCHOR 45; 0.41515pt,0.41515pt
+ANCHOR 90; 0.0pt,74.7193pt
+ANCHOR 135; -0.41515pt,0.41515pt
+ANCHOR 180; -0.41753pt,0.0pt
+ANCHOR 225; -0.41515pt,-0.41515pt
+ANCHOR 270; 0.0pt,-74.7193pt
+ANCHOR 315; 0.41515pt,-0.41515pt
+ANCHOR 450; 0.0pt,74.7193pt
+ANCHOR 90.8; 0.0pt,74.7193pt
+ANCHOR +45.7; 0.41515pt,0.41515pt
+ANCHOR -90.8; 0.0pt,-74.7193pt
+ANCHOR -0.5; 0.41753pt,0.0pt
+CASE signed-fitted-axes
+FONT 10.00002pt,4.30554pt
+STAGE aspectSp; 6554
+STAGE aspectEighthSp; 819
+STAGE inverseSp; 655520
+STAGE initialXSp; -1310720
+STAGE initialYSp; -294912
+STAGE aspectYSp; -29493
+STAGE inverseXSp; -13110400
+STAGE fittedXSp; -1340213
+STAGE fittedYSp; -13405312
+STAGE minimumWidthHalfSp; -3276800
+STAGE minimumHeightHalfSp; -3276800
+STAGE limitedXSp; -1340213
+STAGE limitedYSp; -3276800
+STAGE outerXSp; 147456
+STAGE outerYSp; -81920
+STAGE anchorXSp; -1192757
+STAGE anchorYSp; -3358720
+STAGE paintedXSp; -1401291
+STAGE paintedYSp; -3242868
+PAINT stroke; PATH macro:->\pgfsyssoftpath@movetotoken {-21.382pt}{0.0pt}\pgfsyssoftpath@linetotoken {0.0pt}{-49.48224pt}\pgfsyssoftpath@linetotoken {21.382pt}{0.0pt}\pgfsyssoftpath@linetotoken {0.0pt}{49.48224pt}\pgfsyssoftpath@closepathtoken {-21.382pt}{0.0pt}
+ANCHOR center; 0.0pt,0.0pt
+ANCHOR text; -10.0pt,-2.5pt
+ANCHOR base; 0.0pt,-2.5pt
+ANCHOR mid; 0.0pt,-0.34723pt
+ANCHOR east; -18.20003pt,0.0pt
+ANCHOR north east; -9.1pt,-25.625pt
+ANCHOR north; 0.0pt,-51.25pt
+ANCHOR north west; 9.1pt,-25.625pt
+ANCHOR west; 18.20003pt,0.0pt
+ANCHOR south west; 9.1pt,25.625pt
+ANCHOR south; 0.0pt,51.25pt
+ANCHOR south east; -9.1pt,25.625pt
+ANCHOR 0; -18.20041pt,0.0pt
+ANCHOR 37; -14.35843pt,-10.81987pt
+ANCHOR 45; -13.43083pt,-13.43083pt
+ANCHOR 90; 0.0pt,-51.25371pt
+ANCHOR 135; 13.43083pt,-13.43083pt
+ANCHOR 180; 18.20041pt,0.0pt
+ANCHOR 225; 13.43083pt,13.43083pt
+ANCHOR 270; 0.0pt,51.25371pt
+ANCHOR 315; -13.43083pt,13.43083pt
+ANCHOR 450; 0.0pt,-51.25371pt
+ANCHOR 90.8; 0.0pt,-51.25371pt
+ANCHOR +45.7; -13.43083pt,-13.43083pt
+ANCHOR -90.8; 0.0pt,51.25371pt
+ANCHOR -0.5; -18.20041pt,0.0pt
+CASE odd-sp-body-and-products
+FONT 10.00002pt,4.30554pt
+STAGE aspectSp; 1966
+STAGE aspectEighthSp; 245
+STAGE inverseSp; 2191309
+STAGE initialXSp; 581632
+STAGE initialYSp; 382293
+STAGE aspectYSp; 11468
+STAGE inverseXSp; 19447867
+STAGE fittedXSp; 593100
+STAGE fittedYSp; 19830160
+STAGE minimumWidthHalfSp; 32768
+STAGE minimumHeightHalfSp; 32768
+STAGE limitedXSp; 593100
+STAGE limitedYSp; 19830160
+STAGE outerXSp; 24577
+STAGE outerYSp; -40960
+STAGE anchorXSp; 617677
+STAGE anchorYSp; 19789200
+STAGE paintedXSp; 582920
+STAGE paintedYSp; 19847126
+PAINT stroke; PATH macro:->\pgfsyssoftpath@movetotoken {8.89465pt}{0.0pt}\pgfsyssoftpath@linetotoken {0.0pt}{302.84311pt}\pgfsyssoftpath@linetotoken {-8.89465pt}{0.0pt}\pgfsyssoftpath@linetotoken {0.0pt}{-302.84311pt}\pgfsyssoftpath@closepathtoken {8.89465pt}{0.0pt}
+ANCHOR center; 0.0pt,0.0pt
+ANCHOR text; -10.0pt,-2.5pt
+ANCHOR base; 0.0pt,-2.5pt
+ANCHOR mid; 0.0pt,-0.34723pt
+ANCHOR east; 9.425pt,0.0pt
+ANCHOR north east; 4.7125pt,150.97961pt
+ANCHOR north; 0.0pt,301.95923pt
+ANCHOR north west; -4.7125pt,150.97961pt
+ANCHOR west; -9.425pt,0.0pt
+ANCHOR south west; -4.7125pt,-150.97961pt
+ANCHOR south; 0.0pt,-301.95923pt
+ANCHOR south east; 4.7125pt,-150.97961pt
+ANCHOR 0; 9.42441pt,0.0pt
+ANCHOR 37; 9.20882pt,6.93925pt
+ANCHOR 45; 9.1404pt,9.1404pt
+ANCHOR 90; 0.0pt,302.00916pt
+ANCHOR 135; -9.1404pt,9.1404pt
+ANCHOR 180; -9.42441pt,0.0pt
+ANCHOR 225; -9.1404pt,-9.1404pt
+ANCHOR 270; 0.0pt,-302.00916pt
+ANCHOR 315; 9.1404pt,-9.1404pt
+ANCHOR 450; 0.0pt,302.00916pt
+ANCHOR 90.8; 0.0pt,302.00916pt
+ANCHOR +45.7; 9.1404pt,9.1404pt
+ANCHOR -90.8; 0.0pt,-302.00916pt
+ANCHOR -0.5; 9.42441pt,0.0pt
+CASE empty-body
+FONT 10.00002pt,4.30554pt
+STAGE aspectSp; 655
+STAGE aspectEighthSp; 81
+STAGE inverseSp; 6628035
+STAGE initialXSp; 655360
+STAGE initialYSp; 360448
+STAGE aspectYSp; 3602
+STAGE inverseXSp; 66280350
+STAGE fittedXSp; 658962
+STAGE fittedYSp; 66640798
+STAGE minimumWidthHalfSp; 32768
+STAGE minimumHeightHalfSp; 32768
+STAGE limitedXSp; 658962
+STAGE limitedYSp; 66640798
+STAGE outerXSp; 0
+STAGE outerYSp; 0
+STAGE anchorXSp; 658962
+STAGE anchorYSp; 66640798
+STAGE paintedXSp; 658962
+STAGE paintedYSp; 66640798
+PAINT stroke; PATH macro:->\pgfsyssoftpath@movetotoken {10.05496pt}{0.0pt}\pgfsyssoftpath@linetotoken {0.0pt}{1016.85788pt}\pgfsyssoftpath@linetotoken {-10.05496pt}{0.0pt}\pgfsyssoftpath@linetotoken {0.0pt}{-1016.85788pt}\pgfsyssoftpath@closepathtoken {10.05496pt}{0.0pt}
+ANCHOR center; 0.0pt,0.0pt
+ANCHOR text; 0.0pt,0.0pt
+ANCHOR base; 0.0pt,0.0pt
+ANCHOR mid; 0.0pt,2.15277pt
+ANCHOR east; 10.05496pt,0.0pt
+ANCHOR north east; 5.02748pt,508.42894pt
+ANCHOR north; 0.0pt,1016.85788pt
+ANCHOR north west; -5.02748pt,508.42894pt
+ANCHOR west; -10.05496pt,0.0pt
+ANCHOR south west; -5.02748pt,-508.42894pt
+ANCHOR south; 0.0pt,-1016.85788pt
+ANCHOR south east; 5.02748pt,-508.42894pt
+ANCHOR 0; 10.05399pt,0.0pt
+ANCHOR 37; 9.9807pt,7.521pt
+ANCHOR 45; 9.95667pt,9.95667pt
+ANCHOR 90; 0.0pt,1016.87202pt
+ANCHOR 135; -9.95667pt,9.95667pt
+ANCHOR 180; -10.05399pt,0.0pt
+ANCHOR 225; -9.95667pt,-9.95667pt
+ANCHOR 270; 0.0pt,-1016.87202pt
+ANCHOR 315; 9.95667pt,-9.95667pt
+ANCHOR 450; 0.0pt,1016.87202pt
+ANCHOR 90.8; 0.0pt,1016.87202pt
+ANCHOR +45.7; 9.95667pt,9.95667pt
+ANCHOR -90.8; 0.0pt,-1016.87202pt
+ANCHOR -0.5; 10.05399pt,0.0pt
+CASE native-empty-width-minimum
+FONT 10.00002pt,4.30554pt
+STAGE aspectSp; 655
+STAGE aspectEighthSp; 81
+STAGE inverseSp; 6628035
+STAGE initialXSp; 65536
+STAGE initialYSp; 36045
+STAGE aspectYSp; 360
+STAGE inverseXSp; 6628035
+STAGE fittedXSp; 65896
+STAGE fittedYSp; 6664080
+STAGE minimumWidthHalfSp; 655360
+STAGE minimumHeightHalfSp; 32768
+STAGE limitedXSp; 655360
+STAGE limitedYSp; 6664080
+STAGE outerXSp; 0
+STAGE outerYSp; 0
+STAGE anchorXSp; 655360
+STAGE anchorYSp; 6664080
+STAGE paintedXSp; 655360
+STAGE paintedYSp; 6664080
+PAINT stroke; PATH macro:->\pgfsyssoftpath@movetotoken {10.0pt}{0.0pt}\pgfsyssoftpath@linetotoken {0.0pt}{101.68579pt}\pgfsyssoftpath@linetotoken {-10.0pt}{0.0pt}\pgfsyssoftpath@linetotoken {0.0pt}{-101.68579pt}\pgfsyssoftpath@closepathtoken {10.0pt}{0.0pt}
+ANCHOR center; 0.0pt,0.0pt
+ANCHOR text; 0.0pt,0.0pt
+ANCHOR base; 0.0pt,0.0pt
+ANCHOR mid; 0.0pt,2.15277pt
+ANCHOR east; 10.0pt,0.0pt
+ANCHOR north east; 5.0pt,50.8429pt
+ANCHOR north; 0.0pt,101.68579pt
+ANCHOR north west; -5.0pt,50.8429pt
+ANCHOR west; -10.0pt,0.0pt
+ANCHOR south west; -5.0pt,-50.8429pt
+ANCHOR south; 0.0pt,-101.68579pt
+ANCHOR south east; 5.0pt,-50.8429pt
+ANCHOR 0; 10.00002pt,0.0pt
+ANCHOR 37; 9.31018pt,7.01566pt
+ANCHOR 45; 9.10484pt,9.10484pt
+ANCHOR 90; 0.0pt,101.6847pt
+ANCHOR 135; -9.10484pt,9.10484pt
+ANCHOR 180; -10.00002pt,0.0pt
+ANCHOR 225; -9.10484pt,-9.10484pt
+ANCHOR 270; 0.0pt,-101.6847pt
+ANCHOR 315; 9.10484pt,-9.10484pt
+ANCHOR 450; 0.0pt,101.6847pt
+ANCHOR 90.8; 0.0pt,101.6847pt
+ANCHOR +45.7; 9.10484pt,9.10484pt
+ANCHOR -90.8; 0.0pt,-101.6847pt
+ANCHOR -0.5; 10.00002pt,0.0pt
+CASE zero-body-zero-axes
+FONT 10.00002pt,4.30554pt
+STAGE aspectSp; 655
+STAGE aspectEighthSp; 81
+STAGE inverseSp; 6628035
+STAGE initialXSp; 0
+STAGE initialYSp; 0
+STAGE aspectYSp; 0
+STAGE inverseXSp; 0
+STAGE fittedXSp; 0
+STAGE fittedYSp; 0
+STAGE minimumWidthHalfSp; 0
+STAGE minimumHeightHalfSp; 0
+STAGE limitedXSp; 0
+STAGE limitedYSp; 0
+STAGE outerXSp; 0
+STAGE outerYSp; 0
+STAGE anchorXSp; 0
+STAGE anchorYSp; 0
+STAGE paintedXSp; 0
+STAGE paintedYSp; 0
+PAINT stroke; PATH macro:->\pgfsyssoftpath@movetotoken {0.0pt}{0.0pt}\pgfsyssoftpath@linetotoken {0.0pt}{0.0pt}\pgfsyssoftpath@linetotoken {0.0pt}{0.0pt}\pgfsyssoftpath@linetotoken {0.0pt}{0.0pt}\pgfsyssoftpath@closepathtoken {0.0pt}{0.0pt}
+ANCHOR center; 0.0pt,0.0pt
+ANCHOR text; 0.0pt,0.0pt
+ANCHOR base; 0.0pt,0.0pt
+ANCHOR mid; 0.0pt,2.15277pt
+ANCHOR east; 0.0pt,0.0pt
+ANCHOR north east; 0.0pt,0.0pt
+ANCHOR north; 0.0pt,0.0pt
+ANCHOR north west; 0.0pt,0.0pt
+ANCHOR west; 0.0pt,0.0pt
+ANCHOR south west; 0.0pt,0.0pt
+ANCHOR south; 0.0pt,0.0pt
+ANCHOR south east; 0.0pt,0.0pt
+CASE empty-independent-minima
+FONT 10.00002pt,4.30554pt
+STAGE aspectSp; 6553600
+STAGE aspectEighthSp; 819200
+STAGE inverseSp; 655
+STAGE initialXSp; 0
+STAGE initialYSp; 0
+STAGE aspectYSp; 0
+STAGE inverseXSp; 0
+STAGE fittedXSp; 0
+STAGE fittedYSp; 0
+STAGE minimumWidthHalfSp; 425984
+STAGE minimumHeightHalfSp; 557056
+STAGE limitedXSp; 425984
+STAGE limitedYSp; 557056
+STAGE outerXSp; 0
+STAGE outerYSp; 0
+STAGE anchorXSp; 425984
+STAGE anchorYSp; 557056
+STAGE paintedXSp; 425984
+STAGE paintedYSp; 557056
+PAINT stroke; PATH macro:->\pgfsyssoftpath@movetotoken {6.5pt}{0.0pt}\pgfsyssoftpath@linetotoken {0.0pt}{8.5pt}\pgfsyssoftpath@linetotoken {-6.5pt}{0.0pt}\pgfsyssoftpath@linetotoken {0.0pt}{-8.5pt}\pgfsyssoftpath@closepathtoken {6.5pt}{0.0pt}
+ANCHOR center; 0.0pt,0.0pt
+ANCHOR text; 0.0pt,0.0pt
+ANCHOR base; 0.0pt,0.0pt
+ANCHOR mid; 0.0pt,2.15277pt
+ANCHOR east; 6.5pt,0.0pt
+ANCHOR north east; 3.25pt,4.25pt
+ANCHOR north; 0.0pt,8.5pt
+ANCHOR north west; -3.25pt,4.25pt
+ANCHOR west; -6.5pt,0.0pt
+ANCHOR south west; -3.25pt,-4.25pt
+ANCHOR south; 0.0pt,-8.5pt
+ANCHOR south east; 3.25pt,-4.25pt
+ANCHOR 0; 6.5002pt,0.0pt
+ANCHOR 37; 4.12383pt,3.10751pt
+ANCHOR 45; 3.68349pt,3.68349pt
+ANCHOR 90; 0.0pt,8.50024pt
+ANCHOR 135; -3.68349pt,3.68349pt
+ANCHOR 180; -6.5002pt,0.0pt
+ANCHOR 225; -3.68349pt,-3.68349pt
+ANCHOR 270; 0.0pt,-8.50024pt
+ANCHOR 315; 3.68349pt,-3.68349pt
+ANCHOR 450; 0.0pt,8.50024pt
+ANCHOR 90.8; 0.0pt,8.50024pt
+ANCHOR +45.7; 3.68349pt,3.68349pt
+ANCHOR -90.8; 0.0pt,-8.50024pt
+ANCHOR -0.5; 6.5002pt,0.0pt

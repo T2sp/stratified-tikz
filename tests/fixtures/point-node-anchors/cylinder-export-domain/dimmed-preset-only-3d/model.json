@@ -1,0 +1,299 @@
+{
+  "format": "stratified-tikz-diagram",
+  "version": 2,
+  "diagram": {
+    "version": 1,
+    "ambientDimension": 3,
+    "view": {
+      "camera3d": {
+        "mode": "3d",
+        "kind": "orthographic",
+        "thetaDeg": 90,
+        "phiDeg": 0,
+        "zoom": 1,
+        "pan": {
+          "x": 0,
+          "y": 0
+        }
+      },
+      "visibility": {
+        "enabled": true,
+        "surfaceDepthSort": true,
+        "curveOcclusion": true,
+        "pointVisibility": "dimHidden",
+        "labelVisibility": "alwaysForeground",
+        "sortMode": "layerThenDepth",
+        "depthEpsilon": 1e-9,
+        "maxSurfaceFacesForSorting": 256,
+        "maxCurveSamples": 512,
+        "hiddenCurveStyle": {
+          "lineStyle": "denselyDotted",
+          "opacity": 0.45
+        }
+      }
+    },
+    "layers": [
+      {
+        "value": 0,
+        "name": "Layer 0"
+      }
+    ],
+    "userStylePresets": [
+      {
+        "id": "user-point-tinycylinder",
+        "name": "tinyCylinder",
+        "kind": "point",
+        "style": {
+          "kind": "pointStyle",
+          "color": "#000000",
+          "opacity": 1,
+          "shape": "cylinder",
+          "fill": "filled",
+          "size": 3,
+          "layout": {
+            "innerXSep": 0,
+            "units": {
+              "innerXSep": {
+                "source": "0pt",
+                "unit": "pt",
+                "texPoints": 0
+              },
+              "innerYSep": {
+                "source": "0.0000074em",
+                "unit": "em",
+                "texPoints": 0.00007400000000000001,
+                "fontContext": {
+                  "fontSizePt": 10,
+                  "xHeightPt": 4.30554
+                }
+              },
+              "outerXSep": {
+                "source": "0pt",
+                "unit": "pt",
+                "texPoints": 0
+              },
+              "outerYSep": {
+                "source": "0pt",
+                "unit": "pt",
+                "texPoints": 0
+              },
+              "minimumWidth": {
+                "source": "0pt",
+                "unit": "pt",
+                "texPoints": 0
+              },
+              "minimumHeight": {
+                "source": "80pt",
+                "unit": "pt",
+                "texPoints": 80
+              }
+            },
+            "innerYSep": 0.00007400000000000001,
+            "fontContext": {
+              "fontSizePt": 10,
+              "xHeightPt": 4.30554
+            },
+            "outerXSep": 0,
+            "outerYSep": 0,
+            "minimumWidth": 0,
+            "minimumHeight": 80
+          },
+          "paint": {
+            "text": {
+              "color": "#000000",
+              "opacity": 1
+            },
+            "fill": {
+              "enabled": true,
+              "color": "#000000",
+              "opacity": 1
+            },
+            "stroke": {
+              "enabled": true,
+              "color": "#000000",
+              "opacity": 1,
+              "width": 0.4,
+              "lineStyle": "solid",
+              "dashPhase": 0,
+              "lineCap": "butt",
+              "lineJoin": "miter"
+            }
+          },
+          "shapeParameters": {}
+        },
+        "tikzStyleName": "stratifiedStyleTinyCylinder",
+        "importedTikzStyleReferenceId": "imported-style-tinycylinder"
+      },
+      {
+        "id": "user-label-tinycylinder",
+        "name": "tinyCylinder",
+        "kind": "label",
+        "style": {
+          "kind": "labelStyle",
+          "color": "#000000",
+          "opacity": 1,
+          "fontSize": 10,
+          "anchor": "center"
+        },
+        "tikzStyleName": "stratifiedStyleTinyCylinder2",
+        "importedTikzStyleReferenceId": "imported-style-tinycylinder"
+      }
+    ],
+    "externalTikzStyleSources": [
+      {
+        "id": "external-style-source-tiny-cylinder-sty",
+        "name": "tiny-cylinder.sty",
+        "rawSource": "\\tikzset{tinyCylinder/.style={cylinder,inner xsep=0pt,inner ysep=0.0000074em,outer sep=0pt,minimum width=0pt,minimum height=80pt}}",
+        "loadHint": "\\input{tiny-cylinder.sty}"
+      }
+    ],
+    "importedTikzStyleReferences": [
+      {
+        "id": "imported-style-tinycylinder",
+        "key": "tinyCylinder",
+        "sourceId": "external-style-source-tiny-cylinder-sty",
+        "displayName": "tinyCylinder",
+        "targets": [
+          "node",
+          "point",
+          "label"
+        ],
+        "options": "cylinder,inner xsep=0pt,inner ysep=0.0000074em,outer sep=0pt,minimum width=0pt,minimum height=80pt",
+        "rawOptions": "cylinder,inner xsep=0pt,inner ysep=0.0000074em,outer sep=0pt,minimum width=0pt,minimum height=80pt",
+        "previewDiagnostics": []
+      }
+    ],
+    "strata": [
+      {
+        "id": "p",
+        "codim": 3,
+        "geometricKind": "point",
+        "name": "Point",
+        "text": "",
+        "style": {
+          "kind": "pointStyle",
+          "color": "#000000",
+          "opacity": 1,
+          "shape": "cylinder",
+          "fill": "filled",
+          "size": 3,
+          "layout": {
+            "innerXSep": 0,
+            "units": {
+              "innerXSep": {
+                "source": "0pt",
+                "unit": "pt",
+                "texPoints": 0
+              },
+              "innerYSep": {
+                "source": "0.0000074em",
+                "unit": "em",
+                "texPoints": 0.00007400000000000001,
+                "fontContext": {
+                  "fontSizePt": 10,
+                  "xHeightPt": 4.30554
+                }
+              },
+              "outerXSep": {
+                "source": "0pt",
+                "unit": "pt",
+                "texPoints": 0
+              },
+              "outerYSep": {
+                "source": "0pt",
+                "unit": "pt",
+                "texPoints": 0
+              },
+              "minimumWidth": {
+                "source": "0pt",
+                "unit": "pt",
+                "texPoints": 0
+              },
+              "minimumHeight": {
+                "source": "80pt",
+                "unit": "pt",
+                "texPoints": 80
+              }
+            },
+            "innerYSep": 0.00007400000000000001,
+            "fontContext": {
+              "fontSizePt": 10,
+              "xHeightPt": 4.30554
+            },
+            "outerXSep": 0,
+            "outerYSep": 0,
+            "minimumWidth": 0,
+            "minimumHeight": 80
+          },
+          "paint": {
+            "text": {
+              "color": "#000000",
+              "opacity": 1
+            },
+            "fill": {
+              "enabled": true,
+              "color": "#000000",
+              "opacity": 1
+            },
+            "stroke": {
+              "enabled": true,
+              "color": "#000000",
+              "opacity": 1,
+              "width": 0.4,
+              "lineStyle": "solid",
+              "dashPhase": 0,
+              "lineCap": "butt",
+              "lineJoin": "miter"
+            }
+          },
+          "shapeParameters": {}
+        },
+        "position": {
+          "x": 0,
+          "y": -1,
+          "z": 0
+        },
+        "layer": 0,
+        "stylePresetId": "user-point-tinycylinder"
+      },
+      {
+        "id": "occluding-sheet",
+        "codim": 1,
+        "geometricKind": "sheet",
+        "kind": "quadSheet",
+        "name": "Sheet",
+        "style": {
+          "kind": "sheetStyle",
+          "fillColor": "#4D9DE0",
+          "fillOpacity": 0.35,
+          "strokeColor": "#4D9DE0",
+          "strokeOpacity": 1
+        },
+        "corners": [
+          {
+            "x": -1,
+            "y": 0,
+            "z": -1
+          },
+          {
+            "x": 1,
+            "y": 0,
+            "z": -1
+          },
+          {
+            "x": 1,
+            "y": 0,
+            "z": 1
+          },
+          {
+            "x": -1,
+            "y": 0,
+            "z": 1
+          }
+        ],
+        "layer": 0
+      }
+    ],
+    "labels": []
+  }
+}

@@ -256,6 +256,29 @@ test('layer visibility defaults visible and persists when hidden', () => {
   )
 })
 
+test('explicit visible locked layer input saves and loads with the canonical omitted visible default', () => {
+  const diagram: Diagram = {
+    ...createNamedLayerTestDiagram(),
+    layers: [{ value: -1, name: 'Background', visible: true, locked: true }],
+  }
+  const input = JSON.stringify({ format: savedDiagramFormat, version: savedDiagramVersion, diagram })
+  const saved = serializeDiagram(diagram)
+  for (const source of [input, saved]) {
+    const result = parseSavedDiagramJson(source)
+    if (!result.ok) throw new Error(result.error)
+    assert.deepEqual(result.diagram.layers?.find((layer) => layer.value === -1),
+      { value: -1, name: 'Background', locked: true })
+    assert.equal(isLayerVisible(result.diagram, -1), true)
+    assert.equal(isLayerLocked(result.diagram, -1), true)
+  }
+  const savedLayers: unknown = (JSON.parse(saved) as { diagram: { layers: unknown } }).diagram.layers
+  assert.ok(Array.isArray(savedLayers))
+  assert.deepEqual(savedLayers.find((layer: unknown) => typeof layer === 'object' && layer !== null && 'value' in layer && layer.value === -1),
+    { value: -1, name: 'Background', locked: true })
+  assert.deepEqual(diagram.layers, [{ value: -1, name: 'Background', visible: true, locked: true }],
+    'Serialization preserves its input while canonicalizing only the saved output')
+})
+
 test('layer locking defaults unlocked and persists when locked', () => {
   const locked = setLayerLock(createNamedLayerTestDiagram(), -1, true)
   const result = parseSavedDiagramJson(serializeDiagram(locked))

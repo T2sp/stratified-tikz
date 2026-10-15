@@ -1,0 +1,228 @@
+[
+  {
+    "id": "ellipse-small",
+    "validation": {
+      "valid": true,
+      "errors": []
+    },
+    "loaded": true,
+    "limitation": null,
+    "selectedAnchor": {
+      "x": 1.2,
+      "y": 0
+    },
+    "placementOffset": {
+      "x": -1.2,
+      "y": 0
+    },
+    "bodyMetrics": {
+      "width": 2,
+      "ascent": 0.7999999999999999,
+      "descent": 0.3,
+      "inkLeft": 0,
+      "inkRight": 2
+    },
+    "vertices": [
+      {
+        "x": -1.2,
+        "y": 0
+      },
+      {
+        "x": -7.347880794884119e-17,
+        "y": 3
+      },
+      {
+        "x": 1.2,
+        "y": 3.6739403974420594e-16
+      },
+      {
+        "x": 2.2043642384652356e-16,
+        "y": -3
+      }
+    ],
+    "path": "M -1.2 0 A -1.2 -3 0 0 0 1.2 0 A -1.2 -3 0 0 0 -1.2 0 Z",
+    "tikzNode": "\\node[\n            ellipse,\n            fill=stzPointpFill,\n            draw=stzPointpStroke,\n            text=stzPointpText,\n            fill opacity=1,\n            draw opacity=1,\n            text opacity=1,\n            line width=0.4pt,\n            solid,\n            dash phase=0pt,\n            line cap=butt,\n            line join=miter,\n            inner sep=1.5pt,\n            inner xsep=-30pt,\n            inner ysep=-30pt,\n            outer xsep=0pt,\n            outer ysep=0pt,\n            minimum width=-2pt,\n            minimum height=-5pt,\n            anchor=east\n        ] at (pointPoint0p0) {x};"
+  },
+  {
+    "id": "rectangle-small",
+    "validation": {
+      "valid": true,
+      "errors": []
+    },
+    "loaded": true,
+    "limitation": null,
+    "selectedAnchor": {
+      "x": 1.2,
+      "y": 0
+    },
+    "placementOffset": {
+      "x": -1.2,
+      "y": 0
+    },
+    "bodyMetrics": {
+      "width": 2,
+      "ascent": 0.7999999999999999,
+      "descent": 0.3,
+      "inkLeft": 0,
+      "inkRight": 2
+    },
+    "vertices": [
+      {
+        "x": -1.2,
+        "y": 3
+      },
+      {
+        "x": 1.2,
+        "y": 3
+      },
+      {
+        "x": 1.2,
+        "y": -3
+      },
+      {
+        "x": -1.2,
+        "y": -3
+      }
+    ],
+    "path": "M -1.2 3 L 1.2 3 L 1.2 -3 L -1.2 -3 Z",
+    "tikzNode": "\\node[\n            rectangle,\n            fill=stzPointpFill,\n            draw=stzPointpStroke,\n            text=stzPointpText,\n            fill opacity=1,\n            draw opacity=1,\n            text opacity=1,\n            line width=0.4pt,\n            solid,\n            dash phase=0pt,\n            line cap=butt,\n            line join=miter,\n            inner sep=1.5pt,\n            inner xsep=-30pt,\n            inner ysep=-30pt,\n            outer xsep=0pt,\n            outer ysep=0pt,\n            minimum width=-2pt,\n            minimum height=-5pt,\n            anchor=east\n        ] at (pointPoint0p0) {x};"
+  },
+  {
+    "id": "ellipse-strong",
+    "validation": {
+      "valid": true,
+      "errors": []
+    },
+    "loaded": true,
+    "limitation": null,
+    "selectedAnchor": {
+      "x": 0,
+      "y": 0
+    },
+    "placementOffset": {
+      "x": 0,
+      "y": 0
+    },
+    "bodyMetrics": {
+      "width": 2,
+      "ascent": 0.7999999999999999,
+      "descent": 0.3,
+      "inkLeft": 0,
+      "inkRight": 2
+    },
+    "vertices": [
+      {
+        "x": -96,
+        "y": 0
+      },
+      {
+        "x": -5.878304635907295e-15,
+        "y": 96
+      },
+      {
+        "x": 96,
+        "y": 1.175660927181459e-14
+      },
+      {
+        "x": 1.7634913907721887e-14,
+        "y": -96
+      }
+    ],
+    "path": "M -96 0 A -96 -96 0 0 0 96 0 A -96 -96 0 0 0 -96 0 Z",
+    "tikzNode": "\\node[\n            ellipse,\n            fill=stzPointpFill,\n            draw=stzPointpStroke,\n            text=stzPointpText,\n            fill opacity=1,\n            draw opacity=1,\n            text opacity=1,\n            line width=0.4pt,\n            solid,\n            dash phase=0pt,\n            line cap=butt,\n            line join=miter,\n            inner sep=1.5pt,\n            inner xsep=-100pt,\n            inner ysep=-100pt,\n            outer xsep=0pt,\n            outer ysep=0pt,\n            minimum width=-160pt,\n            minimum height=-160pt,\n            anchor=center\n        ] at (pointPoint0p0) {x};",
+    "picking": {
+      "localPoint": {
+        "x": 67.2,
+        "y": -67.2
+      },
+      "paintedRadius": 96,
+      "distanceFromPaintCenter": 95.035151391472,
+      "samplingBoundaryDistance": 27.152900397563428,
+      "candidates": []
+    }
+  },
+  {
+    "id": "ellipse-empty",
+    "validation": {
+      "valid": true,
+      "errors": []
+    },
+    "loaded": true,
+    "limitation": null,
+    "selectedAnchor": {
+      "x": 96,
+      "y": 0
+    },
+    "placementOffset": {
+      "x": -96,
+      "y": 0
+    },
+    "bodyMetrics": {
+      "width": 0,
+      "ascent": 0,
+      "descent": 0
+    },
+    "vertices": [
+      {
+        "x": -96,
+        "y": 0
+      },
+      {
+        "x": -5.878304635907295e-15,
+        "y": 96
+      },
+      {
+        "x": 96,
+        "y": 1.175660927181459e-14
+      },
+      {
+        "x": 1.7634913907721887e-14,
+        "y": -96
+      }
+    ],
+    "path": "M -96 0 A -96 -96 0 0 0 96 0 A -96 -96 0 0 0 -96 0 Z",
+    "tikzNode": "\\node[\n            ellipse,\n            fill=stzPointpFill,\n            draw=stzPointpStroke,\n            text=stzPointpText,\n            fill opacity=1,\n            draw opacity=1,\n            text opacity=1,\n            line width=0.4pt,\n            solid,\n            dash phase=0pt,\n            line cap=butt,\n            line join=miter,\n            inner sep=1.5pt,\n            inner xsep=-100pt,\n            inner ysep=-100pt,\n            outer xsep=0pt,\n            outer ysep=0pt,\n            minimum width=-160pt,\n            minimum height=-160pt,\n            anchor=east\n        ] at (pointPoint0p0) {};"
+  },
+  {
+    "id": "rectangle-empty",
+    "validation": {
+      "valid": true,
+      "errors": []
+    },
+    "loaded": true,
+    "limitation": null,
+    "selectedAnchor": {
+      "x": 96,
+      "y": 0
+    },
+    "placementOffset": {
+      "x": -96,
+      "y": 0
+    },
+    "bodyMetrics": {
+      "width": 0,
+      "ascent": 0,
+      "descent": 0
+    },
+    "vertices": [
+      {
+        "x": -96,
+        "y": 96
+      },
+      {
+        "x": 96,
+        "y": 96
+      },
+      {
+        "x": 96,
+        "y": -96
+      },
+      {
+        "x": -96,
+        "y": -96
+      }
+    ],
+    "path": "M -96 96 L 96 96 L 96 -96 L -96 -96 Z",
+    "tikzNode": "\\node[\n            rectangle,\n            fill=stzPointpFill,\n            draw=stzPointpStroke,\n            text=stzPointpText,\n            fill opacity=1,\n            draw opacity=1,\n            text opacity=1,\n            line width=0.4pt,\n            solid,\n            dash phase=0pt,\n            line cap=butt,\n            line join=miter,\n            inner sep=1.5pt,\n            inner xsep=-100pt,\n            inner ysep=-100pt,\n            outer xsep=0pt,\n            outer ysep=0pt,\n            minimum width=-160pt,\n            minimum height=-160pt,\n            anchor=east\n        ] at (pointPoint0p0) {};"
+  }
+]

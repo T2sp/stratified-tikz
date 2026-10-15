@@ -1,0 +1,4639 @@
+{
+  "schema": "stz-pgf-diamond-aspect-scanning-v1",
+  "pgfVersion": "3.1.11a",
+  "engine": "pdfTeX 3.141592653-2.6-1.40.29 (TeX Live 2026)",
+  "engineBinarySha256": "3ead7baeffb81c638fe75599602278566370e6319c0469f6ab00ff62bff4b0eb",
+  "command": [
+    "/Library/TeX/texbin/pdflatex",
+    "-no-shell-escape",
+    "-interaction=nonstopmode",
+    "-halt-on-error",
+    "fixed-box.tex"
+  ],
+  "exitCode": 0,
+  "units": "TeX pt; integer register stages in TeX sp; y reversed exactly once for path/anchor SVG coordinates; unitScale tests convert only units",
+  "upstream": "https://github.com/pgf-tikz/pgf/releases/tag/3.1.11a",
+  "sourceHashes": {
+    "/usr/local/texlive/2026/texmf-dist/tex/generic/pgf/libraries/shapes/pgflibraryshapes.geometric.code.tex": "bbd6abe9df51153e2f4f61cca3ad669de34a6648cf37795df44da931402b69ee",
+    "/usr/local/texlive/2026/texmf-dist/tex/generic/pgf/modules/pgfmoduleshapes.code.tex": "01dd81e3f2c56a8db7864916ada1a5036964aff2e8176aafd4773244e236bb27",
+    "/usr/local/texlive/2026/texmf-dist/tex/generic/pgf/basiclayer/pgfcorepoints.code.tex": "7533dd80c95a5124726b0a617a5f458226d4a7490bcd209e3fd7e717e24dc127",
+    "/usr/local/texlive/2026/texmf-dist/tex/generic/pgf/math/pgfmathcalc.code.tex": "58fcc94547646458470315a6d10953a9729e7962e3def5273633b06fb444a5aa",
+    "/usr/local/texlive/2026/texmf-dist/tex/generic/pgf/math/pgfmathfunctions.trigonometric.code.tex": "1c8834abe00807467a52d31ef96032d5084b2560eea45995018084d13a3cde3c",
+    "/usr/local/texlive/2026/texmf-dist/tex/generic/pgf/math/pgfmathfunctions.basic.code.tex": "c94abbd89ad0556546d9e5053af16b58ce7f38d19c379b27309e5fefd23908f8",
+    "/usr/local/texlive/2026/texmf-dist/tex/generic/pgf/basiclayer/pgfcoretransformations.code.tex": "bdea875774b4ad7a1e12debc67c46286245031f5c2e287c9e192f3ca4b6193b6"
+  },
+  "originalReferenceSha256": "d88d83fdecd840cd9c8ebfc2a23b69d2254164a33d2cec35360ccbc22de4cd8e",
+  "generatorSha256": "50b82c07c6efb496708d86beab1e0a13744f864a4dfc264d64914f982ea58a52",
+  "artifactHashes": {
+    "fixed-box.tex": "204dfb0c9004e9faa9db61a2e85bcd54adefb9bf999ca3611d50e36c4136f2fd",
+    "geometry.txt": "1ec05729f65bd1bda3665338effba9c97dd583acc653b6bbbe0794909ad2021e",
+    "compilation.txt": "08ab234f6599d036f54a97c90ab159c787f83f8138b9d635ed80b9b634c50d10",
+    "staged-upstream-source.tex": "7c971fe24cc2df9c0656f76079196ed72c7a543bd204e215153dc0cbaea304af",
+    "fixed-box.log": "8ee6fe2ed06494246c12fcd3ed8a224f477cb3676abc7f939ee9bacfbce87faa",
+    "fixed-box.pdf": "d996227e9ee5d13b05e97ef868bc586272dcd92a70d58ac54aa606b715453db6"
+  },
+  "namedAnchors": [
+    "center",
+    "text",
+    "base",
+    "mid",
+    "east",
+    "north east",
+    "north",
+    "north west",
+    "west",
+    "south west",
+    "south",
+    "south east"
+  ],
+  "numericAnchors": [
+    "0",
+    "37",
+    "45",
+    "90",
+    "135",
+    "180",
+    "225",
+    "270",
+    "315",
+    "450",
+    "90.8",
+    "+45.7",
+    "-90.8",
+    "-0.5"
+  ],
+  "cases": [
+    {
+      "id": "aspect-0.01",
+      "shape": "diamond",
+      "body": {
+        "width": 20,
+        "height": 8,
+        "depth": 3
+      },
+      "innerXSep": 1.5,
+      "innerYSep": 1.5,
+      "outerXSep": 0,
+      "outerYSep": 0,
+      "minimumWidth": 1,
+      "minimumHeight": 1,
+      "lineWidth": 0.4,
+      "parameters": {
+        "aspect": 0.01
+      },
+      "anchor": "north",
+      "anchors": [
+        "center",
+        "text",
+        "base",
+        "mid",
+        "east",
+        "north east",
+        "north",
+        "north west",
+        "west",
+        "south west",
+        "south",
+        "south east",
+        "0",
+        "37",
+        "45",
+        "90",
+        "135",
+        "180",
+        "225",
+        "270",
+        "315",
+        "450",
+        "90.8",
+        "+45.7",
+        "-90.8",
+        "-0.5"
+      ],
+      "expectedStages": {
+        "aspectSp": 655,
+        "aspectEighthSp": 81,
+        "inverseSp": 6628035,
+        "initialXSp": 753664,
+        "initialYSp": 458752,
+        "aspectYSp": 4585,
+        "inverseXSp": 76222402,
+        "fittedXSp": 758249,
+        "fittedYSp": 76681154,
+        "minimumWidthHalfSp": 32768,
+        "minimumHeightHalfSp": 32768,
+        "limitedXSp": 758249,
+        "limitedYSp": 76681154,
+        "outerXSp": 0,
+        "outerYSp": 0,
+        "anchorXSp": 758249,
+        "anchorYSp": 76681154,
+        "paintedXSp": 758249,
+        "paintedYSp": 76681154
+      },
+      "paints": [
+        {
+          "action": "stroke",
+          "tokens": [
+            {
+              "kind": "movetotoken",
+              "x": 11.56996,
+              "y": 0
+            },
+            {
+              "kind": "linetotoken",
+              "x": 0,
+              "y": -1170.06155
+            },
+            {
+              "kind": "linetotoken",
+              "x": -11.56996,
+              "y": 0
+            },
+            {
+              "kind": "linetotoken",
+              "x": 0,
+              "y": 1170.06155
+            },
+            {
+              "kind": "closepathtoken",
+              "x": 11.56996,
+              "y": 0
+            }
+          ]
+        }
+      ],
+      "expectedAnchors": {
+        "0": {
+          "x": 11.5693,
+          "y": 0
+        },
+        "37": {
+          "x": 11.48483,
+          "y": -8.65446
+        },
+        "45": {
+          "x": 11.45772,
+          "y": -11.45772
+        },
+        "90": {
+          "x": 0,
+          "y": -1169.6732
+        },
+        "135": {
+          "x": -11.45772,
+          "y": -11.45772
+        },
+        "180": {
+          "x": -11.5693,
+          "y": 0
+        },
+        "225": {
+          "x": -11.45772,
+          "y": 11.45772
+        },
+        "270": {
+          "x": 0,
+          "y": 1169.6732
+        },
+        "315": {
+          "x": 11.45772,
+          "y": 11.45772
+        },
+        "450": {
+          "x": 0,
+          "y": -1169.6732
+        },
+        "center": {
+          "x": 0,
+          "y": 0
+        },
+        "text": {
+          "x": -10,
+          "y": 2.5
+        },
+        "base": {
+          "x": 0,
+          "y": 2.5
+        },
+        "mid": {
+          "x": 0,
+          "y": 0.34723
+        },
+        "east": {
+          "x": 11.56996,
+          "y": 0
+        },
+        "north east": {
+          "x": 5.78497,
+          "y": -585.03078
+        },
+        "north": {
+          "x": 0,
+          "y": -1170.06155
+        },
+        "north west": {
+          "x": -5.78497,
+          "y": -585.03078
+        },
+        "west": {
+          "x": -11.56996,
+          "y": 0
+        },
+        "south west": {
+          "x": -5.78497,
+          "y": 585.03078
+        },
+        "south": {
+          "x": 0,
+          "y": 1170.06155
+        },
+        "south east": {
+          "x": 5.78497,
+          "y": 585.03078
+        },
+        "90.8": {
+          "x": 0,
+          "y": -1169.6732
+        },
+        "+45.7": {
+          "x": 11.45772,
+          "y": -11.45772
+        },
+        "-90.8": {
+          "x": 0,
+          "y": 1169.6732
+        },
+        "-0.5": {
+          "x": 11.5693,
+          "y": 0
+        }
+      },
+      "fontContext": {
+        "em": 10.00002,
+        "ex": 4.30554
+      }
+    },
+    {
+      "id": "aspect-0.01001",
+      "shape": "diamond",
+      "body": {
+        "width": 20,
+        "height": 8,
+        "depth": 3
+      },
+      "innerXSep": 1.5,
+      "innerYSep": 1.5,
+      "outerXSep": 0,
+      "outerYSep": 0,
+      "minimumWidth": 1,
+      "minimumHeight": 1,
+      "lineWidth": 0.4,
+      "parameters": {
+        "aspect": 0.01001
+      },
+      "anchor": "north",
+      "anchors": [
+        "center",
+        "text",
+        "base",
+        "mid",
+        "east",
+        "north east",
+        "north",
+        "north west",
+        "west",
+        "south west",
+        "south",
+        "south east",
+        "0",
+        "37",
+        "45",
+        "90",
+        "135",
+        "180",
+        "225",
+        "270",
+        "315",
+        "450",
+        "90.8",
+        "+45.7",
+        "-90.8",
+        "-0.5"
+      ],
+      "expectedStages": {
+        "aspectSp": 656,
+        "aspectEighthSp": 82,
+        "inverseSp": 6547206,
+        "initialXSp": 753664,
+        "initialYSp": 458752,
+        "aspectYSp": 4592,
+        "inverseXSp": 75292869,
+        "fittedXSp": 758256,
+        "fittedYSp": 75751621,
+        "minimumWidthHalfSp": 32768,
+        "minimumHeightHalfSp": 32768,
+        "limitedXSp": 758256,
+        "limitedYSp": 75751621,
+        "outerXSp": 0,
+        "outerYSp": 0,
+        "anchorXSp": 758256,
+        "anchorYSp": 75751621,
+        "paintedXSp": 758256,
+        "paintedYSp": 75751621
+      },
+      "paints": [
+        {
+          "action": "stroke",
+          "tokens": [
+            {
+              "kind": "movetotoken",
+              "x": 11.57007,
+              "y": 0
+            },
+            {
+              "kind": "linetotoken",
+              "x": 0,
+              "y": -1155.878
+            },
+            {
+              "kind": "linetotoken",
+              "x": -11.57007,
+              "y": 0
+            },
+            {
+              "kind": "linetotoken",
+              "x": 0,
+              "y": 1155.878
+            },
+            {
+              "kind": "closepathtoken",
+              "x": 11.57007,
+              "y": 0
+            }
+          ]
+        }
+      ],
+      "expectedAnchors": {
+        "0": {
+          "x": 11.5697,
+          "y": 0
+        },
+        "37": {
+          "x": 11.48384,
+          "y": -8.6537
+        },
+        "45": {
+          "x": 11.4562,
+          "y": -11.4562
+        },
+        "90": {
+          "x": 0,
+          "y": -1157.54715
+        },
+        "135": {
+          "x": -11.4562,
+          "y": -11.4562
+        },
+        "180": {
+          "x": -11.5697,
+          "y": 0
+        },
+        "225": {
+          "x": -11.4562,
+          "y": 11.4562
+        },
+        "270": {
+          "x": 0,
+          "y": 1157.54715
+        },
+        "315": {
+          "x": 11.4562,
+          "y": 11.4562
+        },
+        "450": {
+          "x": 0,
+          "y": -1157.54715
+        },
+        "center": {
+          "x": 0,
+          "y": 0
+        },
+        "text": {
+          "x": -10,
+          "y": 2.5
+        },
+        "base": {
+          "x": 0,
+          "y": 2.5
+        },
+        "mid": {
+          "x": 0,
+          "y": 0.34723
+        },
+        "east": {
+          "x": 11.57007,
+          "y": 0
+        },
+        "north east": {
+          "x": 5.78503,
+          "y": -577.939
+        },
+        "north": {
+          "x": 0,
+          "y": -1155.878
+        },
+        "north west": {
+          "x": -5.78503,
+          "y": -577.939
+        },
+        "west": {
+          "x": -11.57007,
+          "y": 0
+        },
+        "south west": {
+          "x": -5.78503,
+          "y": 577.939
+        },
+        "south": {
+          "x": 0,
+          "y": 1155.878
+        },
+        "south east": {
+          "x": 5.78503,
+          "y": 577.939
+        },
+        "90.8": {
+          "x": 0,
+          "y": -1157.54715
+        },
+        "+45.7": {
+          "x": 11.4562,
+          "y": -11.4562
+        },
+        "-90.8": {
+          "x": 0,
+          "y": 1157.54715
+        },
+        "-0.5": {
+          "x": 11.5697,
+          "y": 0
+        }
+      },
+      "fontContext": {
+        "em": 10.00002,
+        "ex": 4.30554
+      }
+    },
+    {
+      "id": "aspect-0.0101",
+      "shape": "diamond",
+      "body": {
+        "width": 20,
+        "height": 8,
+        "depth": 3
+      },
+      "innerXSep": 1.5,
+      "innerYSep": 1.5,
+      "outerXSep": 0,
+      "outerYSep": 0,
+      "minimumWidth": 1,
+      "minimumHeight": 1,
+      "lineWidth": 0.4,
+      "parameters": {
+        "aspect": 0.0101
+      },
+      "anchor": "north",
+      "anchors": [
+        "center",
+        "text",
+        "base",
+        "mid",
+        "east",
+        "north east",
+        "north",
+        "north west",
+        "west",
+        "south west",
+        "south",
+        "south east",
+        "0",
+        "37",
+        "45",
+        "90",
+        "135",
+        "180",
+        "225",
+        "270",
+        "315",
+        "450",
+        "90.8",
+        "+45.7",
+        "-90.8",
+        "-0.5"
+      ],
+      "expectedStages": {
+        "aspectSp": 662,
+        "aspectEighthSp": 82,
+        "inverseSp": 6547206,
+        "initialXSp": 753664,
+        "initialYSp": 458752,
+        "aspectYSp": 4634,
+        "inverseXSp": 75292869,
+        "fittedXSp": 758298,
+        "fittedYSp": 75751621,
+        "minimumWidthHalfSp": 32768,
+        "minimumHeightHalfSp": 32768,
+        "limitedXSp": 758298,
+        "limitedYSp": 75751621,
+        "outerXSp": 0,
+        "outerYSp": 0,
+        "anchorXSp": 758298,
+        "anchorYSp": 75751621,
+        "paintedXSp": 758298,
+        "paintedYSp": 75751621
+      },
+      "paints": [
+        {
+          "action": "stroke",
+          "tokens": [
+            {
+              "kind": "movetotoken",
+              "x": 11.57071,
+              "y": 0
+            },
+            {
+              "kind": "linetotoken",
+              "x": 0,
+              "y": -1155.878
+            },
+            {
+              "kind": "linetotoken",
+              "x": -11.57071,
+              "y": 0
+            },
+            {
+              "kind": "linetotoken",
+              "x": 0,
+              "y": 1155.878
+            },
+            {
+              "kind": "closepathtoken",
+              "x": 11.57071,
+              "y": 0
+            }
+          ]
+        }
+      ],
+      "expectedAnchors": {
+        "0": {
+          "x": 11.57034,
+          "y": 0
+        },
+        "37": {
+          "x": 11.48448,
+          "y": -8.65419
+        },
+        "45": {
+          "x": 11.45685,
+          "y": -11.45685
+        },
+        "90": {
+          "x": 0,
+          "y": -1157.61188
+        },
+        "135": {
+          "x": -11.45685,
+          "y": -11.45685
+        },
+        "180": {
+          "x": -11.57034,
+          "y": 0
+        },
+        "225": {
+          "x": -11.45685,
+          "y": 11.45685
+        },
+        "270": {
+          "x": 0,
+          "y": 1157.61188
+        },
+        "315": {
+          "x": 11.45685,
+          "y": 11.45685
+        },
+        "450": {
+          "x": 0,
+          "y": -1157.61188
+        },
+        "center": {
+          "x": 0,
+          "y": 0
+        },
+        "text": {
+          "x": -10,
+          "y": 2.5
+        },
+        "base": {
+          "x": 0,
+          "y": 2.5
+        },
+        "mid": {
+          "x": 0,
+          "y": 0.34723
+        },
+        "east": {
+          "x": 11.57071,
+          "y": 0
+        },
+        "north east": {
+          "x": 5.78535,
+          "y": -577.939
+        },
+        "north": {
+          "x": 0,
+          "y": -1155.878
+        },
+        "north west": {
+          "x": -5.78535,
+          "y": -577.939
+        },
+        "west": {
+          "x": -11.57071,
+          "y": 0
+        },
+        "south west": {
+          "x": -5.78535,
+          "y": 577.939
+        },
+        "south": {
+          "x": 0,
+          "y": 1155.878
+        },
+        "south east": {
+          "x": 5.78535,
+          "y": 577.939
+        },
+        "90.8": {
+          "x": 0,
+          "y": -1157.61188
+        },
+        "+45.7": {
+          "x": 11.45685,
+          "y": -11.45685
+        },
+        "-90.8": {
+          "x": 0,
+          "y": 1157.61188
+        },
+        "-0.5": {
+          "x": 11.57034,
+          "y": 0
+        }
+      },
+      "fontContext": {
+        "em": 10.00002,
+        "ex": 4.30554
+      }
+    },
+    {
+      "id": "aspect-0.02999",
+      "shape": "diamond",
+      "body": {
+        "width": 20,
+        "height": 8,
+        "depth": 3
+      },
+      "innerXSep": 1.5,
+      "innerYSep": 1.5,
+      "outerXSep": 0,
+      "outerYSep": 0,
+      "minimumWidth": 1,
+      "minimumHeight": 1,
+      "lineWidth": 0.4,
+      "parameters": {
+        "aspect": 0.02999
+      },
+      "anchor": "north",
+      "anchors": [
+        "center",
+        "text",
+        "base",
+        "mid",
+        "east",
+        "north east",
+        "north",
+        "north west",
+        "west",
+        "south west",
+        "south",
+        "south east",
+        "0",
+        "37",
+        "45",
+        "90",
+        "135",
+        "180",
+        "225",
+        "270",
+        "315",
+        "450",
+        "90.8",
+        "+45.7",
+        "-90.8",
+        "-0.5"
+      ],
+      "expectedStages": {
+        "aspectSp": 1965,
+        "aspectEighthSp": 245,
+        "inverseSp": 2191309,
+        "initialXSp": 753664,
+        "initialYSp": 458752,
+        "aspectYSp": 13755,
+        "inverseXSp": 25200053,
+        "fittedXSp": 767419,
+        "fittedYSp": 25658805,
+        "minimumWidthHalfSp": 32768,
+        "minimumHeightHalfSp": 32768,
+        "limitedXSp": 767419,
+        "limitedYSp": 25658805,
+        "outerXSp": 0,
+        "outerYSp": 0,
+        "anchorXSp": 767419,
+        "anchorYSp": 25658805,
+        "paintedXSp": 767419,
+        "paintedYSp": 25658805
+      },
+      "paints": [
+        {
+          "action": "stroke",
+          "tokens": [
+            {
+              "kind": "movetotoken",
+              "x": 11.70988,
+              "y": 0
+            },
+            {
+              "kind": "linetotoken",
+              "x": 0,
+              "y": -391.5223
+            },
+            {
+              "kind": "linetotoken",
+              "x": -11.70988,
+              "y": 0
+            },
+            {
+              "kind": "linetotoken",
+              "x": 0,
+              "y": 391.5223
+            },
+            {
+              "kind": "closepathtoken",
+              "x": 11.70988,
+              "y": 0
+            }
+          ]
+        }
+      ],
+      "expectedAnchors": {
+        "0": {
+          "x": 11.70956,
+          "y": 0
+        },
+        "37": {
+          "x": 11.45197,
+          "y": -8.6296
+        },
+        "45": {
+          "x": 11.37038,
+          "y": -11.37038
+        },
+        "90": {
+          "x": 0,
+          "y": -391.61134
+        },
+        "135": {
+          "x": -11.37038,
+          "y": -11.37038
+        },
+        "180": {
+          "x": -11.70956,
+          "y": 0
+        },
+        "225": {
+          "x": -11.37038,
+          "y": 11.37038
+        },
+        "270": {
+          "x": 0,
+          "y": 391.61134
+        },
+        "315": {
+          "x": 11.37038,
+          "y": 11.37038
+        },
+        "450": {
+          "x": 0,
+          "y": -391.61134
+        },
+        "center": {
+          "x": 0,
+          "y": 0
+        },
+        "text": {
+          "x": -10,
+          "y": 2.5
+        },
+        "base": {
+          "x": 0,
+          "y": 2.5
+        },
+        "mid": {
+          "x": 0,
+          "y": 0.34723
+        },
+        "east": {
+          "x": 11.70988,
+          "y": 0
+        },
+        "north east": {
+          "x": 5.85493,
+          "y": -195.76114
+        },
+        "north": {
+          "x": 0,
+          "y": -391.5223
+        },
+        "north west": {
+          "x": -5.85493,
+          "y": -195.76114
+        },
+        "west": {
+          "x": -11.70988,
+          "y": 0
+        },
+        "south west": {
+          "x": -5.85493,
+          "y": 195.76114
+        },
+        "south": {
+          "x": 0,
+          "y": 391.5223
+        },
+        "south east": {
+          "x": 5.85493,
+          "y": 195.76114
+        },
+        "90.8": {
+          "x": 0,
+          "y": -391.61134
+        },
+        "+45.7": {
+          "x": 11.37038,
+          "y": -11.37038
+        },
+        "-90.8": {
+          "x": 0,
+          "y": 391.61134
+        },
+        "-0.5": {
+          "x": 11.70956,
+          "y": 0
+        }
+      },
+      "fontContext": {
+        "em": 10.00002,
+        "ex": 4.30554
+      }
+    },
+    {
+      "id": "aspect-0.03",
+      "shape": "diamond",
+      "body": {
+        "width": 20,
+        "height": 8,
+        "depth": 3
+      },
+      "innerXSep": 1.5,
+      "innerYSep": 1.5,
+      "outerXSep": 0,
+      "outerYSep": 0,
+      "minimumWidth": 1,
+      "minimumHeight": 1,
+      "lineWidth": 0.4,
+      "parameters": {
+        "aspect": 0.03
+      },
+      "anchor": "north",
+      "anchors": [
+        "center",
+        "text",
+        "base",
+        "mid",
+        "east",
+        "north east",
+        "north",
+        "north west",
+        "west",
+        "south west",
+        "south",
+        "south east",
+        "0",
+        "37",
+        "45",
+        "90",
+        "135",
+        "180",
+        "225",
+        "270",
+        "315",
+        "450",
+        "90.8",
+        "+45.7",
+        "-90.8",
+        "-0.5"
+      ],
+      "expectedStages": {
+        "aspectSp": 1966,
+        "aspectEighthSp": 245,
+        "inverseSp": 2191309,
+        "initialXSp": 753664,
+        "initialYSp": 458752,
+        "aspectYSp": 13762,
+        "inverseXSp": 25200053,
+        "fittedXSp": 767426,
+        "fittedYSp": 25658805,
+        "minimumWidthHalfSp": 32768,
+        "minimumHeightHalfSp": 32768,
+        "limitedXSp": 767426,
+        "limitedYSp": 25658805,
+        "outerXSp": 0,
+        "outerYSp": 0,
+        "anchorXSp": 767426,
+        "anchorYSp": 25658805,
+        "paintedXSp": 767426,
+        "paintedYSp": 25658805
+      },
+      "paints": [
+        {
+          "action": "stroke",
+          "tokens": [
+            {
+              "kind": "movetotoken",
+              "x": 11.70999,
+              "y": 0
+            },
+            {
+              "kind": "linetotoken",
+              "x": 0,
+              "y": -391.5223
+            },
+            {
+              "kind": "linetotoken",
+              "x": -11.70999,
+              "y": 0
+            },
+            {
+              "kind": "linetotoken",
+              "x": 0,
+              "y": 391.5223
+            },
+            {
+              "kind": "closepathtoken",
+              "x": 11.70999,
+              "y": 0
+            }
+          ]
+        }
+      ],
+      "expectedAnchors": {
+        "0": {
+          "x": 11.70967,
+          "y": 0
+        },
+        "37": {
+          "x": 11.45207,
+          "y": -8.62967
+        },
+        "45": {
+          "x": 11.37048,
+          "y": -11.37048
+        },
+        "90": {
+          "x": 0,
+          "y": -391.61502
+        },
+        "135": {
+          "x": -11.37048,
+          "y": -11.37048
+        },
+        "180": {
+          "x": -11.70967,
+          "y": 0
+        },
+        "225": {
+          "x": -11.37048,
+          "y": 11.37048
+        },
+        "270": {
+          "x": 0,
+          "y": 391.61502
+        },
+        "315": {
+          "x": 11.37048,
+          "y": 11.37048
+        },
+        "450": {
+          "x": 0,
+          "y": -391.61502
+        },
+        "center": {
+          "x": 0,
+          "y": 0
+        },
+        "text": {
+          "x": -10,
+          "y": 2.5
+        },
+        "base": {
+          "x": 0,
+          "y": 2.5
+        },
+        "mid": {
+          "x": 0,
+          "y": 0.34723
+        },
+        "east": {
+          "x": 11.70999,
+          "y": 0
+        },
+        "north east": {
+          "x": 5.855,
+          "y": -195.76114
+        },
+        "north": {
+          "x": 0,
+          "y": -391.5223
+        },
+        "north west": {
+          "x": -5.855,
+          "y": -195.76114
+        },
+        "west": {
+          "x": -11.70999,
+          "y": 0
+        },
+        "south west": {
+          "x": -5.855,
+          "y": 195.76114
+        },
+        "south": {
+          "x": 0,
+          "y": 391.5223
+        },
+        "south east": {
+          "x": 5.855,
+          "y": 195.76114
+        },
+        "90.8": {
+          "x": 0,
+          "y": -391.61502
+        },
+        "+45.7": {
+          "x": 11.37048,
+          "y": -11.37048
+        },
+        "-90.8": {
+          "x": 0,
+          "y": 391.61502
+        },
+        "-0.5": {
+          "x": 11.70967,
+          "y": 0
+        }
+      },
+      "fontContext": {
+        "em": 10.00002,
+        "ex": 4.30554
+      }
+    },
+    {
+      "id": "aspect-0.03001",
+      "shape": "diamond",
+      "body": {
+        "width": 20,
+        "height": 8,
+        "depth": 3
+      },
+      "innerXSep": 1.5,
+      "innerYSep": 1.5,
+      "outerXSep": 0,
+      "outerYSep": 0,
+      "minimumWidth": 1,
+      "minimumHeight": 1,
+      "lineWidth": 0.4,
+      "parameters": {
+        "aspect": 0.03001
+      },
+      "anchor": "north",
+      "anchors": [
+        "center",
+        "text",
+        "base",
+        "mid",
+        "east",
+        "north east",
+        "north",
+        "north west",
+        "west",
+        "south west",
+        "south",
+        "south east",
+        "0",
+        "37",
+        "45",
+        "90",
+        "135",
+        "180",
+        "225",
+        "270",
+        "315",
+        "450",
+        "90.8",
+        "+45.7",
+        "-90.8",
+        "-0.5"
+      ],
+      "expectedStages": {
+        "aspectSp": 1967,
+        "aspectEighthSp": 245,
+        "inverseSp": 2191309,
+        "initialXSp": 753664,
+        "initialYSp": 458752,
+        "aspectYSp": 13769,
+        "inverseXSp": 25200053,
+        "fittedXSp": 767433,
+        "fittedYSp": 25658805,
+        "minimumWidthHalfSp": 32768,
+        "minimumHeightHalfSp": 32768,
+        "limitedXSp": 767433,
+        "limitedYSp": 25658805,
+        "outerXSp": 0,
+        "outerYSp": 0,
+        "anchorXSp": 767433,
+        "anchorYSp": 25658805,
+        "paintedXSp": 767433,
+        "paintedYSp": 25658805
+      },
+      "paints": [
+        {
+          "action": "stroke",
+          "tokens": [
+            {
+              "kind": "movetotoken",
+              "x": 11.7101,
+              "y": 0
+            },
+            {
+              "kind": "linetotoken",
+              "x": 0,
+              "y": -391.5223
+            },
+            {
+              "kind": "linetotoken",
+              "x": -11.7101,
+              "y": 0
+            },
+            {
+              "kind": "linetotoken",
+              "x": 0,
+              "y": 391.5223
+            },
+            {
+              "kind": "closepathtoken",
+              "x": 11.7101,
+              "y": 0
+            }
+          ]
+        }
+      ],
+      "expectedAnchors": {
+        "0": {
+          "x": 11.70978,
+          "y": 0
+        },
+        "37": {
+          "x": 11.45218,
+          "y": -8.62975
+        },
+        "45": {
+          "x": 11.37059,
+          "y": -11.37059
+        },
+        "90": {
+          "x": 0,
+          "y": -391.6187
+        },
+        "135": {
+          "x": -11.37059,
+          "y": -11.37059
+        },
+        "180": {
+          "x": -11.70978,
+          "y": 0
+        },
+        "225": {
+          "x": -11.37059,
+          "y": 11.37059
+        },
+        "270": {
+          "x": 0,
+          "y": 391.6187
+        },
+        "315": {
+          "x": 11.37059,
+          "y": 11.37059
+        },
+        "450": {
+          "x": 0,
+          "y": -391.6187
+        },
+        "center": {
+          "x": 0,
+          "y": 0
+        },
+        "text": {
+          "x": -10,
+          "y": 2.5
+        },
+        "base": {
+          "x": 0,
+          "y": 2.5
+        },
+        "mid": {
+          "x": 0,
+          "y": 0.34723
+        },
+        "east": {
+          "x": 11.7101,
+          "y": 0
+        },
+        "north east": {
+          "x": 5.85504,
+          "y": -195.76114
+        },
+        "north": {
+          "x": 0,
+          "y": -391.5223
+        },
+        "north west": {
+          "x": -5.85504,
+          "y": -195.76114
+        },
+        "west": {
+          "x": -11.7101,
+          "y": 0
+        },
+        "south west": {
+          "x": -5.85504,
+          "y": 195.76114
+        },
+        "south": {
+          "x": 0,
+          "y": 391.5223
+        },
+        "south east": {
+          "x": 5.85504,
+          "y": 195.76114
+        },
+        "90.8": {
+          "x": 0,
+          "y": -391.6187
+        },
+        "+45.7": {
+          "x": 11.37059,
+          "y": -11.37059
+        },
+        "-90.8": {
+          "x": 0,
+          "y": 391.6187
+        },
+        "-0.5": {
+          "x": 11.70978,
+          "y": 0
+        }
+      },
+      "fontContext": {
+        "em": 10.00002,
+        "ex": 4.30554
+      }
+    },
+    {
+      "id": "aspect-0.09999",
+      "shape": "diamond",
+      "body": {
+        "width": 20,
+        "height": 8,
+        "depth": 3
+      },
+      "innerXSep": 1.5,
+      "innerYSep": 1.5,
+      "outerXSep": 0,
+      "outerYSep": 0,
+      "minimumWidth": 1,
+      "minimumHeight": 1,
+      "lineWidth": 0.4,
+      "parameters": {
+        "aspect": 0.09999
+      },
+      "anchor": "north",
+      "anchors": [
+        "center",
+        "text",
+        "base",
+        "mid",
+        "east",
+        "north east",
+        "north",
+        "north west",
+        "west",
+        "south west",
+        "south",
+        "south east",
+        "0",
+        "37",
+        "45",
+        "90",
+        "135",
+        "180",
+        "225",
+        "270",
+        "315",
+        "450",
+        "90.8",
+        "+45.7",
+        "-90.8",
+        "-0.5"
+      ],
+      "expectedStages": {
+        "aspectSp": 6553,
+        "aspectEighthSp": 819,
+        "inverseSp": 655520,
+        "initialXSp": 753664,
+        "initialYSp": 458752,
+        "aspectYSp": 45871,
+        "inverseXSp": 7538480,
+        "fittedXSp": 799535,
+        "fittedYSp": 7997232,
+        "minimumWidthHalfSp": 32768,
+        "minimumHeightHalfSp": 32768,
+        "limitedXSp": 799535,
+        "limitedYSp": 7997232,
+        "outerXSp": 0,
+        "outerYSp": 0,
+        "anchorXSp": 799535,
+        "anchorYSp": 7997232,
+        "paintedXSp": 799535,
+        "paintedYSp": 7997232
+      },
+      "paints": [
+        {
+          "action": "stroke",
+          "tokens": [
+            {
+              "kind": "movetotoken",
+              "x": 12.19994,
+              "y": 0
+            },
+            {
+              "kind": "linetotoken",
+              "x": 0,
+              "y": -122.02808
+            },
+            {
+              "kind": "linetotoken",
+              "x": -12.19994,
+              "y": 0
+            },
+            {
+              "kind": "linetotoken",
+              "x": 0,
+              "y": 122.02808
+            },
+            {
+              "kind": "closepathtoken",
+              "x": 12.19994,
+              "y": 0
+            }
+          ]
+        }
+      ],
+      "expectedAnchors": {
+        "0": {
+          "x": 12.19983,
+          "y": 0
+        },
+        "37": {
+          "x": 11.3451,
+          "y": -8.54916
+        },
+        "45": {
+          "x": 11.09149,
+          "y": -11.09149
+        },
+        "90": {
+          "x": 0,
+          "y": -122.0471
+        },
+        "135": {
+          "x": -11.09149,
+          "y": -11.09149
+        },
+        "180": {
+          "x": -12.19983,
+          "y": 0
+        },
+        "225": {
+          "x": -11.09149,
+          "y": 11.09149
+        },
+        "270": {
+          "x": 0,
+          "y": 122.0471
+        },
+        "315": {
+          "x": 11.09149,
+          "y": 11.09149
+        },
+        "450": {
+          "x": 0,
+          "y": -122.0471
+        },
+        "center": {
+          "x": 0,
+          "y": 0
+        },
+        "text": {
+          "x": -10,
+          "y": 2.5
+        },
+        "base": {
+          "x": 0,
+          "y": 2.5
+        },
+        "mid": {
+          "x": 0,
+          "y": 0.34723
+        },
+        "east": {
+          "x": 12.19994,
+          "y": 0
+        },
+        "north east": {
+          "x": 6.09996,
+          "y": -61.01404
+        },
+        "north": {
+          "x": 0,
+          "y": -122.02808
+        },
+        "north west": {
+          "x": -6.09996,
+          "y": -61.01404
+        },
+        "west": {
+          "x": -12.19994,
+          "y": 0
+        },
+        "south west": {
+          "x": -6.09996,
+          "y": 61.01404
+        },
+        "south": {
+          "x": 0,
+          "y": 122.02808
+        },
+        "south east": {
+          "x": 6.09996,
+          "y": 61.01404
+        },
+        "90.8": {
+          "x": 0,
+          "y": -122.0471
+        },
+        "+45.7": {
+          "x": 11.09149,
+          "y": -11.09149
+        },
+        "-90.8": {
+          "x": 0,
+          "y": 122.0471
+        },
+        "-0.5": {
+          "x": 12.19983,
+          "y": 0
+        }
+      },
+      "fontContext": {
+        "em": 10.00002,
+        "ex": 4.30554
+      }
+    },
+    {
+      "id": "aspect-0.1",
+      "shape": "diamond",
+      "body": {
+        "width": 20,
+        "height": 8,
+        "depth": 3
+      },
+      "innerXSep": 1.5,
+      "innerYSep": 1.5,
+      "outerXSep": 0,
+      "outerYSep": 0,
+      "minimumWidth": 1,
+      "minimumHeight": 1,
+      "lineWidth": 0.4,
+      "parameters": {
+        "aspect": 0.1
+      },
+      "anchor": "north",
+      "anchors": [
+        "center",
+        "text",
+        "base",
+        "mid",
+        "east",
+        "north east",
+        "north",
+        "north west",
+        "west",
+        "south west",
+        "south",
+        "south east",
+        "0",
+        "37",
+        "45",
+        "90",
+        "135",
+        "180",
+        "225",
+        "270",
+        "315",
+        "450",
+        "90.8",
+        "+45.7",
+        "-90.8",
+        "-0.5"
+      ],
+      "expectedStages": {
+        "aspectSp": 6554,
+        "aspectEighthSp": 819,
+        "inverseSp": 655520,
+        "initialXSp": 753664,
+        "initialYSp": 458752,
+        "aspectYSp": 45878,
+        "inverseXSp": 7538480,
+        "fittedXSp": 799542,
+        "fittedYSp": 7997232,
+        "minimumWidthHalfSp": 32768,
+        "minimumHeightHalfSp": 32768,
+        "limitedXSp": 799542,
+        "limitedYSp": 7997232,
+        "outerXSp": 0,
+        "outerYSp": 0,
+        "anchorXSp": 799542,
+        "anchorYSp": 7997232,
+        "paintedXSp": 799542,
+        "paintedYSp": 7997232
+      },
+      "paints": [
+        {
+          "action": "stroke",
+          "tokens": [
+            {
+              "kind": "movetotoken",
+              "x": 12.20004,
+              "y": 0
+            },
+            {
+              "kind": "linetotoken",
+              "x": 0,
+              "y": -122.02808
+            },
+            {
+              "kind": "linetotoken",
+              "x": -12.20004,
+              "y": 0
+            },
+            {
+              "kind": "linetotoken",
+              "x": 0,
+              "y": 122.02808
+            },
+            {
+              "kind": "closepathtoken",
+              "x": 12.20004,
+              "y": 0
+            }
+          ]
+        }
+      ],
+      "expectedAnchors": {
+        "0": {
+          "x": 12.19992,
+          "y": 0
+        },
+        "37": {
+          "x": 11.34518,
+          "y": -8.54924
+        },
+        "45": {
+          "x": 11.09158,
+          "y": -11.09158
+        },
+        "90": {
+          "x": 0,
+          "y": -122.04811
+        },
+        "135": {
+          "x": -11.09158,
+          "y": -11.09158
+        },
+        "180": {
+          "x": -12.19992,
+          "y": 0
+        },
+        "225": {
+          "x": -11.09158,
+          "y": 11.09158
+        },
+        "270": {
+          "x": 0,
+          "y": 122.04811
+        },
+        "315": {
+          "x": 11.09158,
+          "y": 11.09158
+        },
+        "450": {
+          "x": 0,
+          "y": -122.04811
+        },
+        "center": {
+          "x": 0,
+          "y": 0
+        },
+        "text": {
+          "x": -10,
+          "y": 2.5
+        },
+        "base": {
+          "x": 0,
+          "y": 2.5
+        },
+        "mid": {
+          "x": 0,
+          "y": 0.34723
+        },
+        "east": {
+          "x": 12.20004,
+          "y": 0
+        },
+        "north east": {
+          "x": 6.10002,
+          "y": -61.01404
+        },
+        "north": {
+          "x": 0,
+          "y": -122.02808
+        },
+        "north west": {
+          "x": -6.10002,
+          "y": -61.01404
+        },
+        "west": {
+          "x": -12.20004,
+          "y": 0
+        },
+        "south west": {
+          "x": -6.10002,
+          "y": 61.01404
+        },
+        "south": {
+          "x": 0,
+          "y": 122.02808
+        },
+        "south east": {
+          "x": 6.10002,
+          "y": 61.01404
+        },
+        "90.8": {
+          "x": 0,
+          "y": -122.04811
+        },
+        "+45.7": {
+          "x": 11.09158,
+          "y": -11.09158
+        },
+        "-90.8": {
+          "x": 0,
+          "y": 122.04811
+        },
+        "-0.5": {
+          "x": 12.19992,
+          "y": 0
+        }
+      },
+      "fontContext": {
+        "em": 10.00002,
+        "ex": 4.30554
+      }
+    },
+    {
+      "id": "aspect-0.10001",
+      "shape": "diamond",
+      "body": {
+        "width": 20,
+        "height": 8,
+        "depth": 3
+      },
+      "innerXSep": 1.5,
+      "innerYSep": 1.5,
+      "outerXSep": 0,
+      "outerYSep": 0,
+      "minimumWidth": 1,
+      "minimumHeight": 1,
+      "lineWidth": 0.4,
+      "parameters": {
+        "aspect": 0.10001
+      },
+      "anchor": "north",
+      "anchors": [
+        "center",
+        "text",
+        "base",
+        "mid",
+        "east",
+        "north east",
+        "north",
+        "north west",
+        "west",
+        "south west",
+        "south",
+        "south east",
+        "0",
+        "37",
+        "45",
+        "90",
+        "135",
+        "180",
+        "225",
+        "270",
+        "315",
+        "450",
+        "90.8",
+        "+45.7",
+        "-90.8",
+        "-0.5"
+      ],
+      "expectedStages": {
+        "aspectSp": 6554,
+        "aspectEighthSp": 819,
+        "inverseSp": 655520,
+        "initialXSp": 753664,
+        "initialYSp": 458752,
+        "aspectYSp": 45878,
+        "inverseXSp": 7538480,
+        "fittedXSp": 799542,
+        "fittedYSp": 7997232,
+        "minimumWidthHalfSp": 32768,
+        "minimumHeightHalfSp": 32768,
+        "limitedXSp": 799542,
+        "limitedYSp": 7997232,
+        "outerXSp": 0,
+        "outerYSp": 0,
+        "anchorXSp": 799542,
+        "anchorYSp": 7997232,
+        "paintedXSp": 799542,
+        "paintedYSp": 7997232
+      },
+      "paints": [
+        {
+          "action": "stroke",
+          "tokens": [
+            {
+              "kind": "movetotoken",
+              "x": 12.20004,
+              "y": 0
+            },
+            {
+              "kind": "linetotoken",
+              "x": 0,
+              "y": -122.02808
+            },
+            {
+              "kind": "linetotoken",
+              "x": -12.20004,
+              "y": 0
+            },
+            {
+              "kind": "linetotoken",
+              "x": 0,
+              "y": 122.02808
+            },
+            {
+              "kind": "closepathtoken",
+              "x": 12.20004,
+              "y": 0
+            }
+          ]
+        }
+      ],
+      "expectedAnchors": {
+        "0": {
+          "x": 12.19992,
+          "y": 0
+        },
+        "37": {
+          "x": 11.34518,
+          "y": -8.54924
+        },
+        "45": {
+          "x": 11.09158,
+          "y": -11.09158
+        },
+        "90": {
+          "x": 0,
+          "y": -122.04811
+        },
+        "135": {
+          "x": -11.09158,
+          "y": -11.09158
+        },
+        "180": {
+          "x": -12.19992,
+          "y": 0
+        },
+        "225": {
+          "x": -11.09158,
+          "y": 11.09158
+        },
+        "270": {
+          "x": 0,
+          "y": 122.04811
+        },
+        "315": {
+          "x": 11.09158,
+          "y": 11.09158
+        },
+        "450": {
+          "x": 0,
+          "y": -122.04811
+        },
+        "center": {
+          "x": 0,
+          "y": 0
+        },
+        "text": {
+          "x": -10,
+          "y": 2.5
+        },
+        "base": {
+          "x": 0,
+          "y": 2.5
+        },
+        "mid": {
+          "x": 0,
+          "y": 0.34723
+        },
+        "east": {
+          "x": 12.20004,
+          "y": 0
+        },
+        "north east": {
+          "x": 6.10002,
+          "y": -61.01404
+        },
+        "north": {
+          "x": 0,
+          "y": -122.02808
+        },
+        "north west": {
+          "x": -6.10002,
+          "y": -61.01404
+        },
+        "west": {
+          "x": -12.20004,
+          "y": 0
+        },
+        "south west": {
+          "x": -6.10002,
+          "y": 61.01404
+        },
+        "south": {
+          "x": 0,
+          "y": 122.02808
+        },
+        "south east": {
+          "x": 6.10002,
+          "y": 61.01404
+        },
+        "90.8": {
+          "x": 0,
+          "y": -122.04811
+        },
+        "+45.7": {
+          "x": 11.09158,
+          "y": -11.09158
+        },
+        "-90.8": {
+          "x": 0,
+          "y": 122.04811
+        },
+        "-0.5": {
+          "x": 12.19992,
+          "y": 0
+        }
+      },
+      "fontContext": {
+        "em": 10.00002,
+        "ex": 4.30554
+      }
+    },
+    {
+      "id": "aspect-0.2",
+      "shape": "diamond",
+      "body": {
+        "width": 20,
+        "height": 8,
+        "depth": 3
+      },
+      "innerXSep": 1.5,
+      "innerYSep": 1.5,
+      "outerXSep": 0,
+      "outerYSep": 0,
+      "minimumWidth": 1,
+      "minimumHeight": 1,
+      "lineWidth": 0.4,
+      "parameters": {
+        "aspect": 0.2
+      },
+      "anchor": "north",
+      "anchors": [
+        "center",
+        "text",
+        "base",
+        "mid",
+        "east",
+        "north east",
+        "north",
+        "north west",
+        "west",
+        "south west",
+        "south",
+        "south east",
+        "0",
+        "37",
+        "45",
+        "90",
+        "135",
+        "180",
+        "225",
+        "270",
+        "315",
+        "450",
+        "90.8",
+        "+45.7",
+        "-90.8",
+        "-0.5"
+      ],
+      "expectedStages": {
+        "aspectSp": 13107,
+        "aspectEighthSp": 1638,
+        "inverseSp": 327760,
+        "initialXSp": 753664,
+        "initialYSp": 458752,
+        "aspectYSp": 91749,
+        "inverseXSp": 3769240,
+        "fittedXSp": 845413,
+        "fittedYSp": 4227992,
+        "minimumWidthHalfSp": 32768,
+        "minimumHeightHalfSp": 32768,
+        "limitedXSp": 845413,
+        "limitedYSp": 4227992,
+        "outerXSp": 0,
+        "outerYSp": 0,
+        "anchorXSp": 845413,
+        "anchorYSp": 4227992,
+        "paintedXSp": 845413,
+        "paintedYSp": 4227992
+      },
+      "paints": [
+        {
+          "action": "stroke",
+          "tokens": [
+            {
+              "kind": "movetotoken",
+              "x": 12.89998,
+              "y": 0
+            },
+            {
+              "kind": "linetotoken",
+              "x": 0,
+              "y": -64.51404
+            },
+            {
+              "kind": "linetotoken",
+              "x": -12.89998,
+              "y": 0
+            },
+            {
+              "kind": "linetotoken",
+              "x": 0,
+              "y": 64.51404
+            },
+            {
+              "kind": "closepathtoken",
+              "x": 12.89998,
+              "y": 0
+            }
+          ]
+        }
+      ],
+      "expectedAnchors": {
+        "0": {
+          "x": 12.89978,
+          "y": 0
+        },
+        "37": {
+          "x": 11.21136,
+          "y": -8.44835
+        },
+        "45": {
+          "x": 10.75108,
+          "y": -10.75108
+        },
+        "90": {
+          "x": 0,
+          "y": -64.51526
+        },
+        "135": {
+          "x": -10.75108,
+          "y": -10.75108
+        },
+        "180": {
+          "x": -12.89978,
+          "y": 0
+        },
+        "225": {
+          "x": -10.75108,
+          "y": 10.75108
+        },
+        "270": {
+          "x": 0,
+          "y": 64.51526
+        },
+        "315": {
+          "x": 10.75108,
+          "y": 10.75108
+        },
+        "450": {
+          "x": 0,
+          "y": -64.51526
+        },
+        "center": {
+          "x": 0,
+          "y": 0
+        },
+        "text": {
+          "x": -10,
+          "y": 2.5
+        },
+        "base": {
+          "x": 0,
+          "y": 2.5
+        },
+        "mid": {
+          "x": 0,
+          "y": 0.34723
+        },
+        "east": {
+          "x": 12.89998,
+          "y": 0
+        },
+        "north east": {
+          "x": 6.44998,
+          "y": -32.25702
+        },
+        "north": {
+          "x": 0,
+          "y": -64.51404
+        },
+        "north west": {
+          "x": -6.44998,
+          "y": -32.25702
+        },
+        "west": {
+          "x": -12.89998,
+          "y": 0
+        },
+        "south west": {
+          "x": -6.44998,
+          "y": 32.25702
+        },
+        "south": {
+          "x": 0,
+          "y": 64.51404
+        },
+        "south east": {
+          "x": 6.44998,
+          "y": 32.25702
+        },
+        "90.8": {
+          "x": 0,
+          "y": -64.51526
+        },
+        "+45.7": {
+          "x": 10.75108,
+          "y": -10.75108
+        },
+        "-90.8": {
+          "x": 0,
+          "y": 64.51526
+        },
+        "-0.5": {
+          "x": 12.89978,
+          "y": 0
+        }
+      },
+      "fontContext": {
+        "em": 10.00002,
+        "ex": 4.30554
+      }
+    },
+    {
+      "id": "aspect-0.6",
+      "shape": "diamond",
+      "body": {
+        "width": 20,
+        "height": 8,
+        "depth": 3
+      },
+      "innerXSep": 1.5,
+      "innerYSep": 1.5,
+      "outerXSep": 0,
+      "outerYSep": 0,
+      "minimumWidth": 1,
+      "minimumHeight": 1,
+      "lineWidth": 0.4,
+      "parameters": {
+        "aspect": 0.6
+      },
+      "anchor": "north",
+      "anchors": [
+        "center",
+        "text",
+        "base",
+        "mid",
+        "east",
+        "north east",
+        "north",
+        "north west",
+        "west",
+        "south west",
+        "south",
+        "south east",
+        "0",
+        "37",
+        "45",
+        "90",
+        "135",
+        "180",
+        "225",
+        "270",
+        "315",
+        "450",
+        "90.8",
+        "+45.7",
+        "-90.8",
+        "-0.5"
+      ],
+      "expectedStages": {
+        "aspectSp": 39322,
+        "aspectEighthSp": 4915,
+        "inverseSp": 109231,
+        "initialXSp": 753664,
+        "initialYSp": 458752,
+        "aspectYSp": 275254,
+        "inverseXSp": 1256156,
+        "fittedXSp": 1028918,
+        "fittedYSp": 1714908,
+        "minimumWidthHalfSp": 32768,
+        "minimumHeightHalfSp": 32768,
+        "limitedXSp": 1028918,
+        "limitedYSp": 1714908,
+        "outerXSp": 0,
+        "outerYSp": 0,
+        "anchorXSp": 1028918,
+        "anchorYSp": 1714908,
+        "paintedXSp": 1028918,
+        "paintedYSp": 1714908
+      },
+      "paints": [
+        {
+          "action": "stroke",
+          "tokens": [
+            {
+              "kind": "movetotoken",
+              "x": 15.70004,
+              "y": 0
+            },
+            {
+              "kind": "linetotoken",
+              "x": 0,
+              "y": -26.16742
+            },
+            {
+              "kind": "linetotoken",
+              "x": -15.70004,
+              "y": 0
+            },
+            {
+              "kind": "linetotoken",
+              "x": 0,
+              "y": 26.16742
+            },
+            {
+              "kind": "closepathtoken",
+              "x": 15.70004,
+              "y": 0
+            }
+          ]
+        }
+      ],
+      "expectedAnchors": {
+        "0": {
+          "x": 15.70093,
+          "y": 0
+        },
+        "37": {
+          "x": 10.81206,
+          "y": -8.14738
+        },
+        "45": {
+          "x": 9.81303,
+          "y": -9.81303
+        },
+        "90": {
+          "x": 0,
+          "y": -26.16913
+        },
+        "135": {
+          "x": -9.81303,
+          "y": -9.81303
+        },
+        "180": {
+          "x": -15.70093,
+          "y": 0
+        },
+        "225": {
+          "x": -9.81303,
+          "y": 9.81303
+        },
+        "270": {
+          "x": 0,
+          "y": 26.16913
+        },
+        "315": {
+          "x": 9.81303,
+          "y": 9.81303
+        },
+        "450": {
+          "x": 0,
+          "y": -26.16913
+        },
+        "center": {
+          "x": 0,
+          "y": 0
+        },
+        "text": {
+          "x": -10,
+          "y": 2.5
+        },
+        "base": {
+          "x": 0,
+          "y": 2.5
+        },
+        "mid": {
+          "x": 0,
+          "y": 0.34723
+        },
+        "east": {
+          "x": 15.70004,
+          "y": 0
+        },
+        "north east": {
+          "x": 7.85002,
+          "y": -13.08371
+        },
+        "north": {
+          "x": 0,
+          "y": -26.16742
+        },
+        "north west": {
+          "x": -7.85002,
+          "y": -13.08371
+        },
+        "west": {
+          "x": -15.70004,
+          "y": 0
+        },
+        "south west": {
+          "x": -7.85002,
+          "y": 13.08371
+        },
+        "south": {
+          "x": 0,
+          "y": 26.16742
+        },
+        "south east": {
+          "x": 7.85002,
+          "y": 13.08371
+        },
+        "90.8": {
+          "x": 0,
+          "y": -26.16913
+        },
+        "+45.7": {
+          "x": 9.81303,
+          "y": -9.81303
+        },
+        "-90.8": {
+          "x": 0,
+          "y": 26.16913
+        },
+        "-0.5": {
+          "x": 15.70093,
+          "y": 0
+        }
+      },
+      "fontContext": {
+        "em": 10.00002,
+        "ex": 4.30554
+      }
+    },
+    {
+      "id": "aspect-1.1",
+      "shape": "diamond",
+      "body": {
+        "width": 20,
+        "height": 8,
+        "depth": 3
+      },
+      "innerXSep": 1.5,
+      "innerYSep": 1.5,
+      "outerXSep": 0,
+      "outerYSep": 0,
+      "minimumWidth": 1,
+      "minimumHeight": 1,
+      "lineWidth": 0.4,
+      "parameters": {
+        "aspect": 1.1
+      },
+      "anchor": "north",
+      "anchors": [
+        "center",
+        "text",
+        "base",
+        "mid",
+        "east",
+        "north east",
+        "north",
+        "north west",
+        "west",
+        "south west",
+        "south",
+        "south east",
+        "0",
+        "37",
+        "45",
+        "90",
+        "135",
+        "180",
+        "225",
+        "270",
+        "315",
+        "450",
+        "90.8",
+        "+45.7",
+        "-90.8",
+        "-0.5"
+      ],
+      "expectedStages": {
+        "aspectSp": 72090,
+        "aspectEighthSp": 9011,
+        "inverseSp": 59579,
+        "initialXSp": 753664,
+        "initialYSp": 458752,
+        "aspectYSp": 504630,
+        "inverseXSp": 685158,
+        "fittedXSp": 1258294,
+        "fittedYSp": 1143910,
+        "minimumWidthHalfSp": 32768,
+        "minimumHeightHalfSp": 32768,
+        "limitedXSp": 1258294,
+        "limitedYSp": 1143910,
+        "outerXSp": 0,
+        "outerYSp": 0,
+        "anchorXSp": 1258294,
+        "anchorYSp": 1143910,
+        "paintedXSp": 1258294,
+        "paintedYSp": 1143910
+      },
+      "paints": [
+        {
+          "action": "stroke",
+          "tokens": [
+            {
+              "kind": "movetotoken",
+              "x": 19.20004,
+              "y": 0
+            },
+            {
+              "kind": "linetotoken",
+              "x": 0,
+              "y": -17.45468
+            },
+            {
+              "kind": "linetotoken",
+              "x": -19.20004,
+              "y": 0
+            },
+            {
+              "kind": "linetotoken",
+              "x": 0,
+              "y": 17.45468
+            },
+            {
+              "kind": "closepathtoken",
+              "x": 19.20004,
+              "y": 0
+            }
+          ]
+        }
+      ],
+      "expectedAnchors": {
+        "0": {
+          "x": 19.19916,
+          "y": 0
+        },
+        "37": {
+          "x": 10.49901,
+          "y": -7.91165
+        },
+        "45": {
+          "x": 9.1436,
+          "y": -9.1436
+        },
+        "90": {
+          "x": 0,
+          "y": -17.45654
+        },
+        "135": {
+          "x": -9.1436,
+          "y": -9.1436
+        },
+        "180": {
+          "x": -19.19916,
+          "y": 0
+        },
+        "225": {
+          "x": -9.1436,
+          "y": 9.1436
+        },
+        "270": {
+          "x": 0,
+          "y": 17.45654
+        },
+        "315": {
+          "x": 9.1436,
+          "y": 9.1436
+        },
+        "450": {
+          "x": 0,
+          "y": -17.45654
+        },
+        "center": {
+          "x": 0,
+          "y": 0
+        },
+        "text": {
+          "x": -10,
+          "y": 2.5
+        },
+        "base": {
+          "x": 0,
+          "y": 2.5
+        },
+        "mid": {
+          "x": 0,
+          "y": 0.34723
+        },
+        "east": {
+          "x": 19.20004,
+          "y": 0
+        },
+        "north east": {
+          "x": 9.60002,
+          "y": -8.72734
+        },
+        "north": {
+          "x": 0,
+          "y": -17.45468
+        },
+        "north west": {
+          "x": -9.60002,
+          "y": -8.72734
+        },
+        "west": {
+          "x": -19.20004,
+          "y": 0
+        },
+        "south west": {
+          "x": -9.60002,
+          "y": 8.72734
+        },
+        "south": {
+          "x": 0,
+          "y": 17.45468
+        },
+        "south east": {
+          "x": 9.60002,
+          "y": 8.72734
+        },
+        "90.8": {
+          "x": 0,
+          "y": -17.45654
+        },
+        "+45.7": {
+          "x": 9.1436,
+          "y": -9.1436
+        },
+        "-90.8": {
+          "x": 0,
+          "y": 17.45654
+        },
+        "-0.5": {
+          "x": 19.19916,
+          "y": 0
+        }
+      },
+      "fontContext": {
+        "em": 10.00002,
+        "ex": 4.30554
+      }
+    },
+    {
+      "id": "aspect-100",
+      "shape": "diamond",
+      "body": {
+        "width": 20,
+        "height": 8,
+        "depth": 3
+      },
+      "innerXSep": 1.5,
+      "innerYSep": 1.5,
+      "outerXSep": 0,
+      "outerYSep": 0,
+      "minimumWidth": 1,
+      "minimumHeight": 1,
+      "lineWidth": 0.4,
+      "parameters": {
+        "aspect": 100
+      },
+      "anchor": "north",
+      "anchors": [
+        "center",
+        "text",
+        "base",
+        "mid",
+        "east",
+        "north east",
+        "north",
+        "north west",
+        "west",
+        "south west",
+        "south",
+        "south east",
+        "0",
+        "37",
+        "45",
+        "90",
+        "135",
+        "180",
+        "225",
+        "270",
+        "315",
+        "450",
+        "90.8",
+        "+45.7",
+        "-90.8",
+        "-0.5"
+      ],
+      "expectedStages": {
+        "aspectSp": 6553600,
+        "aspectEighthSp": 819200,
+        "inverseSp": 655,
+        "initialXSp": 753664,
+        "initialYSp": 458752,
+        "aspectYSp": 45875200,
+        "inverseXSp": 7532,
+        "fittedXSp": 46628864,
+        "fittedYSp": 466284,
+        "minimumWidthHalfSp": 32768,
+        "minimumHeightHalfSp": 32768,
+        "limitedXSp": 46628864,
+        "limitedYSp": 466284,
+        "outerXSp": 0,
+        "outerYSp": 0,
+        "anchorXSp": 46628864,
+        "anchorYSp": 466284,
+        "paintedXSp": 46628864,
+        "paintedYSp": 466284
+      },
+      "paints": [
+        {
+          "action": "stroke",
+          "tokens": [
+            {
+              "kind": "movetotoken",
+              "x": 711.5,
+              "y": 0
+            },
+            {
+              "kind": "linetotoken",
+              "x": 0,
+              "y": -7.11493
+            },
+            {
+              "kind": "linetotoken",
+              "x": -711.5,
+              "y": 0
+            },
+            {
+              "kind": "linetotoken",
+              "x": 0,
+              "y": 7.11493
+            },
+            {
+              "kind": "closepathtoken",
+              "x": 711.5,
+              "y": 0
+            }
+          ]
+        }
+      ],
+      "expectedAnchors": {
+        "0": {
+          "x": 711.71153,
+          "y": 0
+        },
+        "37": {
+          "x": 9.31326,
+          "y": -7.01799
+        },
+        "45": {
+          "x": 7.04024,
+          "y": -7.04024
+        },
+        "90": {
+          "x": 0,
+          "y": -7.11002
+        },
+        "135": {
+          "x": -7.04024,
+          "y": -7.04024
+        },
+        "180": {
+          "x": -711.71153,
+          "y": 0
+        },
+        "225": {
+          "x": -7.04024,
+          "y": 7.04024
+        },
+        "270": {
+          "x": 0,
+          "y": 7.11002
+        },
+        "315": {
+          "x": 7.04024,
+          "y": 7.04024
+        },
+        "450": {
+          "x": 0,
+          "y": -7.11002
+        },
+        "center": {
+          "x": 0,
+          "y": 0
+        },
+        "text": {
+          "x": -10,
+          "y": 2.5
+        },
+        "base": {
+          "x": 0,
+          "y": 2.5
+        },
+        "mid": {
+          "x": 0,
+          "y": 0.34723
+        },
+        "east": {
+          "x": 711.5,
+          "y": 0
+        },
+        "north east": {
+          "x": 355.75,
+          "y": -3.55746
+        },
+        "north": {
+          "x": 0,
+          "y": -7.11493
+        },
+        "north west": {
+          "x": -355.75,
+          "y": -3.55746
+        },
+        "west": {
+          "x": -711.5,
+          "y": 0
+        },
+        "south west": {
+          "x": -355.75,
+          "y": 3.55746
+        },
+        "south": {
+          "x": 0,
+          "y": 7.11493
+        },
+        "south east": {
+          "x": 355.75,
+          "y": 3.55746
+        },
+        "90.8": {
+          "x": 0,
+          "y": -7.11002
+        },
+        "+45.7": {
+          "x": 7.04024,
+          "y": -7.04024
+        },
+        "-90.8": {
+          "x": 0,
+          "y": 7.11002
+        },
+        "-0.5": {
+          "x": 711.71153,
+          "y": 0
+        }
+      },
+      "fontContext": {
+        "em": 10.00002,
+        "ex": 4.30554
+      }
+    },
+    {
+      "id": "independent-width-minimum",
+      "shape": "diamond",
+      "body": {
+        "width": 20,
+        "height": 8,
+        "depth": 3
+      },
+      "innerXSep": 1.5,
+      "innerYSep": 1.5,
+      "outerXSep": 0,
+      "outerYSep": 0,
+      "minimumWidth": 90,
+      "minimumHeight": 1,
+      "lineWidth": 0.4,
+      "parameters": {
+        "aspect": 0.03
+      },
+      "anchor": "north",
+      "anchors": [
+        "center",
+        "text",
+        "base",
+        "mid",
+        "east",
+        "north east",
+        "north",
+        "north west",
+        "west",
+        "south west",
+        "south",
+        "south east",
+        "0",
+        "37",
+        "45",
+        "90",
+        "135",
+        "180",
+        "225",
+        "270",
+        "315",
+        "450",
+        "90.8",
+        "+45.7",
+        "-90.8",
+        "-0.5"
+      ],
+      "expectedStages": {
+        "aspectSp": 1966,
+        "aspectEighthSp": 245,
+        "inverseSp": 2191309,
+        "initialXSp": 753664,
+        "initialYSp": 458752,
+        "aspectYSp": 13762,
+        "inverseXSp": 25200053,
+        "fittedXSp": 767426,
+        "fittedYSp": 25658805,
+        "minimumWidthHalfSp": 2949120,
+        "minimumHeightHalfSp": 32768,
+        "limitedXSp": 2949120,
+        "limitedYSp": 25658805,
+        "outerXSp": 0,
+        "outerYSp": 0,
+        "anchorXSp": 2949120,
+        "anchorYSp": 25658805,
+        "paintedXSp": 2949120,
+        "paintedYSp": 25658805
+      },
+      "paints": [
+        {
+          "action": "stroke",
+          "tokens": [
+            {
+              "kind": "movetotoken",
+              "x": 45,
+              "y": 0
+            },
+            {
+              "kind": "linetotoken",
+              "x": 0,
+              "y": -391.5223
+            },
+            {
+              "kind": "linetotoken",
+              "x": -45,
+              "y": 0
+            },
+            {
+              "kind": "linetotoken",
+              "x": 0,
+              "y": 391.5223
+            },
+            {
+              "kind": "closepathtoken",
+              "x": 45,
+              "y": 0
+            }
+          ]
+        }
+      ],
+      "expectedAnchors": {
+        "0": {
+          "x": 45.00024,
+          "y": 0
+        },
+        "37": {
+          "x": 41.41412,
+          "y": -31.20766
+        },
+        "45": {
+          "x": 40.36284,
+          "y": -40.36284
+        },
+        "90": {
+          "x": 0,
+          "y": -391.52592
+        },
+        "135": {
+          "x": -40.36284,
+          "y": -40.36284
+        },
+        "180": {
+          "x": -45.00024,
+          "y": 0
+        },
+        "225": {
+          "x": -40.36284,
+          "y": 40.36284
+        },
+        "270": {
+          "x": 0,
+          "y": 391.52592
+        },
+        "315": {
+          "x": 40.36284,
+          "y": 40.36284
+        },
+        "450": {
+          "x": 0,
+          "y": -391.52592
+        },
+        "center": {
+          "x": 0,
+          "y": 0
+        },
+        "text": {
+          "x": -10,
+          "y": 2.5
+        },
+        "base": {
+          "x": 0,
+          "y": 2.5
+        },
+        "mid": {
+          "x": 0,
+          "y": 0.34723
+        },
+        "east": {
+          "x": 45,
+          "y": 0
+        },
+        "north east": {
+          "x": 22.5,
+          "y": -195.76114
+        },
+        "north": {
+          "x": 0,
+          "y": -391.5223
+        },
+        "north west": {
+          "x": -22.5,
+          "y": -195.76114
+        },
+        "west": {
+          "x": -45,
+          "y": 0
+        },
+        "south west": {
+          "x": -22.5,
+          "y": 195.76114
+        },
+        "south": {
+          "x": 0,
+          "y": 391.5223
+        },
+        "south east": {
+          "x": 22.5,
+          "y": 195.76114
+        },
+        "90.8": {
+          "x": 0,
+          "y": -391.52592
+        },
+        "+45.7": {
+          "x": 40.36284,
+          "y": -40.36284
+        },
+        "-90.8": {
+          "x": 0,
+          "y": 391.52592
+        },
+        "-0.5": {
+          "x": 45.00024,
+          "y": 0
+        }
+      },
+      "fontContext": {
+        "em": 10.00002,
+        "ex": 4.30554
+      }
+    },
+    {
+      "id": "independent-height-minimum",
+      "shape": "diamond",
+      "body": {
+        "width": 20,
+        "height": 8,
+        "depth": 3
+      },
+      "innerXSep": 1.5,
+      "innerYSep": 1.5,
+      "outerXSep": 0,
+      "outerYSep": 0,
+      "minimumWidth": 1,
+      "minimumHeight": 90,
+      "lineWidth": 0.4,
+      "parameters": {
+        "aspect": 0.6
+      },
+      "anchor": "north",
+      "anchors": [
+        "center",
+        "text",
+        "base",
+        "mid",
+        "east",
+        "north east",
+        "north",
+        "north west",
+        "west",
+        "south west",
+        "south",
+        "south east",
+        "0",
+        "37",
+        "45",
+        "90",
+        "135",
+        "180",
+        "225",
+        "270",
+        "315",
+        "450",
+        "90.8",
+        "+45.7",
+        "-90.8",
+        "-0.5"
+      ],
+      "expectedStages": {
+        "aspectSp": 39322,
+        "aspectEighthSp": 4915,
+        "inverseSp": 109231,
+        "initialXSp": 753664,
+        "initialYSp": 458752,
+        "aspectYSp": 275254,
+        "inverseXSp": 1256156,
+        "fittedXSp": 1028918,
+        "fittedYSp": 1714908,
+        "minimumWidthHalfSp": 32768,
+        "minimumHeightHalfSp": 2949120,
+        "limitedXSp": 1028918,
+        "limitedYSp": 2949120,
+        "outerXSp": 0,
+        "outerYSp": 0,
+        "anchorXSp": 1028918,
+        "anchorYSp": 2949120,
+        "paintedXSp": 1028918,
+        "paintedYSp": 2949120
+      },
+      "paints": [
+        {
+          "action": "stroke",
+          "tokens": [
+            {
+              "kind": "movetotoken",
+              "x": 15.70004,
+              "y": 0
+            },
+            {
+              "kind": "linetotoken",
+              "x": 0,
+              "y": -45
+            },
+            {
+              "kind": "linetotoken",
+              "x": -15.70004,
+              "y": 0
+            },
+            {
+              "kind": "linetotoken",
+              "x": 0,
+              "y": 45
+            },
+            {
+              "kind": "closepathtoken",
+              "x": 15.70004,
+              "y": 0
+            }
+          ]
+        }
+      ],
+      "expectedAnchors": {
+        "0": {
+          "x": 15.7005,
+          "y": 0
+        },
+        "37": {
+          "x": 12.4319,
+          "y": -9.36812
+        },
+        "45": {
+          "x": 11.63991,
+          "y": -11.63991
+        },
+        "90": {
+          "x": 0,
+          "y": -45.00278
+        },
+        "135": {
+          "x": -11.63991,
+          "y": -11.63991
+        },
+        "180": {
+          "x": -15.7005,
+          "y": 0
+        },
+        "225": {
+          "x": -11.63991,
+          "y": 11.63991
+        },
+        "270": {
+          "x": 0,
+          "y": 45.00278
+        },
+        "315": {
+          "x": 11.63991,
+          "y": 11.63991
+        },
+        "450": {
+          "x": 0,
+          "y": -45.00278
+        },
+        "center": {
+          "x": 0,
+          "y": 0
+        },
+        "text": {
+          "x": -10,
+          "y": 2.5
+        },
+        "base": {
+          "x": 0,
+          "y": 2.5
+        },
+        "mid": {
+          "x": 0,
+          "y": 0.34723
+        },
+        "east": {
+          "x": 15.70004,
+          "y": 0
+        },
+        "north east": {
+          "x": 7.85002,
+          "y": -22.5
+        },
+        "north": {
+          "x": 0,
+          "y": -45
+        },
+        "north west": {
+          "x": -7.85002,
+          "y": -22.5
+        },
+        "west": {
+          "x": -15.70004,
+          "y": 0
+        },
+        "south west": {
+          "x": -7.85002,
+          "y": 22.5
+        },
+        "south": {
+          "x": 0,
+          "y": 45
+        },
+        "south east": {
+          "x": 7.85002,
+          "y": 22.5
+        },
+        "90.8": {
+          "x": 0,
+          "y": -45.00278
+        },
+        "+45.7": {
+          "x": 11.63991,
+          "y": -11.63991
+        },
+        "-90.8": {
+          "x": 0,
+          "y": 45.00278
+        },
+        "-0.5": {
+          "x": 15.7005,
+          "y": 0
+        }
+      },
+      "fontContext": {
+        "em": 10.00002,
+        "ex": 4.30554
+      }
+    },
+    {
+      "id": "asymmetric-signed-separation",
+      "shape": "diamond",
+      "body": {
+        "width": 20,
+        "height": 8,
+        "depth": 3
+      },
+      "innerXSep": -8.125,
+      "innerYSep": 4.25,
+      "outerXSep": -1.75,
+      "outerYSep": 2.125,
+      "minimumWidth": 1,
+      "minimumHeight": 1,
+      "lineWidth": 0.4,
+      "parameters": {
+        "aspect": 0.03
+      },
+      "anchor": "north",
+      "anchors": [
+        "center",
+        "text",
+        "base",
+        "mid",
+        "east",
+        "north east",
+        "north",
+        "north west",
+        "west",
+        "south west",
+        "south",
+        "south east",
+        "0",
+        "37",
+        "45",
+        "90",
+        "135",
+        "180",
+        "225",
+        "270",
+        "315",
+        "450",
+        "90.8",
+        "+45.7",
+        "-90.8",
+        "-0.5"
+      ],
+      "expectedStages": {
+        "aspectSp": 1966,
+        "aspectEighthSp": 245,
+        "inverseSp": 2191309,
+        "initialXSp": 122880,
+        "initialYSp": 638976,
+        "aspectYSp": 19168,
+        "inverseXSp": 4108704,
+        "fittedXSp": 142048,
+        "fittedYSp": 4747680,
+        "minimumWidthHalfSp": 32768,
+        "minimumHeightHalfSp": 32768,
+        "limitedXSp": 142048,
+        "limitedYSp": 4747680,
+        "outerXSp": -114688,
+        "outerYSp": 139264,
+        "anchorXSp": 27360,
+        "anchorYSp": 4886944,
+        "paintedXSp": 189553,
+        "paintedYSp": 4689995
+      },
+      "paints": [
+        {
+          "action": "stroke",
+          "tokens": [
+            {
+              "kind": "movetotoken",
+              "x": 2.89235,
+              "y": 0
+            },
+            {
+              "kind": "linetotoken",
+              "x": 0,
+              "y": -71.56364
+            },
+            {
+              "kind": "linetotoken",
+              "x": -2.89235,
+              "y": 0
+            },
+            {
+              "kind": "linetotoken",
+              "x": 0,
+              "y": 71.56364
+            },
+            {
+              "kind": "closepathtoken",
+              "x": 2.89235,
+              "y": 0
+            }
+          ]
+        }
+      ],
+      "expectedAnchors": {
+        "0": {
+          "x": 0.41753,
+          "y": 0
+        },
+        "37": {
+          "x": 0.4157,
+          "y": -0.31325
+        },
+        "45": {
+          "x": 0.41515,
+          "y": -0.41515
+        },
+        "90": {
+          "x": 0,
+          "y": -74.7193
+        },
+        "135": {
+          "x": -0.41515,
+          "y": -0.41515
+        },
+        "180": {
+          "x": -0.41753,
+          "y": 0
+        },
+        "225": {
+          "x": -0.41515,
+          "y": 0.41515
+        },
+        "270": {
+          "x": 0,
+          "y": 74.7193
+        },
+        "315": {
+          "x": 0.41515,
+          "y": 0.41515
+        },
+        "450": {
+          "x": 0,
+          "y": -74.7193
+        },
+        "center": {
+          "x": 0,
+          "y": 0
+        },
+        "text": {
+          "x": -10,
+          "y": 2.5
+        },
+        "base": {
+          "x": 0,
+          "y": 2.5
+        },
+        "mid": {
+          "x": 0,
+          "y": 0.34723
+        },
+        "east": {
+          "x": 0.41748,
+          "y": 0
+        },
+        "north east": {
+          "x": 0.20874,
+          "y": -37.28442
+        },
+        "north": {
+          "x": 0,
+          "y": -74.56885
+        },
+        "north west": {
+          "x": -0.20874,
+          "y": -37.28442
+        },
+        "west": {
+          "x": -0.41748,
+          "y": 0
+        },
+        "south west": {
+          "x": -0.20874,
+          "y": 37.28442
+        },
+        "south": {
+          "x": 0,
+          "y": 74.56885
+        },
+        "south east": {
+          "x": 0.20874,
+          "y": 37.28442
+        },
+        "90.8": {
+          "x": 0,
+          "y": -74.7193
+        },
+        "+45.7": {
+          "x": 0.41515,
+          "y": -0.41515
+        },
+        "-90.8": {
+          "x": 0,
+          "y": 74.7193
+        },
+        "-0.5": {
+          "x": 0.41753,
+          "y": 0
+        }
+      },
+      "fontContext": {
+        "em": 10.00002,
+        "ex": 4.30554
+      }
+    },
+    {
+      "id": "signed-fitted-axes",
+      "shape": "diamond",
+      "body": {
+        "width": 20,
+        "height": 8,
+        "depth": 3
+      },
+      "innerXSep": -30,
+      "innerYSep": -10,
+      "outerXSep": 2.25,
+      "outerYSep": -1.25,
+      "minimumWidth": -100,
+      "minimumHeight": -100,
+      "lineWidth": 0.4,
+      "parameters": {
+        "aspect": 0.1
+      },
+      "anchor": "north",
+      "anchors": [
+        "center",
+        "text",
+        "base",
+        "mid",
+        "east",
+        "north east",
+        "north",
+        "north west",
+        "west",
+        "south west",
+        "south",
+        "south east",
+        "0",
+        "37",
+        "45",
+        "90",
+        "135",
+        "180",
+        "225",
+        "270",
+        "315",
+        "450",
+        "90.8",
+        "+45.7",
+        "-90.8",
+        "-0.5"
+      ],
+      "expectedStages": {
+        "aspectSp": 6554,
+        "aspectEighthSp": 819,
+        "inverseSp": 655520,
+        "initialXSp": -1310720,
+        "initialYSp": -294912,
+        "aspectYSp": -29493,
+        "inverseXSp": -13110400,
+        "fittedXSp": -1340213,
+        "fittedYSp": -13405312,
+        "minimumWidthHalfSp": -3276800,
+        "minimumHeightHalfSp": -3276800,
+        "limitedXSp": -1340213,
+        "limitedYSp": -3276800,
+        "outerXSp": 147456,
+        "outerYSp": -81920,
+        "anchorXSp": -1192757,
+        "anchorYSp": -3358720,
+        "paintedXSp": -1401291,
+        "paintedYSp": -3242868
+      },
+      "paints": [
+        {
+          "action": "stroke",
+          "tokens": [
+            {
+              "kind": "movetotoken",
+              "x": -21.382,
+              "y": 0
+            },
+            {
+              "kind": "linetotoken",
+              "x": 0,
+              "y": 49.48224
+            },
+            {
+              "kind": "linetotoken",
+              "x": 21.382,
+              "y": 0
+            },
+            {
+              "kind": "linetotoken",
+              "x": 0,
+              "y": -49.48224
+            },
+            {
+              "kind": "closepathtoken",
+              "x": -21.382,
+              "y": 0
+            }
+          ]
+        }
+      ],
+      "expectedAnchors": {
+        "0": {
+          "x": -18.20041,
+          "y": 0
+        },
+        "37": {
+          "x": -14.35843,
+          "y": 10.81987
+        },
+        "45": {
+          "x": -13.43083,
+          "y": 13.43083
+        },
+        "90": {
+          "x": 0,
+          "y": 51.25371
+        },
+        "135": {
+          "x": 13.43083,
+          "y": 13.43083
+        },
+        "180": {
+          "x": 18.20041,
+          "y": 0
+        },
+        "225": {
+          "x": 13.43083,
+          "y": -13.43083
+        },
+        "270": {
+          "x": 0,
+          "y": -51.25371
+        },
+        "315": {
+          "x": -13.43083,
+          "y": -13.43083
+        },
+        "450": {
+          "x": 0,
+          "y": 51.25371
+        },
+        "center": {
+          "x": 0,
+          "y": 0
+        },
+        "text": {
+          "x": -10,
+          "y": 2.5
+        },
+        "base": {
+          "x": 0,
+          "y": 2.5
+        },
+        "mid": {
+          "x": 0,
+          "y": 0.34723
+        },
+        "east": {
+          "x": -18.20003,
+          "y": 0
+        },
+        "north east": {
+          "x": -9.1,
+          "y": 25.625
+        },
+        "north": {
+          "x": 0,
+          "y": 51.25
+        },
+        "north west": {
+          "x": 9.1,
+          "y": 25.625
+        },
+        "west": {
+          "x": 18.20003,
+          "y": 0
+        },
+        "south west": {
+          "x": 9.1,
+          "y": -25.625
+        },
+        "south": {
+          "x": 0,
+          "y": -51.25
+        },
+        "south east": {
+          "x": -9.1,
+          "y": -25.625
+        },
+        "90.8": {
+          "x": 0,
+          "y": 51.25371
+        },
+        "+45.7": {
+          "x": -13.43083,
+          "y": 13.43083
+        },
+        "-90.8": {
+          "x": 0,
+          "y": -51.25371
+        },
+        "-0.5": {
+          "x": -18.20041,
+          "y": 0
+        }
+      },
+      "fontContext": {
+        "em": 10.00002,
+        "ex": 4.30554
+      }
+    },
+    {
+      "id": "odd-sp-body-and-products",
+      "shape": "diamond",
+      "body": {
+        "width": 20.000015258789062,
+        "height": 8.000015258789062,
+        "depth": 3.0000152587890625
+      },
+      "innerXSep": -1.1250076293945312,
+      "innerYSep": 0.333333,
+      "outerXSep": 0.37500762939453125,
+      "outerYSep": -0.6250076293945312,
+      "minimumWidth": 1,
+      "minimumHeight": 1,
+      "lineWidth": 0.4,
+      "parameters": {
+        "aspect": 0.03
+      },
+      "anchor": "north",
+      "anchors": [
+        "center",
+        "text",
+        "base",
+        "mid",
+        "east",
+        "north east",
+        "north",
+        "north west",
+        "west",
+        "south west",
+        "south",
+        "south east",
+        "0",
+        "37",
+        "45",
+        "90",
+        "135",
+        "180",
+        "225",
+        "270",
+        "315",
+        "450",
+        "90.8",
+        "+45.7",
+        "-90.8",
+        "-0.5"
+      ],
+      "expectedStages": {
+        "aspectSp": 1966,
+        "aspectEighthSp": 245,
+        "inverseSp": 2191309,
+        "initialXSp": 581632,
+        "initialYSp": 382293,
+        "aspectYSp": 11468,
+        "inverseXSp": 19447867,
+        "fittedXSp": 593100,
+        "fittedYSp": 19830160,
+        "minimumWidthHalfSp": 32768,
+        "minimumHeightHalfSp": 32768,
+        "limitedXSp": 593100,
+        "limitedYSp": 19830160,
+        "outerXSp": 24577,
+        "outerYSp": -40960,
+        "anchorXSp": 617677,
+        "anchorYSp": 19789200,
+        "paintedXSp": 582920,
+        "paintedYSp": 19847126
+      },
+      "paints": [
+        {
+          "action": "stroke",
+          "tokens": [
+            {
+              "kind": "movetotoken",
+              "x": 8.89465,
+              "y": 0
+            },
+            {
+              "kind": "linetotoken",
+              "x": 0,
+              "y": -302.84311
+            },
+            {
+              "kind": "linetotoken",
+              "x": -8.89465,
+              "y": 0
+            },
+            {
+              "kind": "linetotoken",
+              "x": 0,
+              "y": 302.84311
+            },
+            {
+              "kind": "closepathtoken",
+              "x": 8.89465,
+              "y": 0
+            }
+          ]
+        }
+      ],
+      "expectedAnchors": {
+        "0": {
+          "x": 9.42441,
+          "y": 0
+        },
+        "37": {
+          "x": 9.20882,
+          "y": -6.93925
+        },
+        "45": {
+          "x": 9.1404,
+          "y": -9.1404
+        },
+        "90": {
+          "x": 0,
+          "y": -302.00916
+        },
+        "135": {
+          "x": -9.1404,
+          "y": -9.1404
+        },
+        "180": {
+          "x": -9.42441,
+          "y": 0
+        },
+        "225": {
+          "x": -9.1404,
+          "y": 9.1404
+        },
+        "270": {
+          "x": 0,
+          "y": 302.00916
+        },
+        "315": {
+          "x": 9.1404,
+          "y": 9.1404
+        },
+        "450": {
+          "x": 0,
+          "y": -302.00916
+        },
+        "center": {
+          "x": 0,
+          "y": 0
+        },
+        "text": {
+          "x": -10,
+          "y": 2.5
+        },
+        "base": {
+          "x": 0,
+          "y": 2.5
+        },
+        "mid": {
+          "x": 0,
+          "y": 0.34723
+        },
+        "east": {
+          "x": 9.425,
+          "y": 0
+        },
+        "north east": {
+          "x": 4.7125,
+          "y": -150.97961
+        },
+        "north": {
+          "x": 0,
+          "y": -301.95923
+        },
+        "north west": {
+          "x": -4.7125,
+          "y": -150.97961
+        },
+        "west": {
+          "x": -9.425,
+          "y": 0
+        },
+        "south west": {
+          "x": -4.7125,
+          "y": 150.97961
+        },
+        "south": {
+          "x": 0,
+          "y": 301.95923
+        },
+        "south east": {
+          "x": 4.7125,
+          "y": 150.97961
+        },
+        "90.8": {
+          "x": 0,
+          "y": -302.00916
+        },
+        "+45.7": {
+          "x": 9.1404,
+          "y": -9.1404
+        },
+        "-90.8": {
+          "x": 0,
+          "y": 302.00916
+        },
+        "-0.5": {
+          "x": 9.42441,
+          "y": 0
+        }
+      },
+      "fontContext": {
+        "em": 10.00002,
+        "ex": 4.30554
+      }
+    },
+    {
+      "id": "empty-body",
+      "shape": "diamond",
+      "body": {
+        "width": 0,
+        "height": 0,
+        "depth": 0
+      },
+      "innerXSep": 10,
+      "innerYSep": 5.5,
+      "outerXSep": 0,
+      "outerYSep": 0,
+      "minimumWidth": 1,
+      "minimumHeight": 1,
+      "lineWidth": 0.4,
+      "parameters": {
+        "aspect": 0.01
+      },
+      "anchor": "north",
+      "anchors": [
+        "center",
+        "text",
+        "base",
+        "mid",
+        "east",
+        "north east",
+        "north",
+        "north west",
+        "west",
+        "south west",
+        "south",
+        "south east",
+        "0",
+        "37",
+        "45",
+        "90",
+        "135",
+        "180",
+        "225",
+        "270",
+        "315",
+        "450",
+        "90.8",
+        "+45.7",
+        "-90.8",
+        "-0.5"
+      ],
+      "expectedStages": {
+        "aspectSp": 655,
+        "aspectEighthSp": 81,
+        "inverseSp": 6628035,
+        "initialXSp": 655360,
+        "initialYSp": 360448,
+        "aspectYSp": 3602,
+        "inverseXSp": 66280350,
+        "fittedXSp": 658962,
+        "fittedYSp": 66640798,
+        "minimumWidthHalfSp": 32768,
+        "minimumHeightHalfSp": 32768,
+        "limitedXSp": 658962,
+        "limitedYSp": 66640798,
+        "outerXSp": 0,
+        "outerYSp": 0,
+        "anchorXSp": 658962,
+        "anchorYSp": 66640798,
+        "paintedXSp": 658962,
+        "paintedYSp": 66640798
+      },
+      "paints": [
+        {
+          "action": "stroke",
+          "tokens": [
+            {
+              "kind": "movetotoken",
+              "x": 10.05496,
+              "y": 0
+            },
+            {
+              "kind": "linetotoken",
+              "x": 0,
+              "y": -1016.85788
+            },
+            {
+              "kind": "linetotoken",
+              "x": -10.05496,
+              "y": 0
+            },
+            {
+              "kind": "linetotoken",
+              "x": 0,
+              "y": 1016.85788
+            },
+            {
+              "kind": "closepathtoken",
+              "x": 10.05496,
+              "y": 0
+            }
+          ]
+        }
+      ],
+      "expectedAnchors": {
+        "0": {
+          "x": 10.05399,
+          "y": 0
+        },
+        "37": {
+          "x": 9.9807,
+          "y": -7.521
+        },
+        "45": {
+          "x": 9.95667,
+          "y": -9.95667
+        },
+        "90": {
+          "x": 0,
+          "y": -1016.87202
+        },
+        "135": {
+          "x": -9.95667,
+          "y": -9.95667
+        },
+        "180": {
+          "x": -10.05399,
+          "y": 0
+        },
+        "225": {
+          "x": -9.95667,
+          "y": 9.95667
+        },
+        "270": {
+          "x": 0,
+          "y": 1016.87202
+        },
+        "315": {
+          "x": 9.95667,
+          "y": 9.95667
+        },
+        "450": {
+          "x": 0,
+          "y": -1016.87202
+        },
+        "center": {
+          "x": 0,
+          "y": 0
+        },
+        "text": {
+          "x": 0,
+          "y": 0
+        },
+        "base": {
+          "x": 0,
+          "y": 0
+        },
+        "mid": {
+          "x": 0,
+          "y": -2.15277
+        },
+        "east": {
+          "x": 10.05496,
+          "y": 0
+        },
+        "north east": {
+          "x": 5.02748,
+          "y": -508.42894
+        },
+        "north": {
+          "x": 0,
+          "y": -1016.85788
+        },
+        "north west": {
+          "x": -5.02748,
+          "y": -508.42894
+        },
+        "west": {
+          "x": -10.05496,
+          "y": 0
+        },
+        "south west": {
+          "x": -5.02748,
+          "y": 508.42894
+        },
+        "south": {
+          "x": 0,
+          "y": 1016.85788
+        },
+        "south east": {
+          "x": 5.02748,
+          "y": 508.42894
+        },
+        "90.8": {
+          "x": 0,
+          "y": -1016.87202
+        },
+        "+45.7": {
+          "x": 9.95667,
+          "y": -9.95667
+        },
+        "-90.8": {
+          "x": 0,
+          "y": 1016.87202
+        },
+        "-0.5": {
+          "x": 10.05399,
+          "y": 0
+        }
+      },
+      "fontContext": {
+        "em": 10.00002,
+        "ex": 4.30554
+      }
+    },
+    {
+      "id": "native-empty-width-minimum",
+      "shape": "diamond",
+      "body": {
+        "width": 0,
+        "height": 0,
+        "depth": 0
+      },
+      "innerXSep": 1,
+      "innerYSep": 0.55,
+      "outerXSep": 0,
+      "outerYSep": 0,
+      "minimumWidth": 20,
+      "minimumHeight": 1,
+      "lineWidth": 0.4,
+      "parameters": {
+        "aspect": 0.01
+      },
+      "anchor": "north",
+      "anchors": [
+        "center",
+        "text",
+        "base",
+        "mid",
+        "east",
+        "north east",
+        "north",
+        "north west",
+        "west",
+        "south west",
+        "south",
+        "south east",
+        "0",
+        "37",
+        "45",
+        "90",
+        "135",
+        "180",
+        "225",
+        "270",
+        "315",
+        "450",
+        "90.8",
+        "+45.7",
+        "-90.8",
+        "-0.5"
+      ],
+      "expectedStages": {
+        "aspectSp": 655,
+        "aspectEighthSp": 81,
+        "inverseSp": 6628035,
+        "initialXSp": 65536,
+        "initialYSp": 36045,
+        "aspectYSp": 360,
+        "inverseXSp": 6628035,
+        "fittedXSp": 65896,
+        "fittedYSp": 6664080,
+        "minimumWidthHalfSp": 655360,
+        "minimumHeightHalfSp": 32768,
+        "limitedXSp": 655360,
+        "limitedYSp": 6664080,
+        "outerXSp": 0,
+        "outerYSp": 0,
+        "anchorXSp": 655360,
+        "anchorYSp": 6664080,
+        "paintedXSp": 655360,
+        "paintedYSp": 6664080
+      },
+      "paints": [
+        {
+          "action": "stroke",
+          "tokens": [
+            {
+              "kind": "movetotoken",
+              "x": 10,
+              "y": 0
+            },
+            {
+              "kind": "linetotoken",
+              "x": 0,
+              "y": -101.68579
+            },
+            {
+              "kind": "linetotoken",
+              "x": -10,
+              "y": 0
+            },
+            {
+              "kind": "linetotoken",
+              "x": 0,
+              "y": 101.68579
+            },
+            {
+              "kind": "closepathtoken",
+              "x": 10,
+              "y": 0
+            }
+          ]
+        }
+      ],
+      "expectedAnchors": {
+        "0": {
+          "x": 10.00002,
+          "y": 0
+        },
+        "37": {
+          "x": 9.31018,
+          "y": -7.01566
+        },
+        "45": {
+          "x": 9.10484,
+          "y": -9.10484
+        },
+        "90": {
+          "x": 0,
+          "y": -101.6847
+        },
+        "135": {
+          "x": -9.10484,
+          "y": -9.10484
+        },
+        "180": {
+          "x": -10.00002,
+          "y": 0
+        },
+        "225": {
+          "x": -9.10484,
+          "y": 9.10484
+        },
+        "270": {
+          "x": 0,
+          "y": 101.6847
+        },
+        "315": {
+          "x": 9.10484,
+          "y": 9.10484
+        },
+        "450": {
+          "x": 0,
+          "y": -101.6847
+        },
+        "center": {
+          "x": 0,
+          "y": 0
+        },
+        "text": {
+          "x": 0,
+          "y": 0
+        },
+        "base": {
+          "x": 0,
+          "y": 0
+        },
+        "mid": {
+          "x": 0,
+          "y": -2.15277
+        },
+        "east": {
+          "x": 10,
+          "y": 0
+        },
+        "north east": {
+          "x": 5,
+          "y": -50.8429
+        },
+        "north": {
+          "x": 0,
+          "y": -101.68579
+        },
+        "north west": {
+          "x": -5,
+          "y": -50.8429
+        },
+        "west": {
+          "x": -10,
+          "y": 0
+        },
+        "south west": {
+          "x": -5,
+          "y": 50.8429
+        },
+        "south": {
+          "x": 0,
+          "y": 101.68579
+        },
+        "south east": {
+          "x": 5,
+          "y": 50.8429
+        },
+        "90.8": {
+          "x": 0,
+          "y": -101.6847
+        },
+        "+45.7": {
+          "x": 9.10484,
+          "y": -9.10484
+        },
+        "-90.8": {
+          "x": 0,
+          "y": 101.6847
+        },
+        "-0.5": {
+          "x": 10.00002,
+          "y": 0
+        }
+      },
+      "fontContext": {
+        "em": 10.00002,
+        "ex": 4.30554
+      }
+    },
+    {
+      "id": "zero-body-zero-axes",
+      "shape": "diamond",
+      "body": {
+        "width": 0,
+        "height": 0,
+        "depth": 0
+      },
+      "innerXSep": 0,
+      "innerYSep": 0,
+      "outerXSep": 0,
+      "outerYSep": 0,
+      "minimumWidth": 0,
+      "minimumHeight": 0,
+      "lineWidth": 0.4,
+      "parameters": {
+        "aspect": 0.01
+      },
+      "anchor": "north",
+      "anchors": [
+        "center",
+        "text",
+        "base",
+        "mid",
+        "east",
+        "north east",
+        "north",
+        "north west",
+        "west",
+        "south west",
+        "south",
+        "south east"
+      ],
+      "expectedStages": {
+        "aspectSp": 655,
+        "aspectEighthSp": 81,
+        "inverseSp": 6628035,
+        "initialXSp": 0,
+        "initialYSp": 0,
+        "aspectYSp": 0,
+        "inverseXSp": 0,
+        "fittedXSp": 0,
+        "fittedYSp": 0,
+        "minimumWidthHalfSp": 0,
+        "minimumHeightHalfSp": 0,
+        "limitedXSp": 0,
+        "limitedYSp": 0,
+        "outerXSp": 0,
+        "outerYSp": 0,
+        "anchorXSp": 0,
+        "anchorYSp": 0,
+        "paintedXSp": 0,
+        "paintedYSp": 0
+      },
+      "paints": [
+        {
+          "action": "stroke",
+          "tokens": [
+            {
+              "kind": "movetotoken",
+              "x": 0,
+              "y": 0
+            },
+            {
+              "kind": "linetotoken",
+              "x": 0,
+              "y": 0
+            },
+            {
+              "kind": "linetotoken",
+              "x": 0,
+              "y": 0
+            },
+            {
+              "kind": "linetotoken",
+              "x": 0,
+              "y": 0
+            },
+            {
+              "kind": "closepathtoken",
+              "x": 0,
+              "y": 0
+            }
+          ]
+        }
+      ],
+      "expectedAnchors": {
+        "center": {
+          "x": 0,
+          "y": 0
+        },
+        "text": {
+          "x": 0,
+          "y": 0
+        },
+        "base": {
+          "x": 0,
+          "y": 0
+        },
+        "mid": {
+          "x": 0,
+          "y": -2.15277
+        },
+        "east": {
+          "x": 0,
+          "y": 0
+        },
+        "north east": {
+          "x": 0,
+          "y": 0
+        },
+        "north": {
+          "x": 0,
+          "y": 0
+        },
+        "north west": {
+          "x": 0,
+          "y": 0
+        },
+        "west": {
+          "x": 0,
+          "y": 0
+        },
+        "south west": {
+          "x": 0,
+          "y": 0
+        },
+        "south": {
+          "x": 0,
+          "y": 0
+        },
+        "south east": {
+          "x": 0,
+          "y": 0
+        }
+      },
+      "fontContext": {
+        "em": 10.00002,
+        "ex": 4.30554
+      }
+    },
+    {
+      "id": "empty-independent-minima",
+      "shape": "diamond",
+      "body": {
+        "width": 0,
+        "height": 0,
+        "depth": 0
+      },
+      "innerXSep": 0,
+      "innerYSep": 0,
+      "outerXSep": 0,
+      "outerYSep": 0,
+      "minimumWidth": 13,
+      "minimumHeight": 17,
+      "lineWidth": 0.4,
+      "parameters": {
+        "aspect": 100
+      },
+      "anchor": "north",
+      "anchors": [
+        "center",
+        "text",
+        "base",
+        "mid",
+        "east",
+        "north east",
+        "north",
+        "north west",
+        "west",
+        "south west",
+        "south",
+        "south east",
+        "0",
+        "37",
+        "45",
+        "90",
+        "135",
+        "180",
+        "225",
+        "270",
+        "315",
+        "450",
+        "90.8",
+        "+45.7",
+        "-90.8",
+        "-0.5"
+      ],
+      "expectedStages": {
+        "aspectSp": 6553600,
+        "aspectEighthSp": 819200,
+        "inverseSp": 655,
+        "initialXSp": 0,
+        "initialYSp": 0,
+        "aspectYSp": 0,
+        "inverseXSp": 0,
+        "fittedXSp": 0,
+        "fittedYSp": 0,
+        "minimumWidthHalfSp": 425984,
+        "minimumHeightHalfSp": 557056,
+        "limitedXSp": 425984,
+        "limitedYSp": 557056,
+        "outerXSp": 0,
+        "outerYSp": 0,
+        "anchorXSp": 425984,
+        "anchorYSp": 557056,
+        "paintedXSp": 425984,
+        "paintedYSp": 557056
+      },
+      "paints": [
+        {
+          "action": "stroke",
+          "tokens": [
+            {
+              "kind": "movetotoken",
+              "x": 6.5,
+              "y": 0
+            },
+            {
+              "kind": "linetotoken",
+              "x": 0,
+              "y": -8.5
+            },
+            {
+              "kind": "linetotoken",
+              "x": -6.5,
+              "y": 0
+            },
+            {
+              "kind": "linetotoken",
+              "x": 0,
+              "y": 8.5
+            },
+            {
+              "kind": "closepathtoken",
+              "x": 6.5,
+              "y": 0
+            }
+          ]
+        }
+      ],
+      "expectedAnchors": {
+        "0": {
+          "x": 6.5002,
+          "y": 0
+        },
+        "37": {
+          "x": 4.12383,
+          "y": -3.10751
+        },
+        "45": {
+          "x": 3.68349,
+          "y": -3.68349
+        },
+        "90": {
+          "x": 0,
+          "y": -8.50024
+        },
+        "135": {
+          "x": -3.68349,
+          "y": -3.68349
+        },
+        "180": {
+          "x": -6.5002,
+          "y": 0
+        },
+        "225": {
+          "x": -3.68349,
+          "y": 3.68349
+        },
+        "270": {
+          "x": 0,
+          "y": 8.50024
+        },
+        "315": {
+          "x": 3.68349,
+          "y": 3.68349
+        },
+        "450": {
+          "x": 0,
+          "y": -8.50024
+        },
+        "center": {
+          "x": 0,
+          "y": 0
+        },
+        "text": {
+          "x": 0,
+          "y": 0
+        },
+        "base": {
+          "x": 0,
+          "y": 0
+        },
+        "mid": {
+          "x": 0,
+          "y": -2.15277
+        },
+        "east": {
+          "x": 6.5,
+          "y": 0
+        },
+        "north east": {
+          "x": 3.25,
+          "y": -4.25
+        },
+        "north": {
+          "x": 0,
+          "y": -8.5
+        },
+        "north west": {
+          "x": -3.25,
+          "y": -4.25
+        },
+        "west": {
+          "x": -6.5,
+          "y": 0
+        },
+        "south west": {
+          "x": -3.25,
+          "y": 4.25
+        },
+        "south": {
+          "x": 0,
+          "y": 8.5
+        },
+        "south east": {
+          "x": 3.25,
+          "y": 4.25
+        },
+        "90.8": {
+          "x": 0,
+          "y": -8.50024
+        },
+        "+45.7": {
+          "x": 3.68349,
+          "y": -3.68349
+        },
+        "-90.8": {
+          "x": 0,
+          "y": 8.50024
+        },
+        "-0.5": {
+          "x": 6.5002,
+          "y": 0
+        }
+      },
+      "fontContext": {
+        "em": 10.00002,
+        "ex": 4.30554
+      }
+    }
+  ]
+}

@@ -1,0 +1,48 @@
+CASE ellipse-negative-minima
+FONT 10.00002pt,4.30554pt
+PAINT stroke; PATH macro:->\pgfsyssoftpath@movetotoken {-1.0pt}{0.0pt}\pgfsyssoftpath@curvetosupportatoken {-1.0pt}{-1.38072pt}\pgfsyssoftpath@curvetosupportbtoken {-0.55229pt}{-2.5pt}\pgfsyssoftpath@curvetotoken {0.0pt}{-2.5pt}\pgfsyssoftpath@curvetosupportatoken {0.55229pt}{-2.5pt}\pgfsyssoftpath@curvetosupportbtoken {1.0pt}{-1.38072pt}\pgfsyssoftpath@curvetotoken {1.0pt}{0.0pt}\pgfsyssoftpath@curvetosupportatoken {1.0pt}{1.38072pt}\pgfsyssoftpath@curvetosupportbtoken {0.55229pt}{2.5pt}\pgfsyssoftpath@curvetotoken {0.0pt}{2.5pt}\pgfsyssoftpath@curvetosupportatoken {-0.55229pt}{2.5pt}\pgfsyssoftpath@curvetosupportbtoken {-1.0pt}{1.38072pt}\pgfsyssoftpath@curvetotoken {-1.0pt}{0.0pt}\pgfsyssoftpath@closepathtoken {-1.0pt}{0.0pt}\pgfsyssoftpath@movetotoken {0.0pt}{0.0pt}
+ANCHOR text; -10.0pt,-2.5pt
+ANCHOR center; 0.0pt,0.0pt
+ANCHOR east; -1.0pt,0.0pt
+ANCHOR north; 0.0pt,-2.5pt
+ANCHOR 45; -0.92844pt,-0.92842pt
+CASE circle-negative-minima
+FONT 10.00002pt,4.30554pt
+PAINT stroke; PATH macro:->\pgfsyssoftpath@movetotoken {31.60474pt}{0.0pt}\pgfsyssoftpath@curvetosupportatoken {31.60474pt}{17.45503pt}\pgfsyssoftpath@curvetosupportbtoken {17.45503pt}{31.60474pt}\pgfsyssoftpath@curvetotoken {0.0pt}{31.60474pt}\pgfsyssoftpath@curvetosupportatoken {-17.45503pt}{31.60474pt}\pgfsyssoftpath@curvetosupportbtoken {-31.60474pt}{17.45503pt}\pgfsyssoftpath@curvetotoken {-31.60474pt}{0.0pt}\pgfsyssoftpath@curvetosupportatoken {-31.60474pt}{-17.45503pt}\pgfsyssoftpath@curvetosupportbtoken {-17.45503pt}{-31.60474pt}\pgfsyssoftpath@curvetotoken {0.0pt}{-31.60474pt}\pgfsyssoftpath@curvetosupportatoken {17.45503pt}{-31.60474pt}\pgfsyssoftpath@curvetosupportbtoken {31.60474pt}{-17.45503pt}\pgfsyssoftpath@curvetotoken {31.60474pt}{0.0pt}\pgfsyssoftpath@closepathtoken {31.60474pt}{0.0pt}\pgfsyssoftpath@movetotoken {0.0pt}{0.0pt}
+ANCHOR text; -10.0pt,-2.5pt
+ANCHOR center; 0.0pt,0.0pt
+ANCHOR east; 31.60474pt,0.0pt
+ANCHOR north; 0.0pt,31.60474pt
+ANCHOR 45; 22.34795pt,22.34795pt
+CASE rectangle-negative-minima
+FONT 10.00002pt,4.30554pt
+PAINT stroke; PATH macro:->\pgfsyssoftpath@rectcornertoken {1.0pt}{2.5pt}\pgfsyssoftpath@rectsizetoken {-2.0pt}{-5.0pt}
+ANCHOR text; -10.0pt,-2.5pt
+ANCHOR center; 0.0pt,0.0pt
+ANCHOR east; -1.0pt,0.0pt
+ANCHOR north; 0.0pt,-2.5pt
+ANCHOR 45; -2.50023pt,-2.5pt
+CASE ellipse-strong-negative-minima
+FONT 10.00002pt,4.30554pt
+PAINT stroke; PATH macro:->\pgfsyssoftpath@movetotoken {-80.0pt}{0.0pt}\pgfsyssoftpath@curvetosupportatoken {-80.0pt}{-44.18335pt}\pgfsyssoftpath@curvetosupportbtoken {-44.18335pt}{-80.0pt}\pgfsyssoftpath@curvetotoken {0.0pt}{-80.0pt}\pgfsyssoftpath@curvetosupportatoken {44.18335pt}{-80.0pt}\pgfsyssoftpath@curvetosupportbtoken {80.0pt}{-44.18335pt}\pgfsyssoftpath@curvetotoken {80.0pt}{0.0pt}\pgfsyssoftpath@curvetosupportatoken {80.0pt}{44.18335pt}\pgfsyssoftpath@curvetosupportbtoken {44.18335pt}{80.0pt}\pgfsyssoftpath@curvetotoken {0.0pt}{80.0pt}\pgfsyssoftpath@curvetosupportatoken {-44.18335pt}{80.0pt}\pgfsyssoftpath@curvetosupportbtoken {-80.0pt}{44.18335pt}\pgfsyssoftpath@curvetotoken {-80.0pt}{0.0pt}\pgfsyssoftpath@closepathtoken {-80.0pt}{0.0pt}\pgfsyssoftpath@movetotoken {0.0pt}{0.0pt}
+ANCHOR text; -10.0pt,-2.5pt
+ANCHOR center; 0.0pt,0.0pt
+ANCHOR east; -80.0pt,0.0pt
+ANCHOR north; 0.0pt,-80.0pt
+ANCHOR 45; -56.5686pt,-56.5686pt
+CASE ellipse-empty-negative-minima
+FONT 10.00002pt,4.30554pt
+PAINT stroke; PATH macro:->\pgfsyssoftpath@movetotoken {-80.0pt}{0.0pt}\pgfsyssoftpath@curvetosupportatoken {-80.0pt}{-44.18335pt}\pgfsyssoftpath@curvetosupportbtoken {-44.18335pt}{-80.0pt}\pgfsyssoftpath@curvetotoken {0.0pt}{-80.0pt}\pgfsyssoftpath@curvetosupportatoken {44.18335pt}{-80.0pt}\pgfsyssoftpath@curvetosupportbtoken {80.0pt}{-44.18335pt}\pgfsyssoftpath@curvetotoken {80.0pt}{0.0pt}\pgfsyssoftpath@curvetosupportatoken {80.0pt}{44.18335pt}\pgfsyssoftpath@curvetosupportbtoken {44.18335pt}{80.0pt}\pgfsyssoftpath@curvetotoken {0.0pt}{80.0pt}\pgfsyssoftpath@curvetosupportatoken {-44.18335pt}{80.0pt}\pgfsyssoftpath@curvetosupportbtoken {-80.0pt}{44.18335pt}\pgfsyssoftpath@curvetotoken {-80.0pt}{0.0pt}\pgfsyssoftpath@closepathtoken {-80.0pt}{0.0pt}\pgfsyssoftpath@movetotoken {0.0pt}{0.0pt}
+ANCHOR text; 0.0pt,0.0pt
+ANCHOR center; 0.0pt,0.0pt
+ANCHOR east; -80.0pt,0.0pt
+ANCHOR north; 0.0pt,-80.0pt
+ANCHOR 45; -56.5686pt,-56.5686pt
+CASE rectangle-empty-negative-minima
+FONT 10.00002pt,4.30554pt
+PAINT stroke; PATH macro:->\pgfsyssoftpath@rectcornertoken {80.0pt}{80.0pt}\pgfsyssoftpath@rectsizetoken {-160.0pt}{-160.0pt}
+ANCHOR text; 0.0pt,0.0pt
+ANCHOR center; 0.0pt,0.0pt
+ANCHOR east; -80.0pt,0.0pt
+ANCHOR north; 0.0pt,-80.0pt
+ANCHOR 45; -80.00732pt,-80.0pt

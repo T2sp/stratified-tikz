@@ -235,19 +235,54 @@ test('failed capture/report writes cannot replace the native primary failure or 
 })
 
 test('a stalled failure report has a finite deadline and owns its late rejection', async (t) => {
-  const primary = new Error('native first error'), rejectWrites = []
-  const f = await fixture(t, { nativeChecks: async () => { throw primary }, diagnosticTimeoutMs: 20 })
+  const primary = new Error('native first error'), rejectWrites = [], writes = [], diagnosticMessages = []
+  let nativeCalls = 0
+  const f = await fixture(t, { nativeChecks: async () => { nativeCalls++; throw primary }, diagnosticTimeoutMs: 20 })
+  t.mock.method(console, 'error', (message) => { diagnosticMessages.push(message) })
   f.options.write = (path, bytes) => {
-    if (basename(path) === reportName && JSON.parse(bytes).result === 'failed') {
+    const recorded = { path, bytes: Buffer.isBuffer(bytes) ? Buffer.from(bytes) : bytes }
+    writes.push(recorded)
+    if (basename(path) === reportName && JSON.parse(recorded.bytes).result === 'failed') {
       return new Promise((resolve, reject) => { rejectWrites.push(reject) })
     }
-    return writeFile(path, bytes)
+    // This test stalls only failure reports. Ordinary writes complete without
+    // racing filesystem load against the deliberately short diagnostic deadline.
+    return Promise.resolve()
   }
   await assert.rejects(runFocusedNativePointAcceptance(f.options), (error) => error === primary)
+  assert.equal(nativeCalls, 1)
   assert.equal(rejectWrites.length, 2)
+  const reports = writes.filter(({ path }) => basename(path) === reportName).map(({ bytes }) => JSON.parse(bytes))
+  assert.deepEqual(reports.map(({ result }) => result), ['running', 'running', 'running', 'failed', 'failed'])
+  assert.deepEqual(writes.slice(0, 2).map(({ path }) => basename(path)), ['checkout.diff', 'checkout-untracked.json'])
+  assert.ok(writes.every(({ path }) => path.startsWith(f.options.artifactDir + '/')))
+  assert.deepEqual(writes[0].bytes, Buffer.from([0, 255, 10]))
+  assert.equal(JSON.parse(writes[1].bytes).files['binary.png'].data, 'AP8=')
+  const failedReports = reports.filter(({ result }) => result === 'failed')
+  for (const report of failedReports) {
+    assert.equal(report.stage, 'point-node-native-input')
+    assert.deepEqual(report.error, { message: primary.message, stack: primary.stack })
+    assert.deepEqual(report.startedNativeScopes, [bodyGroup])
+    assert.deepEqual(report.completedNativeScopes, [])
+  }
+  const timeoutMessage = 'Timed out after 20ms during focused-point-native-evidence.json write'
+  assert.deepEqual(failedReports[0].secondary, [])
+  assert.equal(failedReports[1].secondary.length, 1)
+  assert.equal(failedReports[1].secondary[0].name, 'failure report write')
+  assert.equal(failedReports[1].secondary[0].error.message, timeoutMessage)
+  assert.deepEqual(diagnosticMessages, Array(2).fill(`Focused native point failure report write: ${timeoutMessage}`),
+    'Both deliberately unresolved failure reports reached the finite diagnostic deadline')
+  assert.deepEqual(f.calls.slice(-4), ['off:pageerror', 'page close', 'browser close', 'server close'])
+  assert.equal(f.handlers.size, 0)
+  const unhandled = []
+  const onUnhandled = (error) => { unhandled.push(error) }
+  process.on('unhandledRejection', onUnhandled)
+  t.after(() => process.off('unhandledRejection', onUnhandled))
   rejectWrites.forEach((reject) => reject(new Error('late evidence failure')))
   await new Promise((resolve) => setImmediate(resolve))
-  assert.equal(f.calls.at(-1), 'server close')
+  assert.deepEqual(unhandled, [], 'The completed runner owns both late report rejections')
+  assert.deepEqual(f.calls.slice(-4), ['off:pageerror', 'page close', 'browser close', 'server close'])
+  assert.equal(f.handlers.size, 0)
 })
 
 test('a workflow that returns without required saved scenarios cannot claim a passing native subset', async (t) => {

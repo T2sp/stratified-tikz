@@ -1,0 +1,15 @@
+CASE contextual-ex-tie
+FONT 10.00002pt,4.30554pt
+STAGE innerXSp; 0
+STAGE innerYSp; 4
+STAGE initialXSp; 0
+STAGE initialYSp; 4
+STAGE fittedXSp; 0
+STAGE fittedYSp; 4
+STAGE transverseInnerSepSp; 4
+STAGE minimumWidthSp; 0
+STAGE divisorSp; 4
+STAGE bodyWidthHalfSp; 0
+STAGE bodyHeightHalfSp; 0
+STAGE bodyDepthHalfSp; 0
+STAGE minimumWidthHalfSp; 0

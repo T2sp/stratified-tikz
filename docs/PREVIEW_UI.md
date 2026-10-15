@@ -87,17 +87,71 @@ Set ordinary Fill enabled off to expose cylinder custom fills without an
 overlaid generic fill. Legacy hollow continues to mean white-filled.
 
 Parameters survive presets, JSON, clipboard, history and both TikZ exports.
-Unsupported imported keys remain raw with preview diagnostics. Full configurable
-spacing/minimum-size and anchor controls remain in 32D. The implementation and
+Unsupported imported keys remain raw with preview diagnostics. Configurable
+spacing/minimum-size and anchor controls are described in the 32D section below. The implementation and
 independent fixed-box oracle are described in the
 [32C record](PHASE_32C_IMPLEMENTATION.md); native acceptance/review remain
 separate gates. The [named 32B deferrals](../prompts/phase-32b-fix.md) describe
 this branch before main's later 32B completion, which now takes precedence.
 Fresh strict acceptance of the combined 32C checkout remains required.
 Native Add point, picking, font-ready, and downloaded standalone coverage is
-implemented in `checkPointNodes.mjs` / `checkPointNodesApp.mjs`; execution in the
-32A child stopped at localhost `EPERM`. Support is not yet browser-accepted:
-fresh parent verification of all 15 groups and independent review remain required.
+implemented in `checkPointNodes.mjs` / `checkPointNodesApp.mjs`. 32A was accepted
+by its subsequent matching parent verification and independent review; current
+combined 32C/32D acceptance requires fresh evidence for the changed checkout.
+
+## Point spacing, minima, and anchors (Phase 32D)
+
+The point Inspector provides **Inner xsep**, **Inner ysep**, **Outer xsep**,
+**Outer ysep**, **Minimum width**, **Minimum height**, and **Anchor**. Separation
+and minimum inputs accept signed finite decimal dimensions in `pt`, `mm`, `cm`,
+`in`, `bp`, `em`, or `ex`; a bare number means TeX points. Zero and negative
+separations are retained. A blank field restores its inherited default. Invalid
+drafts remain visible without replacing the saved value. Shape-specific fitting
+can diagnose a separation that makes PGF's construction undefined, including
+cylinder content fitting with a negative inner y-separation.
+
+Omitted inner axes use legacy **Size / 2**. Editing Size clears both explicit
+inner axes so the old and new controls have one precedence rule. Omitted outer
+axes use half the border width, and omitted minima use 1pt. Outer separation
+changes anchor clearance and does not enlarge the hit region to that clearance.
+PGF's diamond has an explicit exception: positive outer separation shrinks its
+painted axes by `(sqrt(2) - 1) * outer sep`; the independent PGF fixtures record
+this behavior. Other supported shapes keep their painted contour unchanged.
+Minima follow each shape's aspect, angle, stretch, or circumcircle rule.
+With valid negative inner padding, visible text may extend outside that contour.
+Picking and the selection ring include the actual text ink as well as the painted
+shape; outer anchor clearance remains excluded from both.
+
+TeX uses 72.27pt per inch, while `bp` uses 72 per inch; CSS pixels remain a
+separate preview scale. `em`/`ex` resolve using a recorded context for each axis,
+default 10pt em and 4.30554pt ex; imported axes retain their context when another
+axis changes. This conversion context does not execute a LaTeX font command or
+change the text/mid anchor typography. Raw dimension spelling and explicit values survive presets, clipboard,
+JSON, undo/redo, and both TikZ modes.
+
+The selected anchor stays at the stored coordinate while the upright body and
+painted contour move around it, including after formula conversion. Standard,
+numeric border, and shape-specific anchor names are listed in the
+[32D support table](PHASE_32D_IMPLEMENTATION.md#anchor-support). Unsupported
+names remain saved and produce a visible preview diagnostic. Numeric border
+angles follow PGF's integer truncation toward zero. Magnitudes at 16,384 degrees
+or more exceed PGF's parser range; negative literals can also round past that
+boundary. Positive fractions require an integer prefix (`0.5`); `.5` and `+.5`
+produce a diagnostic. Unsupported values retain their source.
+`text height`,
+`text depth`, `text width`, and paragraph `align` are diagnosed as unsupported;
+they are retained in imported external style source. Imported `rotate` and
+`transform shape` are also diagnosed as unsupported and retained externally;
+they do not become border rotation or turn the preview's upright body.
+An unsupported shape or selected anchor displays the exact body and a small
+pickable warning beside it. Its hidden requested contour contributes no hits or
+selection radius, even with large minima; the ring encloses the visible body and
+warning only.
+
+The combined native matrix is registered in
+`point-node-layout-anchors-combined`. Child browser startup is restricted, so
+implementation and Node checks do not establish native acceptance. Matching
+parent browser/download evidence and independent review remain required.
 See [32A verification and handoff](PHASE_32A_IMPLEMENTATION.md).
 
 ## Label Preview Input Contract (Phase 31A)
@@ -1751,8 +1805,8 @@ not the declaring style's directory. Bare `base` and `/tikz/base` share canonica
 identity and last-definition-wins order; raw source and external key spelling
 remain unchanged. A missing root reference is diagnosed even if `ns/base` exists.
 Imported partial styles use materialized application node defaults consistently
-in preview and export. This is not arbitrary TeX execution or support for the
-32D layout and anchor options. The later 32C section describes shape support. See
+in preview and export. Arbitrary TeX execution remains unsupported. Point layout
+and anchor support is described in the 32D section above. See
 [paint grammar and compatibility](PHASE_32B_IMPLEMENTATION.md).
 
 New JSON saves use envelope version 2 and explicit point paint, including saved

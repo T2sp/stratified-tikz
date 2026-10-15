@@ -302,7 +302,7 @@ test('common xcolor names, chained mixtures and literal definecolor models are b
   if (loaded.ok) assert.deepEqual(loaded.diagram.externalTikzStyleSources, result.externalTikzStyleSources)
 })
 
-test('invalid values and deferred layout options are diagnosed while 32C shapes resolve', () => {
+test('invalid values and deferred paragraph options are diagnosed while 32D minima resolve', () => {
   const options = String.raw`fill=unknownFill,text=unknown,draw opacity=1.2,line width=NaN,opacity=0x1,minimum size=1cm,rectangle,isosceles triangle,text width=3cm`
   const preview = parseTikzStylePreviewOptions(options)
   assert.equal(preview.fillColor, undefined)
@@ -310,11 +310,13 @@ test('invalid values and deferred layout options are diagnosed while 32C shapes 
   assert.equal(preview.pointShape, 'isosceles triangle')
   assert.equal(preview.pointSize, undefined)
   assert.equal(preview.executionUncertain, undefined, 'ordinary invalid literals do not imply execution')
-  assert.equal(preview.diagnostics?.length, 7)
+  assert.equal(preview.pointLayout?.minimumWidth, 72.27 / 2.54)
+  assert.equal(preview.pointLayout?.minimumHeight, 72.27 / 2.54)
+  assert.equal(preview.diagnostics?.length, 6)
   const result = importTikzStyleFile(diagram(), 'paint.sty', `\\tikzstyle{node}=[${options}]`)
   assert.equal(result.references[0].options, options)
-  assert.equal(result.references[0].previewDiagnostics?.length, 7)
-  assert.equal(result.parseResult.warnings.length, 7)
+  assert.equal(result.references[0].previewDiagnostics?.length, 6)
+  assert.equal(result.parseResult.warnings.length, 6)
 })
 
 test('draw/fill none, white fill, zero opacity and bare draw/fill remain distinct', () => {
@@ -333,7 +335,8 @@ test('dimension grammar uses TeX points and ordered dash state is explicit', () 
   assert.equal(literalTikzDimension('1in'), 72.27)
   assert.equal(literalTikzDimension('2.54cm'), 72.27)
   assert.equal(literalTikzDimension('1bp'), 72.27 / 72)
-  assert.equal(literalTikzDimension('1em'), null)
+  assert.equal(literalTikzDimension('1em'), 10)
+  assert.equal(literalTikzDimension('1ex', false, { fontSizePt: 12, xHeightPt: 5.2 }), 5.2)
   assert.equal(literalTikzDimension('calc(2pt)'), null)
   const paint = getPointPaint(pointStyle('very thick,dash pattern=on 2pt off 1pt on .5pt off 3pt,dash phase=-1pt,line cap=round,line join=bevel'))
   assert.equal(paint.stroke.width, 1.2)

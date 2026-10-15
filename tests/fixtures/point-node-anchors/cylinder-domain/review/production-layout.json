@@ -1,0 +1,14 @@
+{
+  "limitation": null,
+  "paintedBounds": {
+    "minX": 0,
+    "minY": -0.24,
+    "maxX": 0.24,
+    "maxY": 0.24
+  },
+  "selectedAnchor": {
+    "x": 0,
+    "y": 0
+  },
+  "path": "M 0 0 L 0 0 L 0 0 L 0.24 0 L 0.24 0 L 0.24 0 Z"
+}
