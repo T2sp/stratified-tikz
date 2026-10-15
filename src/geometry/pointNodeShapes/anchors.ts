@@ -4,6 +4,7 @@
 import type { PointShape, Vec2 } from '../../model/types.ts'
 import { resolvePointShapeParameters } from '../../model/pointShapeParameters.ts'
 import { boundsOfPoints, svgPoint } from './contours.ts'
+import { fitDiamond } from './diamondFitting.ts'
 import type { PointNodeAnchorResolution, PointNodeShapeInput, PointNodeShapeSolution, PointShapeBounds } from './types.ts'
 import { pgfAsin, pgfAtan2, pgfCos, pgfReciprocal, pgfRound, pgfSin, pgfTan, pgfMultiply, pgfDivide, pgfCot } from './pgfMath.ts'
 
@@ -149,6 +150,15 @@ function resolveUnchecked(input: PointNodeShapeInput, solution: UnanchoredSoluti
     if (input.shape === 'diamond' && boundary.signedAxes?.x === 0 && boundary.signedAxes.y === 0) {
       return { supported: false, position: { x: 0, y: 0 }, diagnostic: 'PGF diamond numeric border anchors are singular when both clearance axes are zero.' }
     }
+    if (input.shape === 'diamond' && boundary.signedAxes) {
+      const axes = boundary.signedAxes
+      const segment: Line = { kind: 'line', a: { x: pgfCos(angle) > 0 ? axes.x : -axes.x, y: 0 },
+        b: { x: 0, y: pgfSin(angle) > 0 ? axes.y : -axes.y } }
+      // Diamond declares its center at the origin and intersects the selected
+      // infinite side with PGF's dimensional matrix inversion. Analytic division
+      // loses the source's rounding for the supported extreme aspect ratios.
+      return pgfIntersectionResult({ ...boundary, sourceCenter: { x: 0, y: 0 } }, segment, angle, { x: 0, y: 0 }, false)
+    }
     if (boundary.signedAxes) return position(signedBasicBorder(input.shape, boundary.signedAxes, angle, boundary.unitScale))
     return borderResult(boundary, angle)
   }
@@ -165,11 +175,6 @@ function signedBasicBorder(shape: PointShape, axes: Vec2, angle: number, scale: 
     // direction. A zero ellipse axis does not imply an undefined anchor.
     const normalized = pgfAtan2(direction.y, direction.x)
     return { x: axes.x * pgfCos(normalized), y: -axes.y * pgfSin(normalized) }
-  }
-  if (shape === 'diamond') {
-    if (a === 0 && axes.y === 0 || b === 0 && axes.x === 0) return { x: 0, y: 0 }
-    const factor = 1 / ((a === 0 ? 0 : a / axes.x) + (b === 0 ? 0 : b / axes.y))
-    return { x: dx * factor, y: -dy * factor }
   }
   // PGF compares signed saved axes, even after negative outer separation
   // inverts them. Sorting the bounds or choosing the nearest positive ray
@@ -454,10 +459,8 @@ function anchorBoundary(input: PointNodeShapeInput, solution: UnanchoredSolution
       break
     }
     case 'diamond': {
-      const paddedX = input.body.width / 2 + input.innerXSep, paddedY = (input.body.height + input.body.depth) / 2 + input.innerYSep
-      const rx = Math.max(paddedX + p.aspect * paddedY, input.minimumWidth / 2) + input.outerXSep
-      const ry = Math.max(paddedX / p.aspect + paddedY, input.minimumHeight / 2) + input.outerYSep
-      signedAxes = { x: rx, y: ry }
+      signedAxes = fitDiamond(input, p.aspect).anchorAxes
+      const { x: rx, y: ry } = signedAxes
       segments = polyline([{ x: rx, y: 0 }, { x: 0, y: ry }, { x: -rx, y: 0 }, { x: 0, y: -ry }]); break
     }
     case 'square': case 'triangle': case 'regular polygon': {

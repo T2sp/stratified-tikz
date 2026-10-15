@@ -26,6 +26,7 @@ import { dashCapScenario, dashCapArtifacts, assertDashCapEvidence } from "../poi
 import { readEvidenceDocumentSync } from "../evidencePublication.mjs";
 import { cylinderDiagnosticScenarios, assertSingularCylinderStandaloneEvidence } from "../singularCylinderDiagnosticContract.mjs";
 import { foldedCylinderScenario, assertFoldedCylinderStandaloneEvidence } from "../foldedCylinderContract.mjs";
+import { assertConformanceEvidence } from '../pointConformanceContract.mjs';
 
 import { polygonJoinScenario, polygonJoinArtifacts, assertPolygonJoinEvidence } from "../pointPolygonJoinContract.mjs";
 import { inspectConnectedLivePaintPng } from "../connectedLivePaintOracle.mjs";
@@ -292,6 +293,7 @@ function validateTargetedPaintEvidence(artifactDir, name, group, profile = "stri
       const raw = evidenceObject(artifactDir, `${name}-${ambientDimension}d-standalone.json`, checkout);
       assertSignedPolygonalStandaloneEvidence(evidence, raw, artifactDir, ambientDimension, { checkout });
     }
+    if (name === signedPolygonalScenario) return assertConformanceEvidence(evidence, artifactDir, { checkout });
     if (cylinderDiagnosticScenarios.includes(name)) {
       return [2, 3].map((ambientDimension) => {
         const raw = evidenceObject(artifactDir, `${name}-${ambientDimension}d-standalone.json`, checkout);
@@ -878,7 +880,8 @@ export function validateBrowserEvidence(name, artifactDir, phase, checkout, prof
         const authenticatedEmptyPointSvgs = new Set();
         const authenticatedDiagnosticPointSvgs = new Map();
         if (group === layoutAnchorGroup && name === signedPolygonalScenario) {
-          validateTargetedPaintEvidence(artifactDir, name, group, profile, checkout);
+          const conformanceSvgs = validateTargetedPaintEvidence(artifactDir, name, group, profile, checkout);
+          for (const artifact of conformanceSvgs) authenticatedEmptyPointSvgs.add(artifact);
           for (const ambientDimension of [2, 3]) {
             authenticatedEmptyPointSvgs.add(`${signedPolygonalScenario}-${ambientDimension}d.svg`);
           }

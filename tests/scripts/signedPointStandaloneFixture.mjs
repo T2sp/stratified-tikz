@@ -80,7 +80,7 @@ function syntheticSignedState(spec, overlap = false) {
 }
 // Deliberately fabricated geometry exercises raw-policy rejection only. Real
 // .23 SVG arclength/CTM measurements and trusted input come from the App runner.
-function setSyntheticSignedBoundary(record, local = { x: -96 * Math.cos(.23 * 2 * Math.PI), y: -96 * Math.sin(.23 * 2 * Math.PI) }) {
+function setSyntheticSignedBoundary(record, local = { x: -96 * Math.cos(.23 * 2 * Math.PI), y: 96 * Math.sin(.23 * 2 * Math.PI) }) {
   const matrix = { a: 1, b: 0, c: 0, d: 1, e: 310, f: 290 }
   const boundary = { x: matrix.e + local.x, y: matrix.f + local.y }
   const visit = (value) => {
@@ -100,7 +100,7 @@ function syntheticSignedPlacement(spec, picking = false) {
     key: spec.key, ambientDimension: spec.ambientDimension, source: spec.source, layout: structuredClone(spec.layout), state })
   Object.assign(entry.rendered, { source: spec.source, layout: structuredClone(spec.layout), anchorOffset: { x: picking ? 0 : -96, y: 0 },
     placementOffset: { x: picking ? 0 : 96, y: 0 }, bounds: { x: -96, y: -96, width: 192, height: 192 },
-    contour: { tag: 'path', attributes: picking ? { d: 'M -96 0 A -96 -96 0 0 0 96 0 A -96 -96 0 0 0 -96 0 Z' }
+    contour: { tag: 'path', attributes: picking ? { d: 'M -96 0 A 96 96 0 0 0 96 0 A 96 96 0 0 0 -96 0 Z' }
       : { transform: 'translate(96 0)' } } })
   if (picking) {
     const selectedState = { ...state, selection: { kind: 'stratum', id: 'signed-overlap' } }

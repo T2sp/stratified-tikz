@@ -1526,6 +1526,18 @@ test('32D real complete parent artifact loop accepts seven native empty-source b
   validateBrowserEvidence('check:free-labels', fixture.artifactDir, '32D', fixture.checkout)
 })
 
+test('32D strict parent rejects exit-zero complete reports missing or mismatching fresh geometry conformance', t => {
+  const fixture = completePhase32dParentFixture(t), scenario = 'point-layout-signed-polygonal-zero-axis'
+  const terminal = fixture.readJson(`${scenario}.json`), retained = structuredClone(terminal)
+  delete terminal.geometryConformance; fixture.save(`${scenario}.json`, terminal)
+  assert.throws(() => validateBrowserEvidence('check:free-labels', fixture.artifactDir, '32D', fixture.checkout), /geometryConformance/)
+  fixture.save(`${scenario}.json`, retained)
+  const artifact = retained.geometryConformance.find(entry => entry.key === 'ellipse-signed-dashes').artifact
+  const raw = fixture.readJson(artifact)
+  raw.live.actual.svg = raw.live.old.svg; fixture.save(artifact, raw)
+  assert.throws(() => validateBrowserEvidence('check:free-labels', fixture.artifactDir, '32D', fixture.checkout), /SVG|equal|strictly/u)
+})
+
 test('32D real complete parent dispatch accepts explicitly closed empty titles and authenticated raw publications', async t => {
   const fixture = completePhase32dParentFixture(t)
   const publisher = createEvidencePublisher({ artifactDir: fixture.artifactDir, checkout: fixture.checkout })

@@ -10,6 +10,7 @@ import { resolvePointShapeParameters } from '../../model/pointShapeParameters.ts
 import { ellipseContour, ellipsePoint, polygonContour, ShapeContourBuilder } from './contours.ts'
 import { pointNodeAnchorLayout } from './anchors.ts'
 import { cylinderDimensionDomain } from './cylinderDomain.ts'
+import { fitDiamond } from './diamondFitting.ts'
 import { pgfCircleRadius, pgfReciprocal, pgfSin, pgfCos, pgfTan, pgfCot, pgfMultiply, pgfDivide, pgfAtan } from './pgfMath.ts'
 import type {
   PointNodeShapeInput,
@@ -88,13 +89,7 @@ function construct(input: PointNodeShapeInput, p: Parameters, x: number, y: numb
       return { ...single(ellipseContour(axes.x, axes.y)), signedFittedAxes: axes }
     }
     case 'diamond': {
-      // Minima intentionally operate independently, after aspect fitting.
-      const rx = Math.max(x + p.aspect * y, input.minimumWidth / 2)
-      const ry = Math.max(x / p.aspect + y, input.minimumHeight / 2)
-      // PGF's diamond background deliberately subtracts sqrt(2)*outer sep
-      // from the saved anchor axes, unlike the other basic shapes.
-      const paintedX = rx + (1 - 1.414213) * input.outerXSep
-      const paintedY = ry + (1 - 1.414213) * input.outerYSep
+      const { x: paintedX, y: paintedY } = fitDiamond(input, p.aspect).paintedAxes
       return single(polygonContour([{ x: paintedX, y: 0 }, { x: 0, y: paintedY }, { x: -paintedX, y: 0 }, { x: 0, y: -paintedY }]))
     }
     case 'square':

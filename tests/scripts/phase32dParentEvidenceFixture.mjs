@@ -13,6 +13,7 @@ import { cylinderDiagnosticScenarios } from '../../scripts/singularCylinderDiagn
 import { syntheticSingularCylinderStandalone } from './singularCylinderFixture.mjs'
 import { foldedCylinderScenario } from '../../scripts/foldedCylinderContract.mjs'
 import { syntheticFoldedCylinderStandalone } from './foldedCylinderFixture.mjs'
+import { populateSyntheticConformance } from './pointConformanceFixture.mjs'
 
 // Controlled full cumulative dispatch evidence uses the existing strong fixtures.
 // It supplies complete retained PNGs and native shells for policy tests only.
@@ -84,6 +85,7 @@ export function populatePhase32dParentEvidence(artifactDir, checkout, earlierArt
   const evidence = signed[0].evidence
   evidence.downloads[1] = signed[1].download
   evidence.zeroAxisCases[1] = signed[1].evidence.zeroAxisCases[1]
+  evidence.geometryConformance = populateSyntheticConformance(artifactDir).geometryConformance
   for (const fixture of signed) save(`${fixture.download.scenario}-standalone.json`, fixture.raw)
   save(`${signedPolygonalScenario}.json`, evidence)
   const singular = []

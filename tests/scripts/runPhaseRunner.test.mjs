@@ -85,6 +85,19 @@ function fixture(t, phase = '31B', options = {}) {
   // every isolated runner, including failure-before-browser controls.
   copyRelativeFixtureModules(cwd, ['scripts/singularCylinderDiagnosticContract.mjs'])
   copyRelativeFixtureModules(cwd, ['scripts/foldedCylinderContract.mjs'])
+  copyRelativeFixtureModules(cwd, ['scripts/pointConformanceContract.mjs'])
+  for (const directory of ['diamond-aspect-scanning', 'signed-traversal']) {
+    const referenceDirectory = `tests/fixtures/point-node-anchors/${directory}`
+    const referenceSource = join(automationDir, '../..', referenceDirectory)
+    const reference = JSON.parse(readFileSync(join(referenceSource, 'references.json'), 'utf8'))
+    // Isolated policy replay reads the reference and its authenticated inputs;
+    // the complete independent renderer bundles remain in the source checkout.
+    for (const file of ['references.json', ...Object.keys(reference.artifactHashes)]) {
+      const target = join(cwd, referenceDirectory, file)
+      mkdirSync(dirname(target), { recursive: true })
+      cpSync(join(referenceSource, file), target)
+    }
+  }
   const cylinderReference = 'tests/fixtures/point-node-anchors/cylinder-fitting-scanning/references.json'
   mkdirSync(join(cwd, 'tests/fixtures/point-node-anchors/cylinder-fitting-scanning'), { recursive: true })
   cpSync(join(automationDir, '../..', cylinderReference), join(cwd, cylinderReference))
@@ -257,6 +270,9 @@ if (prompt.startsWith('REVIEW_FIXTURE')) {
 `)
   chmodSync(codex, 0o755)
   git('init', '-q')
+  // Temporary repositories cannot leave detached Git maintenance writing after
+  // their fixture-owned commands and before the existing one-shot cleanup.
+  git('config', '--local', 'maintenance.auto', 'false')
   git('config', 'user.name', 'Phase Runner Test')
   git('config', 'user.email', 'phase-runner@example.invalid')
   git('add', '.')

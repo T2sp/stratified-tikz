@@ -36,6 +36,10 @@ import { foldedCylinderScenario, foldedCylinderOwner, foldedCylinderLayout, fold
 import { observeSignedPointPreExport, observeSignedPointReopening, signedPointRenderOrderProof,
   createSignedPointAssociationCandidate, assertSignedPointStandaloneAssociation,
   assertSignedPointStandaloneGeometry } from './signedPointStandaloneAssociation.mjs'
+import { conformanceCases, conformanceStem, conformanceReference, conformanceSpec, conformancePaint,
+  assertConformancePlacement, assertConformanceEvidence } from './pointConformanceContract.mjs'
+import { captureConformancePaint } from './pointConformanceBrowser.mjs'
+import { createHash } from 'node:crypto'
 
 const paint = { text: { color: '#203040', opacity: 1 }, fill: { enabled: true, color: '#d8ecff', opacity: .7 },
   stroke: { enabled: true, color: '#203040', opacity: 1, width: .4, lineStyle: 'solid', dashPhase: 0, lineCap: 'butt', lineJoin: 'miter' } }
@@ -153,7 +157,7 @@ export async function runPointLayoutAnchorChecks({ browser, origin, artifactDir,
   const app = createOwnedAppPage({ page, expectedUrl: url, artifactDir, prefix: 'point-layout-app',
     writeEvidence: (name, value, phase) => publish(name, value, { stage: phase, disposition: primary ? 'failed' : 'running' }) })
   const diagnostic = createPointDiagnostics({ artifactDir, observe, artifactPrefix: 'point-layout-selection', publish })
-  let scenario = 'point-layout-per-shape-spacing-minima', primary, selectionSequence = 0, currentLiveCapture
+  let scenario = 'point-layout-per-shape-spacing-minima', primary, selectionSequence = 0, currentLiveCapture, conformanceImageAttempt = false
   async function retainFailure(name, details) {
     try { await publish(name, details, { stage: name, disposition: 'failed' }) }
     catch (error) { selectionSecondaryErrors.push(`Failure evidence ${name}: ${error.message}`); console.error(`Layout failure evidence ${name}: ${error.message}`) }
@@ -921,7 +925,61 @@ export async function runPointLayoutAnchorChecks({ browser, origin, artifactDir,
         capture: raw.capture, strokePixels: raw.strokePixels })
       await page.evaluate(() => window.stzAppLabels.releasePointExportClick())
     }
-    await save({ polygonalCases, zeroAxisCases, downloads })
+    // Additive correction coverage stays within this existing mandatory matrix
+    // identity. Neither immutable pending fixture nor its download flow changes.
+    const geometryConformance = []
+    for (const ambientDimension of [2, 3]) for (const key of conformanceCases) {
+      const stem = conformanceStem(key, ambientDimension), spec = conformanceSpec(key), reference = conformanceReference(key)
+      const input = await document(spec.shape, spec.layout, '', ambientDimension)
+      input.diagram.strata[0].style.shapeParameters = spec.parameters
+      input.diagram.strata[0].style.paint = conformancePaint(key)
+      await load(input); await settle()
+      const native = { key, ambientDimension, rendered: await select(), state: await state() }
+      await publish(`${stem}.json`, { scenario: stem, group, result: 'observed', native, reference })
+      assertConformancePlacement(native, reference)
+      conformanceImageAttempt = true
+      const live = await captureConformancePaint({ page, key, stage: 'live', stem, artifactDir, contour: native.rendered.contour,
+        reference, retain: probe => publish(`${stem}-live-paint.json`, probe) })
+      const screenshot = await page.screenshot({ path: resolve(artifactDir, `${stem}-live.png`), fullPage: false, scale: 'css', timeout: 5000 })
+      const liveCapture = { attempts: 1, bytes: screenshot.length, sha256: createHash('sha256').update(screenshot).digest('hex'),
+        width: screenshot.readUInt32BE(16), height: screenshot.readUInt32BE(20) }, afterLive = await state()
+      for (const field of ['json', 'runtimeDiagramJson', 'history', 'labelDocumentRevision']) assert.equal(afterLive[field], native.state[field])
+      const saved = await saveAppJson({ page, artifactDir, name: `${stem}-saved`, owned: waits,
+        diagnose: details => observe(`${stem}-save`, { group, details }) })
+      const savedJson = saved.json, outputs = await tikzArtifacts(stem)
+      await page.getByLabel('SVG export background', { exact: true }).selectOption('transparent')
+      await page.evaluate(() => window.stzAppLabels.armPointExportClick(['app-point']))
+      const beforeExportState = await state(), preExport = await page.evaluate(observeSignedPointPreExport)
+      const expected = [{ id: 'app-point', source: '', shape: spec.shape, modelPoint: JSON.parse(savedJson).diagram.strata[0], rendered: native.rendered }]
+      await observe(`${stem}-before-export-click`, { group, result: 'observed', beforeExportState, preExport, expected, live, liveCapture })
+      const { event: download } = await event(stem, 'download', () => page.getByRole('button', { name: 'Export current diagram view as SVG', exact: true }).click())
+      const click = await page.evaluate(() => window.stzAppLabels.pointExportClick()), svgPath = resolve(artifactDir, `${stem}.svg`)
+      await download.saveAs(svgPath)
+      const xml = await readFile(svgPath, 'utf8'), fileUrl = pathToFileURL(svgPath).href
+      let reopenedPaint
+      const standalone = await context.newPage()
+      const raw = await capturePointLayoutStandalone({ standalone, artifactDir, evidencePublisher,
+        details: { scenario: stem, group, background: 'transparent', ambientDimension, key, svgPath, fileUrl, pageErrors,
+          expected, click, outputs, xml, savedJson, beforeExportState, preExport, native, reference, live, liveCapture, afterLive },
+        observe: candidate => observe(`${stem}-standalone-observed`, { group, result: 'observed', candidate }),
+        reopen: standalone => standalone.evaluate(observeSignedPointReopening),
+        assertReopened: async candidate => {
+          assert.equal(candidate.reopened.length, 1)
+          const actual = candidate.reopened[0]
+          assert.deepEqual(actual.contour, native.rendered.contour); assert.equal(actual.nodeTransform, native.rendered.nodeTransform)
+          reopenedPaint = await captureConformancePaint({ page: standalone, key,
+            stage: 'reopened', stem, artifactDir, contour: actual.contour, reference,
+            retain: probe => publish(`${stem}-reopened-paint.json`, probe) })
+        } })
+      raw.reopenedPaint = reopenedPaint
+      raw.terminal = { key, ambientDimension, artifact: `${stem}.json`, svg: `${stem}.svg`, result: 'passed' }
+      geometryConformance.push(raw.terminal)
+      await publish(`${stem}.json`, raw)
+      await page.evaluate(() => window.stzAppLabels.releasePointExportClick())
+      conformanceImageAttempt = false
+    }
+    assertConformanceEvidence({ geometryConformance }, artifactDir)
+    await save({ polygonalCases, zeroAxisCases, downloads, geometryConformance })
 
     // The PGF zero-divisor input is authored and valid model data. Native
     // Inspector edits change only the intended minimum-width option; the live
@@ -1140,7 +1198,7 @@ export async function runPointLayoutAnchorChecks({ browser, origin, artifactDir,
     await retainFailure('point-layout-failure.json', { scenario, group, result: 'failed', pageErrors,
       secondaryErrors: selectionSecondaryErrors, liveCapture, error: { message: error.message, stack: error.stack } })
     try { await app.failure(error, { scenario, pageErrors, secondaryErrors: selectionSecondaryErrors, liveCapture }, { captureScreenshot: !scenario.startsWith('point-layout-pending-')
-      && !isZeroAxisLiveCaptureFailure(error) }) } catch (diagnosticError) {
+      && !isZeroAxisLiveCaptureFailure(error) && !conformanceImageAttempt }) } catch (diagnosticError) {
       await retainFailure('point-layout-secondary-failure.json', { primary: error.message, diagnostic: diagnosticError.message })
     }
     throw error

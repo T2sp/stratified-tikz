@@ -15,6 +15,7 @@ import { assertSignedPointStandaloneAssociation, assertSignedPointStandaloneGeom
 import { readEvidenceDocumentSync } from './evidencePublication.mjs'
 import { singularCylinderScenario, subspCylinderScenario, cylinderDiagnosticScenarios, assertSingularCylinderEvidence } from './singularCylinderDiagnosticContract.mjs'
 import { foldedCylinderScenario, assertFoldedCylinderEvidence } from './foldedCylinderContract.mjs'
+import { conformanceArtifacts } from './pointConformanceContract.mjs'
 
 export const layoutAnchorGroup = 'point-node-layout-anchors-combined'
 export const layoutShapes = ['circle', 'rectangle', 'square', 'triangle', 'ellipse', 'diamond', 'regular polygon',
@@ -105,6 +106,7 @@ export function layoutAnchorArtifacts(name) {
     files.push(`${stem}-native.json`, `${stem}-live-capture.json`, `${stem}-live.png`, `${stem}.svg`, `${stem}.png`, `${stem}-standalone.json`,
       `${stem}-saved.json`, `${stem}-standalone.tex`, `${stem}-inlineMath.tex`)
   }
+  if (name === signedPolygonalScenario) files.push(...conformanceArtifacts())
   if (cylinderDiagnosticScenarios.includes(name) || name === foldedCylinderScenario) for (const ambientDimension of [2, 3]) {
     const stem = `${name}-${ambientDimension}d`
     files.push(`${stem}-native.json`, `${stem}.svg`, `${stem}.png`, `${stem}-standalone.json`,
@@ -445,8 +447,13 @@ export function assertLayoutAnchorEvidence(evidence, name) {
       assert.equal(entry.rendered.contour.tag, 'path')
       const path = entry.rendered.contour.attributes.d
       assert.equal(typeof path, 'string'); assert.match(path, /\bZ\s*$/)
-      assert.deepEqual([...path.matchAll(/\bA\s+(-?[0-9.]+)\s+(-?[0-9.]+)/g)].map((match) => [Number(match[1]), Number(match[2])]),
-        [[-96, -96], [-96, -96]], 'Actual SVG path retains both signed radius-96 half-arcs')
+      // SVG radius operands are magnitudes. Both negative PGF axes survive in
+      // the left-hand start, ordered half-arc endpoints and Y-reflected sweep:
+      // (-96,0) -> (0,96) -> (96,0) -> (0,-96) -> (-96,0).
+      const commands = path.trim().split(/\s+/u).map((token) => /^[MAZ]$/u.test(token) ? token : Number(token))
+      assert.deepEqual(commands,
+        ['M', -96, 0, 'A', 96, 96, 0, 0, 0, 96, 0, 'A', 96, 96, 0, 0, 0, -96, 0, 'Z'],
+        'Actual SVG uses positive radius magnitudes while retaining signed start, endpoints and traversal')
       assert.deepEqual(entry.rendered.bounds, { x: -96, y: -96, width: 192, height: 192 })
       const selection = entry.rendered.nativeSelection
       assertGeometricSelectionEvidence(selection, 'signed-overlap')

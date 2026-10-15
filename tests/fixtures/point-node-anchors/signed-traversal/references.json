@@ -1,0 +1,1636 @@
+{
+  "schema": "stz-pgf-signed-traversal-v1",
+  "engine": "pdfTeX 3.141592653-2.6-1.40.29 (TeX Live 2026)",
+  "pgfVersion": "3.1.11a",
+  "command": [
+    "/Library/TeX/texbin/pdflatex",
+    "-no-shell-escape",
+    "-interaction=nonstopmode",
+    "-halt-on-error",
+    "fixed-box.tex"
+  ],
+  "exitCode": 0,
+  "units": "TeX pt; raw PGF Y is negated once for SVG; rotations apply before that reflection; no bp conversion",
+  "sourceHashes": {
+    "/usr/local/texlive/2026/texmf-dist/tex/generic/pgf/basiclayer/pgfcorepathconstruct.code.tex": "64b0b4193616b937a2b4520c678f8863ae06ab38385bb58db437b39a8f27719b",
+    "/usr/local/texlive/2026/texmf-dist/tex/generic/pgf/basiclayer/pgfcorepoints.code.tex": "7533dd80c95a5124726b0a617a5f458226d4a7490bcd209e3fd7e717e24dc127",
+    "/usr/local/texlive/2026/texmf-dist/tex/generic/pgf/basiclayer/pgfcoretransformations.code.tex": "bdea875774b4ad7a1e12debc67c46286245031f5c2e287c9e192f3ca4b6193b6",
+    "/usr/local/texlive/2026/texmf-dist/tex/generic/pgf/modules/pgfmoduleshapes.code.tex": "01dd81e3f2c56a8db7864916ada1a5036964aff2e8176aafd4773244e236bb27",
+    "/usr/local/texlive/2026/texmf-dist/tex/generic/pgf/libraries/shapes/pgflibraryshapes.geometric.code.tex": "bbd6abe9df51153e2f4f61cca3ad669de34a6648cf37795df44da931402b69ee",
+    "/usr/local/texlive/2026/texmf-dist/tex/generic/pgf/math/pgfmathfunctions.trigonometric.code.tex": "1c8834abe00807467a52d31ef96032d5084b2560eea45995018084d13a3cde3c"
+  },
+  "artifactHashes": {
+    "fixed-box.tex": "cffa80ca30aa56e6474efa58b3a799b7644eacf6f0a4ebd20ab3dedd4603bc10",
+    "fixed-box.log": "cefcf0d4e81d303007f8bbd786901bd0f825315571f30dbc7b50da958a263ea3",
+    "fixed-box.pdf": "b9abc1926c131dae5adfee2c5f67a8da237534d07dc390e90b7066858277aba8",
+    "geometry.txt": "6cc0dda761bfac5d974e7df63a0029508f9907487af264920db30dde6aca4c5b",
+    "compilation.txt": "d5e55415ebf2af1dbfdbec59338b53be6d5b8cc625bf12f50f776da89ca75924",
+    "generate.mjs": "1a50237d0076c4ded6e6176795197eddf0258cc3e58e0628c1dbcff93e2a9263"
+  },
+  "cases": [
+    {
+      "start": 0,
+      "end": 360,
+      "rotation": 0,
+      "closed": true,
+      "id": "positive-x-positive-y-full-forward",
+      "kind": "arc",
+      "rx": 11,
+      "ry": 7,
+      "center": {
+        "x": 3,
+        "y": -5
+      },
+      "lineWidth": 0.4,
+      "paints": [
+        {
+          "action": "stroke",
+          "tokens": [
+            {
+              "kind": "movetotoken",
+              "x": 14,
+              "y": 5
+            },
+            {
+              "kind": "curvetosupportatoken",
+              "x": 14,
+              "y": 1.13396
+            },
+            {
+              "kind": "curvetosupportbtoken",
+              "x": 9.07521,
+              "y": -2
+            },
+            {
+              "kind": "curvetotoken",
+              "x": 3,
+              "y": -2
+            },
+            {
+              "kind": "curvetosupportatoken",
+              "x": -3.07521,
+              "y": -2
+            },
+            {
+              "kind": "curvetosupportbtoken",
+              "x": -8,
+              "y": 1.13396
+            },
+            {
+              "kind": "curvetotoken",
+              "x": -8,
+              "y": 5
+            },
+            {
+              "kind": "curvetosupportatoken",
+              "x": -8,
+              "y": 8.86604
+            },
+            {
+              "kind": "curvetosupportbtoken",
+              "x": -3.07521,
+              "y": 12
+            },
+            {
+              "kind": "curvetotoken",
+              "x": 3,
+              "y": 12
+            },
+            {
+              "kind": "curvetosupportatoken",
+              "x": 9.07521,
+              "y": 12
+            },
+            {
+              "kind": "curvetosupportbtoken",
+              "x": 14,
+              "y": 8.86604
+            },
+            {
+              "kind": "curvetotoken",
+              "x": 14,
+              "y": 5
+            },
+            {
+              "kind": "closepathtoken",
+              "x": 14,
+              "y": 5
+            }
+          ]
+        }
+      ],
+      "expectedAnchors": {}
+    },
+    {
+      "start": 0,
+      "end": -360,
+      "rotation": -23,
+      "closed": true,
+      "id": "positive-x-positive-y-full-reverse",
+      "kind": "arc",
+      "rx": 11,
+      "ry": 7,
+      "center": {
+        "x": 3,
+        "y": -5
+      },
+      "lineWidth": 0.4,
+      "paints": [
+        {
+          "action": "stroke",
+          "tokens": [
+            {
+              "kind": "movetotoken",
+              "x": 10.93336,
+              "y": 10.07275
+            },
+            {
+              "kind": "curvetosupportatoken",
+              "x": 9.42279,
+              "y": 13.63144
+            },
+            {
+              "kind": "curvetosupportbtoken",
+              "x": 3.66496,
+              "y": 14.59198
+            },
+            {
+              "kind": "curvetotoken",
+              "x": -1.92728,
+              "y": 12.21822
+            },
+            {
+              "kind": "curvetosupportatoken",
+              "x": -7.51952,
+              "y": 9.84445
+            },
+            {
+              "kind": "curvetosupportbtoken",
+              "x": -10.82825,
+              "y": 5.03534
+            },
+            {
+              "kind": "curvetotoken",
+              "x": -9.31767,
+              "y": 1.47665
+            },
+            {
+              "kind": "curvetosupportatoken",
+              "x": -7.8071,
+              "y": -2.08203
+            },
+            {
+              "kind": "curvetosupportbtoken",
+              "x": -2.04927,
+              "y": -3.04257
+            },
+            {
+              "kind": "curvetotoken",
+              "x": 3.54297,
+              "y": -0.66881
+            },
+            {
+              "kind": "curvetosupportatoken",
+              "x": 9.13521,
+              "y": 1.70496
+            },
+            {
+              "kind": "curvetosupportbtoken",
+              "x": 12.44394,
+              "y": 6.51407
+            },
+            {
+              "kind": "curvetotoken",
+              "x": 10.93336,
+              "y": 10.07275
+            },
+            {
+              "kind": "closepathtoken",
+              "x": 10.93336,
+              "y": 10.07275
+            }
+          ]
+        }
+      ],
+      "expectedAnchors": {}
+    },
+    {
+      "start": 30,
+      "end": 210,
+      "rotation": 37,
+      "closed": false,
+      "id": "positive-x-positive-y-partial-forward",
+      "kind": "arc",
+      "rx": 11,
+      "ry": 7,
+      "center": {
+        "x": 3,
+        "y": -5
+      },
+      "lineWidth": 0.4,
+      "paints": [
+        {
+          "action": "stroke",
+          "tokens": [
+            {
+              "kind": "movetotoken",
+              "x": 10.90678,
+              "y": -6.34064
+            },
+            {
+              "kind": "curvetosupportatoken",
+              "x": 6.46588,
+              "y": -7.1865
+            },
+            {
+              "kind": "curvetosupportbtoken",
+              "x": 0.40268,
+              "y": -4.0539
+            },
+            {
+              "kind": "curvetotoken",
+              "x": -2.63588,
+              "y": 0.65623
+            },
+            {
+              "kind": "curvetosupportatoken",
+              "x": -5.67444,
+              "y": 5.36636
+            },
+            {
+              "kind": "curvetosupportbtoken",
+              "x": -4.53763,
+              "y": 9.8703
+            },
+            {
+              "kind": "curvetotoken",
+              "x": -0.09673,
+              "y": 10.71616
+            }
+          ]
+        }
+      ],
+      "expectedAnchors": {}
+    },
+    {
+      "start": 210,
+      "end": 30,
+      "rotation": 37,
+      "closed": false,
+      "id": "positive-x-positive-y-partial-reverse",
+      "kind": "arc",
+      "rx": 11,
+      "ry": 7,
+      "center": {
+        "x": 3,
+        "y": -5
+      },
+      "lineWidth": 0.4,
+      "paints": [
+        {
+          "action": "stroke",
+          "tokens": [
+            {
+              "kind": "movetotoken",
+              "x": -0.09671,
+              "y": 10.71616
+            },
+            {
+              "kind": "curvetosupportatoken",
+              "x": -4.53761,
+              "y": 9.8703
+            },
+            {
+              "kind": "curvetosupportbtoken",
+              "x": -5.67442,
+              "y": 5.36636
+            },
+            {
+              "kind": "curvetotoken",
+              "x": -2.63586,
+              "y": 0.65623
+            },
+            {
+              "kind": "curvetosupportatoken",
+              "x": 0.4027,
+              "y": -4.0539
+            },
+            {
+              "kind": "curvetosupportbtoken",
+              "x": 6.4659,
+              "y": -7.1865
+            },
+            {
+              "kind": "curvetotoken",
+              "x": 10.9068,
+              "y": -6.34064
+            }
+          ]
+        }
+      ],
+      "expectedAnchors": {}
+    },
+    {
+      "start": 0,
+      "end": 360,
+      "rotation": 0,
+      "closed": true,
+      "id": "negative-x-positive-y-full-forward",
+      "kind": "arc",
+      "rx": -11,
+      "ry": 7,
+      "center": {
+        "x": 3,
+        "y": -5
+      },
+      "lineWidth": 0.4,
+      "paints": [
+        {
+          "action": "stroke",
+          "tokens": [
+            {
+              "kind": "movetotoken",
+              "x": -8,
+              "y": 5
+            },
+            {
+              "kind": "curvetosupportatoken",
+              "x": -8,
+              "y": 1.13396
+            },
+            {
+              "kind": "curvetosupportbtoken",
+              "x": -3.07521,
+              "y": -2
+            },
+            {
+              "kind": "curvetotoken",
+              "x": 3,
+              "y": -2
+            },
+            {
+              "kind": "curvetosupportatoken",
+              "x": 9.07521,
+              "y": -2
+            },
+            {
+              "kind": "curvetosupportbtoken",
+              "x": 14,
+              "y": 1.13396
+            },
+            {
+              "kind": "curvetotoken",
+              "x": 14,
+              "y": 5
+            },
+            {
+              "kind": "curvetosupportatoken",
+              "x": 14,
+              "y": 8.86604
+            },
+            {
+              "kind": "curvetosupportbtoken",
+              "x": 9.07521,
+              "y": 12
+            },
+            {
+              "kind": "curvetotoken",
+              "x": 3,
+              "y": 12
+            },
+            {
+              "kind": "curvetosupportatoken",
+              "x": -3.07521,
+              "y": 12
+            },
+            {
+              "kind": "curvetosupportbtoken",
+              "x": -8,
+              "y": 8.86604
+            },
+            {
+              "kind": "curvetotoken",
+              "x": -8,
+              "y": 5
+            },
+            {
+              "kind": "closepathtoken",
+              "x": -8,
+              "y": 5
+            }
+          ]
+        }
+      ],
+      "expectedAnchors": {}
+    },
+    {
+      "start": 0,
+      "end": -360,
+      "rotation": -23,
+      "closed": true,
+      "id": "negative-x-positive-y-full-reverse",
+      "kind": "arc",
+      "rx": -11,
+      "ry": 7,
+      "center": {
+        "x": 3,
+        "y": -5
+      },
+      "lineWidth": 0.4,
+      "paints": [
+        {
+          "action": "stroke",
+          "tokens": [
+            {
+              "kind": "movetotoken",
+              "x": -9.31767,
+              "y": 1.47665
+            },
+            {
+              "kind": "curvetosupportatoken",
+              "x": -10.82825,
+              "y": 5.03534
+            },
+            {
+              "kind": "curvetosupportbtoken",
+              "x": -7.51952,
+              "y": 9.84445
+            },
+            {
+              "kind": "curvetotoken",
+              "x": -1.92728,
+              "y": 12.21822
+            },
+            {
+              "kind": "curvetosupportatoken",
+              "x": 3.66496,
+              "y": 14.59198
+            },
+            {
+              "kind": "curvetosupportbtoken",
+              "x": 9.42279,
+              "y": 13.63144
+            },
+            {
+              "kind": "curvetotoken",
+              "x": 10.93336,
+              "y": 10.07275
+            },
+            {
+              "kind": "curvetosupportatoken",
+              "x": 12.44394,
+              "y": 6.51407
+            },
+            {
+              "kind": "curvetosupportbtoken",
+              "x": 9.13521,
+              "y": 1.70496
+            },
+            {
+              "kind": "curvetotoken",
+              "x": 3.54297,
+              "y": -0.66881
+            },
+            {
+              "kind": "curvetosupportatoken",
+              "x": -2.04927,
+              "y": -3.04257
+            },
+            {
+              "kind": "curvetosupportbtoken",
+              "x": -7.8071,
+              "y": -2.08203
+            },
+            {
+              "kind": "curvetotoken",
+              "x": -9.31767,
+              "y": 1.47665
+            },
+            {
+              "kind": "closepathtoken",
+              "x": -9.31767,
+              "y": 1.47665
+            }
+          ]
+        }
+      ],
+      "expectedAnchors": {}
+    },
+    {
+      "start": 30,
+      "end": 210,
+      "rotation": 37,
+      "closed": false,
+      "id": "negative-x-positive-y-partial-forward",
+      "kind": "arc",
+      "rx": -11,
+      "ry": 7,
+      "center": {
+        "x": 3,
+        "y": -5
+      },
+      "lineWidth": 0.4,
+      "paints": [
+        {
+          "action": "stroke",
+          "tokens": [
+            {
+              "kind": "movetotoken",
+              "x": -4.30946,
+              "y": 5.12564
+            },
+            {
+              "kind": "curvetosupportatoken",
+              "x": -3.89847,
+              "y": 0.62363
+            },
+            {
+              "kind": "curvetosupportbtoken",
+              "x": 0.784,
+              "y": -4.34122
+            },
+            {
+              "kind": "curvetotoken",
+              "x": 6.14922,
+              "y": -5.96379
+            },
+            {
+              "kind": "curvetosupportatoken",
+              "x": 11.51443,
+              "y": -7.58636
+            },
+            {
+              "kind": "curvetosupportbtoken",
+              "x": 15.53052,
+              "y": -5.25214
+            },
+            {
+              "kind": "curvetotoken",
+              "x": 15.11952,
+              "y": -0.75012
+            }
+          ]
+        }
+      ],
+      "expectedAnchors": {}
+    },
+    {
+      "start": 210,
+      "end": 30,
+      "rotation": 37,
+      "closed": false,
+      "id": "negative-x-positive-y-partial-reverse",
+      "kind": "arc",
+      "rx": -11,
+      "ry": 7,
+      "center": {
+        "x": 3,
+        "y": -5
+      },
+      "lineWidth": 0.4,
+      "paints": [
+        {
+          "action": "stroke",
+          "tokens": [
+            {
+              "kind": "movetotoken",
+              "x": 15.11954,
+              "y": -0.75012
+            },
+            {
+              "kind": "curvetosupportatoken",
+              "x": 15.53053,
+              "y": -5.25214
+            },
+            {
+              "kind": "curvetosupportbtoken",
+              "x": 11.51445,
+              "y": -7.58636
+            },
+            {
+              "kind": "curvetotoken",
+              "x": 6.14923,
+              "y": -5.96379
+            },
+            {
+              "kind": "curvetosupportatoken",
+              "x": 0.78401,
+              "y": -4.34122
+            },
+            {
+              "kind": "curvetosupportbtoken",
+              "x": -3.89845,
+              "y": 0.62363
+            },
+            {
+              "kind": "curvetotoken",
+              "x": -4.30945,
+              "y": 5.12564
+            }
+          ]
+        }
+      ],
+      "expectedAnchors": {}
+    },
+    {
+      "start": 0,
+      "end": 360,
+      "rotation": 0,
+      "closed": true,
+      "id": "positive-x-negative-y-full-forward",
+      "kind": "arc",
+      "rx": 11,
+      "ry": -7,
+      "center": {
+        "x": 3,
+        "y": -5
+      },
+      "lineWidth": 0.4,
+      "paints": [
+        {
+          "action": "stroke",
+          "tokens": [
+            {
+              "kind": "movetotoken",
+              "x": 14,
+              "y": 5
+            },
+            {
+              "kind": "curvetosupportatoken",
+              "x": 14,
+              "y": 8.86604
+            },
+            {
+              "kind": "curvetosupportbtoken",
+              "x": 9.07521,
+              "y": 12
+            },
+            {
+              "kind": "curvetotoken",
+              "x": 3,
+              "y": 12
+            },
+            {
+              "kind": "curvetosupportatoken",
+              "x": -3.07521,
+              "y": 12
+            },
+            {
+              "kind": "curvetosupportbtoken",
+              "x": -8,
+              "y": 8.86604
+            },
+            {
+              "kind": "curvetotoken",
+              "x": -8,
+              "y": 5
+            },
+            {
+              "kind": "curvetosupportatoken",
+              "x": -8,
+              "y": 1.13396
+            },
+            {
+              "kind": "curvetosupportbtoken",
+              "x": -3.07521,
+              "y": -2
+            },
+            {
+              "kind": "curvetotoken",
+              "x": 3,
+              "y": -2
+            },
+            {
+              "kind": "curvetosupportatoken",
+              "x": 9.07521,
+              "y": -2
+            },
+            {
+              "kind": "curvetosupportbtoken",
+              "x": 14,
+              "y": 1.13396
+            },
+            {
+              "kind": "curvetotoken",
+              "x": 14,
+              "y": 5
+            },
+            {
+              "kind": "closepathtoken",
+              "x": 14,
+              "y": 5
+            }
+          ]
+        }
+      ],
+      "expectedAnchors": {}
+    },
+    {
+      "start": 0,
+      "end": -360,
+      "rotation": -23,
+      "closed": true,
+      "id": "positive-x-negative-y-full-reverse",
+      "kind": "arc",
+      "rx": 11,
+      "ry": -7,
+      "center": {
+        "x": 3,
+        "y": -5
+      },
+      "lineWidth": 0.4,
+      "paints": [
+        {
+          "action": "stroke",
+          "tokens": [
+            {
+              "kind": "movetotoken",
+              "x": 10.93336,
+              "y": 10.07275
+            },
+            {
+              "kind": "curvetosupportatoken",
+              "x": 12.44394,
+              "y": 6.51407
+            },
+            {
+              "kind": "curvetosupportbtoken",
+              "x": 9.13521,
+              "y": 1.70496
+            },
+            {
+              "kind": "curvetotoken",
+              "x": 3.54297,
+              "y": -0.66881
+            },
+            {
+              "kind": "curvetosupportatoken",
+              "x": -2.04927,
+              "y": -3.04257
+            },
+            {
+              "kind": "curvetosupportbtoken",
+              "x": -7.8071,
+              "y": -2.08203
+            },
+            {
+              "kind": "curvetotoken",
+              "x": -9.31767,
+              "y": 1.47665
+            },
+            {
+              "kind": "curvetosupportatoken",
+              "x": -10.82825,
+              "y": 5.03534
+            },
+            {
+              "kind": "curvetosupportbtoken",
+              "x": -7.51952,
+              "y": 9.84445
+            },
+            {
+              "kind": "curvetotoken",
+              "x": -1.92728,
+              "y": 12.21822
+            },
+            {
+              "kind": "curvetosupportatoken",
+              "x": 3.66496,
+              "y": 14.59198
+            },
+            {
+              "kind": "curvetosupportbtoken",
+              "x": 9.42279,
+              "y": 13.63144
+            },
+            {
+              "kind": "curvetotoken",
+              "x": 10.93336,
+              "y": 10.07275
+            },
+            {
+              "kind": "closepathtoken",
+              "x": 10.93336,
+              "y": 10.07275
+            }
+          ]
+        }
+      ],
+      "expectedAnchors": {}
+    },
+    {
+      "start": 30,
+      "end": 210,
+      "rotation": 37,
+      "closed": false,
+      "id": "positive-x-negative-y-partial-forward",
+      "kind": "arc",
+      "rx": 11,
+      "ry": -7,
+      "center": {
+        "x": 3,
+        "y": -5
+      },
+      "lineWidth": 0.4,
+      "paints": [
+        {
+          "action": "stroke",
+          "tokens": [
+            {
+              "kind": "movetotoken",
+              "x": 15.11954,
+              "y": -0.75012
+            },
+            {
+              "kind": "curvetosupportatoken",
+              "x": 14.70854,
+              "y": 3.75189
+            },
+            {
+              "kind": "curvetosupportbtoken",
+              "x": 10.02608,
+              "y": 8.71674
+            },
+            {
+              "kind": "curvetotoken",
+              "x": 4.66086,
+              "y": 10.33931
+            },
+            {
+              "kind": "curvetosupportatoken",
+              "x": -0.70436,
+              "y": 11.96188
+            },
+            {
+              "kind": "curvetosupportbtoken",
+              "x": -4.72044,
+              "y": 9.62766
+            },
+            {
+              "kind": "curvetotoken",
+              "x": -4.30945,
+              "y": 5.12564
+            }
+          ]
+        }
+      ],
+      "expectedAnchors": {}
+    },
+    {
+      "start": 210,
+      "end": 30,
+      "rotation": 37,
+      "closed": false,
+      "id": "positive-x-negative-y-partial-reverse",
+      "kind": "arc",
+      "rx": 11,
+      "ry": -7,
+      "center": {
+        "x": 3,
+        "y": -5
+      },
+      "lineWidth": 0.4,
+      "paints": [
+        {
+          "action": "stroke",
+          "tokens": [
+            {
+              "kind": "movetotoken",
+              "x": -4.30946,
+              "y": 5.12564
+            },
+            {
+              "kind": "curvetosupportatoken",
+              "x": -4.72046,
+              "y": 9.62766
+            },
+            {
+              "kind": "curvetosupportbtoken",
+              "x": -0.70438,
+              "y": 11.96188
+            },
+            {
+              "kind": "curvetotoken",
+              "x": 4.66084,
+              "y": 10.33931
+            },
+            {
+              "kind": "curvetosupportatoken",
+              "x": 10.02606,
+              "y": 8.71674
+            },
+            {
+              "kind": "curvetosupportbtoken",
+              "x": 14.70853,
+              "y": 3.75189
+            },
+            {
+              "kind": "curvetotoken",
+              "x": 15.11952,
+              "y": -0.75012
+            }
+          ]
+        }
+      ],
+      "expectedAnchors": {}
+    },
+    {
+      "start": 0,
+      "end": 360,
+      "rotation": 0,
+      "closed": true,
+      "id": "negative-x-negative-y-full-forward",
+      "kind": "arc",
+      "rx": -11,
+      "ry": -7,
+      "center": {
+        "x": 3,
+        "y": -5
+      },
+      "lineWidth": 0.4,
+      "paints": [
+        {
+          "action": "stroke",
+          "tokens": [
+            {
+              "kind": "movetotoken",
+              "x": -8,
+              "y": 5
+            },
+            {
+              "kind": "curvetosupportatoken",
+              "x": -8,
+              "y": 8.86604
+            },
+            {
+              "kind": "curvetosupportbtoken",
+              "x": -3.07521,
+              "y": 12
+            },
+            {
+              "kind": "curvetotoken",
+              "x": 3,
+              "y": 12
+            },
+            {
+              "kind": "curvetosupportatoken",
+              "x": 9.07521,
+              "y": 12
+            },
+            {
+              "kind": "curvetosupportbtoken",
+              "x": 14,
+              "y": 8.86604
+            },
+            {
+              "kind": "curvetotoken",
+              "x": 14,
+              "y": 5
+            },
+            {
+              "kind": "curvetosupportatoken",
+              "x": 14,
+              "y": 1.13396
+            },
+            {
+              "kind": "curvetosupportbtoken",
+              "x": 9.07521,
+              "y": -2
+            },
+            {
+              "kind": "curvetotoken",
+              "x": 3,
+              "y": -2
+            },
+            {
+              "kind": "curvetosupportatoken",
+              "x": -3.07521,
+              "y": -2
+            },
+            {
+              "kind": "curvetosupportbtoken",
+              "x": -8,
+              "y": 1.13396
+            },
+            {
+              "kind": "curvetotoken",
+              "x": -8,
+              "y": 5
+            },
+            {
+              "kind": "closepathtoken",
+              "x": -8,
+              "y": 5
+            }
+          ]
+        }
+      ],
+      "expectedAnchors": {}
+    },
+    {
+      "start": 0,
+      "end": -360,
+      "rotation": -23,
+      "closed": true,
+      "id": "negative-x-negative-y-full-reverse",
+      "kind": "arc",
+      "rx": -11,
+      "ry": -7,
+      "center": {
+        "x": 3,
+        "y": -5
+      },
+      "lineWidth": 0.4,
+      "paints": [
+        {
+          "action": "stroke",
+          "tokens": [
+            {
+              "kind": "movetotoken",
+              "x": -9.31767,
+              "y": 1.47665
+            },
+            {
+              "kind": "curvetosupportatoken",
+              "x": -7.8071,
+              "y": -2.08203
+            },
+            {
+              "kind": "curvetosupportbtoken",
+              "x": -2.04927,
+              "y": -3.04257
+            },
+            {
+              "kind": "curvetotoken",
+              "x": 3.54297,
+              "y": -0.66881
+            },
+            {
+              "kind": "curvetosupportatoken",
+              "x": 9.13521,
+              "y": 1.70496
+            },
+            {
+              "kind": "curvetosupportbtoken",
+              "x": 12.44394,
+              "y": 6.51407
+            },
+            {
+              "kind": "curvetotoken",
+              "x": 10.93336,
+              "y": 10.07275
+            },
+            {
+              "kind": "curvetosupportatoken",
+              "x": 9.42279,
+              "y": 13.63144
+            },
+            {
+              "kind": "curvetosupportbtoken",
+              "x": 3.66496,
+              "y": 14.59198
+            },
+            {
+              "kind": "curvetotoken",
+              "x": -1.92728,
+              "y": 12.21822
+            },
+            {
+              "kind": "curvetosupportatoken",
+              "x": -7.51952,
+              "y": 9.84445
+            },
+            {
+              "kind": "curvetosupportbtoken",
+              "x": -10.82825,
+              "y": 5.03534
+            },
+            {
+              "kind": "curvetotoken",
+              "x": -9.31767,
+              "y": 1.47665
+            },
+            {
+              "kind": "closepathtoken",
+              "x": -9.31767,
+              "y": 1.47665
+            }
+          ]
+        }
+      ],
+      "expectedAnchors": {}
+    },
+    {
+      "start": 30,
+      "end": 210,
+      "rotation": 37,
+      "closed": false,
+      "id": "negative-x-negative-y-partial-forward",
+      "kind": "arc",
+      "rx": -11,
+      "ry": -7,
+      "center": {
+        "x": 3,
+        "y": -5
+      },
+      "lineWidth": 0.4,
+      "paints": [
+        {
+          "action": "stroke",
+          "tokens": [
+            {
+              "kind": "movetotoken",
+              "x": -0.09671,
+              "y": 10.71616
+            },
+            {
+              "kind": "curvetosupportatoken",
+              "x": 4.3442,
+              "y": 11.56201
+            },
+            {
+              "kind": "curvetosupportbtoken",
+              "x": 10.4074,
+              "y": 8.42941
+            },
+            {
+              "kind": "curvetotoken",
+              "x": 13.44595,
+              "y": 3.71928
+            },
+            {
+              "kind": "curvetosupportatoken",
+              "x": 16.48451,
+              "y": -0.99084
+            },
+            {
+              "kind": "curvetosupportbtoken",
+              "x": 15.3477,
+              "y": -5.49478
+            },
+            {
+              "kind": "curvetotoken",
+              "x": 10.9068,
+              "y": -6.34064
+            }
+          ]
+        }
+      ],
+      "expectedAnchors": {}
+    },
+    {
+      "start": 210,
+      "end": 30,
+      "rotation": 37,
+      "closed": false,
+      "id": "negative-x-negative-y-partial-reverse",
+      "kind": "arc",
+      "rx": -11,
+      "ry": -7,
+      "center": {
+        "x": 3,
+        "y": -5
+      },
+      "lineWidth": 0.4,
+      "paints": [
+        {
+          "action": "stroke",
+          "tokens": [
+            {
+              "kind": "movetotoken",
+              "x": 10.90678,
+              "y": -6.34064
+            },
+            {
+              "kind": "curvetosupportatoken",
+              "x": 15.34769,
+              "y": -5.49478
+            },
+            {
+              "kind": "curvetosupportbtoken",
+              "x": 16.4845,
+              "y": -0.99084
+            },
+            {
+              "kind": "curvetotoken",
+              "x": 13.44594,
+              "y": 3.71928
+            },
+            {
+              "kind": "curvetosupportatoken",
+              "x": 10.40738,
+              "y": 8.42941
+            },
+            {
+              "kind": "curvetosupportbtoken",
+              "x": 4.34418,
+              "y": 11.56201
+            },
+            {
+              "kind": "curvetotoken",
+              "x": -0.09673,
+              "y": 10.71616
+            }
+          ]
+        }
+      ],
+      "expectedAnchors": {}
+    },
+    {
+      "id": "review-mixed-axes",
+      "body": {
+        "width": 20,
+        "height": 8,
+        "depth": 3
+      },
+      "innerXSep": -30,
+      "innerYSep": 2,
+      "kind": "node",
+      "shape": "ellipse",
+      "minimumWidth": -2,
+      "minimumHeight": -5,
+      "outerXSep": 0,
+      "outerYSep": 0,
+      "lineWidth": 0.4,
+      "anchor": "center",
+      "paints": [
+        {
+          "action": "stroke",
+          "tokens": [
+            {
+              "kind": "movetotoken",
+              "x": -1,
+              "y": 0
+            },
+            {
+              "kind": "curvetosupportatoken",
+              "x": -1,
+              "y": -5.85794
+            },
+            {
+              "kind": "curvetosupportbtoken",
+              "x": -0.55229,
+              "y": -10.60661
+            },
+            {
+              "kind": "curvetotoken",
+              "x": 0,
+              "y": -10.60661
+            },
+            {
+              "kind": "curvetosupportatoken",
+              "x": 0.55229,
+              "y": -10.60661
+            },
+            {
+              "kind": "curvetosupportbtoken",
+              "x": 1,
+              "y": -5.85794
+            },
+            {
+              "kind": "curvetotoken",
+              "x": 1,
+              "y": 0
+            },
+            {
+              "kind": "curvetosupportatoken",
+              "x": 1,
+              "y": 5.85794
+            },
+            {
+              "kind": "curvetosupportbtoken",
+              "x": 0.55229,
+              "y": 10.60661
+            },
+            {
+              "kind": "curvetotoken",
+              "x": 0,
+              "y": 10.60661
+            },
+            {
+              "kind": "curvetosupportatoken",
+              "x": -0.55229,
+              "y": 10.60661
+            },
+            {
+              "kind": "curvetosupportbtoken",
+              "x": -1,
+              "y": 5.85794
+            },
+            {
+              "kind": "curvetotoken",
+              "x": -1,
+              "y": 0
+            },
+            {
+              "kind": "closepathtoken",
+              "x": -1,
+              "y": 0
+            },
+            {
+              "kind": "movetotoken",
+              "x": 0,
+              "y": 0
+            }
+          ]
+        }
+      ],
+      "expectedAnchors": {
+        "0": {
+          "x": -1,
+          "y": 0
+        },
+        "13": {
+          "x": -0.99973,
+          "y": 0.23045
+        },
+        "45": {
+          "x": -0.99553,
+          "y": 0.99533
+        },
+        "90": {
+          "x": 0,
+          "y": 10.60661
+        },
+        "181": {
+          "x": 0.99998,
+          "y": -0.01715
+        },
+        "270": {
+          "x": 0,
+          "y": -10.60661
+        },
+        "315": {
+          "x": -0.99553,
+          "y": -0.99533
+        },
+        "text": {
+          "x": -10,
+          "y": 2.5
+        },
+        "center": {
+          "x": 0,
+          "y": 0
+        },
+        "base": {
+          "x": 0,
+          "y": 2.5
+        },
+        "mid": {
+          "x": 0,
+          "y": 0.34723
+        },
+        "east": {
+          "x": -1,
+          "y": 0
+        },
+        "west": {
+          "x": 1,
+          "y": 0
+        },
+        "north": {
+          "x": 0,
+          "y": -10.60661
+        },
+        "south": {
+          "x": 0,
+          "y": 10.60661
+        },
+        "north east": {
+          "x": -0.7071,
+          "y": -7.50002
+        },
+        "north west": {
+          "x": 0.7071,
+          "y": -7.50002
+        },
+        "south east": {
+          "x": -0.7071,
+          "y": 7.50002
+        },
+        "south west": {
+          "x": 0.7071,
+          "y": 7.50002
+        },
+        "base east": {
+          "x": -1,
+          "y": 2.5
+        },
+        "base west": {
+          "x": 1,
+          "y": 2.5
+        },
+        "mid east": {
+          "x": -1,
+          "y": 0.34723
+        },
+        "mid west": {
+          "x": 1,
+          "y": 0.34723
+        },
+        "-30": {
+          "x": -0.99849,
+          "y": -0.57599
+        }
+      }
+    },
+    {
+      "id": "native-empty-mixed-axes",
+      "body": {
+        "width": 0,
+        "height": 0,
+        "depth": 0
+      },
+      "innerXSep": -20,
+      "innerYSep": 7.5,
+      "kind": "node",
+      "shape": "ellipse",
+      "minimumWidth": -2,
+      "minimumHeight": -5,
+      "outerXSep": 0,
+      "outerYSep": 0,
+      "lineWidth": 0.4,
+      "anchor": "center",
+      "paints": [
+        {
+          "action": "stroke",
+          "tokens": [
+            {
+              "kind": "movetotoken",
+              "x": -1,
+              "y": 0
+            },
+            {
+              "kind": "curvetosupportatoken",
+              "x": -1,
+              "y": -5.85794
+            },
+            {
+              "kind": "curvetosupportbtoken",
+              "x": -0.55229,
+              "y": -10.60661
+            },
+            {
+              "kind": "curvetotoken",
+              "x": 0,
+              "y": -10.60661
+            },
+            {
+              "kind": "curvetosupportatoken",
+              "x": 0.55229,
+              "y": -10.60661
+            },
+            {
+              "kind": "curvetosupportbtoken",
+              "x": 1,
+              "y": -5.85794
+            },
+            {
+              "kind": "curvetotoken",
+              "x": 1,
+              "y": 0
+            },
+            {
+              "kind": "curvetosupportatoken",
+              "x": 1,
+              "y": 5.85794
+            },
+            {
+              "kind": "curvetosupportbtoken",
+              "x": 0.55229,
+              "y": 10.60661
+            },
+            {
+              "kind": "curvetotoken",
+              "x": 0,
+              "y": 10.60661
+            },
+            {
+              "kind": "curvetosupportatoken",
+              "x": -0.55229,
+              "y": 10.60661
+            },
+            {
+              "kind": "curvetosupportbtoken",
+              "x": -1,
+              "y": 5.85794
+            },
+            {
+              "kind": "curvetotoken",
+              "x": -1,
+              "y": 0
+            },
+            {
+              "kind": "closepathtoken",
+              "x": -1,
+              "y": 0
+            },
+            {
+              "kind": "movetotoken",
+              "x": 0,
+              "y": 0
+            }
+          ]
+        }
+      ],
+      "expectedAnchors": {
+        "0": {
+          "x": -1,
+          "y": 0
+        },
+        "13": {
+          "x": -0.99973,
+          "y": 0.23045
+        },
+        "45": {
+          "x": -0.99553,
+          "y": 0.99533
+        },
+        "90": {
+          "x": 0,
+          "y": 10.60661
+        },
+        "181": {
+          "x": 0.99998,
+          "y": -0.01715
+        },
+        "270": {
+          "x": 0,
+          "y": -10.60661
+        },
+        "315": {
+          "x": -0.99553,
+          "y": -0.99533
+        },
+        "text": {
+          "x": 0,
+          "y": 0
+        },
+        "center": {
+          "x": 0,
+          "y": 0
+        },
+        "base": {
+          "x": 0,
+          "y": 0
+        },
+        "mid": {
+          "x": 0,
+          "y": -2.15277
+        },
+        "east": {
+          "x": -1,
+          "y": 0
+        },
+        "west": {
+          "x": 1,
+          "y": 0
+        },
+        "north": {
+          "x": 0,
+          "y": -10.60661
+        },
+        "south": {
+          "x": 0,
+          "y": 10.60661
+        },
+        "north east": {
+          "x": -0.7071,
+          "y": -7.50002
+        },
+        "north west": {
+          "x": 0.7071,
+          "y": -7.50002
+        },
+        "south east": {
+          "x": -0.7071,
+          "y": 7.50002
+        },
+        "south west": {
+          "x": 0.7071,
+          "y": 7.50002
+        },
+        "base east": {
+          "x": -1,
+          "y": 0
+        },
+        "base west": {
+          "x": 1,
+          "y": 0
+        },
+        "mid east": {
+          "x": -1,
+          "y": -2.15277
+        },
+        "mid west": {
+          "x": 1,
+          "y": -2.15277
+        },
+        "-30": {
+          "x": -0.99849,
+          "y": -0.57599
+        }
+      }
+    }
+  ]
+}

@@ -228,7 +228,10 @@ test('signed ellipse radii retain analytic paint bounds and 0.005-unit contour p
     close(contour.bounds.minY, paintedCenter.y - halfHeight)
     close(contour.bounds.maxY, paintedCenter.y + halfHeight)
     assert.ok(contour.closed)
-    assert.match(contour.path, new RegExp(`A ${rx} ${ry} ${-rotation} 0 0`))
+    // PGF reflects orientation once for each negative analytic axis; SVG also
+    // reflects Y. Only the arc radius operands use magnitudes.
+    const sweep = (rx < 0) !== (ry < 0) ? 1 : 0
+    assert.match(contour.path, new RegExp(`A ${Math.abs(rx)} ${Math.abs(ry)} ${-rotation} 0 ${sweep}`))
     // Sample the independent analytic ellipse, rather than treating vertex
     // count as proof that the shared picking contour follows painted SVG arcs.
     for (let degrees = .25; degrees < 360; degrees += .5) {

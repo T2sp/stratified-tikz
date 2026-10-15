@@ -1,0 +1,46 @@
+\documentclass{article}
+\usepackage{tikz}
+\usetikzlibrary{shapes.geometric}
+\typeout{STZ PGF VERSION \pgfversion}
+\pagestyle{empty}
+\makeatletter
+\newwrite\fixtureout
+\immediate\openout\fixtureout=geometry.txt
+\newcommand\recordpaint{\pgfgetpath\fixturepath\immediate\write\fixtureout{PAINT stroke; PATH \meaning\fixturepath}\pgfusepath{stroke}}
+\newcommand\fixedarc[9]{%
+\begin{pgfpicture}\begingroup\pgfsetlinewidth{.4pt}\pgftransformrotate{#6}%
+\immediate\write\fixtureout{CASE #1}%
+\pgfpathmoveto{\pgfpointadd{\pgfpoint{#7pt}{#8pt}}{\pgfpointpolar{#4}{#2pt and #3pt}}}%
+\pgfpatharc{#4}{#5}{#2pt and #3pt}%
+\ifnum#9=1\pgfpathclose\fi\recordpaint
+\endgroup\end{pgfpicture}\par}
+\newcommand\fixedellipse[6]{%
+\begin{pgfpicture}\begingroup\normalfont
+\pgfkeys{/pgf/inner xsep=#5pt,/pgf/inner ysep=#6pt,/pgf/outer xsep=0pt,/pgf/outer ysep=0pt,/pgf/minimum width=-2pt,/pgf/minimum height=-5pt}%
+\setbox\pgfnodeparttextbox=\hbox{}%
+\wd\pgfnodeparttextbox=#2pt\ht\pgfnodeparttextbox=#3pt\dp\pgfnodeparttextbox=#4pt%
+\pgfsetlinewidth{.4pt}\immediate\write\fixtureout{CASE #1}%
+\pgfmultipartnode{ellipse}{center}{fixture}{\recordpaint}%
+\foreach\anchorname in {text,center,base,mid,east,west,north,south,north east,north west,south east,south west,base east,base west,mid east,mid west,0,13,45,90,181,270,315,-30}{\pgfpointanchor{fixture}{\anchorname}\immediate\write\fixtureout{ANCHOR \anchorname; \the\pgf@x,\the\pgf@y}}%
+\endgroup\end{pgfpicture}\par}
+\makeatother
+\begin{document}
+\fixedarc{positive-x-positive-y-full-forward}{11}{7}{0}{360}{0}{3}{-5}{1}
+\fixedarc{positive-x-positive-y-full-reverse}{11}{7}{0}{-360}{-23}{3}{-5}{1}
+\fixedarc{positive-x-positive-y-partial-forward}{11}{7}{30}{210}{37}{3}{-5}{0}
+\fixedarc{positive-x-positive-y-partial-reverse}{11}{7}{210}{30}{37}{3}{-5}{0}
+\fixedarc{negative-x-positive-y-full-forward}{-11}{7}{0}{360}{0}{3}{-5}{1}
+\fixedarc{negative-x-positive-y-full-reverse}{-11}{7}{0}{-360}{-23}{3}{-5}{1}
+\fixedarc{negative-x-positive-y-partial-forward}{-11}{7}{30}{210}{37}{3}{-5}{0}
+\fixedarc{negative-x-positive-y-partial-reverse}{-11}{7}{210}{30}{37}{3}{-5}{0}
+\fixedarc{positive-x-negative-y-full-forward}{11}{-7}{0}{360}{0}{3}{-5}{1}
+\fixedarc{positive-x-negative-y-full-reverse}{11}{-7}{0}{-360}{-23}{3}{-5}{1}
+\fixedarc{positive-x-negative-y-partial-forward}{11}{-7}{30}{210}{37}{3}{-5}{0}
+\fixedarc{positive-x-negative-y-partial-reverse}{11}{-7}{210}{30}{37}{3}{-5}{0}
+\fixedarc{negative-x-negative-y-full-forward}{-11}{-7}{0}{360}{0}{3}{-5}{1}
+\fixedarc{negative-x-negative-y-full-reverse}{-11}{-7}{0}{-360}{-23}{3}{-5}{1}
+\fixedarc{negative-x-negative-y-partial-forward}{-11}{-7}{30}{210}{37}{3}{-5}{0}
+\fixedarc{negative-x-negative-y-partial-reverse}{-11}{-7}{210}{30}{37}{3}{-5}{0}
+\fixedellipse{review-mixed-axes}{20}{8}{3}{-30}{2}
+\fixedellipse{native-empty-mixed-axes}{0}{0}{0}{-20}{7.5}
+\end{document}

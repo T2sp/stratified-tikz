@@ -22,6 +22,12 @@ function pointText(point: Vec2): string {
   return `${number(point.x)} ${number(point.y)}`
 }
 
+/** Signed PGF axes and the Y reflection determine the SVG traversal direction. */
+function svgArcSweep(rx: number, ry: number, from: number, to: number): 0 | 1 {
+  const axisReflection = (rx < 0) !== (ry < 0)
+  return (to > from) === axisReflection ? 1 : 0
+}
+
 export function boundsOfPoints(points: readonly Vec2[]): PointShapeBounds {
   let minX = Infinity
   let minY = Infinity
@@ -88,7 +94,7 @@ export class ShapeContourBuilder {
         }
       } else {
         this.commands.push(
-          `A ${number(rx)} ${number(ry)} ${number(-this.rotation)} 0 ${to > from ? 0 : 1} ${pointText(target)}`,
+          `A ${number(Math.abs(rx))} ${number(Math.abs(ry))} ${number(-this.rotation)} 0 ${svgArcSweep(rx, ry, from, to)} ${pointText(target)}`,
         )
       }
       const span = Math.abs(to - from) * radians

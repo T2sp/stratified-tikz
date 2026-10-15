@@ -17,7 +17,7 @@ import { syntheticSingularCylinderStandalone } from './singularCylinderFixture.m
 import { cylinderDiagnosticScenarios } from '../../scripts/singularCylinderDiagnosticContract.mjs'
 import { foldedCylinderScenario } from '../../scripts/foldedCylinderContract.mjs'
 import { syntheticFoldedCylinderStandalone } from './foldedCylinderFixture.mjs'
-import { pointNodeAnchorSupport } from '../../src/geometry/pointNodeShapes/index.ts'
+import { pointNodeAnchorSupport, solvePointNodeShape } from '../../src/geometry/pointNodeShapes/index.ts'
 import { createEmptyDiagram, createPointStratum } from '../../src/model/constructors.ts'
 import { generateTikz } from '../../src/tikz/generateTikz.ts'
 import { syntheticPointToolbarRevisionRecords } from './pointNativeDragFixture.mjs'
@@ -836,8 +836,27 @@ for (const spec of signedAnchorCases) for (const fault of ['missing', 'duplicate
     assert.throws(() => assertLayoutAnchorEvidence(current, name))
   })
 }
+for (const spec of signedPickingCases) test(`32D signed ${spec.key} picking policy accepts actual positive-radius SVG with signed traversal`, () => {
+  const name = 'point-layout-native-interaction-2d-3d', current = evidence(name)
+  const solution = solvePointNodeShape({ shape: 'ellipse',
+    body: spec.source ? { width: 12, height: 9, depth: 3 } : { width: 0, height: 0, depth: 0 },
+    innerXSep: -120, innerYSep: -120, minimumWidth: -192, minimumHeight: -192,
+    outerXSep: 0, outerYSep: 0, unitScale: 1.2, anchor: 'center' })
+  assert.deepEqual(solution.signedFittedAxes, { x: -96, y: -96 })
+  const contour = solution.contours[0]
+  const firstQuarter = contour.vertices.findIndex(({ x, y }) => Math.abs(x) < .0001 && Math.abs(y - 96) < .0001)
+  const thirdQuarter = contour.vertices.findIndex(({ x, y }) => Math.abs(x) < .0001 && Math.abs(y + 96) < .0001)
+  assert.ok(firstQuarter > 0 && thirdQuarter > firstQuarter, 'Signed PGF axes visit SVG south before north')
+  const entry = current.signedPickingCases.find(({ key }) => key === spec.key)
+  entry.rendered.contour.attributes.d = contour.path
+  assert.ok(entry.rendered.nativeSelection.before.geometry.contour.localBoundary.y > 0,
+    'Synthetic .23 boundary follows the same signed first half-arc')
+  assertLayoutAnchorEvidence(current, name)
+})
 for (const spec of signedPickingCases) for (const fault of ['missing', 'wrong-source', 'wrong-dimension', 'cardinal-click',
-  'wrong-radius', 'absolute-path-radius', 'wrong-paint-bounds', 'missing-screen-bounds', 'local-bounds-in-screen-frame',
+  'wrong-radius', 'negative-svg-radii', 'absolute-axis-start', 'wrong-first-endpoint', 'wrong-final-endpoint',
+  'reversed-first-sweep', 'reversed-second-sweep', 'wrong-x-radius', 'wrong-y-radius', 'extra-arc',
+  'wrong-paint-bounds', 'missing-screen-bounds', 'local-bounds-in-screen-frame',
   'cycle-screen-bounds', 'missing-native-selection', 'missing-cycle',
   'untrusted-cycle', 'wrong-cycle-owner', 'stale-cycle-revision', 'changed-cycle-layout']) {
   test(`synthetic 32D signed ${spec.key} picking policy rejects ${fault}`, () => {
@@ -846,7 +865,22 @@ for (const spec of signedPickingCases) for (const fault of ['missing', 'wrong-so
     if (fault === 'missing') current.signedPickingCases = current.signedPickingCases.filter(({ key }) => key !== spec.key)
     if (fault === 'wrong-source') entry.source = spec.source === '' ? 'x' : ''
     if (fault === 'wrong-dimension') entry.ambientDimension = spec.ambientDimension === 2 ? 3 : 2
-    if (fault === 'absolute-path-radius') entry.rendered.contour.attributes.d = entry.rendered.contour.attributes.d.replaceAll('A -96 -96', 'A 96 96')
+    const pathFaults = {
+      'negative-svg-radii': (path) => path.replaceAll('A 96 96', 'A -96 -96'),
+      'absolute-axis-start': (path) => path.replace('M -96 0', 'M 96 0'),
+      'wrong-first-endpoint': (path) => path.replace('0 0 0 96 0 A', '0 0 0 -96 0 A'),
+      'wrong-final-endpoint': (path) => path.replace('0 0 0 -96 0 Z', '0 0 0 96 0 Z'),
+      'reversed-first-sweep': (path) => path.replace('A 96 96 0 0 0 96 0', 'A 96 96 0 0 1 96 0'),
+      'reversed-second-sweep': (path) => path.replace('A 96 96 0 0 0 -96 0', 'A 96 96 0 0 1 -96 0'),
+      'wrong-x-radius': (path) => path.replace('A 96 96', 'A 48 96'),
+      'wrong-y-radius': (path) => path.replace('A 96 96', 'A 96 48'),
+      'extra-arc': (path) => path.replace(' Z', ' A 96 96 0 0 0 96 0 Z'),
+    }
+    if (Object.hasOwn(pathFaults, fault)) {
+      const path = entry.rendered.contour.attributes.d
+      entry.rendered.contour.attributes.d = pathFaults[fault](path)
+      assert.notEqual(entry.rendered.contour.attributes.d, path, 'The path negative control changes actual operands')
+    }
     if (fault === 'wrong-paint-bounds') entry.rendered.bounds.width = 96
     if (fault === 'missing-screen-bounds') delete entry.rendered.contourScreenBounds
     if (fault === 'local-bounds-in-screen-frame') entry.rendered.contourScreenBounds = structuredClone(entry.rendered.bounds)

@@ -1,5 +1,349 @@
 # Phase 32D spacing, minima, anchors, and combined audit
 
+## SVG radius acceptance contract follow-up (2026-10-15)
+
+The conformance handoff SHA256
+`30bbc6a0cd2278f8c086e5263a7f41bdd27f28ad20251c88c7cb6d3cead2882a`
+and all 474 declared source/reference files authenticate against entry fingerprint
+`2141baadb5e2bad657af93b492f64c0726423aa685736c939ab6661e43be4153`.
+The subsequent browser-capable parent `rXGfwJ` passed its Node suite, build,
+diff check and label-assets, then failed `check:free-labels` at the signed picking
+contract: actual SVG arc radius operands were `96 96`, but the old assertion
+still required `-96 -96`. Its failed report and artifacts remain unchanged at
+`/var/folders/vk/7kf940pd4bx8f6cg3rzlmtc80000gn/T/stz-phase32d-before-review-rXGfwJ/`.
+This is a reached native assertion, separate from the preceding child EPERM.
+
+The correction is confined to the acceptance contract, its browser paint-probe
+helper and synthetic policy fixtures/tests. SVG operands retain positive radius magnitudes; the contract
+checks the ordered negative-axis start, both half-arc endpoints, rotation,
+large-arc and sweep flags, and closure. Negative controls reject changes to
+those values, including restoring negative radius operands. Authored signed
+layout, signed anchors, ordered paint bounds, native oblique picking and owner
+cycling retain their independent checks. Production geometry, inherited PGF
+reference bytes, tolerances and browser deadlines are unchanged by this follow-up.
+
+The first fresh strict run, `stz-phase32d-manual-BWmR5t`, passed **7,518/7,518**
+tests (zero failures/cancellations/skips/todos), build, diff and label-assets on
+unchanged fingerprint `1a4124812756c5c7e6fd26098155dc11a6582bb8f7ebe3f76cd08e289d21c6f2`.
+Native `point-layout-native-interaction-2d-3d`, including both signed picking
+cases, passed. The newly reached conformance reopening then failed with
+`canvas.getContext is not a function`: in a standalone SVG document,
+`document.createElement('canvas')` does not create an HTML Canvas. The probe now
+uses the explicit XHTML namespace, matching the existing standalone raster
+helpers. HTML/SVG document regression coverage and a real Chrome probe precede
+the next complete strict run. The failed full outcome and its live/downloaded/
+reopened evidence remain immutable; it does not establish full acceptance.
+
+The standalone probe also used Blob image URLs, which entered the unfiltered
+request ledger that correctly requires only the downloaded file URL. Exact SVG
+data URLs now retain that ledger without filtering requests. The actual file
+also has one trailing empty, unstyled selection group and an immutable click
+revision at `snapshot.runtime.documentRevision`; the synthetic fixture and policy
+now match those real structures. Exact ancestry, foreign-paint rejection and
+native/click revision continuity remain mandatory, with corruption controls.
+
+A focused Chrome probe exposed a separate invalid exact-raster assumption:
+the identical signed ellipse SVG inputs have zero dark-mask differences in the
+reference librsvg 2.63.0 renderer, but twelve boundary pixels differ in Chrome
+155 between analytic SVG arcs and PGF cubic tokens. Independent ordered geometry
+error is about .00102pt and stroke-length difference .00255pt, both within the
+unchanged .03pt contour tolerance; restoring the old sweep gives about 21.21pt
+ordered error. All twelve Chrome differences are one pixel from the PGF mask.
+The policy retains raw counts, hashes, threshold 128, 800px frame, authored
+styles and the .025pt/.03pt tolerances. Diamond still requires exact pixel equality.
+Ellipse requires independent ordered path/length/tangent conformance and symmetric
+mask containment within two raster-cell half-diagonals plus the existing contour
+tolerance: `sqrt(2) + .03 * 1.2 * 800 / 96` pixels. No mismatch-count allowance is
+fitted to the observed twelve. The old sweep must fail both the same ordered
+geometry criterion and the same spatial criterion, as well as the prior pixel
+disagreement margin.
+
+The final direct-helper Chrome probe passed **4/4** HTML/SVG-document cases:
+diamond mismatch zero versus old 620; ellipse raw mismatch twelve with zero
+outside the derived bound versus old 282 with 228 outside. Request ledgers,
+markup, image handlers and timers remain intact. Eight final focused tests cover
+namespace/cleanup, independent masks and traversal, coherently rehashed displaced
+paint, real root anatomy and click revision. Scoped lint, syntax and diff pass.
+The initial namespace failure, first strict failure and first exact-mask probe
+failure remain retained separately. These helper results precede another complete
+strict run and cannot replace cumulative native acceptance or completion review.
+
+The next strict run, `stz-phase32d-manual-sViYfD`, passed **7,523/7,523** tests,
+build, diff and label-assets on unchanged fingerprint
+`025ab6d856a9d6273272f89155323c2b97624914d63203378aeaacc0d9c838b3`.
+Signed native interaction passed again. The first diamond 2D conformance workflow
+completed its actual download/reopening/capture and all downstream checks. Ellipse
+2D then stopped before export because a measured CTM residue of about
+`7.105427357601002e-15` was treated as requiring a contour `transform` attribute.
+The renderer correctly omits that attribute for its exact geometric center.
+Attribute presence and exact serialized translation now follow the geometric
+anchor offset; measured CTM placement retains its existing independent .0001
+comparison. Both-dimension tests accept microscopic measured residues while
+rejecting genuine displacement, invented center transforms and missing/incorrect
+north-anchor translations. No placement tolerance is widened. The first focused
+CTM test passed 1/1; the actual first failure remains retained, without claiming
+a pre-fix Node test run. Only diamond 2D completed and ellipse 2D was observed in
+that failed native run; neither ellipse export nor the two 3D conformance cases
+are inferred as passed. A fresh complete strict run remains required.
+
+Fresh outcomes, exact changed-file hashes, preserved inventories and the final
+tracked/untracked tree guard are retained separately under
+`/private/tmp/stz-32d-radius-contract-20261015/`, with terminal status in
+`HANDOFF.json`. Earlier failed runs and handoffs remain immutable. All eighteen
+groups, twelve layouts, four conformance workflows, both fifteen-entry pending
+downloads/reopening and final standalone must pass on the final tree before a
+fresh independent completion review and its matching-tree guard. **Phase 32
+completion remains conditional on those gates.** No commit or push.
+
+## Diamond scanned aspect and signed ellipse traversal follow-up (2026-10-15)
+
+The current entry is clean `dd88dd390eb2bae61313a4cd1fec4d5446c86b05`,
+fingerprint `1504a8364a3081b97331694fc0884763e47c7b558fd37574ec8cd0030a315686`.
+This commit incorporates the new fix prompt and the inherited implementation;
+the prompt's preceding dirty identity remains historical. Before source edits,
+all nine original handoff source entries and all eighteen independent review
+artifact/source hashes matched. Exact reviewed source bytes were copied with
+original-path/retained-path/byte/SHA256 associations to
+`/private/tmp/stz-32d-conformance-fix-20261015/pre-fix/`. Authentication and
+the exact original nine-file inventory are retained in `baseline-authentication.json`
+in that directory's parent. The original reproduction manifest is unchanged.
+All 571 inherited associations, 562 additive cylinder files and 654 original
+reference hashes were rechecked with zero mismatches (`preservation-before.json`).
+
+The latest immutable App handoff is 33,191 bytes, SHA256
+`a525e18e9cbeb5058d7b4369a5e02705af2da08db9e00be1dc3421556cfde378`.
+Its child native-pending disposition predates complete browser-capable parent
+KZ5KP9. That parent's report SHA256 is
+`8369c139f29dd306724dda5e37f1303d2768ecb8cdedd6a59cc26262e8c46bf1`;
+verifier response SHA256 is
+`af5bed781225c8536725e3aca302236db1a1e8d948d4d843721d411866bee881`.
+Both authenticate the preceding fingerprint
+`8443f980f600cd365fd8f93b8af2946542012f486a201fae67bd83adae362396`.
+The raw cumulative evidence was resolved using `readEvidenceDocumentSync` with
+its complete exact checkout, then replayed through `validateBrowserEvidence`:
+18/18 groups, all twelve named layout scenarios, 205 evidence records, 4,907
+diagnostics and no page errors. Both actual pending downloads, fifteen-entry
+click envelopes, external reopening and final standalone passed on that tree.
+The resolved raw observation is retained separately as `parent-raw-resolved.json`;
+the publication pointer is not treated as the raw report. Its full suite passed
+7,344/7,344, with build, diff, label-assets and free-labels passing.
+
+The independent completion review subsequently returned **needs_changes**, Critical
+0 / Medium 2 / Low 0, `ready_to_commit:false`. Summary SHA256:
+`a29a114135cfc4b2ec8d6302db2e7d1fceb4e25497275c6f9413f57c26faf212`;
+full log SHA256:
+`1def5ecd9293e6d8df0b11956ea3b359b1e396a2e415666a76dd3721bb5f2731`.
+Its immutable PGF 3.1.11a reproduction manifest is 4,985 bytes, SHA256
+`8cd2592e5084d3d38f71fd568659951575ea19d08eab1dd7550401f267151a48`.
+The review accepted the matching complete parent artifacts, but reproduced two
+production defects: ordinary diamond division gives 1157pt instead of PGF's
+1170.06155pt north distance at aspect .01, and mixed-sign ellipse SVG arcs reverse
+dash traversal (298 differing dark pixels; a sweep-only correction gives zero).
+These two findings supersede earlier missing-browser status as the active
+production blockers. Completed wait/publication, signed-axis and cylinder fixes
+remain preserved; neither historical native timeout's exclusive cause is proved.
+
+This follow-up is limited to shared pure diamond arithmetic and signed arc
+encoding, additive independent references, rendering/export regressions and
+mandatory native evidence. Keep aspect .01–100, authored options, model/history,
+coordinates, styles and existing .025pt anchor/.03pt contour tolerances. The
+accepted diamond background outer-separation subtraction remains shape-specific.
+New execution results and source/artifact identities are recorded below when
+checks finish. **Phase 32 remains incomplete** until fresh matching verification
+and independent completion review pass. Prior-tree browser acceptance cannot
+accept these edits. No commit or push is authorized or performed.
+
+The shared `fitDiamond` helper follows TeX's decimal scan (including its
+seventeen-digit fractional rounding), `.125` dimensional product, scaled-point
+count conversion and `8192pt` integer division. It then performs the separately
+scanned dimensional products/advances, per-axis minima, clearance additions and
+the documented diamond-only background subtraction. Both paint and anchor
+construction consume it. Diamond numeric border anchors reuse the existing PGF
+dimensional intersection routine with the declared origin; analytic intersections
+also missed the unchanged tolerance at extreme supported aspects. Authored aspect
+and option text are still exported unchanged, and unsupported text-side anchors
+remain diagnosed. No support-map, aspect-range, model, style or dependency change.
+
+Additive `diamond-aspect-scanning/` references retain 22 actual PGF fixed boxes,
+558 anchors, nineteen source-register stages per box, ordered paths, exact TeX,
+raw log/PDF, compiler output and source/engine/command/hash identities. Required
+aspects .01/.03/.1/.2/.6/1.1/100, neighboring values, independent minima, signed
+asymmetric separation, odd-sp inputs, empty/zero bodies and unit scales 1/1.2/2.7
+are covered. Exact stage equality and .025pt anchor/.03pt contour checks reject
+restoring old division or substituting `pgfmathreciprocal`. The offline generator
+imports no production geometry. New rendering checks exercise north/text/base/mid/
+numeric placement, actual controller pending/ready states, live/detached settled
+SVG, attached body/free/inline source isolation, saved/history/model/projection/
+picking and both TikZ modes in 2D/3D.
+
+The small pure SVG sweep helper combines parameter direction with the parity of
+negative radii under the existing Y reflection. Only SVG radius operands use
+magnitudes. Signed analytic axes, start/endpoints, ordered samples, extrema,
+anchors and placement retain their meanings. Additive `signed-traversal/`
+references contain eighteen independent PGF cases (sixteen signed full/partial
+forward/reverse arcs with translated centers/rotation and two actual ellipse
+nodes), 48 anchors and ninety direction-sensitive renderer records with 432
+SVG/PNG artifacts. Multiple dash phases, caps/joins, solid/fill controls and
+ordered cumulative traversal/tangents distinguish the two negative controls.
+The reviewed mixed case retains 480 dark pixels and its corrected PNG is exactly
+`7e29b9db2533c9e41672f63cffe547232155c0dfd669f51dcd7de4ab51d39d55`;
+old sweep/global-absolute controls differ at 298/297 pixels. Other PGF cubic versus
+analytic-arc boundary differences are explicitly recorded, maximum 16/640,000
+pixels. Geometric tolerances remain unchanged. Zero-axis retracing, finite work,
+signed picking/anchors, cylinder folding/seams/custom fill and domain/scanning
+contracts pass preservation checks.
+
+Fresh focused results: combined new suites **152/152**, diamond preservation
+**645/645**, diamond model/TikZ/import contracts **180/180**, ellipse preservation
+**614/614**, and App wait/publication/pending/capture preservation **292/292**.
+These overlap; do not add them into a purported full-suite total. Build, strict
+application TypeScript and strict new-test TypeScript pass. The four original
+lint findings (two geometric caller `no-unsafe-finally`, verifier `_role`, layer
+test `defaultCurveStyle`) and the separate `SvgDiagram` ref finding were
+reproduced from entry HEAD; repository-wide lint was not run.
+
+First outcomes are retained in `diamond-outcomes.json`, `ELLIPSE_HANDOFF.json`
+and command logs under the external follow-up directory. Diamond's first trace
+assertion failed after successful PGF compilation (18 versus 19 instrumented
+stages); trace comments/matching were corrected. Its first geometry run was
+15/25 and exposed the scanner/numeric-intersection defects plus an incorrect
+zero-vertex assertion; the next 24/25 failure distinguished signed zero in a test.
+The first combined diamond run was 25/39 because the renderer fixture used
+emergency metrics instead of an actual controller pending state. Ellipse's first
+focused run was 106/107 due to a negative-control regex selecting the wrong arc
+field; its first renderer run was 91/93 due to signed-zero equality in two fixture
+assertions. Correcting those tests did not relax geometry or readiness. The new
+native policy's first focused run was 2/3 because a missing-inventory assertion
+expected diagnostic text from a TypeError; an explicit required-array assertion
+now diagnoses the missing evidence. These first outcomes are not replaced by
+later isolated passes.
+
+Mandatory native correction evidence is added inside
+`point-layout-signed-polygonal-zero-axis`, preserving eighteen groups and twelve
+layout scenarios. Four actual shape/dimension workflows require trusted selection,
+live ordered traversal/paint, saved/history/click continuity, actual SVG downloads,
+external reopening and complete-root PNG. Actual DOM/reopened contours are bound
+to independent PGF-token probes and exact authored paint. Parent replay parses
+the actual SVG owner ancestry, root/ancestor attributes and projected model
+placement, and rejects missing/mismatched coverage. Focused new policy tests pass
+3/3; the filtered parent/isolated-runner sweep passes 9/9, including actual strict
+exit-zero reports with missing/mismatched conformance evidence. A focused read-only
+audit found and closed file placement/root-opacity, detached-probe, dimension/key
+reuse and native continuity/paint gaps in this new validator. Corruption controls
+preserve each case. That scoped audit is not independent completion review.
+
+The exact native probe inputs were also rendered offline with librsvg 2.63.0:
+diamond corrected/PGF masks match at all 800×800 pixels (2,204 dark), while old
+division differs at 621; signed ellipse masks match (478 dark), while old sweep
+differs at 300. Input SVG/PNG/command/hash evidence is retained under
+`native-probe-offline/`; this helper result is not browser/native acceptance.
+Final expanded lint covers nine changed/new TypeScript and thirteen JavaScript
+files plus thirteen syntax checks with zero new findings; the inherited verifier
+`_role` finding remains separately reported. Its first expanded attempt found two
+`no-loss-of-precision` findings in intentional below-half-sp generator literals.
+Explicit `Number(string)` conversion preserves the exact emitted numeric text;
+all six actual PGF input/raw/log/PDF artifacts stayed byte-identical. Only generator
+source identity and its separate new reference identity changed. New diamond
+reference SHA256 is `fc2b38a25519e211e19ab1e2b4b9c941d1d9f2caa7d7eabcba806143172af69b`;
+ellipse reference SHA256 is `b28ea0e82967b868b4db62439ef0b562fda511b65e2d7eedc6f8e1cb0c732659`.
+
+Both fresh configured direct browser commands hit `listen EPERM 127.0.0.1` before
+Chrome on an unchanged exact attempted tree (`before-direct-browser/` and
+`after-direct-browser/`). Label-assets passed only its static graph: four entries,
+43 chunks, 85 references, forty font modules. Free-labels started no groups and
+has no launched browser version. Logs and raw failure evidence remain in the
+external follow-up directory; no sandbox permission or assertion changed. Fresh
+full/strict frozen execution and final exact inventories belong to the matching
+handoff. Browser-capable parent acceptance of these changed bytes and a fresh
+independent completion review remain required; no completion review starts after
+this child startup failure. The old `needs_changes` review remains historical and
+is not a pass. The final unchanged-tree guard and preserved-reference rehash are
+required after verification. No commit or push.
+
+The first complete registered run after these fixes passed **7,500/7,500** with
+zero failures, cancellations, skips or todos in 1,075,685.88825ms. Exact fingerprint
+`0f49dfabac4aa1c8c492cb9b0ff97b95d695efeca486519b63daa95b641aac9c` was unchanged
+before/after; `first-full-outcome.json` retains both complete checkout identities,
+terminal counts and log hash. It includes the new strict parent and isolated
+runner controls. New references total 451 additive files (nine diamond, 442
+signed-traversal); these file counts are separate from 22/18 PGF geometry cases.
+The exact changed inventory has 23 source/documentation/test files, plus that
+independent reference inventory, all with byte lengths and hashes. All 571/562/654
+preserved associations still match, and the six inherited App wait/publication
+source/test entries are unchanged; only the two status docs and package test
+registration differ within the original nine-file App baseline.
+
+This results-only documentation update changes checkout identity. The required
+fresh `node scripts/automation/run-phase.mjs 32D verify` must capture its actual
+final tracked/untracked bytes and rerun the complete commands. Its exact response,
+report, first outcomes and terminal matching-tree guard are retained in the final
+external `HANDOFF.json`; no preceding fingerprint is reused as acceptance. Child
+EPERM remains distinct from browser-capable parent acceptance. All native groups,
+both immutable pending exports, independent completion review and the post-review
+guard remain required before declaring Phase 32 complete. No commit or push.
+
+The first strict invocation after that documentation update completed
+**7,499/7,500**, zero cancellations/skips/todos, in 1,348,048.7485ms. Its sole
+failure was `ENOTEMPTY` in the disposable runner fixture's after-hook `rmSync`,
+for `32B cannot request the 32C-only review-deferred route`; the mode-rejection
+runner returned its expected nonzero status. The exact fixture was
+`stz-runner-test-2AL8p2`, retaining only `.git/objects/info/packs` (one newline,
+SHA256 `01ba4719c80b6fe911b091a7c05124b64eeece964e09c058ef8f9805daca546b`).
+The failed report SHA256 is
+`5e141eb8f39b06ee3b8642a903beeaac9b17ed134bfddf55a62728a6192ef9c0`;
+before/after fingerprint `489b791bc1cb6b4df992fa9c54c6715a019360fc51c198bc7a992ed4cdd56b56`
+matched. The complete failed outcome is retained in `first-strict-outcome.json`;
+build/browser checks were not reached by that invocation. The earlier full pass
+does not replace this first strict failure.
+
+A separate one-shot diagnostic of the same target passed 1/1, while Git Trace2
+proved the fixture baseline commit dispatched detached automatic maintenance
+that continued repacking after the commit returned. This identifies an unowned
+fixture task; it does not uniquely establish the writer in the earlier cleanup
+failure, or either historical native timeout's exclusive cause. The disposable
+repository now sets local `maintenance.auto=false` immediately after init and
+before its first commit. The production runner, existing cleanup, deadlines and
+all assertions remain unchanged; no sleep, retry or cleanup loop was added.
+The matching one-shot fixed target passed 1/1 with zero automatic maintenance/GC
+dispatches in its trace, versus one detached dispatch in the control. Original
+trace/logs and the orphan's exact metadata/bytes are retained. These focused
+controls are diagnostic evidence, not a replacement full-suite pass. A fresh
+final strict invocation on the actual newly frozen bytes remains required and
+is recorded separately in the final handoff.
+Focused verification after the fixture setting passes 7/7: both deferred-route
+controls and five complete/corrupt isolated 32D runner cases. Scoped lint, syntax
+and diff checks also pass; the failed full report and both one-shot traces remain
+separate first outcomes.
+
+The next strict invocation, KkNvUj, completed **7,495/7,500** with five failures,
+zero cancellations/skips/todos, in 1,002,649.745834ms. Before/after fingerprint
+`f27c823b6da3ff548bf2112fdab96e31bb1434eceb6fa24cf8987cf877788320` matched;
+report SHA256 is `bf6b540ec90dc0ddbfd658ab3c8494429cc9f31b94b1b20276bd1170b132aa0f`.
+`second-strict-outcome.json` preserves counts, complete checkouts, logs and footer.
+Four replay targets (wrong-length, wrong-owner, wrong-order, missing-node) timed
+out in their ordinary 5,000ms fixture publications before corruption began.
+The controlled late-fulfillment target encountered three earlier 2,000ms toolbar
+diagnostic timeouts before its intended expiry control. These are failed checks,
+not reader corruption acceptance or completed injected-expiry assertions. Build
+and browser gates were not reached. No exclusive workload cause is established.
+
+A read-only dependency audit independently found unnecessary copies in the new
+runner setup: 451 files/2,150,417 bytes were copied, while its 96-file dependency
+closure reads only fourteen files/258,459 bytes (`references.json` plus each
+manifest's authenticated inputs). The new copy loop now copies those fourteen;
+all 451 repository reference files remain intact. The prepared patch, complete
+before/required inventories and source hashes are retained in
+`runner-reference-copy-inventory.json` and `runner-reference-copy-control.json`.
+This is fixture dependency pruning; it does not prove the cause of KkNvUj's
+timeouts. No production publication, deadline, assertion or original fixture
+was changed. Afterward the seven complete/corrupt/deferred runner targets and
+the five preceding publication targets pass 7/7 and 5/5 on unchanged fingerprint
+`7cdda2b3ca1e2ccdffe3f3ba68e2d7860c9d6f645e278c0e139a13bc6f3a16c0`.
+Expanded changed-code lint/syntax/diff still has zero new findings. Focused
+passes do not replace either failed full invocation. This documentation changes
+identity again; final fresh full/strict outcomes and exact inventories belong
+to the external handoff, with native acceptance and completion review pending.
+
 ## Real-App stable-frame boundary and ownership follow-up (2026-10-14)
 
 Actual clean entry is `129bccd8119f313b6902fa9ae948f3b216aa4dda`, fingerprint
